@@ -1,0 +1,20 @@
+<Window x:Class="eViSTool.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="eViSTool" Height="700" Width="1100" MinHeight="480" MinWidth="760"
+        WindowStartupLocation="CenterScreen">
+    <TabControl Margin="8">
+        <TabItem Header="Моды">
+            <TextBlock Margin="16" Text="Здесь будет менеджер модов (этап 1)." />
+        </TabItem>
+        <TabItem Header="Каталог">
+            <TextBlock Margin="16" Text="Здесь будет каталог модов из модбазы (этап 2)." />
+        </TabItem>
+        <TabItem Header="Сервер">
+            <TextBlock Margin="16" Text="Здесь будет управление сервером (этап 3)." />
+        </TabItem>
+        <TabItem Header="Настройки">
+            <TextBlock Margin="16" Text="Пути к игре, данным, профили." />
+        </TabItem>
+    </TabControl>
+</Window>

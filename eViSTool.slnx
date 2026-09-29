@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/eViSTool.Agent/eViSTool.Agent.csproj" />
+    <Project Path="src/eViSTool.App/eViSTool.App.csproj" />
+    <Project Path="src/eViSTool.Core/eViSTool.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/eViSTool.Core.Tests/eViSTool.Core.Tests.csproj" />
+  </Folder>
+</Solution>
