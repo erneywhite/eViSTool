@@ -43,6 +43,9 @@ public sealed partial class ModsViewModel : ObservableObject
     [ObservableProperty] private IReadOnlyList<DependencyIssue> _dependencyIssues = [];
     [ObservableProperty] private int _updateCount;
 
+    /// <summary>Сколько модов в профиле (счётчик в боковой навигации).</summary>
+    [ObservableProperty] private int _modCount;
+
     public bool HasDependencyIssues => DependencyIssues.Count > 0;
     public string DependencyText => DependencyIssues.Count == 0 ? ""
         : Loc.T("mods.depBanner", DependencyIssues.Count, string.Join("; ", DependencyIssues.Select(i => i.Describe())));
@@ -117,6 +120,7 @@ public sealed partial class ModsViewModel : ObservableObject
         var policy = _main.ActiveProfile?.Model.ToPolicy() ?? ModPolicy.Empty;
         var results = UpdateChecker.Evaluate(_locals, remote, game, _main.AllowUnstable, policy);
         UpdateCount = results.Count(r => r.Status == ModStatus.UpdateAvailable && r.LatestCompatible?.MainFile is not null);
+        ModCount = results.Count;
         DependencyIssues = Dependencies.FindIssues(_locals);
 
         Rows.Clear();

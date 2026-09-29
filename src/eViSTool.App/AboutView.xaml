@@ -31,7 +31,8 @@
             </DockPanel>
 
             <!-- поддержать -->
-            <Border Margin="0,24,0,0" Padding="16" CornerRadius="8" Background="#1A29ABE0">
+            <Border Margin="0,24,0,0" Padding="16" CornerRadius="8" Background="{StaticResource Forest.Surface}"
+                    BorderBrush="{StaticResource Forest.Line}" BorderThickness="1">
                 <DockPanel>
                     <!-- официальная кнопка Ko-fi (картинка вшита в программу) -->
                     <Image DockPanel.Dock="Right" Source="Assets/kofi.png" Height="44" Margin="16,0,0,0" VerticalAlignment="Center"

@@ -6,7 +6,8 @@
         xmlns:mods="clr-namespace:eViSTool.Core.Mods;assembly=eViSTool.Core"
         Title="eViSTool" Icon="Assets/eViSTool.ico" Height="860" Width="1400" MinHeight="480" MinWidth="860"
         Loaded="Window_Loaded" Closing="Window_Closing"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen" Background="{StaticResource Forest.Base}"
+        SourceInitialized="Window_SourceInitialized">
     <Window.DataContext>
         <vm:MainViewModel />
     </Window.DataContext>
@@ -64,27 +65,116 @@
         </Style>
     </Window.Resources>
 
-    <DockPanel>
-        <!-- шапка: лого и активный профиль -->
-        <DockPanel DockPanel.Dock="Top" Margin="16,10,16,4">
-            <Image Source="Assets/logo256.png" Width="36" Height="36" RenderOptions.BitmapScalingMode="HighQuality" />
-            <TextBlock Text="eViSTool" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0" />
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <TextBlock Text="{local:Tr ui.profile}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8" />
-                <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding ActiveProfile}" MinWidth="240">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock>
-                                <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" />
-                                <Run Text="{Binding KindText, Mode=OneWay}" Foreground="Gray" />
+    <Grid Background="{StaticResource Forest.Base}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="210" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ===== боковая колонка ===== -->
+        <DockPanel Background="{StaticResource Forest.Side}">
+            <Border DockPanel.Dock="Right" Width="1" Background="{StaticResource Forest.Line}" />
+
+            <!-- лого и слоган -->
+            <DockPanel DockPanel.Dock="Top" Margin="16,20,10,22">
+                <Image Source="Assets/logo256.png" Width="36" Height="36" RenderOptions.BitmapScalingMode="HighQuality" VerticalAlignment="Top" />
+                <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="eViSTool" FontSize="19" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" />
+                    <TextBlock Text="{local:Tr shell.slogan}" FontSize="11" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap" />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- низ: версия игры профиля, автор -->
+            <StackPanel DockPanel.Dock="Bottom" Margin="14,0,14,14">
+                <Border Background="{StaticResource Forest.Surface}" CornerRadius="8" Padding="10,8">
+                    <DockPanel>
+                        <Border Background="{StaticResource Forest.Raised}" CornerRadius="6" Width="30" Height="30" Margin="0,0,10,0">
+                            <TextBlock Text="VS" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Vintage Story" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" />
+                            <TextBlock FontSize="11" Foreground="{StaticResource Forest.Muted}">
+                                <Run Text="{local:Tr shell.profileVersion}" /><Run Text=" · " /><Run Text="{Binding ActiveProfile.GameVersionText, Mode=OneWay}" />
                             </TextBlock>
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+                <TextBlock Text="{local:Tr shell.madeBy}" FontSize="11" Foreground="{StaticResource Forest.Muted}" Margin="4,10,0,0" />
+            </StackPanel>
+
+            <!-- навигация: порядок пунктов = порядок разделов -->
+            <StackPanel Margin="12,0,12,0">
+                <TextBlock Text="{local:Tr shell.workspace}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource Forest.Muted}"
+                           Margin="8,0,0,8" />
+                <ListBox SelectedIndex="{Binding SelectedTab}" Background="Transparent" BorderThickness="0"
+                         ItemContainerStyle="{StaticResource Forest.NavItem}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBoxItem>
+                        <DockPanel>
+                            <Border DockPanel.Dock="Right" Background="{StaticResource Forest.Raised}" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Mods.ModCount}" FontSize="11" Foreground="{StaticResource Forest.Muted}" />
+                            </Border>
+                            <Path Data="{StaticResource Icon.Mods}" Style="{StaticResource Forest.Icon}" />
+                            <TextBlock Text="{local:Tr nav.mods}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+                        </DockPanel>
+                    </ListBoxItem>
+                    <ListBoxItem>
+                        <DockPanel>
+                            <Path Data="{StaticResource Icon.Catalog}" Style="{StaticResource Forest.Icon}" />
+                            <TextBlock Text="{local:Tr nav.catalog}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+                        </DockPanel>
+                    </ListBoxItem>
+                    <ListBoxItem>
+                        <DockPanel>
+                            <Path Data="{StaticResource Icon.Server}" Style="{StaticResource Forest.Icon}" />
+                            <TextBlock Text="{local:Tr nav.server}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+                        </DockPanel>
+                    </ListBoxItem>
+                    <ListBoxItem>
+                        <DockPanel>
+                            <Path Data="{StaticResource Icon.Settings}" Style="{StaticResource Forest.Icon}" />
+                            <TextBlock Text="{local:Tr nav.settings}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+                        </DockPanel>
+                    </ListBoxItem>
+                    <ListBoxItem>
+                        <DockPanel>
+                            <Path Data="{StaticResource Icon.About}" Style="{StaticResource Forest.Icon}" />
+                            <TextBlock Text="{local:Tr nav.about}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+                        </DockPanel>
+                    </ListBoxItem>
+                </ListBox>
             </StackPanel>
         </DockPanel>
 
-        <TabControl Margin="8,0,8,8" SelectedIndex="{Binding SelectedTab}">
+        <!-- ===== основная часть ===== -->
+        <DockPanel Grid.Column="1">
+            <!-- полоса: раздел и активный профиль -->
+            <Border DockPanel.Dock="Top" Height="60" BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,0,0,1">
+                <DockPanel Margin="24,0,20,0">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{local:Tr shell.activeProfile}" VerticalAlignment="Center" Margin="0,0,10,0"
+                                   Foreground="{StaticResource Forest.Muted}" FontSize="12" />
+                        <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding ActiveProfile}" MinWidth="240">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock>
+                                        <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" />
+                                        <Run Text="·" Foreground="{StaticResource Forest.Muted}" />
+                                        <Run Text="{Binding KindText, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" />
+                                    </TextBlock>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                    <TextBlock VerticalAlignment="Center" FontSize="13">
+                        <Run Text="{local:Tr shell.workspaceCrumb}" Foreground="{StaticResource Forest.Muted}" />
+                        <Run Text="  /  " Foreground="{StaticResource Forest.Muted}" />
+                        <Run Text="{Binding PageTitle, Mode=OneWay}" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" />
+                    </TextBlock>
+                </DockPanel>
+            </Border>
+
+        <TabControl Margin="16,12,16,12" SelectedIndex="{Binding SelectedTab}" Style="{StaticResource Forest.PagesHost}">
             <!-- ============ МОДЫ ============ -->
             <TabItem Header="{local:Tr tab.mods}" DataContext="{Binding Mods}">
                 <DockPanel Margin="8">
@@ -364,5 +454,6 @@
                 <local:AboutView DataContext="{Binding About}" />
             </TabItem>
         </TabControl>
-    </DockPanel>
+        </DockPanel>
+    </Grid>
 </Window>

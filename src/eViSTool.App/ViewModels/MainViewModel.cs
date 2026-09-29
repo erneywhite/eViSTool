@@ -23,8 +23,19 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Открытая вкладка: 0 — моды, 1 — каталог, …</summary>
     [ObservableProperty] private int _selectedTab;
 
+    /// <summary>Название открытого раздела — в полосе сверху.</summary>
+    public string PageTitle => Loc.T(SelectedTab switch
+    {
+        1 => "nav.catalog",
+        2 => "nav.server",
+        3 => "nav.settings",
+        4 => "nav.about",
+        _ => "nav.mods",
+    });
+
     partial void OnSelectedTabChanged(int value)
     {
+        OnPropertyChanged(nameof(PageTitle));
         if (value == 1) _ = Catalog.EnsureLoadedAsync(); // каталог грузим только когда он нужен
     }
     public ObservableCollection<ProfileViewModel> Profiles { get; } = [];
@@ -52,6 +63,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         // подписи в разметке обновились сами; тексты, собранные в коде, пересобираем
         OnPropertyChanged(nameof(DataLocationText));
+        OnPropertyChanged(nameof(PageTitle));
         foreach (var p in Profiles) p.NotifyLanguageChanged();
         Mods.OnProfileSwitched();
         Catalog.OnLanguageChanged();
