@@ -77,6 +77,16 @@
                         <MouseBinding Gesture="LeftDoubleClick" Command="{Binding OpenPageCommand}"
                                       CommandParameter="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
                     </DataGrid.InputBindings>
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Открыть страницу мода"
+                                      Command="{Binding PlacementTarget.DataContext.OpenPageCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            <MenuItem Header="Показать файл в папке"
+                                      Command="{Binding PlacementTarget.DataContext.ShowFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Мод" Binding="{Binding Name}" Width="2*" ElementStyle="{StaticResource CellText}" />
                         <DataGridTextColumn Header="modid" Binding="{Binding ModId}" Width="1.3*" ElementStyle="{StaticResource CellText}" />
@@ -94,6 +104,25 @@
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
                         <DataGridTextColumn Header="Примечание" Binding="{Binding Note}" Width="3*" ElementStyle="{StaticResource CellText}" />
+                        <DataGridTemplateColumn Header="" Width="110">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock VerticalAlignment="Center" Margin="4,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding PageUrl}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                        <Hyperlink Command="{Binding DataContext.OpenPageCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                   CommandParameter="{Binding}" ToolTip="{Binding PageUrl}">На сайте ↗</Hyperlink>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                     </DataGrid.Columns>
                 </DataGrid>
             </DockPanel>

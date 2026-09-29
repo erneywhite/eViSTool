@@ -13,6 +13,7 @@ public sealed partial class ModRowViewModel(ModCheckResult r)
     public string Name { get; } = r.Local.Info?.Name is { Length: > 0 } n ? n : r.Local.FileName;
     public string ModId { get; } = r.Local.Info?.ModId ?? "";
     public string FileName { get; } = r.Local.FileName;
+    public string FilePath { get; } = r.Local.Path;
     public string Installed { get; } = r.Local.Info?.Version ?? "";
     public string Latest { get; } = r.LatestCompatible?.ModVersion ?? "";
     public string? PageUrl { get; } = r.Remote?.PageUrl;

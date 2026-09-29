@@ -83,6 +83,13 @@ public sealed partial class ModsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private static void ShowFile(ModRowViewModel? row)
+    {
+        if (row is not null && File.Exists(row.FilePath))
+            Process.Start("explorer.exe", $"/select,\"{row.FilePath}\"");
+    }
+
+    [RelayCommand]
     private void OpenModsFolder()
     {
         if (Directory.Exists(_main.ModsDir)) Process.Start(new ProcessStartInfo(_main.ModsDir) { UseShellExecute = true });
