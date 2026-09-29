@@ -32,6 +32,8 @@ if (!createdNew)
     return 3;
 }
 
+eViSTool.Core.Localization.Loc.Instance.SetLanguage(opts.Language);
+
 // Ctrl+C, который мы шлём серверу через общую консоль, самого агента ронять не должен
 Console.CancelKeyPress += (_, e) => e.Cancel = true;
 
@@ -155,7 +157,7 @@ finally
 }
 return 0;
 
-internal sealed record AgentOptions(string ProfileId, string ExePath, string DataPath, IReadOnlyList<string> ExtraArgs, bool StartServer, TimeSpan IdleExit, string? AgentsDir)
+internal sealed record AgentOptions(string ProfileId, string ExePath, string DataPath, IReadOnlyList<string> ExtraArgs, bool StartServer, TimeSpan IdleExit, string? AgentsDir, string? Language)
 {
     public static AgentOptions? Parse(string[] args)
     {
@@ -163,7 +165,7 @@ internal sealed record AgentOptions(string ProfileId, string ExePath, string Dat
         var extra = new List<string>();
         var start = false;
         var idle = TimeSpan.FromMinutes(2);
-        string? agentsDir = null;
+        string? agentsDir = null, lang = null;
         for (var i = 0; i < args.Length; i++)
         {
             string Next() => i + 1 < args.Length ? args[++i] : "";
@@ -176,8 +178,9 @@ internal sealed record AgentOptions(string ProfileId, string ExePath, string Dat
                 case "--start": start = true; break;
                 case "--idle-exit": idle = TimeSpan.FromSeconds(int.Parse(Next())); break;
                 case "--agents-dir": agentsDir = Next(); break;
+                case "--lang": lang = Next(); break;
             }
         }
-        return profile is null || exe is null || data is null ? null : new AgentOptions(profile, exe, data, extra, start, idle, agentsDir);
+        return profile is null || exe is null || data is null ? null : new AgentOptions(profile, exe, data, extra, start, idle, agentsDir, lang);
     }
 }

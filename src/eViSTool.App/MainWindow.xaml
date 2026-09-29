@@ -253,7 +253,7 @@
 
             <!-- ============ СЕРВЕР ============ -->
             <TabItem Header="{local:Tr tab.server}">
-                <TextBlock Margin="16" Text="{local:Tr server.placeholder}" />
+                <local:ServerView DataContext="{Binding Server}" />
             </TabItem>
 
             <!-- ============ НАСТРОЙКИ ============ -->

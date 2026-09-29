@@ -143,6 +143,8 @@ public static class AgentLauncher
         psi.ArgumentList.Add("--data"); psi.ArgumentList.Add(profile.DataDir);
         if (agentsDir is not null) { psi.ArgumentList.Add("--agents-dir"); psi.ArgumentList.Add(agentsDir); }
         if (startServer) psi.ArgumentList.Add("--start");
+        // сообщения агента (запуск, сторож, остановка) — на языке окна
+        psi.ArgumentList.Add("--lang"); psi.ArgumentList.Add(Loc.Instance.Language);
 
         var stateFile = AgentProtocol.StateFile(profile.Id, agentsDir);
         try { File.Delete(stateFile); } catch (IOException) { }

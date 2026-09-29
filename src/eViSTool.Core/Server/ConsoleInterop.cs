@@ -55,6 +55,37 @@ public static partial class ConsoleInterop
         }
     }
 
+    /// <summary>
+    /// Ctrl+C серверу, запущенному не нами (например, оставшемуся от ViSST): подключаемся к его консоли,
+    /// шлём событие и отключаемся. Работает только из процесса без своей консоли (окно eViSTool).
+    /// Сервер VS на Ctrl+C сохраняет мир и завершается — в отличие от kill.
+    /// </summary>
+    public static bool SendCtrlCToForeignProcess(int pid)
+    {
+        if (!OperatingSystem.IsWindows() || HasConsole) return false;
+        if (!AttachConsole((uint)pid)) return false;
+        try
+        {
+            SetConsoleCtrlHandler(IntPtr.Zero, true); // сами не реагируем
+            var ok = GenerateConsoleCtrlEvent(0 /* CTRL_C_EVENT */, 0);
+            Thread.Sleep(300); // событие доставляется асинхронно — не отключаемся раньше времени
+            return ok;
+        }
+        finally
+        {
+            FreeConsole();
+            SetConsoleCtrlHandler(IntPtr.Zero, false);
+        }
+    }
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool AttachConsole(uint processId);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool FreeConsole();
+
     [LibraryImport("kernel32.dll")]
     private static partial uint GetConsoleCP();
 

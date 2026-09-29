@@ -18,6 +18,7 @@ public sealed partial class MainViewModel : ObservableObject
     public ModsViewModel Mods { get; }
     public CatalogViewModel Catalog { get; }
     public AboutViewModel About { get; } = new();
+    public ServerViewModel Server { get; }
 
     /// <summary>Открытая вкладка: 0 — моды, 1 — каталог, …</summary>
     [ObservableProperty] private int _selectedTab;
@@ -84,6 +85,8 @@ public sealed partial class MainViewModel : ObservableObject
         var db = new ModDbClient();
         Mods = new ModsViewModel(this, db);
         Catalog = new CatalogViewModel(this, db);
+        Server = new ServerViewModel(this);
+        Server.OnProfileSwitched();
         Save(); // перенос настроек старого формата сразу на диск
         Mods.OnProfileSwitched(); // список модов виден сразу, без сети
     }
@@ -93,6 +96,7 @@ public sealed partial class MainViewModel : ObservableObject
         _settings.ActiveProfileId = value?.Model.Id;
         Save();
         Mods.OnProfileSwitched();
+        Server.OnProfileSwitched();
     }
 
     partial void OnAllowUnstableChanged(bool value)
@@ -105,7 +109,11 @@ public sealed partial class MainViewModel : ObservableObject
     private void OnProfileChanged(ProfileViewModel profile)
     {
         Save();
-        if (profile == ActiveProfile) Mods.OnProfileSwitched();
+        if (profile == ActiveProfile)
+        {
+            Mods.OnProfileSwitched();
+            Server.OnProfileSwitched();
+        }
     }
 
     public WindowLayout Layout => _settings.Layout;

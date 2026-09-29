@@ -29,3 +29,24 @@ public sealed class CountToVisibilityConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         throw new NotSupportedException();
 }
+
+/// <summary>true — скрыто, false — видно.</summary>
+public sealed class InvertBoolToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is true ? Visibility.Collapsed : Visibility.Visible;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>Значение не null (для триггеров «цвет задан»).</summary>
+public sealed class IsNotNullConverter : IValueConverter
+{
+    public static IsNotNullConverter Instance { get; } = new();
+
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value is not null;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}

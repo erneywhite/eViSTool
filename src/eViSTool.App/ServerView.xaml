@@ -1,0 +1,109 @@
+<UserControl x:Class="eViSTool.App.ServerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:eViSTool.App">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:InvertBoolToVisibilityConverter x:Key="InvertVis" />
+    </UserControl.Resources>
+
+    <Grid Margin="8">
+        <!-- не серверный профиль -->
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="520"
+                    Visibility="{Binding IsServerProfile, Converter={StaticResource InvertVis}}">
+            <TextBlock Text="{local:Tr server.notServerTitle}" FontSize="18" FontWeight="SemiBold" TextAlignment="Center" />
+            <TextBlock Text="{local:Tr server.notServerHint}" Opacity="0.75" TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,0" />
+        </StackPanel>
+
+        <DockPanel Visibility="{Binding IsServerProfile, Converter={StaticResource BoolToVis}}">
+            <!-- статус и кнопки -->
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                <StackPanel DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,16,0">
+                    <TextBlock Text="{Binding StateText}" FontSize="18" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding DetailsText}" Opacity="0.7" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button Content="{local:Tr server.start}" Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}"
+                            Style="{DynamicResource AccentButtonStyle}" Padding="16,6" />
+                    <Button Content="{local:Tr server.stop}" Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}" Margin="8,0,0,0" Padding="12,6" />
+                    <Button Content="{local:Tr server.restart}" Command="{Binding RestartCommand}" IsEnabled="{Binding CanStop}" Margin="8,0,0,0" Padding="12,6" />
+                    <Button Content="{local:Tr server.kill}" Command="{Binding KillCommand}" IsEnabled="{Binding CanStop}" Margin="8,0,0,0" Padding="12,6"
+                            ToolTip="{local:Tr server.killTip}" />
+                    <Button Content="{local:Tr server.logs}" Command="{Binding OpenLogsCommand}" Margin="8,0,0,0" Padding="12,6" />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- сервер, запущенный не нами -->
+            <Border DockPanel.Dock="Top" Margin="0,0,0,8" Padding="12,8" CornerRadius="6" Background="#40F0A020"
+                    Visibility="{Binding HasForeign, Converter={StaticResource BoolToVis}}">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0">
+                        <Button Content="{local:Tr server.stopForeign}" Command="{Binding StopForeignCommand}" Padding="12,4"
+                                ToolTip="{local:Tr server.stopForeignTip}" />
+                        <Button Content="{local:Tr server.kill}" Command="{Binding KillForeignCommand}" Padding="12,4" Margin="8,0,0,0" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding ForeignText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                </DockPanel>
+            </Border>
+
+            <!-- ошибка последнего действия -->
+            <TextBlock DockPanel.Dock="Top" Text="{Binding ErrorText}" Foreground="#F06060" TextWrapping="Wrap" Margin="0,0,0,8">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ErrorText}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <!-- ввод команды: Enter — отправить, ↑/↓ — история -->
+            <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                <Button DockPanel.Dock="Right" Content="{local:Tr server.clear}" Command="{Binding ClearConsoleCommand}" Margin="8,0,0,0" Padding="12,6" />
+                <Button DockPanel.Dock="Right" Content="{local:Tr server.send}" Command="{Binding SendCommandCommand}" IsEnabled="{Binding CanCommand}"
+                        Margin="8,0,0,0" Padding="12,6" />
+                <TextBox x:Name="CommandBox" Text="{Binding CommandText, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas"
+                         IsEnabled="{Binding CanCommand}" PreviewKeyDown="CommandBox_PreviewKeyDown" VerticalAlignment="Center"
+                         ToolTip="{local:Tr server.commandTip}" />
+            </DockPanel>
+
+            <!-- консоль -->
+            <Border CornerRadius="6" Background="#FF141414" Padding="4">
+                <ListBox x:Name="ConsoleList" ItemsSource="{Binding Lines}" Background="Transparent" BorderThickness="0"
+                         FontFamily="Cascadia Mono, Consolas" FontSize="12.5"
+                         VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionMode="Extended">
+                    <ListBox.Resources>
+                        <Thickness x:Key="ListBoxItemPadding">6,1</Thickness>
+                        <SolidColorBrush x:Key="ListBoxItemSelectedBackgroundThemeBrush" Color="#38909090" />
+                        <SolidColorBrush x:Key="ListBoxItemSelectedBackgroundPointerOverThemeBrush" Color="#48909090" />
+                        <SolidColorBrush x:Key="ListBoxItemSelectedForegroundThemeBrush" Color="#FFE0E0E0" />
+                    </ListBox.Resources>
+                    <ListBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="{local:Tr server.copy}" Click="CopyLines_Click" />
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Opacity="{Binding Opacity}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="#FFD8D8D8" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Foreground, Converter={x:Static local:IsNotNullConverter.Instance}}" Value="True">
+                                                <Setter Property="Foreground" Value="{Binding Foreground}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+        </DockPanel>
+    </Grid>
+</UserControl>
