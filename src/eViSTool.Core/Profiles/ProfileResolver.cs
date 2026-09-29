@@ -1,6 +1,7 @@
 using eViSTool.Core.Game;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using eViSTool.Core.Localization;
 
 namespace eViSTool.Core.Profiles;
 
@@ -16,12 +17,12 @@ public static class ProfileResolver
         var warnings = new List<string>();
         var version = string.IsNullOrWhiteSpace(profile.GameDir) ? null : GameInstall.DetectVersion(profile.GameDir);
         if (version is null)
-            warnings.Add("Не найдена игра: укажи папку, где лежит " +
-                          (profile.Kind == ProfileKind.Server ? "VintagestoryServer.exe" : "Vintagestory.exe"));
+            warnings.Add(Loc.T("profile.gameNotFound",
+                          profile.Kind == ProfileKind.Server ? "VintagestoryServer.exe" : "Vintagestory.exe"));
 
         if (string.IsNullOrWhiteSpace(profile.DataDir) || !Directory.Exists(profile.DataDir))
         {
-            warnings.Add("Папка данных не найдена");
+            warnings.Add(Loc.T("profile.dataNotFound"));
             return new ResolvedProfile { Profile = profile, GameVersion = version, Warnings = warnings };
         }
 
@@ -32,8 +33,8 @@ public static class ProfileResolver
         if (configPath is null)
         {
             warnings.Add(profile.Kind == ProfileKind.Server
-                ? "Нет serverconfig.json — сервер ещё ни разу не запускался с этой папкой данных"
-                : "Нет clientsettings.json — игра ещё ни разу не запускалась");
+                ? Loc.T("profile.noServerConfig")
+                : Loc.T("profile.noClientConfig"));
         }
         else
         {
@@ -44,7 +45,7 @@ public static class ProfileResolver
             }
             catch (Exception ex) when (ex is JsonException or IOException)
             {
-                warnings.Add($"Не удалось прочитать {Path.GetFileName(configPath)}: {ex.Message}");
+                warnings.Add(Loc.T("profile.configReadFailed", Path.GetFileName(configPath), ex.Message));
             }
         }
 
@@ -120,7 +121,7 @@ public static class ProfileResolver
     /// <summary>Профиль клиента по умолчанию — для первого запуска.</summary>
     public static GameProfile DefaultClient(string? gameDir = null) => new()
     {
-        Name = "Клиент",
+        Name = Loc.T("profile.defaultClientName"),
         Kind = ProfileKind.Client,
         GameDir = gameDir ?? GameInstall.FindGameDir(),
         DataDir = GameInstall.DefaultDataDir,

@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using eViSTool.Core.ModDb;
 using eViSTool.Core.Mods;
+using eViSTool.Core.Localization;
 
 namespace eViSTool.App;
 
@@ -27,7 +28,7 @@ public partial class RollbackWindow : Window, INotifyPropertyChanged
         InitializeComponent();
         Heading = title;
         foreach (var o in options) Options.Add(o);
-        Status = Options.Count == 0 ? "Других версий не найдено" : "";
+        Status = Options.Count == 0 ? Loc.T("rollback.none") : "";
         DataContext = this;
     }
 
@@ -40,14 +41,14 @@ public partial class RollbackWindow : Window, INotifyPropertyChanged
         {
             var info = File.Exists(path) ? ModScanner.ReadZip(path).Info : null;
             var version = info?.Version ?? System.IO.Path.GetFileName(path);
-            list.Add(new VersionOption(version, "сохранённая копия", File.GetCreationTime(path).ToString("dd.MM.yyyy HH:mm"),
-                version == installedVersion ? "установлена" : "", path, null));
+            list.Add(new VersionOption(version, Loc.T("rollback.savedCopy"), File.GetCreationTime(path).ToString("g"),
+                version == installedVersion ? Loc.T("rollback.installed") : "", path, null));
         }
         foreach (var r in releases)
         {
-            var date = DateTime.TryParse(r.Created, out var d) ? d.ToString("dd.MM.yyyy") : r.Created ?? "";
-            list.Add(new VersionOption(r.ModVersion ?? "?", "модбаза", date,
-                r.ModVersion == installedVersion ? "установлена" : "", null, r));
+            var date = DateTime.TryParse(r.Created, out var d) ? d.ToString("d") : r.Created ?? "";
+            list.Add(new VersionOption(r.ModVersion ?? "?", "ModDB", date,
+                r.ModVersion == installedVersion ? Loc.T("rollback.installed") : "", null, r));
         }
         return list;
     }
@@ -59,7 +60,7 @@ public partial class RollbackWindow : Window, INotifyPropertyChanged
     {
         if (List.SelectedItem is not VersionOption o)
         {
-            Status = "Выбери версию";
+            Status = Loc.T("rollback.pick");
             return;
         }
         Selected = o;

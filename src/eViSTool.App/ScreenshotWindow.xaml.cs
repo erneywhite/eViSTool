@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
+using eViSTool.Core.Localization;
 
 namespace eViSTool.App;
 
@@ -30,7 +31,7 @@ public partial class ScreenshotWindow : Window
         Counter.Text = $"{_index + 1} / {_urls.Count}";
         PrevButton.Visibility = NextButton.Visibility = _urls.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
 
-        Loading.Text = "Загрузка…";
+        Loading.Text = Loc.T("common.loading");
         Loading.Visibility = Visibility.Visible;
         var image = new BitmapImage();
         image.BeginInit();
@@ -40,7 +41,7 @@ public partial class ScreenshotWindow : Window
         if (image.IsDownloading)
         {
             image.DownloadCompleted += (_, _) => Loading.Visibility = Visibility.Collapsed;
-            image.DownloadFailed += (_, _) => Loading.Text = "Не удалось загрузить картинку";
+            image.DownloadFailed += (_, _) => Loading.Text = Loc.T("shots.loadFailed");
         }
         else Loading.Visibility = Visibility.Collapsed;
         Picture.Source = image;

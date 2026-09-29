@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Profiles;
 using Microsoft.Win32;
+using eViSTool.Core.Localization;
 
 namespace eViSTool.App.ViewModels;
 
@@ -36,9 +37,9 @@ public sealed partial class ProfileViewModel : ObservableObject
         set => Kind = value ? ProfileKind.Server : ProfileKind.Client;
     }
 
-    public string KindText => Kind == ProfileKind.Server ? "сервер" : "клиент";
-    public string GameVersionText => Resolved.GameVersion?.ToString() ?? "не найдена";
-    public string ConfigText => Resolved.ConfigPath ?? "не найден";
+    public string KindText => Loc.T(Kind == ProfileKind.Server ? "profile.kindServer" : "profile.kindClient");
+    public string GameVersionText => Resolved.GameVersion?.ToString() ?? Loc.T("common.notFound");
+    public string ConfigText => Resolved.ConfigPath ?? Loc.T("common.notFoundM");
     public string ModDirsText => Resolved.ModDirs.Count == 0 ? "—" : string.Join(Environment.NewLine, Resolved.ModDirs);
     public string WarningsText => string.Join(Environment.NewLine, Resolved.Warnings);
     public bool HasWarnings => Resolved.Warnings.Count > 0;
@@ -73,11 +74,18 @@ public sealed partial class ProfileViewModel : ObservableObject
     [RelayCommand]
     private void Reread() => Refresh();
 
+    /// <summary>Сменился язык: пересчитать тексты (предупреждения тоже приходят из Core на текущем языке).</summary>
+    public void NotifyLanguageChanged()
+    {
+        Resolved = ProfileResolver.Resolve(Model);
+        OnPropertyChanged(string.Empty);
+    }
+
     [RelayCommand]
     private void BrowseGameDir()
     {
         var exe = Kind == ProfileKind.Server ? "VintagestoryServer.exe" : "Vintagestory.exe";
-        var dlg = new OpenFolderDialog { Title = $"Папка, где лежит {exe}", InitialDirectory = GameDir };
+        var dlg = new OpenFolderDialog { Title = Loc.T("profile.pickGameDir", exe), InitialDirectory = GameDir };
         if (dlg.ShowDialog() == true) GameDir = dlg.FolderName;
     }
 
@@ -86,7 +94,7 @@ public sealed partial class ProfileViewModel : ObservableObject
     {
         var dlg = new OpenFolderDialog
         {
-            Title = Kind == ProfileKind.Server ? "Папка данных сервера (--dataPath, там serverconfig.json)" : "Папка данных игры (VintagestoryData)",
+            Title = Loc.T(Kind == ProfileKind.Server ? "profile.pickServerData" : "profile.pickClientData"),
             InitialDirectory = DataDir,
         };
         if (dlg.ShowDialog() == true) DataDir = dlg.FolderName;

@@ -1,5 +1,6 @@
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Versioning;
+using eViSTool.Core.Localization;
 
 namespace eViSTool.Core.Mods;
 
@@ -39,7 +40,7 @@ public static class ModInstaller
 
         // новая версия ложится туда же, где лежала старая; новый мод — в папку установки профиля
         var dir = replaces.FirstOrDefault()?.Directory ?? profile.InstallDir
-                  ?? throw new InvalidOperationException("У профиля нет папки модов");
+                  ?? throw new InvalidOperationException(Loc.T("err.noModsDir"));
         var target = Path.Combine(dir, Path.GetFileName(sourceZip));
 
         // файл с таким именем есть, но это другой мод — не затираем его

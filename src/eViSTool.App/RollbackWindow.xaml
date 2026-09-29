@@ -1,27 +1,28 @@
 <Window x:Class="eViSTool.App.RollbackWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Другая версия мода" Icon="Assets/eViSTool.ico"
+        xmlns:local="clr-namespace:eViSTool.App"
+        Title="{local:Tr rollback.title}" Icon="Assets/eViSTool.ico"
         Width="640" Height="460" MinWidth="480" MinHeight="320"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <DockPanel Margin="16">
         <TextBlock DockPanel.Dock="Top" FontSize="16" FontWeight="SemiBold" Text="{Binding Heading}" />
         <TextBlock DockPanel.Dock="Top" Margin="0,4,0,12" Opacity="0.7" TextWrapping="Wrap"
-                   Text="Сохранённые копии — версии, которые стояли раньше (уходят сюда при обновлении). Из модбазы — релизы для твоей ветки игры, скачаются." />
+                   Text="{local:Tr rollback.hint}" />
 
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Opacity="0.7" Margin="0,0,16,0" />
-            <Button Content="Установить" IsDefault="True" Click="Install_Click" Padding="16,6"
+            <Button Content="{local:Tr rollback.install}" IsDefault="True" Click="Install_Click" Padding="16,6"
                     Style="{DynamicResource AccentButtonStyle}" />
-            <Button Content="Отмена" IsCancel="True" Margin="8,0,0,0" Padding="16,6" />
+            <Button Content="{local:Tr common.cancel}" IsCancel="True" Margin="8,0,0,0" Padding="16,6" />
         </StackPanel>
 
         <ListView x:Name="List" ItemsSource="{Binding Options}" SelectionMode="Single" MouseDoubleClick="List_MouseDoubleClick">
             <ListView.View>
                 <GridView>
-                    <GridViewColumn Header="Версия" Width="130" DisplayMemberBinding="{Binding Version}" />
-                    <GridViewColumn Header="Откуда" Width="170" DisplayMemberBinding="{Binding Source}" />
-                    <GridViewColumn Header="Дата" Width="150" DisplayMemberBinding="{Binding Date}" />
+                    <GridViewColumn Header="{local:Tr rollback.colVersion}" Width="130" DisplayMemberBinding="{Binding Version}" />
+                    <GridViewColumn Header="{local:Tr rollback.colSource}" Width="170" DisplayMemberBinding="{Binding Source}" />
+                    <GridViewColumn Header="{local:Tr rollback.colDate}" Width="150" DisplayMemberBinding="{Binding Date}" />
                     <GridViewColumn Header="" Width="120" DisplayMemberBinding="{Binding Note}" />
                 </GridView>
             </ListView.View>

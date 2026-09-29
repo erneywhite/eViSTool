@@ -2,6 +2,7 @@ using System.Text;
 using eViSTool.Core.Mods;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using eViSTool.Core.Localization;
 
 namespace eViSTool.Core.Profiles;
 
@@ -17,8 +18,8 @@ public static class ModConfigEditor
     {
         var path = profile.ConfigPath ?? throw new InvalidOperationException(
             profile.Profile.Kind == ProfileKind.Server
-                ? "Нет serverconfig.json — запусти сервер хотя бы раз"
-                : "Нет clientsettings.json — запусти игру хотя бы раз");
+                ? Loc.T("cfg.noServerConfigRun")
+                : Loc.T("cfg.noClientConfigRun"));
 
         var root = Load(path);
         var list = GetOrCreateList(root, profile.Profile.Kind);

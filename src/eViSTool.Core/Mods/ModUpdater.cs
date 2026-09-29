@@ -1,5 +1,6 @@
 using eViSTool.Core.ModDb;
 using eViSTool.Core.Versioning;
+using eViSTool.Core.Localization;
 
 namespace eViSTool.Core.Mods;
 
@@ -15,7 +16,7 @@ public sealed class ModUpdater(ModDbClient db, string? downloadDir = null)
     public async Task<string> DownloadReleaseAsync(ModDbRelease release, string expectedModId,
         IProgress<double>? progress = null, CancellationToken ct = default)
     {
-        var url = release.MainFile ?? throw new InvalidDataException($"У релиза {release.ModVersion} нет файла для скачивания");
+        var url = release.MainFile ?? throw new InvalidDataException(Loc.T("dl.noFile", release.ModVersion));
         var name = SafeFileName(release.FileName) ?? $"{expectedModId}_{release.ModVersion}.zip";
         if (!name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) name += ".zip";
 
@@ -27,12 +28,12 @@ public sealed class ModUpdater(ModDbClient db, string? downloadDir = null)
         if (check.Info is null)
         {
             Cleanup(dest);
-            throw new InvalidDataException($"Скачанный архив {name} не читается: {check.Error}");
+            throw new InvalidDataException(Loc.T("dl.unreadable", name, check.Error));
         }
         if (!string.Equals(check.Info.ModId, expectedModId, StringComparison.OrdinalIgnoreCase))
         {
             Cleanup(dest);
-            throw new InvalidDataException($"В скачанном архиве другой мод: {check.Info.ModId} вместо {expectedModId}");
+            throw new InvalidDataException(Loc.T("dl.wrongMod", check.Info.ModId, expectedModId));
         }
         return dest;
     }

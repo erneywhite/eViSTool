@@ -1,4 +1,5 @@
 using eViSTool.Core.Mods;
+using eViSTool.Core.Localization;
 
 namespace eViSTool.App.ViewModels;
 
@@ -27,23 +28,23 @@ public sealed class ModRowViewModel(ModCheckResult r)
 
     public string StatusText { get; } = r.Status switch
     {
-        ModStatus.UpToDate => "Актуален",
-        ModStatus.UpdateAvailable => "Есть обновление",
-        ModStatus.NoCompatibleRelease => "Нет версии для игры",
-        ModStatus.NotInModDb => "Нет в модбазе",
-        ModStatus.Unreadable => "Не читается",
-        ModStatus.CheckFailed => "Ошибка проверки",
-        ModStatus.NotChecked => "Не проверялся",
-        ModStatus.Pinned => "Закреплён",
+        ModStatus.UpToDate => Loc.T("status.upToDate"),
+        ModStatus.UpdateAvailable => Loc.T("status.updateAvailable"),
+        ModStatus.NoCompatibleRelease => Loc.T("status.noCompatible"),
+        ModStatus.NotInModDb => Loc.T("status.notInModDb"),
+        ModStatus.Unreadable => Loc.T("status.unreadable"),
+        ModStatus.CheckFailed => Loc.T("status.checkFailed"),
+        ModStatus.NotChecked => Loc.T("status.notChecked"),
+        ModStatus.Pinned => Loc.T("status.pinned"),
         _ => r.Status.ToString(),
     };
 
     public string Note { get; } = string.Join(" · ", new[]
     {
-        r.Local.IsDisabled ? "Выключен в настройках игры" : null,
-        r.IsDuplicate ? "Дубликат: этот modid установлен несколько раз" : null,
+        r.Local.IsDisabled ? Loc.T("note.disabled") : null,
+        r.IsDuplicate ? Loc.T("note.duplicate") : null,
         r.Message,
-        r.LatestAny is { } any ? $"Есть {any.ModVersion} для другой версии игры ({string.Join(", ", any.GameVersions.TakeLast(1))})" : null,
+        r.LatestAny is { } any ? Loc.T("note.newerElsewhere", any.ModVersion, string.Join(", ", any.GameVersions.TakeLast(1))) : null,
     }.Where(s => !string.IsNullOrEmpty(s)));
 
     public string? Changelog { get; } = r.Status == ModStatus.UpdateAvailable ? Html.ToPlainText(r.LatestCompatible?.Changelog, 1500) : null;

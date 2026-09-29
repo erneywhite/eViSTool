@@ -6,6 +6,7 @@ using eViSTool.Core.Game;
 using eViSTool.Core.ModDb;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Settings;
+using eViSTool.Core.Localization;
 
 namespace eViSTool.App.ViewModels;
 
@@ -35,6 +36,25 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _allowUnstable;
     [ObservableProperty] private bool _autoCheckUpdates;
 
+    public IReadOnlyList<Choice<string>> Languages { get; } =
+        Loc.Available.Select(l => new Choice<string>(l.Name, l.Code)).ToList();
+
+    [ObservableProperty] private Choice<string> _selectedLanguage = null!;
+
+    partial void OnSelectedLanguageChanged(Choice<string> value)
+    {
+        if (value.Value == Loc.Instance.Language) return;
+        _settings.Language = value.Value;
+        Save();
+        Loc.Instance.SetLanguage(value.Value);
+
+        // подписи в разметке обновились сами; тексты, собранные в коде, пересобираем
+        OnPropertyChanged(nameof(DataLocationText));
+        foreach (var p in Profiles) p.NotifyLanguageChanged();
+        Mods.OnProfileSwitched();
+        Catalog.OnLanguageChanged();
+    }
+
     partial void OnAutoCheckUpdatesChanged(bool value)
     {
         _settings.AutoCheckUpdates = value;
@@ -42,8 +62,8 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     public string DataLocationText => Core.AppPaths.IsPortable
-        ? $"{Core.AppPaths.Root}  (портабельно, рядом с программой)"
-        : $"{Core.AppPaths.Root}  (рядом с программой писать нельзя — используется профиль пользователя)";
+        ? Loc.T("settings.dataPortable", Core.AppPaths.Root)
+        : Loc.T("settings.dataFallback", Core.AppPaths.Root);
 
     [RelayCommand]
     private void OpenDataFolder() => Shell.OpenFolder(Core.AppPaths.Root);
@@ -51,10 +71,12 @@ public sealed partial class MainViewModel : ObservableObject
     public MainViewModel()
     {
         _settings = _store.Load();
+        Loc.Instance.SetLanguage(_settings.Language); // до того, как VM начнут собирать тексты
         foreach (var p in _settings.Profiles) Profiles.Add(new ProfileViewModel(p, OnProfileChanged));
 
         _allowUnstable = _settings.AllowUnstable;
         _autoCheckUpdates = _settings.AutoCheckUpdates;
+        _selectedLanguage = Languages.FirstOrDefault(l => l.Value == Loc.Instance.Language) ?? Languages[0];
         _activeProfile = Profiles.FirstOrDefault(p => p.Model == _settings.ActiveProfile);
         _editedProfile = _activeProfile;
 
@@ -106,7 +128,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void AddClientProfile() => AddProfile(new GameProfile
     {
-        Name = "Клиент " + (Profiles.Count + 1),
+        Name = Loc.T("profile.newClient", Profiles.Count + 1),
         Kind = ProfileKind.Client,
         GameDir = GameInstall.FindGameDir(),
         DataDir = GameInstall.DefaultDataDir,
@@ -115,7 +137,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void AddServerProfile() => AddProfile(new GameProfile
     {
-        Name = "Сервер " + (Profiles.Count + 1),
+        Name = Loc.T("profile.newServer", Profiles.Count + 1),
         Kind = ProfileKind.Server,
         // сервер по умолчанию живёт в той же папке данных, что и клиент (как у тебя на виртуалке)
         GameDir = ActiveProfile?.GameDir,

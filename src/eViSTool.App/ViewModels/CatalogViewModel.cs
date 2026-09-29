@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.ModDb;
 using eViSTool.Core.Mods;
 using eViSTool.Core.Versioning;
+using eViSTool.Core.Localization;
 
 namespace eViSTool.App.ViewModels;
 
@@ -17,7 +18,6 @@ public sealed record Choice<T>(string Title, T Value)
 /// <summary>Вкладка «Каталог»: поиск по модбазе и установка одной кнопкой.</summary>
 public sealed partial class CatalogViewModel : ObservableObject
 {
-    private const string AllTags = "Все теги";
 
     private readonly MainViewModel _main;
     private readonly ModDbClient _db;
@@ -30,15 +30,16 @@ public sealed partial class CatalogViewModel : ObservableObject
     [ObservableProperty] private CatalogItemViewModel? _selected;
     [ObservableProperty] private ModDetailsViewModel? _details;
     [ObservableProperty] private string _search = "";
-    [ObservableProperty] private IReadOnlyList<string> _tags = [AllTags];
-    [ObservableProperty] private string _selectedTag = AllTags;
-    [ObservableProperty] private Choice<string?> _selectedSide;
-    [ObservableProperty] private Choice<CatalogSort> _selectedSort;
+    /// <summary>Теги; значение null — «все теги» (подпись переводится, значение — нет).</summary>
+    [ObservableProperty] private IReadOnlyList<Choice<string?>> _tags = [];
+    [ObservableProperty] private Choice<string?>? _selectedTag;
+    [ObservableProperty] private Choice<string?> _selectedSide = null!;
+    [ObservableProperty] private Choice<CatalogSort> _selectedSort = null!;
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private bool _isLoading;
 
     /// <summary>Фильтр по версии игры: null — любая, иначе ветка "1.22".</summary>
-    [ObservableProperty] private IReadOnlyList<Choice<string?>> _branches = [new("Любая версия игры", null)];
+    [ObservableProperty] private IReadOnlyList<Choice<string?>> _branches = [];
     [ObservableProperty] private Choice<string?>? _selectedBranch;
 
     /// <summary>Моды, у которых есть релиз для ветки активного профиля — для пометки в списке.</summary>
@@ -55,29 +56,60 @@ public sealed partial class CatalogViewModel : ObservableObject
 
     public void SaveLayout() => _main.SaveSettings();
 
-    public IReadOnlyList<Choice<string?>> Sides { get; } =
-    [
-        new("Любая сторона", null),
-        new("Нужен на клиенте", "client"),
-        new("Нужен на сервере", "server"),
-    ];
+    [ObservableProperty] private IReadOnlyList<Choice<string?>> _sides = [];
+    [ObservableProperty] private IReadOnlyList<Choice<CatalogSort>> _sorts = [];
 
-    public IReadOnlyList<Choice<CatalogSort>> Sorts { get; } =
-    [
-        new("Популярные сейчас", CatalogSort.Trending),
-        new("Больше скачиваний", CatalogSort.Downloads),
-        new("Больше подписчиков", CatalogSort.Follows),
-        new("Недавно обновлённые", CatalogSort.RecentlyUpdated),
-        new("По названию", CatalogSort.Name),
-    ];
+    /// <summary>Списки фильтров с переведёнными подписями; выбор сохраняется по значению.</summary>
+    private void BuildChoices()
+    {
+        var side = SelectedSide?.Value;
+        var sort = SelectedSort?.Value ?? CatalogSort.Trending;
+        var branch = SelectedBranch?.Value;
+        var tag = SelectedTag?.Value;
+
+        Sides =
+        [
+            new(Loc.T("catalog.sideAny"), null),
+            new(Loc.T("catalog.sideClient"), "client"),
+            new(Loc.T("catalog.sideServer"), "server"),
+        ];
+        Sorts =
+        [
+            new(Loc.T("catalog.sortTrending"), CatalogSort.Trending),
+            new(Loc.T("catalog.sortDownloads"), CatalogSort.Downloads),
+            new(Loc.T("catalog.sortFollows"), CatalogSort.Follows),
+            new(Loc.T("catalog.sortRecent"), CatalogSort.RecentlyUpdated),
+            new(Loc.T("catalog.sortName"), CatalogSort.Name),
+        ];
+        Branches = [new(Loc.T("catalog.anyVersion"), null), .. _catalog.Branches.Select(b =>
+            new Choice<string?>(Loc.T(b == ProfileBranch ? "catalog.hasVersionMine" : "catalog.hasVersion", b), b))];
+        Tags = [new(Loc.T("catalog.allTags"), null), .. _catalog.Tags().Select(t => new Choice<string?>(t, t))];
+
+        _selectedSide = Sides.First(s => s.Value == side);
+        _selectedSort = Sorts.First(s => s.Value == sort);
+        _selectedBranch = Branches.FirstOrDefault(b => b.Value == branch) ?? Branches[0];
+        _selectedTag = Tags.FirstOrDefault(t => t.Value == tag) ?? Tags[0];
+        OnPropertyChanged(nameof(SelectedSide));
+        OnPropertyChanged(nameof(SelectedSort));
+        OnPropertyChanged(nameof(SelectedBranch));
+        OnPropertyChanged(nameof(SelectedTag));
+    }
+
+    /// <summary>Сменился язык — перестроить подписи и строки списка.</summary>
+    public void OnLanguageChanged()
+    {
+        BuildChoices();
+        if (_loaded) ApplySearch();
+        else StatusText = "";
+        if (Selected is { } s) OnSelectedChanged(s); // карточка собрана на старом языке — пересобрать
+    }
 
     public CatalogViewModel(MainViewModel main, ModDbClient db)
     {
         _main = main;
         _db = db;
         _catalog = new CatalogService(db);
-        _selectedSide = Sides[0];
-        _selectedSort = Sorts[0];
+        BuildChoices();
 
         // поиск не на каждую букву, а после короткой паузы
         _searchDelay = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
@@ -93,7 +125,7 @@ public sealed partial class CatalogViewModel : ObservableObject
     }
 
     partial void OnSearchChanged(string value) { _searchDelay.Stop(); _searchDelay.Start(); }
-    partial void OnSelectedTagChanged(string value) => ApplySearch();
+    partial void OnSelectedTagChanged(Choice<string?>? value) => ApplySearch();
     partial void OnSelectedSideChanged(Choice<string?> value) => ApplySearch();
     partial void OnSelectedSortChanged(Choice<CatalogSort> value) => ApplySearch();
     partial void OnSelectedBranchChanged(Choice<string?>? value) => ApplySearch();
@@ -123,12 +155,12 @@ public sealed partial class CatalogViewModel : ObservableObject
                        string.Equals(i.Name?.Trim(), name.Trim(), StringComparison.OrdinalIgnoreCase)));
         if (item is null)
         {
-            StatusText = $"«{name ?? modId}» нет в каталоге модбазы";
+            StatusText = Loc.T("catalog.notInCatalog", name ?? modId);
             return false;
         }
 
         SelectedBranch = Branches[0];
-        SelectedTag = AllTags;
+        SelectedTag = Tags[0];
         SelectedSide = Sides[0];
         Search = item.Name ?? "";
         _searchDelay.Stop();
@@ -143,7 +175,7 @@ public sealed partial class CatalogViewModel : ObservableObject
     private async Task LoadAsync(bool force)
     {
         IsLoading = true;
-        StatusText = "Загрузка каталога модбазы…";
+        StatusText = Loc.T("catalog.loading");
         try
         {
             await _catalog.LoadAsync(force);
@@ -152,17 +184,15 @@ public sealed partial class CatalogViewModel : ObservableObject
                 _profileCompat = await _catalog.CompatibleAssetsAsync(mine, force);
 
             var keepBranch = SelectedBranch?.Value ?? (_loaded ? null : ProfileBranch);
-            Branches = [new("Любая версия игры", null), .. _catalog.Branches.Select(b =>
-                new Choice<string?>(b == ProfileBranch ? $"Есть версия для {b}.x (твоя)" : $"Есть версия для {b}.x", b))];
+            BuildChoices();
             _loaded = true;
-            Tags = [AllTags, .. _catalog.Tags()];
             // по умолчанию — ветка игры активного профиля
             SelectedBranch = Branches.FirstOrDefault(b => b.Value == keepBranch) ?? Branches[0];
             ApplySearch();
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
-            StatusText = $"Не удалось загрузить каталог: {ex.Message}";
+            StatusText = Loc.T("catalog.loadFailed", ex.Message);
         }
         finally
         {
@@ -183,12 +213,12 @@ public sealed partial class CatalogViewModel : ObservableObject
         {
             try
             {
-                StatusText = $"Сверяю моды с версией {branch}.x…";
+                StatusText = Loc.T("catalog.matchingBranch", branch);
                 only = await _catalog.CompatibleAssetsAsync(branch);
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
-                StatusText = $"Не удалось получить моды для {branch}.x: {ex.Message}";
+                StatusText = Loc.T("catalog.branchFailed", branch, ex.Message);
                 return;
             }
             if (generation != _searchGeneration) return; // пока ждали, условия поменялись
@@ -197,7 +227,7 @@ public sealed partial class CatalogViewModel : ObservableObject
         var found = _catalog.Search(new CatalogQuery
         {
             Text = Search,
-            Tag = SelectedTag == AllTags ? null : SelectedTag,
+            Tag = SelectedTag?.Value,
             Side = SelectedSide.Value,
             Sort = SelectedSort.Value,
             OnlyAssets = only,
@@ -216,7 +246,7 @@ public sealed partial class CatalogViewModel : ObservableObject
         }
 
         var at = _catalog.LoadedAt?.ToLocalTime().ToString("dd.MM HH:mm") ?? "—";
-        StatusText = $"Найдено: {Results.Count} из {_catalog.Items.Count}   ·   каталог от {at}";
+        StatusText = Loc.T("catalog.found", Results.Count, _catalog.Items.Count, at);
     }
 
     partial void OnSelectedChanged(CatalogItemViewModel? value)
@@ -238,7 +268,7 @@ public sealed partial class CatalogViewModel : ObservableObject
         var id = details.ModId ?? release.ModIdStr;
         if (string.IsNullOrEmpty(id))
         {
-            MessageBox.Show(Application.Current.MainWindow, "У мода в модбазе не указан modid — поставь его вручную с сайта.", "eViSTool");
+            MessageBox.Show(Application.Current.MainWindow, Loc.T("catalog.noModId"), "eViSTool");
             return;
         }
         await _main.Mods.InstallFromCatalogAsync(id, details.Name, release);
@@ -250,7 +280,7 @@ public sealed class CatalogItemViewModel(ModDbListItem item, IReadOnlyDictionary
     bool? compatible = null, string? branch = null)
 {
     /// <summary>Пометка «нет версии для 1.22.x» — если известно, что релиза под ветку игры нет.</summary>
-    public string? NoVersionText { get; } = compatible == false ? $"нет версии для {branch}" : null;
+    public string? NoVersionText { get; } = compatible == false ? Loc.T("catalog.noVersionFor", branch) : null;
 
     public ModDbListItem Item { get; } = item;
     public string Name { get; } = item.Name ?? item.PrimaryModId ?? "?";
@@ -260,7 +290,7 @@ public sealed class CatalogItemViewModel(ModDbListItem item, IReadOnlyDictionary
     public string Stats { get; } = $"⬇ {item.Downloads:N0}   ♥ {item.Follows:N0}";
     public string? InstalledVersion { get; } = item.PrimaryModId is { } id && installed.TryGetValue(id, out var v) ? v : null;
     public bool IsInstalled => InstalledVersion is not null;
-    public string InstalledText => IsInstalled ? $"установлен {InstalledVersion}" : "";
+    public string InstalledText => IsInstalled ? Loc.T("catalog.installedBadge", InstalledVersion) : "";
 }
 
 /// <summary>Карточка мода: описание, совместимость, установка.</summary>
@@ -271,9 +301,9 @@ public sealed partial class ModDetailsViewModel : ObservableObject
     private readonly CatalogViewModel _owner;
 
     [ObservableProperty] private string _description = "";
-    [ObservableProperty] private string _compatibility = "Загружаю сведения о релизах…";
+    [ObservableProperty] private string _compatibility = Loc.T("card.loadingReleases");
     [ObservableProperty] private bool _canInstall;
-    [ObservableProperty] private string _installText = "Установить";
+    [ObservableProperty] private string _installText = Loc.T("card.install", "");
     [ObservableProperty] private string? _installedVersion;
     [ObservableProperty] private IReadOnlyList<string> _screenshots = [];
     [ObservableProperty] private ModDbMod? _mod;
@@ -295,14 +325,14 @@ public sealed partial class ModDetailsViewModel : ObservableObject
         _owner = owner;
         Name = item.Name ?? item.PrimaryModId ?? "?";
         ModId = item.PrimaryModId;
-        Author = item.Author is { Length: > 0 } a ? $"автор: {a}" : "";
+        Author = item.Author is { Length: > 0 } a ? Loc.T("card.author", a) : "";
         Logo = string.IsNullOrWhiteSpace(item.Logo) ? null : item.Logo;
-        Stats = $"⬇ {item.Downloads:N0} скачиваний   ♥ {item.Follows:N0}   обновлён {item.LastReleased?[..10]}";
+        Stats = Loc.T("card.stats", item.Downloads.ToString("N0"), item.Follows.ToString("N0"), item.LastReleased?[..10]);
         Side = item.Side switch
         {
-            "client" => "только клиент",
-            "server" => "только сервер",
-            _ => "клиент и сервер",
+            "client" => Loc.T("card.sideClient"),
+            "server" => Loc.T("card.sideServer"),
+            _ => Loc.T("card.sideBoth"),
         };
         TagsText = string.Join(", ", item.Tags.Where(t => !string.IsNullOrWhiteSpace(t)));
         PageUrl = item.PageUrl;
@@ -325,7 +355,7 @@ public sealed partial class ModDetailsViewModel : ObservableObject
             Mod = mod;
             if (mod is null)
             {
-                Compatibility = "Мод не найден в модбазе";
+                Compatibility = Loc.T("card.notFound");
                 return;
             }
 
@@ -334,7 +364,7 @@ public sealed partial class ModDetailsViewModel : ObservableObject
 
             if (_game is null)
             {
-                Compatibility = "Версия игры не определена — укажи папку игры в настройках профиля";
+                Compatibility = Loc.T("mods.noGameVersion");
                 BestRelease = UpdateChecker.PickLatest(mod.Releases, allowUnstable: true);
             }
             else
@@ -346,14 +376,16 @@ public sealed partial class ModDetailsViewModel : ObservableObject
                 BestRelease = stable ?? UpdateChecker.PickLatestCompatible(mod.Releases, _game, allowUnstable: true);
                 var latest = UpdateChecker.PickLatest(mod.Releases, allowUnstable: true);
                 Compatibility = BestRelease is not null
-                    ? $"✔ Есть версия {BestRelease.ModVersion} для {branch}{(ModVersion.ParseOrNull(BestRelease.ModVersion)?.IsPrerelease == true ? " (пре-релиз)" : "")}"
-                    : $"✖ Нет версии для {branch}" + (latest is not null ? $". Последняя — {latest.ModVersion} (для {latest.GameVersions.LastOrDefault()})" : "");
+                    ? "✔ " + Loc.T("card.hasVersion", BestRelease.ModVersion, branch)
+                      + (ModVersion.ParseOrNull(BestRelease.ModVersion)?.IsPrerelease == true ? " " + Loc.T("card.prerelease") : "")
+                    : "✖ " + Loc.T("card.noVersion", branch)
+                      + (latest is not null ? ". " + Loc.T("card.latestFor", latest.ModVersion, latest.GameVersions.LastOrDefault()) : "");
             }
             UpdateInstallText();
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
-            if (!ct.IsCancellationRequested) Compatibility = $"Не удалось загрузить сведения: {ex.Message}";
+            if (!ct.IsCancellationRequested) Compatibility = Loc.T("card.loadFailed", ex.Message);
         }
     }
 
@@ -362,10 +394,10 @@ public sealed partial class ModDetailsViewModel : ObservableObject
         var target = BestRelease?.ModVersion;
         var cmp = ModVersion.ParseOrNull(InstalledVersion) is { } have && ModVersion.ParseOrNull(target) is { } want
             ? have.CompareTo(want) : (int?)null;
-        InstallText = InstalledVersion is null ? $"Установить {target}"
-            : cmp == 0 ? $"Переустановить {target}"
-            : cmp > 0 ? $"Установлена новее ({InstalledVersion})"
-            : $"Обновить {InstalledVersion} → {target}";
+        InstallText = InstalledVersion is null ? Loc.T("card.install", target)
+            : cmp == 0 ? Loc.T("card.reinstall", target)
+            : cmp > 0 ? Loc.T("card.newerInstalled", InstalledVersion)
+            : Loc.T("card.update", InstalledVersion, target);
         // установленную более новую версию одной кнопкой не откатываем — для этого «Другая версия…»
         CanInstall = BestRelease?.MainFile is not null && cmp is null or <= 0;
     }
@@ -382,7 +414,7 @@ public sealed partial class ModDetailsViewModel : ObservableObject
         if (Mod is null) return;
         var releases = _game is null ? Mod.Releases : UpdateChecker.CompatibleReleases(Mod.Releases, _game);
         var options = RollbackWindow.BuildOptions(null, ModId ?? "", InstalledVersion, releases);
-        var dlg = new RollbackWindow($"{Name} — выбор версии", options) { Owner = Application.Current.MainWindow };
+        var dlg = new RollbackWindow(Loc.T("card.chooseVersionTitle", Name), options) { Owner = Application.Current.MainWindow };
         if (dlg.ShowDialog() == true && dlg.Selected?.Release is { } release)
             await _owner.InstallAsync(this, release);
     }
@@ -395,6 +427,6 @@ public sealed partial class ModDetailsViewModel : ObservableObject
     {
         if (string.IsNullOrEmpty(url) || Screenshots.Count == 0) return;
         var index = Math.Max(0, Screenshots.ToList().IndexOf(url));
-        new ScreenshotWindow(Screenshots, index, $"{Name} — скриншоты") { Owner = Application.Current.MainWindow }.ShowDialog();
+        new ScreenshotWindow(Screenshots, index, Loc.T("shots.title", Name)) { Owner = Application.Current.MainWindow }.ShowDialog();
     }
 }

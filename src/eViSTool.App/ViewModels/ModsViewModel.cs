@@ -12,6 +12,7 @@ using eViSTool.Core.Mods;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Versioning;
 using Microsoft.Win32;
+using eViSTool.Core.Localization;
 
 namespace eViSTool.App.ViewModels;
 
@@ -43,8 +44,8 @@ public sealed partial class ModsViewModel : ObservableObject
 
     public bool HasDependencyIssues => DependencyIssues.Count > 0;
     public string DependencyText => DependencyIssues.Count == 0 ? ""
-        : $"Проблемы с зависимостями ({DependencyIssues.Count}): " + string.Join("; ", DependencyIssues.Select(i => i.Describe()));
-    public string UpdateAllText => $"Обновить всё ({UpdateCount})";
+        : Loc.T("mods.depBanner", DependencyIssues.Count, string.Join("; ", DependencyIssues.Select(i => i.Describe())));
+    public string UpdateAllText => Loc.T("mods.updateAll", UpdateCount);
 
     partial void OnDependencyIssuesChanged(IReadOnlyList<DependencyIssue> value)
     {
@@ -75,8 +76,8 @@ public sealed partial class ModsViewModel : ObservableObject
 
     /// <summary>Строка под кнопками: какие папки и какая игра.</summary>
     public string ProfileInfo => Profile is { } r
-        ? $"Игра: {r.GameVersion?.ToString() ?? "не найдена"}   ·   Папки модов: {string.Join("; ", r.ModDirs)}"
-        : "Профиль не выбран";
+        ? Loc.T("mods.profileInfo", r.GameVersion?.ToString() ?? Loc.T("common.notFound"), string.Join("; ", r.ModDirs))
+        : Loc.T("mods.noProfile");
 
     /// <summary>Сменился профиль или его настройки — перечитываем моды с диска, ответ модбазы про другой набор сбрасываем.</summary>
     public void OnProfileSwitched()
@@ -84,7 +85,7 @@ public sealed partial class ModsViewModel : ObservableObject
         _remote = new(StringComparer.OrdinalIgnoreCase);
         OnPropertyChanged(nameof(ProfileInfo));
         ReloadLocal();
-        StatusText = "Моды прочитаны с диска. «Проверить обновления» — сверить с модбазой.";
+        StatusText = Loc.T("mods.readFromDisk");
         if (_main.AutoCheckUpdates && Profile?.GameVersion is not null && CheckCommand.CanExecute(null))
             CheckCommand.Execute(null);
     }
@@ -101,7 +102,7 @@ public sealed partial class ModsViewModel : ObservableObject
         catch (IOException ex)
         {
             _locals = [];
-            StatusText = $"Не удалось прочитать папку модов: {ex.Message}";
+            StatusText = Loc.T("mods.readFailed", ex.Message);
         }
         Rebuild();
         LocalModsChanged?.Invoke(this, EventArgs.Empty);
@@ -121,11 +122,11 @@ public sealed partial class ModsViewModel : ObservableObject
         foreach (var r in results) Rows.Add(new ModRowViewModel(r));
 
         var disabled = results.Count(r => r.Local.IsDisabled);
-        var parts = new List<string> { $"Модов: {results.Count}", $"выключено: {disabled}" };
+        var parts = new List<string> { Loc.T("mods.sumMods", results.Count), Loc.T("mods.sumDisabled", disabled) };
         if (_remote.Count > 0)
         {
-            parts.Add($"обновлений: {results.Count(r => r.Status == ModStatus.UpdateAvailable)}");
-            parts.Add($"требуют внимания: {Rows.Count(r => r.NeedsAttention)}");
+            parts.Add(Loc.T("mods.sumUpdates", results.Count(r => r.Status == ModStatus.UpdateAvailable)));
+            parts.Add(Loc.T("mods.sumAttention", Rows.Count(r => r.NeedsAttention)));
         }
         Summary = string.Join(" · ", parts);
     }
@@ -140,21 +141,21 @@ public sealed partial class ModsViewModel : ObservableObject
             ReloadLocal();
             if (Profile?.GameVersion is not { } game)
             {
-                StatusText = "Не определена версия игры — укажи папку игры в настройках профиля.";
+                StatusText = Loc.T("mods.noGameVersion");
                 return;
             }
             var progress = new Progress<string>(s => StatusText = s);
             _remote = await _service.FetchRemoteAsync(_locals, progress, ct);
             Rebuild();
-            StatusText = $"Проверено {DateTime.Now:HH:mm:ss} для игры {game}";
+            StatusText = Loc.T("mods.checkedAt", DateTime.Now.ToString("HH:mm:ss"), game);
         }
         catch (OperationCanceledException)
         {
-            StatusText = "Проверка отменена";
+            StatusText = Loc.T("mods.checkCancelled");
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException)
         {
-            StatusText = $"Ошибка: {ex.Message}";
+            StatusText = Loc.T("common.errorWith", ex.Message);
         }
     }
 
@@ -170,9 +171,9 @@ public sealed partial class ModsViewModel : ObservableObject
             // клиент при выходе перезаписывает свои настройки, сервер применит только после перезапуска
             var server = profile.Profile.Kind == ProfileKind.Server;
             var what = server
-                ? "Сервер запущен. Изменение вступит в силу после перезапуска, а при остановке сервер может перезаписать свой конфиг."
-                : "Игра запущена. При выходе она перезапишет свои настройки, и изменение потеряется — лучше сначала закрыть игру.";
-            if (!Confirm($"{what}\n\nВсё равно {(row.IsEnabled ? "выключить" : "включить")} «{row.Name}»?"))
+                ? Loc.T("mods.toggleServerRunning")
+                : Loc.T("mods.toggleGameRunning");
+            if (!Confirm(Loc.T(row.IsEnabled ? "mods.toggleAnywayDisable" : "mods.toggleAnywayEnable", what, row.Name)))
             {
                 ReloadLocal(); // вернуть галочку как было
                 return;
@@ -182,11 +183,11 @@ public sealed partial class ModsViewModel : ObservableObject
         try
         {
             ModConfigEditor.SetEnabled(profile, info, enabled: !row.IsEnabled);
-            StatusText = $"«{row.Name}» {(row.IsEnabled ? "выключен" : "включён")}";
+            StatusText = Loc.T(row.IsEnabled ? "mods.disabledOk" : "mods.enabledOk", row.Name);
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
         {
-            Error($"Не удалось изменить настройки игры:\n{ex.Message}");
+            Error(Loc.T("mods.toggleFailed", ex.Message));
         }
         ReloadLocal();
     }
@@ -199,8 +200,8 @@ public sealed partial class ModsViewModel : ObservableObject
         if (row is null || Profile is not { } profile) return;
 
         var running = GameProcess.IsRunning(profile.Profile)
-            ? "\n\nИгра/сервер сейчас запущены — файл может быть занят." : "";
-        if (!Confirm($"Удалить «{row.Name}» {row.Installed}?\n\nФайл уйдёт в Корзину, его можно будет восстановить.{running}"))
+            ? "\n\n" + Loc.T("mods.deleteRunning") : "";
+        if (!Confirm(Loc.T("mods.deleteConfirm", row.Name, row.Installed) + running))
             return;
 
         try
@@ -209,11 +210,11 @@ public sealed partial class ModsViewModel : ObservableObject
             // если других копий мода не осталось — чистим его и из списка выключенных
             if (row.Local.Info is { } info && _locals.Count(l => l.Info?.ModId == info.ModId) == 1)
                 ModConfigEditor.Forget(profile, info);
-            StatusText = $"«{row.Name}» удалён в Корзину";
+            StatusText = Loc.T("mods.deletedOk", row.Name);
         }
         catch (Exception ex) when (ex is IOException or OperationCanceledException or UnauthorizedAccessException)
         {
-            Error($"Не удалось удалить «{row.Name}»:\n{ex.Message}");
+            Error(Loc.T("mods.deleteFailed", row.Name, ex.Message));
         }
         ReloadLocal();
     }
@@ -225,8 +226,8 @@ public sealed partial class ModsViewModel : ObservableObject
     {
         var dlg = new OpenFileDialog
         {
-            Title = "Выбери мод (zip)",
-            Filter = "Моды Vintage Story (*.zip)|*.zip",
+            Title = Loc.T("mods.pickZipTitle"),
+            Filter = Loc.T("mods.zipFilter") + " (*.zip)|*.zip",
             Multiselect = true,
         };
         if (dlg.ShowDialog() == true) AddFiles(dlg.FileNames);
@@ -240,12 +241,12 @@ public sealed partial class ModsViewModel : ObservableObject
         var zips = files.Where(f => f.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)).ToList();
         if (zips.Count == 0)
         {
-            Error("Моды Vintage Story — это zip-архивы, а среди выбранных файлов их нет.");
+            Error(Loc.T("mods.notZip"));
             return;
         }
 
         if (GameProcess.IsRunning(profile.Profile)
-            && !Confirm("Игра/сервер сейчас запущены: новые моды подхватятся только после перезапуска, а заменяемые файлы могут быть заняты.\n\nПродолжить?"))
+            && !Confirm(Loc.T("mods.runningContinue")))
             return;
 
         var installed = new List<string>();
@@ -254,12 +255,12 @@ public sealed partial class ModsViewModel : ObservableObject
             InstallZip(profile, zip, interactive: true, installed, problems);
 
         ReloadLocal();
-        if (installed.Count > 0) StatusText = "Установлено: " + string.Join("; ", installed);
+        if (installed.Count > 0) StatusText = Loc.T("report.installed") + ": " + string.Join("; ", installed);
 
         if (problems.Count > 0)
         {
-            var text = (installed.Count > 0 ? "Установлено:\n• " + string.Join("\n• ", installed) + "\n\n" : "")
-                       + "Внимание:\n• " + string.Join("\n• ", problems);
+            var text = (installed.Count > 0 ? Loc.T("report.installed") + ":\n• " + string.Join("\n• ", installed) + "\n\n" : "")
+                       + Loc.T("report.attention") + ":\n• " + string.Join("\n• ", problems);
             MessageBox.Show(Application.Current.MainWindow, text, "eViSTool", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
@@ -276,9 +277,9 @@ public sealed partial class ModsViewModel : ObservableObject
             var info = plan.Incoming.Info!;
             var old = plan.Replaces.FirstOrDefault()?.Info?.Version;
 
-            if (interactive && plan.IsSameVersion && !Confirm($"«{info.Name}» {info.Version} уже установлен.\n\nПереустановить?"))
+            if (interactive && plan.IsSameVersion && !Confirm(Loc.T("mods.reinstallConfirm", info.Name, info.Version)))
                 return false;
-            if (interactive && plan.IsDowngrade && !Confirm($"Установлен «{info.Name}» {old}, а ставится более старая {info.Version}.\n\nОткатиться на {info.Version}?"))
+            if (interactive && plan.IsDowngrade && !Confirm(Loc.T("mods.downgradeConfirm", info.Name, old, info.Version)))
                 return false;
 
             var disabledSet = new HashSet<string>(profile.DisabledMods);
@@ -303,17 +304,17 @@ public sealed partial class ModsViewModel : ObservableObject
         _ = FetchNewModsAsync();
         // зависимости — по итоговому состоянию, а не на момент установки каждого мода
         if (installed.Count > 0)
-            problems.AddRange(DependencyIssues.Select(i => "зависимость " + i.Describe()));
-        StatusText = installed.Count > 0 ? $"{title}: " + string.Join("; ", installed) : $"{title}: ничего не изменилось";
+            problems.AddRange(DependencyIssues.Select(i => Loc.T("report.dependency", i.Describe())));
+        StatusText = installed.Count > 0 ? $"{title}: " + string.Join("; ", installed) : Loc.T("report.nothingChanged", title);
         if (problems.Count == 0) return;
         var text = (installed.Count > 0 ? $"{title}:\n• " + string.Join("\n• ", installed) + "\n\n" : "")
-                   + "Внимание:\n• " + string.Join("\n• ", problems);
+                   + Loc.T("report.attention") + ":\n• " + string.Join("\n• ", problems);
         MessageBox.Show(Application.Current.MainWindow, text, "eViSTool", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     private static bool ConfirmIfRunning(ResolvedProfile profile) =>
         !GameProcess.IsRunning(profile.Profile)
-        || Confirm("Игра/сервер сейчас запущены: изменения подхватятся только после перезапуска, а заменяемые файлы могут быть заняты.\n\nПродолжить?");
+        || Confirm(Loc.T("mods.runningContinue"));
 
     /// <summary>Скачать релиз и поставить его. Ошибки — в problems.</summary>
     private async Task<bool> DownloadAndInstallAsync(ResolvedProfile profile, string modId, string name, ModDbRelease release,
@@ -322,13 +323,13 @@ public sealed partial class ModsViewModel : ObservableObject
         string? file = null;
         try
         {
-            var progress = new Progress<double>(x => StatusText = $"Скачивание {name} {release.ModVersion}… {x:P0}");
+            var progress = new Progress<double>(x => StatusText = Loc.T("dl.progress", name, release.ModVersion, x.ToString("P0")));
             file = await _updater.DownloadReleaseAsync(release, modId, progress);
             return InstallZip(profile, file, interactive: false, installed, problems);
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or TaskCanceledException)
         {
-            problems.Add($"{name}: не удалось скачать {release.ModVersion} — {ex.Message}");
+            problems.Add(Loc.T("dl.failed", name, release.ModVersion, ex.Message));
             return false;
         }
         finally
@@ -374,7 +375,7 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             IsBusy = false;
         }
-        Report("Обновлено", installed, problems);
+        Report(Loc.T("report.updated"), installed, problems);
     }
 
     [RelayCommand]
@@ -385,7 +386,7 @@ public sealed partial class ModsViewModel : ObservableObject
         if (todo.Count == 0) return;
 
         var list = string.Join("\n", todo.Select(r => $"• {r.Name}: {r.Installed} → {r.Latest}"));
-        if (!Confirm($"Обновить модов: {todo.Count}?\n\n{list}\n\nСтарые версии сохранятся для отката.")) return;
+        if (!Confirm(Loc.T("mods.updateAllConfirm", todo.Count, list))) return;
         if (!ConfirmIfRunning(profile)) return;
 
         var installed = new List<string>();
@@ -401,7 +402,7 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             IsBusy = false;
         }
-        Report("Обновлено", installed, problems);
+        Report(Loc.T("report.updated"), installed, problems);
     }
 
     // ---------- откат / другая версия ----------
@@ -415,7 +416,7 @@ public sealed partial class ModsViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            StatusText = $"Ищу версии «{row.Name}»…";
+            StatusText = Loc.T("mods.findingVersions", row.Name);
             var remote = row.Result.Remote ?? await _db.GetModAsync(info.ModId);
             if (remote is not null && profile.GameVersion is { } game)
                 releases = UpdateChecker.CompatibleReleases(remote.Releases, game);
@@ -431,7 +432,7 @@ public sealed partial class ModsViewModel : ObservableObject
         }
 
         var store = ModBackupStore.ForProfile(profile.Profile);
-        var dlg = new RollbackWindow($"{row.Name} — сейчас {row.Installed}",
+        var dlg = new RollbackWindow(Loc.T("rollback.heading", row.Name, row.Installed),
             RollbackWindow.BuildOptions(store, info.ModId, info.Version, releases))
         {
             Owner = Application.Current.MainWindow,
@@ -453,7 +454,7 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             IsBusy = false;
         }
-        Report("Установлено", installed, problems);
+        Report(Loc.T("report.installed"), installed, problems);
     }
 
     // ---------- зависимости ----------
@@ -464,12 +465,12 @@ public sealed partial class ModsViewModel : ObservableObject
         if (Profile is not { } start || IsBusy || DependencyIssues.Count == 0) return;
         if (start.GameVersion is not { } game)
         {
-            Error("Не определена версия игры — укажи папку игры в настройках профиля.");
+            Error(Loc.T("mods.noGameVersion"));
             return;
         }
 
         var list = string.Join("\n", DependencyIssues.Select(i => "• " + i.Describe()));
-        if (!Confirm($"Исправить зависимости?\n\n{list}\n\nНедостающие и устаревшие скачаются из модбазы, выключенные включатся.")) return;
+        if (!Confirm(Loc.T("mods.fixDepsConfirm", list))) return;
         if (!ConfirmIfRunning(start)) return;
 
         var installed = new List<string>();
@@ -483,7 +484,7 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             IsBusy = false;
         }
-        Report("Зависимости", installed, problems);
+        Report(Loc.T("report.dependencies"), installed, problems);
     }
 
     /// <summary>
@@ -507,15 +508,15 @@ public sealed partial class ModsViewModel : ObservableObject
                     {
                         var mod = _locals.First(l => string.Equals(l.Info?.ModId, issue.ModId, StringComparison.OrdinalIgnoreCase));
                         ModConfigEditor.SetEnabled(profile, mod.Info!, enabled: true);
-                        installed.Add($"{mod.Info!.Name}: включён");
+                        installed.Add(Loc.T("mods.enabledShort", mod.Info!.Name));
                         continue;
                     }
 
-                    StatusText = $"Ищу {issue.ModId} в модбазе…";
+                    StatusText = Loc.T("mods.searchingModDb", issue.ModId);
                     var found = await _updater.FindBestReleaseAsync(issue.ModId, game, _main.AllowUnstable, profile.Profile.ToPolicy());
                     if (found is not { } f)
                     {
-                        problems.Add($"{issue.ModId}: нет в модбазе или нет версии для {game.Major}.{game.Minor}.x — поставь вручную");
+                        problems.Add(Loc.T("mods.depNotFound", issue.ModId, $"{game.Major}.{game.Minor}.x"));
                         continue;
                     }
                     await DownloadAndInstallAsync(profile, issue.ModId, f.Mod.Name ?? issue.ModId, f.Release, installed, problems);
@@ -551,7 +552,7 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             if (!await DownloadAndInstallAsync(profile, modId, name, release, installed, problems))
             {
-                Report("Установка", installed, problems);
+                Report(Loc.T("report.install"), installed, problems);
                 return false;
             }
 
@@ -559,7 +560,7 @@ public sealed partial class ModsViewModel : ObservableObject
             if (DependencyIssues.Count > 0 && profile.GameVersion is { } game)
             {
                 var list = string.Join("\n", DependencyIssues.Select(i => "• " + i.Describe()));
-                if (Confirm($"«{name}» установлен. Не хватает зависимостей:\n\n{list}\n\nДоставить их из модбазы?"))
+                if (Confirm(Loc.T("mods.installDepsConfirm", name, list)))
                     await FixDependencyIssuesAsync(game, installed, problems);
             }
         }
@@ -567,7 +568,7 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             IsBusy = false;
         }
-        Report("Установлено", installed, problems);
+        Report(Loc.T("report.installed"), installed, problems);
         return true;
     }
 
@@ -579,11 +580,11 @@ public sealed partial class ModsViewModel : ObservableObject
         if (row?.Local.Info is not { } info || _main.ActiveProfile is not { } profile) return;
         var pins = profile.Model.PinnedMods;
         if (pins.Remove(info.ModId))
-            StatusText = $"«{row.Name}» откреплён — обновления снова предлагаются";
+            StatusText = Loc.T("mods.unpinned", row.Name);
         else
         {
             pins[info.ModId] = info.Version ?? "";
-            StatusText = $"«{row.Name}» закреплён на {info.Version} — обновления не предлагаются";
+            StatusText = Loc.T("mods.pinned", row.Name, info.Version);
         }
         _main.SaveSettings();
         Rebuild();
@@ -595,14 +596,14 @@ public sealed partial class ModsViewModel : ObservableObject
         if (row?.Local.Info is not { } info || _main.ActiveProfile is not { } profile) return;
         if (row.Kind != ModStatus.UpdateAvailable || row.Result.LatestCompatible?.ModVersion is not { } version)
         {
-            StatusText = "Пропустить можно только предлагаемое обновление";
+            StatusText = Loc.T("mods.skipOnlyOffered");
             return;
         }
         if (!profile.Model.BlockedVersions.TryGetValue(info.ModId, out var list))
             profile.Model.BlockedVersions[info.ModId] = list = [];
         list.Add(version);
         _main.SaveSettings();
-        StatusText = $"«{row.Name}» {version} пропущена — следующая версия снова будет предложена";
+        StatusText = Loc.T("mods.skipped", row.Name, version);
         Rebuild();
     }
 
@@ -613,10 +614,10 @@ public sealed partial class ModsViewModel : ObservableObject
         if (profile.Model.BlockedVersions.Remove(info.ModId))
         {
             _main.SaveSettings();
-            StatusText = $"«{row.Name}»: пропущенные версии снова предлагаются";
+            StatusText = Loc.T("mods.skipCleared", row.Name);
             Rebuild();
         }
-        else StatusText = $"У «{row.Name}» нет пропущенных версий";
+        else StatusText = Loc.T("mods.noSkipped", row.Name);
     }
 
 

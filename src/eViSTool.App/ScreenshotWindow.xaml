@@ -1,7 +1,8 @@
 <Window x:Class="eViSTool.App.ScreenshotWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Скриншоты" Icon="Assets/eViSTool.ico"
+        xmlns:local="clr-namespace:eViSTool.App"
+        Title="{local:Tr shots.windowTitle}" Icon="Assets/eViSTool.ico"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="#FF111111"
         KeyDown="Window_KeyDown">
     <Window.Resources>
@@ -21,15 +22,15 @@
 
     <DockPanel>
         <DockPanel DockPanel.Dock="Bottom" Background="#FF1C1C1C" Height="48">
-            <Button DockPanel.Dock="Right" Content="Закрыть (Esc)" Click="Close_Click" Margin="8" Padding="12,4" Focusable="False" />
-            <Button DockPanel.Dock="Right" Content="Открыть в браузере" Click="Browser_Click" Margin="8" Padding="12,4" Focusable="False" />
+            <Button DockPanel.Dock="Right" Content="{local:Tr shots.close}" Click="Close_Click" Margin="8" Padding="12,4" Focusable="False" />
+            <Button DockPanel.Dock="Right" Content="{local:Tr shots.browser}" Click="Browser_Click" Margin="8" Padding="12,4" Focusable="False" />
             <TextBlock x:Name="Counter" Foreground="#CCFFFFFF" VerticalAlignment="Center" Margin="16,0" />
-            <TextBlock Text="← → — листать" Foreground="#77FFFFFF" VerticalAlignment="Center" />
+            <TextBlock Text="{local:Tr shots.hint}" Foreground="#77FFFFFF" VerticalAlignment="Center" />
         </DockPanel>
 
         <Grid>
             <Image x:Name="Picture" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" Margin="8" />
-            <TextBlock x:Name="Loading" Text="Загрузка…" Foreground="#99FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <TextBlock x:Name="Loading" Text="{local:Tr common.loading}" Foreground="#99FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
             <Button x:Name="PrevButton" Content="‹" Style="{StaticResource NavButton}" HorizontalAlignment="Left" Margin="12,0,0,0" Click="Prev_Click" />
             <Button x:Name="NextButton" Content="›" Style="{StaticResource NavButton}" HorizontalAlignment="Right" Margin="0,0,12,0" Click="Next_Click" />
         </Grid>

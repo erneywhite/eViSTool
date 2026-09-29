@@ -21,15 +21,15 @@
     <DockPanel Margin="8">
         <!-- фильтры -->
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-            <Button DockPanel.Dock="Right" Content="Обновить каталог" Command="{Binding RefreshCommand}" Padding="12,6" Margin="8,0,0,0"
-                    ToolTip="Каталог кэшируется на 6 часов — эта кнопка скачает свежий" />
+            <Button DockPanel.Dock="Right" Content="{local:Tr catalog.refresh}" Command="{Binding RefreshCommand}" Padding="12,6" Margin="8,0,0,0"
+                    ToolTip="{local:Tr catalog.refreshTip}" />
             <ComboBox DockPanel.Dock="Right" Width="200" Margin="8,0,0,0" ItemsSource="{Binding Sorts}" SelectedItem="{Binding SelectedSort}" />
             <ComboBox DockPanel.Dock="Right" Width="170" Margin="8,0,0,0" ItemsSource="{Binding Sides}" SelectedItem="{Binding SelectedSide}" />
             <ComboBox DockPanel.Dock="Right" Width="170" Margin="8,0,0,0" ItemsSource="{Binding Tags}" SelectedItem="{Binding SelectedTag}" />
             <ComboBox DockPanel.Dock="Right" Width="230" Margin="8,0,0,0" ItemsSource="{Binding Branches}" SelectedItem="{Binding SelectedBranch}"
-                      ToolTip="Показывать только моды, у которых в модбазе есть релиз для этой версии игры. Старые моды без отметки иногда тоже работают — тогда выбери «Любая версия игры»." />
+                      ToolTip="{local:Tr catalog.branchTip}" />
             <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
-                     ToolTip="Поиск по названию, описанию, автору и modid (несколько слов — все сразу)" />
+                     ToolTip="{local:Tr catalog.searchTip}" />
         </DockPanel>
 
         <TextBlock DockPanel.Dock="Bottom" Margin="2,8,0,0" Text="{Binding StatusText}" Opacity="0.8" />
@@ -43,7 +43,7 @@
 
             <!-- разделитель: тяни, чтобы сделать карточку шире/уже (ширина запоминается) -->
             <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext"
-                          Background="Transparent" Cursor="SizeWE" ToolTip="Потяни, чтобы изменить ширину"
+                          Background="Transparent" Cursor="SizeWE" ToolTip="{local:Tr catalog.splitterTip}"
                           DragCompleted="Splitter_DragCompleted" />
             <Rectangle Grid.Column="1" Width="2" RadiusX="1" RadiusY="1" Fill="#40808080" Height="40" IsHitTestVisible="False" />
 
@@ -91,7 +91,7 @@
             <!-- карточка мода -->
             <Border Grid.Column="2" CornerRadius="6" Background="#12808080" Padding="16">
                 <Grid>
-                    <TextBlock Text="Выбери мод слева" Opacity="0.6" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="{local:Tr catalog.pickMod}" Opacity="0.6" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Style.Triggers>
@@ -134,8 +134,8 @@
                             <WrapPanel Margin="0,12,0,0">
                                 <Button Content="{Binding InstallText}" Command="{Binding InstallCommand}" IsEnabled="{Binding CanInstall}"
                                         Style="{DynamicResource AccentButtonStyle}" Padding="16,6" Margin="0,0,8,8" />
-                                <Button Content="Другая версия…" Command="{Binding ChooseVersionCommand}" Padding="12,6" Margin="0,0,8,8" />
-                                <Button Content="На сайте ↗" Command="{Binding OpenPageCommand}" Padding="12,6" Margin="0,0,8,8" />
+                                <Button Content="{local:Tr card.otherVersion}" Command="{Binding ChooseVersionCommand}" Padding="12,6" Margin="0,0,8,8" />
+                                <Button Content="{local:Tr card.website}" Command="{Binding OpenPageCommand}" Padding="12,6" Margin="0,0,8,8" />
                             </WrapPanel>
                         </StackPanel>
 
@@ -150,7 +150,7 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Button Padding="0" Margin="0,0,6,6" Cursor="Hand" ToolTip="Открыть скриншот (листать стрелками)"
+                                    <Button Padding="0" Margin="0,0,6,6" Cursor="Hand" ToolTip="{local:Tr card.screenshotTip}"
                                             Command="{Binding DataContext.OpenScreenshotCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                             CommandParameter="{Binding}">
                                         <Image Source="{Binding}" Width="160" Height="90" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />

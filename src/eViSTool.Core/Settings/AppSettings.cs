@@ -14,6 +14,9 @@ public sealed class AppSettings
     /// <summary>Сверять моды с модбазой сразу при запуске и при смене профиля.</summary>
     public bool AutoCheckUpdates { get; set; } = true;
 
+    /// <summary>Язык интерфейса (en, ru). По умолчанию английский.</summary>
+    public string Language { get; set; } = "en";
+
     /// <summary>Раскладка окна: запоминается между запусками.</summary>
     public WindowLayout Layout { get; set; } = new();
 

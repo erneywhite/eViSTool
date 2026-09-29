@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using eViSTool.Core.Localization;
 
 namespace eViSTool.Core.Mods;
 
@@ -28,7 +29,7 @@ public static class ModScanner
     public static IReadOnlyList<LocalMod> Scan(string modsDir)
     {
         if (!System.IO.Directory.Exists(modsDir))
-            throw new DirectoryNotFoundException($"Папка модов не найдена: {modsDir}");
+            throw new DirectoryNotFoundException(Loc.T("err.modsDirNotFound", modsDir));
 
         var result = new List<LocalMod>();
 
@@ -38,7 +39,7 @@ public static class ModScanner
             if (ext.Equals(".zip", StringComparison.OrdinalIgnoreCase))
                 result.Add(ReadZip(file));
             else if (ext.Equals(".dll", StringComparison.OrdinalIgnoreCase) || ext.Equals(".cs", StringComparison.OrdinalIgnoreCase))
-                result.Add(new LocalMod(file, null, "Мод без modinfo.json (dll/cs) — пока не поддерживается"));
+                result.Add(new LocalMod(file, null, Loc.T("scan.codeModUnsupported")));
             // остальное (json-файлы менеджеров, архивы .rar и т. п.) игра не грузит — пропускаем
         }
 
@@ -62,8 +63,8 @@ public static class ModScanner
             {
                 var nested = zip.Entries.Any(e => e.Name.Equals(ModInfoFile, StringComparison.OrdinalIgnoreCase));
                 return new LocalMod(zipPath, null, nested
-                    ? "modinfo.json лежит во вложенной папке — игра такой мод не загрузит"
-                    : "В архиве нет modinfo.json");
+                    ? Loc.T("scan.nestedModInfo")
+                    : Loc.T("scan.noModInfo"));
             }
 
             using var reader = new StreamReader(entry.Open());
@@ -72,11 +73,11 @@ public static class ModScanner
         }
         catch (InvalidDataException)
         {
-            return new LocalMod(zipPath, null, "Архив повреждён");
+            return new LocalMod(zipPath, null, Loc.T("scan.corrupt"));
         }
         catch (IOException ex)
         {
-            return new LocalMod(zipPath, null, $"Не удалось прочитать: {ex.Message}");
+            return new LocalMod(zipPath, null, Loc.T("scan.readFailed", ex.Message));
         }
     }
 
@@ -86,12 +87,12 @@ public static class ModScanner
         {
             var info = ModInfo.Parse(readJson());
             return string.IsNullOrEmpty(info.ModId)
-                ? new LocalMod(path, info, "В modinfo.json нет ни modid, ни name")
+                ? new LocalMod(path, info, Loc.T("scan.noModId"))
                 : new LocalMod(path, info, null);
         }
         catch (Newtonsoft.Json.JsonException ex)
         {
-            return new LocalMod(path, null, $"Ошибка в modinfo.json: {ex.Message}");
+            return new LocalMod(path, null, Loc.T("scan.badModInfo", ex.Message));
         }
     }
 }

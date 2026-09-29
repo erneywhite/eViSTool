@@ -70,7 +70,7 @@
             <Image Source="Assets/logo256.png" Width="36" Height="36" RenderOptions.BitmapScalingMode="HighQuality" />
             <TextBlock Text="eViSTool" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <TextBlock Text="Профиль:" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8" />
+                <TextBlock Text="{local:Tr ui.profile}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8" />
                 <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding ActiveProfile}" MinWidth="240">
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
@@ -86,26 +86,26 @@
 
         <TabControl Margin="8,0,8,8" SelectedIndex="{Binding SelectedTab}">
             <!-- ============ МОДЫ ============ -->
-            <TabItem Header="Моды" DataContext="{Binding Mods}">
+            <TabItem Header="{local:Tr tab.mods}" DataContext="{Binding Mods}">
                 <DockPanel Margin="8">
                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8" LastChildFill="False">
-                        <Button DockPanel.Dock="Left" Content="Проверить обновления" Command="{Binding CheckCommand}"
+                        <Button DockPanel.Dock="Left" Content="{local:Tr mods.check}" Command="{Binding CheckCommand}"
                                 Style="{DynamicResource AccentButtonStyle}" Padding="16,6" />
-                        <Button DockPanel.Dock="Left" Content="Отмена" Command="{Binding CheckCancelCommand}" Margin="8,0,0,0" Padding="12,6" />
+                        <Button DockPanel.Dock="Left" Content="{local:Tr common.cancel}" Command="{Binding CheckCancelCommand}" Margin="8,0,0,0" Padding="12,6" />
                         <Button DockPanel.Dock="Left" Content="{Binding UpdateAllText}" Command="{Binding UpdateAllCommand}" Margin="8,0,0,0" Padding="12,6"
                                 IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}"
                                 Visibility="{Binding UpdateCount, Converter={StaticResource CountToVis}}"
-                                ToolTip="Скачать и поставить все доступные обновления. Старые версии сохранятся для отката." />
-                        <Button DockPanel.Dock="Left" Content="Добавить мод…" Command="{Binding AddFromFileCommand}" Margin="8,0,0,0" Padding="12,6"
+                                ToolTip="{local:Tr mods.updateAllTip}" />
+                        <Button DockPanel.Dock="Left" Content="{local:Tr mods.add}" Command="{Binding AddFromFileCommand}" Margin="8,0,0,0" Padding="12,6"
                                 IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}"
-                                ToolTip="Установить мод из zip-архива. Можно просто перетащить zip в список." />
-                        <Button DockPanel.Dock="Left" Content="Открыть папку" Command="{Binding OpenModsFolderCommand}" Margin="8,0,0,0" Padding="12,6" />
-                        <CheckBox DockPanel.Dock="Right" Content="Только проблемные" IsChecked="{Binding OnlyIssues}"
-                                  ToolTip="Показать только моды, которые требуют внимания"
+                                ToolTip="{local:Tr mods.addTip}" />
+                        <Button DockPanel.Dock="Left" Content="{local:Tr mods.openFolder}" Command="{Binding OpenModsFolderCommand}" Margin="8,0,0,0" Padding="12,6" />
+                        <CheckBox DockPanel.Dock="Right" Content="{local:Tr mods.onlyIssues}" IsChecked="{Binding OnlyIssues}"
+                                  ToolTip="{local:Tr mods.onlyIssuesTip}"
                                   VerticalAlignment="Center" Margin="12,0,0,0" />
                         <TextBox DockPanel.Dock="Right" Width="180" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}"
-                                 ToolTip="Поиск по имени или modid" VerticalAlignment="Center" />
-                        <TextBlock DockPanel.Dock="Right" Text="Поиск:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                 ToolTip="{local:Tr mods.searchTip}" VerticalAlignment="Center" />
+                        <TextBlock DockPanel.Dock="Right" Text="{local:Tr mods.search}" VerticalAlignment="Center" Margin="0,0,6,0" />
                     </DockPanel>
 
                     <TextBlock DockPanel.Dock="Top" Margin="2,0,0,8" Opacity="0.7" TextTrimming="CharacterEllipsis"
@@ -114,7 +114,7 @@
                     <Border DockPanel.Dock="Top" Margin="0,0,0,8" Padding="12,8" CornerRadius="6" Background="#40F0A020"
                             Visibility="{Binding HasDependencyIssues, Converter={StaticResource BoolToVis}}">
                         <DockPanel>
-                            <Button DockPanel.Dock="Right" Content="Исправить" Command="{Binding FixDependenciesCommand}" Padding="12,4" Margin="12,0,0,0"
+                            <Button DockPanel.Dock="Right" Content="{local:Tr mods.fix}" Command="{Binding FixDependenciesCommand}" Padding="12,4" Margin="12,0,0,0"
                                     IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}" />
                             <TextBlock Text="{Binding DependencyText}" TextWrapping="Wrap" VerticalAlignment="Center" />
                         </DockPanel>
@@ -143,57 +143,57 @@
                         </DataGrid.InputBindings>
                         <DataGrid.ContextMenu>
                             <ContextMenu>
-                                <MenuItem Header="Включить / выключить"
+                                <MenuItem Header="{local:Tr menu.toggle}"
                                           Command="{Binding PlacementTarget.DataContext.ToggleEnabledCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <MenuItem Header="Удалить (в Корзину)"
+                                <MenuItem Header="{local:Tr menu.delete}"
                                           Command="{Binding PlacementTarget.DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                 <Separator />
-                                <MenuItem Header="Обновить"
+                                <MenuItem Header="{local:Tr menu.update}"
                                           Command="{Binding PlacementTarget.DataContext.UpdateOneCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <MenuItem Header="Другая версия / откат…"
+                                <MenuItem Header="{local:Tr menu.rollback}"
                                           Command="{Binding PlacementTarget.DataContext.RollbackCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <MenuItem Header="Закрепить / открепить версию"
+                                <MenuItem Header="{local:Tr menu.pin}"
                                           Command="{Binding PlacementTarget.DataContext.TogglePinCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <MenuItem Header="Пропустить эту версию"
+                                <MenuItem Header="{local:Tr menu.skip}"
                                           Command="{Binding PlacementTarget.DataContext.SkipVersionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <MenuItem Header="Снова предлагать пропущенные версии"
+                                <MenuItem Header="{local:Tr menu.unskip}"
                                           Command="{Binding PlacementTarget.DataContext.ClearSkippedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                 <Separator />
-                                <MenuItem Header="Показать в каталоге"
+                                <MenuItem Header="{local:Tr menu.showInCatalog}"
                                           Command="{Binding PlacementTarget.DataContext.ShowInCatalogCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <MenuItem Header="Открыть страницу мода"
+                                <MenuItem Header="{local:Tr menu.openPage}"
                                           Command="{Binding PlacementTarget.DataContext.OpenPageCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <MenuItem Header="Показать файл в папке"
+                                <MenuItem Header="{local:Tr menu.showFile}"
                                           Command="{Binding PlacementTarget.DataContext.ShowFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                             </ContextMenu>
                         </DataGrid.ContextMenu>
                         <DataGrid.Columns>
                             <!-- галочка пишет в настройки игры: disabledMods клиента или WorldConfig.DisabledMods сервера -->
-                            <DataGridTemplateColumn Header="Вкл." Width="52" SortMemberPath="IsEnabled">
+                            <DataGridTemplateColumn Header="{local:Tr col.on}" Width="52" SortMemberPath="IsEnabled">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <CheckBox IsChecked="{Binding IsEnabled, Mode=OneWay}" Focusable="False"
                                                   Command="{Binding DataContext.ToggleEnabledCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                  CommandParameter="{Binding}" ToolTip="Включить / выключить мод"
+                                                  CommandParameter="{Binding}" ToolTip="{local:Tr col.onTip}"
                                                   HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="0" />
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Мод" Binding="{Binding Name}" Width="2*" ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="{local:Tr col.mod}" Binding="{Binding Name}" Width="2*" ElementStyle="{StaticResource CellText}" />
                             <DataGridTextColumn Header="modid" Binding="{Binding ModId}" Width="1.3*" ElementStyle="{StaticResource CellText}" />
-                            <DataGridTextColumn Header="Установлен" Binding="{Binding Installed}" Width="100" ElementStyle="{StaticResource CellText}" />
-                            <DataGridTextColumn Header="Актуальная" Binding="{Binding Latest}" Width="100" ElementStyle="{StaticResource CellText}" />
-                            <DataGridTemplateColumn Header="Статус" Width="160" SortMemberPath="StatusText">
+                            <DataGridTextColumn Header="{local:Tr col.installed}" Binding="{Binding Installed}" Width="100" ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="{local:Tr col.latest}" Binding="{Binding Latest}" Width="100" ElementStyle="{StaticResource CellText}" />
+                            <DataGridTemplateColumn Header="{local:Tr col.status}" Width="160" SortMemberPath="StatusText">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <!-- при наведении на «Есть обновление» — что изменилось -->
@@ -204,14 +204,14 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Примечание" Binding="{Binding Note}" Width="3*" ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="{local:Tr col.note}" Binding="{Binding Note}" Width="3*" ElementStyle="{StaticResource CellText}" />
                             <DataGridTemplateColumn Header="" Width="190">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0">
                                             <TextBlock Margin="0,0,12,0" Visibility="{Binding CanUpdate, Converter={StaticResource BoolToVis}}">
                                                 <Hyperlink Command="{Binding DataContext.UpdateOneCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                           CommandParameter="{Binding}" ToolTip="{Binding Latest}">Обновить</Hyperlink>
+                                                           CommandParameter="{Binding}" ToolTip="{Binding Latest}"><Run Text="{local:Tr menu.update}" /></Hyperlink>
                                             </TextBlock>
                                             <TextBlock>
                                                 <TextBlock.Style>
@@ -224,7 +224,7 @@
                                                     </Style>
                                                 </TextBlock.Style>
                                                 <Hyperlink Command="{Binding DataContext.OpenPageCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                           CommandParameter="{Binding}" ToolTip="{Binding PageUrl}">На сайте ↗</Hyperlink>
+                                                           CommandParameter="{Binding}" ToolTip="{Binding PageUrl}"><Run Text="{local:Tr card.website}" /></Hyperlink>
                                             </TextBlock>
                                         </StackPanel>
                                     </DataTemplate>
@@ -236,25 +236,25 @@
             </TabItem>
 
             <!-- ============ КАТАЛОГ ============ -->
-            <TabItem Header="Каталог">
+            <TabItem Header="{local:Tr tab.catalog}">
                 <local:CatalogView DataContext="{Binding Catalog}" />
             </TabItem>
 
             <!-- ============ СЕРВЕР ============ -->
-            <TabItem Header="Сервер">
-                <TextBlock Margin="16" Text="Здесь будет управление сервером (этап 3)." />
+            <TabItem Header="{local:Tr tab.server}">
+                <TextBlock Margin="16" Text="{local:Tr server.placeholder}" />
             </TabItem>
 
             <!-- ============ НАСТРОЙКИ ============ -->
-            <TabItem Header="Настройки">
+            <TabItem Header="{local:Tr tab.settings}">
                 <DockPanel Margin="8">
                     <!-- список профилей -->
                     <DockPanel DockPanel.Dock="Left" Width="260" Margin="0,0,20,0">
-                        <TextBlock DockPanel.Dock="Top" Text="Профили" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,8" />
+                        <TextBlock DockPanel.Dock="Top" Text="{local:Tr settings.profiles}" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,8" />
                         <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-                            <Button Content="+ Клиент" Command="{Binding AddClientProfileCommand}" HorizontalAlignment="Stretch" Margin="0,0,0,6" />
-                            <Button Content="+ Сервер" Command="{Binding AddServerProfileCommand}" HorizontalAlignment="Stretch" Margin="0,0,0,6" />
-                            <Button Content="Удалить профиль" Command="{Binding RemoveProfileCommand}" CommandParameter="{Binding EditedProfile}"
+                            <Button Content="{local:Tr settings.addClient}" Command="{Binding AddClientProfileCommand}" HorizontalAlignment="Stretch" Margin="0,0,0,6" />
+                            <Button Content="{local:Tr settings.addServer}" Command="{Binding AddServerProfileCommand}" HorizontalAlignment="Stretch" Margin="0,0,0,6" />
+                            <Button Content="{local:Tr settings.removeProfile}" Command="{Binding RemoveProfileCommand}" CommandParameter="{Binding EditedProfile}"
                                     HorizontalAlignment="Stretch" />
                         </StackPanel>
                         <ListBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding EditedProfile}">
@@ -263,7 +263,7 @@
                                     <StackPanel Margin="0,2">
                                         <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
                                         <TextBlock Opacity="0.7">
-                                            <Run Text="{Binding KindText, Mode=OneWay}" /><Run Text=" · игра " /><Run Text="{Binding GameVersionText, Mode=OneWay}" />
+                                            <Run Text="{Binding KindText, Mode=OneWay}" /><Run Text="{local:Tr settings.gameShort}" /><Run Text="{Binding GameVersionText, Mode=OneWay}" />
                                         </TextBlock>
                                     </StackPanel>
                                 </DataTemplate>
@@ -275,29 +275,29 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel MaxWidth="820" HorizontalAlignment="Stretch">
                             <StackPanel DataContext="{Binding EditedProfile}">
-                                <TextBlock Text="Название" FontWeight="SemiBold" />
+                                <TextBlock Text="{local:Tr settings.name}" FontWeight="SemiBold" />
                                 <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
 
-                                <TextBlock Text="Тип" FontWeight="SemiBold" Margin="0,16,0,0" />
+                                <TextBlock Text="{local:Tr settings.type}" FontWeight="SemiBold" Margin="0,16,0,0" />
                                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                    <RadioButton Content="Клиент" IsChecked="{Binding IsServer, Converter={StaticResource Invert}}" Margin="0,0,16,0" />
-                                    <RadioButton Content="Сервер" IsChecked="{Binding IsServer}" />
+                                    <RadioButton Content="{local:Tr settings.kindClient}" IsChecked="{Binding IsServer, Converter={StaticResource Invert}}" Margin="0,0,16,0" />
+                                    <RadioButton Content="{local:Tr tab.server}" IsChecked="{Binding IsServer}" />
                                 </StackPanel>
 
-                                <TextBlock Text="Папка игры" FontWeight="SemiBold" Margin="0,16,0,0" />
+                                <TextBlock Text="{local:Tr settings.gameDir}" FontWeight="SemiBold" Margin="0,16,0,0" />
                                 <TextBlock Style="{StaticResource Hint}"
-                                           Text="Там, где Vintagestory.exe (клиент) или VintagestoryServer.exe (сервер) — по ним определяется версия игры." />
+                                           Text="{local:Tr settings.gameDirHint}" />
                                 <DockPanel>
-                                    <Button DockPanel.Dock="Right" Content="Обзор…" Command="{Binding BrowseGameDirCommand}" Margin="8,0,0,0" Padding="12,4" />
+                                    <Button DockPanel.Dock="Right" Content="{local:Tr common.browse}" Command="{Binding BrowseGameDirCommand}" Margin="8,0,0,0" Padding="12,4" />
                                     <TextBox Text="{Binding GameDir, UpdateSourceTrigger=LostFocus}" />
                                 </DockPanel>
 
-                                <TextBlock Text="Папка данных" FontWeight="SemiBold" Margin="0,16,0,0" />
+                                <TextBlock Text="{local:Tr settings.dataDir}" FontWeight="SemiBold" Margin="0,16,0,0" />
                                 <TextBlock Style="{StaticResource Hint}"
-                                           Text="Клиент — обычно %APPDATA%\VintagestoryData. Сервер — папка из --dataPath (где serverconfig.json). Папки модов и выключенные моды берутся из настроек игры." />
+                                           Text="{local:Tr settings.dataDirHint}" />
                                 <DockPanel>
-                                    <Button DockPanel.Dock="Right" Content="Открыть" Command="{Binding OpenDataDirCommand}" Margin="8,0,0,0" Padding="12,4" />
-                                    <Button DockPanel.Dock="Right" Content="Обзор…" Command="{Binding BrowseDataDirCommand}" Margin="8,0,0,0" Padding="12,4" />
+                                    <Button DockPanel.Dock="Right" Content="{local:Tr common.open}" Command="{Binding OpenDataDirCommand}" Margin="8,0,0,0" Padding="12,4" />
+                                    <Button DockPanel.Dock="Right" Content="{local:Tr common.browse}" Command="{Binding BrowseDataDirCommand}" Margin="8,0,0,0" Padding="12,4" />
                                     <TextBox Text="{Binding DataDir, UpdateSourceTrigger=LostFocus}" />
                                 </DockPanel>
 
@@ -314,29 +314,33 @@
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
-                                        <TextBlock Text="Версия игры:" Opacity="0.7" Margin="0,0,12,6" />
+                                        <TextBlock Text="{local:Tr settings.gameVersion}" Opacity="0.7" Margin="0,0,12,6" />
                                         <TextBlock Grid.Column="1" Text="{Binding GameVersionText}" FontWeight="SemiBold" />
-                                        <TextBlock Grid.Row="1" Text="Файл настроек:" Opacity="0.7" Margin="0,0,12,6" />
+                                        <TextBlock Grid.Row="1" Text="{local:Tr settings.configFile}" Opacity="0.7" Margin="0,0,12,6" />
                                         <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ConfigText}" TextWrapping="Wrap" />
-                                        <TextBlock Grid.Row="2" Text="Папки модов:" Opacity="0.7" Margin="0,0,12,6" />
+                                        <TextBlock Grid.Row="2" Text="{local:Tr settings.modDirs}" Opacity="0.7" Margin="0,0,12,6" />
                                         <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ModDirsText}" TextWrapping="Wrap" Margin="0,0,0,6" />
                                         <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="{Binding WarningsText}" Foreground="#E0A030"
                                                    TextWrapping="Wrap" Visibility="{Binding HasWarnings, Converter={StaticResource BoolToVis}}" />
                                     </Grid>
                                 </Border>
-                                <Button Content="Перечитать" Command="{Binding RereadCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="12,4" />
+                                <Button Content="{local:Tr settings.reread}" Command="{Binding RereadCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="12,4" />
                             </StackPanel>
 
-                            <CheckBox Content="Проверять обновления модов при запуске и смене профиля" IsChecked="{Binding AutoCheckUpdates}" Margin="0,28,0,0" />
-                            <CheckBox Content="Предлагать пре-релизы модов (rc/pre)" IsChecked="{Binding AllowUnstable}" Margin="0,12,0,0" />
-                            <TextBlock Style="{StaticResource Hint}" Margin="28,2,0,0"
-                                       Text="Общая настройка для всех профилей. Для модов, у которых уже стоит пре-релиз, они учитываются всегда." />
+                            <TextBlock Text="{local:Tr settings.language}" FontWeight="SemiBold" Margin="0,28,0,0" />
+                            <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedLanguage}" Width="220"
+                                      HorizontalAlignment="Left" Margin="0,4,0,0" />
 
-                            <TextBlock Text="Данные eViSTool" FontWeight="SemiBold" Margin="0,28,0,0" />
+                            <CheckBox Content="{local:Tr settings.autoCheck}" IsChecked="{Binding AutoCheckUpdates}" Margin="0,20,0,0" />
+                            <CheckBox Content="{local:Tr settings.allowUnstable}" IsChecked="{Binding AllowUnstable}" Margin="0,12,0,0" />
+                            <TextBlock Style="{StaticResource Hint}" Margin="28,2,0,0"
+                                       Text="{local:Tr settings.allowUnstableHint}" />
+
+                            <TextBlock Text="{local:Tr settings.appData}" FontWeight="SemiBold" Margin="0,28,0,0" />
                             <TextBlock Style="{StaticResource Hint}"
-                                       Text="Настройки, сохранённые версии модов, скачивания и логи. Программа портабельная: перенёс папку — перенёс всё." />
+                                       Text="{local:Tr settings.appDataHint}" />
                             <DockPanel>
-                                <Button DockPanel.Dock="Right" Content="Открыть" Command="{Binding OpenDataFolderCommand}" Margin="8,0,0,0" Padding="12,4" />
+                                <Button DockPanel.Dock="Right" Content="{local:Tr common.open}" Command="{Binding OpenDataFolderCommand}" Margin="8,0,0,0" Padding="12,4" />
                                 <TextBlock Text="{Binding DataLocationText}" VerticalAlignment="Center" TextWrapping="Wrap" />
                             </DockPanel>
                         </StackPanel>

@@ -1,5 +1,6 @@
 using eViSTool.Core.ModDb;
 using eViSTool.Core.Versioning;
+using eViSTool.Core.Localization;
 
 namespace eViSTool.Core.Mods;
 
@@ -133,28 +134,28 @@ public static class UpdateChecker
             {
                 // автор просто не отметил текущую ветку игры, а новее ничего нет
                 status = ModStatus.UpToDate;
-                message = $"Последняя версия, но автор не отметил совместимость с {branch}";
+                message = Loc.T("status.latestUnmarked", branch);
             }
             else if (compatible is null)
             {
                 status = ModStatus.NoCompatibleRelease;
-                message = $"Нет релиза для {branch}";
+                message = Loc.T("status.noReleaseFor", branch);
             }
             else if (installed is null)
             {
                 // версию не разобрать — считаем, что стоит не то, что надо
                 status = ModStatus.UpdateAvailable;
-                message = "Не удалось разобрать установленную версию";
+                message = Loc.T("status.unparsedVersion");
             }
             else
             {
                 var target = ModVersion.ParseOrNull(compatible.ModVersion)!;
                 status = target > installed ? ModStatus.UpdateAvailable : ModStatus.UpToDate;
-                if (installed > target) message = "Установлена версия новее, чем в модбазе";
+                if (installed > target) message = Loc.T("status.newerThanModDb");
                 if (status == ModStatus.UpdateAvailable && policy.IsPinned(modId))
                 {
                     status = ModStatus.Pinned;
-                    message = $"Закреплён на {installed}, в модбазе есть {target}";
+                    message = Loc.T("status.pinnedNote", installed, target);
                 }
             }
 

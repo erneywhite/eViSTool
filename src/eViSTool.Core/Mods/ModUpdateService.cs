@@ -1,6 +1,7 @@
 using eViSTool.Core.ModDb;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Versioning;
+using eViSTool.Core.Localization;
 
 namespace eViSTool.Core.Mods;
 
@@ -22,8 +23,8 @@ public sealed class ModUpdateService(ModDbClient db)
     {
         var identified = locals.Where(l => l.Info is not null).ToList();
 
-        progress?.Report($"Запрос модбазы: 0/{identified.Count}");
-        var perMod = new Progress<int>(n => progress?.Report($"Запрос модбазы: {n}/{identified.Count}"));
+        progress?.Report(Loc.T("check.querying", 0, identified.Count));
+        var perMod = new Progress<int>(n => progress?.Report(Loc.T("check.querying", n, identified.Count)));
         var remote = new Dictionary<string, ModDbResult>(
             await db.GetModsAsync(identified.Select(l => l.Info!.ModId), progress: perMod, ct: ct).ConfigureAwait(false),
             StringComparer.OrdinalIgnoreCase);
@@ -31,11 +32,11 @@ public sealed class ModUpdateService(ModDbClient db)
         var notFound = identified.Where(l => remote.TryGetValue(l.Info!.ModId, out var r) && r is { Mod: null, Error: null }).ToList();
         if (notFound.Count > 0)
         {
-            progress?.Report("Поиск ненайденных модов в каталоге…");
+            progress?.Report(Loc.T("check.searchingCatalog"));
             await ResolveViaCatalogAsync(notFound, remote, ct).ConfigureAwait(false);
         }
 
-        progress?.Report("Готово");
+        progress?.Report(Loc.T("common.done"));
         return remote;
     }
 
@@ -44,8 +45,8 @@ public sealed class ModUpdateService(ModDbClient db)
         ResolvedProfile profile, bool allowUnstable = false,
         IProgress<string>? progress = null, CancellationToken ct = default)
     {
-        var gameVersion = profile.GameVersion ?? throw new InvalidOperationException("Не определена версия игры");
-        progress?.Report("Чтение папок модов…");
+        var gameVersion = profile.GameVersion ?? throw new InvalidOperationException(Loc.T("err.noGameVersion"));
+        progress?.Report(Loc.T("check.readingFolders"));
         var locals = await Task.Run(() => ScanLocal(profile), ct).ConfigureAwait(false);
         var remote = await FetchRemoteAsync(locals, progress, ct).ConfigureAwait(false);
         return UpdateChecker.Evaluate(locals, remote, gameVersion, allowUnstable);

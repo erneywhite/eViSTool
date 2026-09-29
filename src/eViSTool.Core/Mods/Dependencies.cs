@@ -1,4 +1,5 @@
 using eViSTool.Core.Versioning;
+using eViSTool.Core.Localization;
 
 namespace eViSTool.Core.Mods;
 
@@ -14,9 +15,9 @@ public sealed record DependencyIssue(
     public bool IsOutdated => !IsMissing && !IsDisabled;
 
     public string Describe() =>
-        IsMissing ? $"{ModId}: не установлен (нужен для {string.Join(", ", RequiredBy)})"
-        : IsDisabled ? $"{ModId}: выключен, а нужен для {string.Join(", ", RequiredBy)}"
-        : $"{ModId}: стоит {InstalledVersion}, а {string.Join(", ", RequiredBy)} требует не ниже {RequiredVersion}";
+        IsMissing ? Loc.T("dep.missing", ModId, string.Join(", ", RequiredBy))
+        : IsDisabled ? Loc.T("dep.disabled", ModId, string.Join(", ", RequiredBy))
+        : Loc.T("dep.outdated", ModId, InstalledVersion, string.Join(", ", RequiredBy), RequiredVersion);
 }
 
 public static class Dependencies
