@@ -1,0 +1,74 @@
+using System.Runtime.InteropServices;
+using System.Text;
+
+namespace eViSTool.Core.Server;
+
+/// <summary>
+/// Общая консоль с сервером. Процесс без окна наследует консоль родителя; если она в UTF-8,
+/// сервер (он на .NET) тоже пишет в UTF-8 — иначе кириллица из логов VS превращается в «????».
+/// Через неё же Ctrl+C для мягкой остановки: событие получают все процессы консоли, себя мы исключаем.
+/// </summary>
+public static partial class ConsoleInterop
+{
+    /// <summary>Есть ли у текущего процесса консоль (у агента — да, у окна eViSTool — нет).</summary>
+    public static bool HasConsole => OperatingSystem.IsWindows() && GetConsoleCP() != 0;
+
+    /// <summary>Переключить свою консоль на UTF-8 — дочерний сервер её унаследует.</summary>
+    public static bool TryUseUtf8()
+    {
+        if (!HasConsole) return false;
+        try
+        {
+            Console.OutputEncoding = Encoding.UTF8;
+            Console.InputEncoding = Encoding.UTF8;
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Признак «игнорировать Ctrl+C» наследуется дочерними процессами. Если нас запустили с ним
+    /// (так делают некоторые оболочки и тестовые среды), сервер тоже не услышит мягкую остановку.
+    /// Снимаем признак перед запуском сервера — сервер унаследует обычную обработку.
+    /// </summary>
+    public static void EnableCtrlCForChildren()
+    {
+        if (HasConsole) SetConsoleCtrlHandler(IntPtr.Zero, false);
+    }
+
+    /// <summary>Ctrl+C всем процессам общей консоли, кроме нас самих.</summary>
+    public static bool SendCtrlCToConsole()
+    {
+        if (!HasConsole) return false;
+        SetConsoleCtrlHandler(IntPtr.Zero, true);   // сами игнорируем
+        try
+        {
+            return GenerateConsoleCtrlEvent(0 /* CTRL_C_EVENT */, 0);
+        }
+        finally
+        {
+            // обработчик возвращаем не сразу: событие доставляется асинхронно
+            Task.Delay(1000).ContinueWith(_ => SetConsoleCtrlHandler(IntPtr.Zero, false));
+        }
+    }
+
+    [LibraryImport("kernel32.dll")]
+    private static partial uint GetConsoleCP();
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GenerateConsoleCtrlEvent(uint ctrlEvent, uint processGroupId);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SetConsoleCtrlHandler(IntPtr handler, [MarshalAs(UnmanagedType.Bool)] bool add);
+}
+
+/// <summary>Ctrl+C через общую консоль (работает, когда сервер запущен в консоли агента).</summary>
+public sealed class SharedConsoleCtrlC : ICtrlCSender
+{
+    public bool SendCtrlC(int pid) => ConsoleInterop.SendCtrlCToConsole();
+}
