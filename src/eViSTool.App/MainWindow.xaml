@@ -347,6 +347,11 @@
                     </ScrollViewer>
                 </DockPanel>
             </TabItem>
+
+            <!-- ============ О ПРОГРАММЕ ============ -->
+            <TabItem Header="{local:Tr tab.about}">
+                <local:AboutView DataContext="{Binding About}" />
+            </TabItem>
         </TabControl>
     </DockPanel>
 </Window>

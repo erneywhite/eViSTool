@@ -17,6 +17,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     public ModsViewModel Mods { get; }
     public CatalogViewModel Catalog { get; }
+    public AboutViewModel About { get; } = new();
 
     /// <summary>Открытая вкладка: 0 — моды, 1 — каталог, …</summary>
     [ObservableProperty] private int _selectedTab;

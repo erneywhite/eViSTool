@@ -1,0 +1,83 @@
+<UserControl x:Class="eViSTool.App.AboutView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:eViSTool.App">
+    <UserControl.Resources>
+        <Style x:Key="Section" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="Margin" Value="0,24,0,6" />
+        </Style>
+        <Style x:Key="Muted" TargetType="TextBlock">
+            <Setter Property="Opacity" Value="0.75" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24" MaxWidth="760" HorizontalAlignment="Left">
+            <!-- шапка -->
+            <DockPanel>
+                <Image DockPanel.Dock="Left" Source="Assets/logo256.png" Width="112" Height="112" Margin="0,0,20,0"
+                       RenderOptions.BitmapScalingMode="HighQuality" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="eViSTool" FontSize="30" FontWeight="SemiBold" />
+                    <TextBlock Style="{StaticResource Muted}">
+                        <Run Text="{local:Tr about.version}" /><Run Text=" " /><Run Text="{Binding AppVersion, Mode=OneWay}" FontWeight="SemiBold" />
+                        <Run Text="   ·   Erney White" />
+                    </TextBlock>
+                    <TextBlock Text="{local:Tr about.tagline}" Style="{StaticResource Muted}" Margin="0,6,0,0" />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- поддержать -->
+            <Border Margin="0,24,0,0" Padding="16" CornerRadius="8" Background="#1A29ABE0">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Command="{Binding OpenKofiCommand}" Padding="18,8" Margin="16,0,0,0"
+                            Style="{DynamicResource AccentButtonStyle}" VerticalAlignment="Center">
+                        <TextBlock Text="{local:Tr about.kofiButton}" />
+                    </Button>
+                    <StackPanel>
+                        <TextBlock Text="{local:Tr about.supportTitle}" FontWeight="SemiBold" FontSize="15" />
+                        <TextBlock Text="{local:Tr about.supportText}" Style="{StaticResource Muted}" Margin="0,4,0,0" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- обновления программы -->
+            <TextBlock Text="{local:Tr about.updates}" Style="{StaticResource Section}" />
+            <StackPanel Orientation="Horizontal">
+                <Button Content="{local:Tr about.checkUpdates}" Command="{Binding CheckAppUpdateCommand}" Padding="12,6" />
+                <TextBlock Text="{Binding UpdateStatus}" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="12,0,0,0" />
+            </StackPanel>
+
+            <!-- ссылки -->
+            <TextBlock Text="{local:Tr about.links}" Style="{StaticResource Section}" />
+            <TextBlock>
+                <Hyperlink Command="{Binding OpenUrlCommand}" CommandParameter="https://github.com/erneywhite/eViSTool"><Run Text="{local:Tr about.github}" /></Hyperlink>
+            </TextBlock>
+            <TextBlock Margin="0,4,0,0">
+                <Hyperlink Command="{Binding OpenUrlCommand}" CommandParameter="https://github.com/erneywhite/eViSTool/issues"><Run Text="{local:Tr about.issues}" /></Hyperlink>
+            </TextBlock>
+            <TextBlock Margin="0,4,0,0">
+                <Hyperlink Command="{Binding OpenUrlCommand}" CommandParameter="https://mods.vintagestory.at/"><Run Text="{local:Tr about.moddb}" /></Hyperlink>
+            </TextBlock>
+
+            <!-- благодарности -->
+            <TextBlock Text="{local:Tr about.credits}" Style="{StaticResource Section}" />
+            <TextBlock Style="{StaticResource Muted}">
+                <Hyperlink Command="{Binding OpenUrlCommand}" CommandParameter="https://github.com/Tekunogosu/Rustique">Rustique</Hyperlink>
+                <Run Text="{local:Tr about.creditRustique}" />
+            </TextBlock>
+            <TextBlock Style="{StaticResource Muted}" Margin="0,4,0,0">
+                <Hyperlink Command="{Binding OpenUrlCommand}" CommandParameter="https://mods.vintagestory.at/show/mod/17652">ViSST Server Tool</Hyperlink>
+                <Run Text="{local:Tr about.creditVisst}" />
+            </TextBlock>
+            <TextBlock Style="{StaticResource Muted}" Margin="0,4,0,0">
+                <Run Text="{local:Tr about.creditGame}" />
+            </TextBlock>
+
+            <TextBlock Text="© 2026 Erney White" Style="{StaticResource Muted}" Margin="0,24,0,0" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
