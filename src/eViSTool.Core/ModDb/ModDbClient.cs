@@ -69,6 +69,18 @@ public sealed class ModDbClient : IDisposable
         return JsonConvert.DeserializeObject<ModDbListResponse>(json)?.Mods ?? [];
     }
 
+    /// <summary>
+    /// Моды, у которых есть релиз с любым из этих тегов версий игры. Фильтр делает сам сайт
+    /// (gameversions[]=…) — одним запросом вместо запроса на каждый мод.
+    /// </summary>
+    public async Task<IReadOnlyList<ModDbListItem>> GetModsForGameVersionsAsync(IEnumerable<long> tagIds, CancellationToken ct = default)
+    {
+        var query = string.Join("&", tagIds.Select(t => $"gameversions[]={t}"));
+        if (query.Length == 0) return [];
+        var json = await _http.GetStringAsync($"mods?{query}", ct).ConfigureAwait(false);
+        return JsonConvert.DeserializeObject<ModDbListResponse>(json)?.Mods ?? [];
+    }
+
     public async Task<IReadOnlyList<ModDbTag>> GetGameVersionsAsync(CancellationToken ct = default)
     {
         var json = await _http.GetStringAsync("gameversions", ct).ConfigureAwait(false);

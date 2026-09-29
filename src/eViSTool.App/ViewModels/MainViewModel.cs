@@ -77,6 +77,8 @@ public sealed partial class MainViewModel : ObservableObject
         if (profile == ActiveProfile) Mods.OnProfileSwitched();
     }
 
+    public WindowLayout Layout => _settings.Layout;
+
     /// <summary>Сохранить настройки (например, после закрепления версии мода).</summary>
     public void SaveSettings() => Save();
 

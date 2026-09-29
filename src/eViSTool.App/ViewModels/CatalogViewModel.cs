@@ -37,6 +37,24 @@ public sealed partial class CatalogViewModel : ObservableObject
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private bool _isLoading;
 
+    /// <summary>Фильтр по версии игры: null — любая, иначе ветка "1.22".</summary>
+    [ObservableProperty] private IReadOnlyList<Choice<string?>> _branches = [new("Любая версия игры", null)];
+    [ObservableProperty] private Choice<string?>? _selectedBranch;
+
+    /// <summary>Моды, у которых есть релиз для ветки активного профиля — для пометки в списке.</summary>
+    private IReadOnlySet<long>? _profileCompat;
+    private string? ProfileBranch => _main.ActiveProfile?.Resolved.GameVersion is { } g ? $"{g.Major}.{g.Minor}" : null;
+    private int _searchGeneration;
+
+    /// <summary>Ширина карточки мода (разделитель можно тянуть, ширина запоминается).</summary>
+    public double DetailsWidth
+    {
+        get => _main.Layout.CatalogDetailsWidth;
+        set { _main.Layout.CatalogDetailsWidth = Math.Max(320, value); OnPropertyChanged(); }
+    }
+
+    public void SaveLayout() => _main.SaveSettings();
+
     public IReadOnlyList<Choice<string?>> Sides { get; } =
     [
         new("Любая сторона", null),
@@ -78,6 +96,7 @@ public sealed partial class CatalogViewModel : ObservableObject
     partial void OnSelectedTagChanged(string value) => ApplySearch();
     partial void OnSelectedSideChanged(Choice<string?> value) => ApplySearch();
     partial void OnSelectedSortChanged(Choice<CatalogSort> value) => ApplySearch();
+    partial void OnSelectedBranchChanged(Choice<string?>? value) => ApplySearch();
 
     /// <summary>Первое открытие вкладки — загрузить каталог (из кэша, если свежий).</summary>
     public async Task EnsureLoadedAsync()
@@ -96,8 +115,17 @@ public sealed partial class CatalogViewModel : ObservableObject
         try
         {
             await _catalog.LoadAsync(force);
+            await _catalog.LoadBranchesAsync(force);
+            if (ProfileBranch is { } mine && _catalog.Branches.Contains(mine))
+                _profileCompat = await _catalog.CompatibleAssetsAsync(mine, force);
+
+            var keepBranch = SelectedBranch?.Value ?? (_loaded ? null : ProfileBranch);
+            Branches = [new("Любая версия игры", null), .. _catalog.Branches.Select(b =>
+                new Choice<string?>(b == ProfileBranch ? $"Есть версия для {b}.x (твоя)" : $"Есть версия для {b}.x", b))];
             _loaded = true;
             Tags = [AllTags, .. _catalog.Tags()];
+            // по умолчанию — ветка игры активного профиля
+            SelectedBranch = Branches.FirstOrDefault(b => b.Value == keepBranch) ?? Branches[0];
             ApplySearch();
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
@@ -110,20 +138,41 @@ public sealed partial class CatalogViewModel : ObservableObject
         }
     }
 
-    private void ApplySearch()
+    private async void ApplySearch()
     {
         if (!_loaded) return;
+        var generation = ++_searchGeneration;
+
+        IReadOnlySet<long>? only = null;
+        if (SelectedBranch?.Value is { } branch)
+        {
+            try
+            {
+                StatusText = $"Сверяю моды с версией {branch}.x…";
+                only = await _catalog.CompatibleAssetsAsync(branch);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            {
+                StatusText = $"Не удалось получить моды для {branch}.x: {ex.Message}";
+                return;
+            }
+            if (generation != _searchGeneration) return; // пока ждали, условия поменялись
+        }
+
         var found = _catalog.Search(new CatalogQuery
         {
             Text = Search,
             Tag = SelectedTag == AllTags ? null : SelectedTag,
             Side = SelectedSide.Value,
             Sort = SelectedSort.Value,
+            OnlyAssets = only,
         });
 
         var installed = _main.Mods.InstalledVersions;
         var keep = Selected?.Item.ModId;
-        Results = found.Select(i => new CatalogItemViewModel(i, installed)).ToList();
+        var branchLabel = ProfileBranch is { } pb ? $"{pb}.x" : null;
+        Results = found.Select(i => new CatalogItemViewModel(i, installed,
+            _profileCompat is null || branchLabel is null ? null : _profileCompat.Contains(i.AssetId), branchLabel)).ToList();
         if (keep is not null) Selected = Results.FirstOrDefault(r => r.Item.ModId == keep);
 
         var at = _catalog.LoadedAt?.ToLocalTime().ToString("dd.MM HH:mm") ?? "—";
@@ -157,8 +206,12 @@ public sealed partial class CatalogViewModel : ObservableObject
 }
 
 /// <summary>Строка списка каталога.</summary>
-public sealed class CatalogItemViewModel(ModDbListItem item, IReadOnlyDictionary<string, string> installed)
+public sealed class CatalogItemViewModel(ModDbListItem item, IReadOnlyDictionary<string, string> installed,
+    bool? compatible = null, string? branch = null)
 {
+    /// <summary>Пометка «нет версии для 1.22.x» — если известно, что релиза под ветку игры нет.</summary>
+    public string? NoVersionText { get; } = compatible == false ? $"нет версии для {branch}" : null;
+
     public ModDbListItem Item { get; } = item;
     public string Name { get; } = item.Name ?? item.PrimaryModId ?? "?";
     public string Author { get; } = item.Author ?? "";
@@ -237,7 +290,7 @@ public sealed partial class ModDetailsViewModel : ObservableObject
             }
 
             Description = Html.ToPlainText(mod.Text) ?? Description;
-            Screenshots = mod.Screenshots.Select(s => s.MainFile).Where(u => !string.IsNullOrWhiteSpace(u)).Take(6).ToList()!;
+            Screenshots = mod.Screenshots.Select(s => s.MainFile).Where(u => !string.IsNullOrWhiteSpace(u)).ToList()!;
 
             if (_game is null)
             {
@@ -298,8 +351,10 @@ public sealed partial class ModDetailsViewModel : ObservableObject
     private void OpenPage() => Shell.OpenUrl(PageUrl);
 
     [RelayCommand]
-    private static void OpenScreenshot(string? url)
+    private void OpenScreenshot(string? url)
     {
-        if (!string.IsNullOrEmpty(url)) Shell.OpenUrl(url);
+        if (string.IsNullOrEmpty(url) || Screenshots.Count == 0) return;
+        var index = Math.Max(0, Screenshots.ToList().IndexOf(url));
+        new ScreenshotWindow(Screenshots, index, $"{Name} — скриншоты") { Owner = Application.Current.MainWindow }.ShowDialog();
     }
 }

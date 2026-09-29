@@ -1,8 +1,10 @@
 <UserControl x:Class="eViSTool.App.CatalogView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:eViSTool.App">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:PixelsToGridLengthConverter x:Key="PxToGrid" />
         <Style x:Key="Muted" TargetType="TextBlock">
             <Setter Property="Opacity" Value="0.7" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -24,6 +26,8 @@
             <ComboBox DockPanel.Dock="Right" Width="200" Margin="8,0,0,0" ItemsSource="{Binding Sorts}" SelectedItem="{Binding SelectedSort}" />
             <ComboBox DockPanel.Dock="Right" Width="170" Margin="8,0,0,0" ItemsSource="{Binding Sides}" SelectedItem="{Binding SelectedSide}" />
             <ComboBox DockPanel.Dock="Right" Width="170" Margin="8,0,0,0" ItemsSource="{Binding Tags}" SelectedItem="{Binding SelectedTag}" />
+            <ComboBox DockPanel.Dock="Right" Width="230" Margin="8,0,0,0" ItemsSource="{Binding Branches}" SelectedItem="{Binding SelectedBranch}"
+                      ToolTip="Показывать только моды, у которых в модбазе есть релиз для этой версии игры. Старые моды без отметки иногда тоже работают — тогда выбери «Любая версия игры»." />
             <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
                      ToolTip="Поиск по названию, описанию, автору и modid (несколько слов — все сразу)" />
         </DockPanel>
@@ -32,10 +36,16 @@
 
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="320" />
+                <ColumnDefinition Width="*" MinWidth="300" />
                 <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="440" />
+                <ColumnDefinition Width="{Binding DetailsWidth, Mode=TwoWay, Converter={StaticResource PxToGrid}}" MinWidth="320" />
             </Grid.ColumnDefinitions>
+
+            <!-- разделитель: тяни, чтобы сделать карточку шире/уже (ширина запоминается) -->
+            <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext"
+                          Background="Transparent" Cursor="SizeWE" ToolTip="Потяни, чтобы изменить ширину"
+                          DragCompleted="Splitter_DragCompleted" />
+            <Rectangle Grid.Column="1" Width="2" RadiusX="1" RadiusY="1" Fill="#40808080" Height="40" IsHitTestVisible="False" />
 
             <!-- список -->
             <ListBox ItemsSource="{Binding Results}" SelectedItem="{Binding Selected}" HorizontalContentAlignment="Stretch"
@@ -67,7 +77,10 @@
                                     </TextBlock>
                                 </DockPanel>
                                 <TextBlock Text="{Binding Summary}" Style="{StaticResource Muted}" Margin="0,2,0,0" />
-                                <TextBlock Text="{Binding Stats}" Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" />
+                                <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0">
+                                    <Run Text="{Binding Stats, Mode=OneWay}" />
+                                    <Run Text="{Binding NoVersionText, Mode=OneWay}" Foreground="#E0A030" />
+                                </TextBlock>
                             </StackPanel>
                         </DockPanel>
                     </DataTemplate>
@@ -125,8 +138,10 @@
                             </WrapPanel>
                         </StackPanel>
 
-                        <!-- скриншоты: клик — открыть в браузере -->
-                        <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding Screenshots}" Margin="0,12,0,0">
+                        <!-- скриншоты и описание — одна прокрутка, чтобы описанию хватало места -->
+                        <ScrollViewer Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <ItemsControl ItemsSource="{Binding Screenshots}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <WrapPanel />
@@ -134,17 +149,16 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Button Padding="0" Margin="0,0,6,6" Cursor="Hand" ToolTip="Открыть скриншот"
+                                    <Button Padding="0" Margin="0,0,6,6" Cursor="Hand" ToolTip="Открыть скриншот (листать стрелками)"
                                             Command="{Binding DataContext.OpenScreenshotCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                             CommandParameter="{Binding}">
-                                        <Image Source="{Binding}" Width="128" Height="72" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                        <Image Source="{Binding}" Width="160" Height="90" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
                                     </Button>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-
-                        <ScrollViewer Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
-                            <TextBlock Text="{Binding Description}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                            </StackPanel>
                         </ScrollViewer>
                     </DockPanel>
                 </Grid>

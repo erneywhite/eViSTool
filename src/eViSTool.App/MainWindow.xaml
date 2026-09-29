@@ -4,7 +4,8 @@
         xmlns:vm="clr-namespace:eViSTool.App.ViewModels"
         xmlns:local="clr-namespace:eViSTool.App"
         xmlns:mods="clr-namespace:eViSTool.Core.Mods;assembly=eViSTool.Core"
-        Title="eViSTool" Icon="Assets/eViSTool.ico" Height="740" Width="1200" MinHeight="480" MinWidth="860"
+        Title="eViSTool" Icon="Assets/eViSTool.ico" Height="860" Width="1400" MinHeight="480" MinWidth="860"
+        Loaded="Window_Loaded" Closing="Window_Closing"
         WindowStartupLocation="CenterScreen">
     <Window.DataContext>
         <vm:MainViewModel />

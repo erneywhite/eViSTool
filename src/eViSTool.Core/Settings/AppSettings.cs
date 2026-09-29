@@ -11,6 +11,9 @@ public sealed class AppSettings
     /// <summary>Предлагать пре-релизы модов (rc/pre) даже тем, у кого стоит стабильная версия.</summary>
     public bool AllowUnstable { get; set; }
 
+    /// <summary>Раскладка окна: запоминается между запусками.</summary>
+    public WindowLayout Layout { get; set; } = new();
+
     /// <summary>Устаревшее (до профилей): папка игры. Переносится в профиль при загрузке.</summary>
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     public string? GameDir { get; set; }
@@ -27,6 +30,16 @@ public sealed class AppSettings
         if (Profiles.All(p => p.Id != ActiveProfileId))
             ActiveProfileId = Profiles[0].Id;
     }
+}
+
+public sealed class WindowLayout
+{
+    public double Width { get; set; } = 1400;
+    public double Height { get; set; } = 860;
+    public bool Maximized { get; set; }
+
+    /// <summary>Ширина карточки мода в каталоге (перетаскивается разделителем).</summary>
+    public double CatalogDetailsWidth { get; set; } = 760;
 }
 
 /// <summary>Хранит настройки в settings.json папки данных (см. <see cref="AppPaths"/>). Запись атомарная: сначала во временный файл.</summary>

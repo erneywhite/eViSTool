@@ -12,6 +12,28 @@ public partial class MainWindow : Window
 
     private MainViewModel Vm => (MainViewModel)DataContext;
 
+    // размер окна — как в прошлый раз (но не больше экрана)
+    private void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        var l = Vm.Layout;
+        var area = SystemParameters.WorkArea;
+        Width = Math.Min(l.Width, area.Width);
+        Height = Math.Min(l.Height, area.Height);
+        Left = area.Left + (area.Width - Width) / 2;
+        Top = area.Top + (area.Height - Height) / 2;
+        if (l.Maximized) WindowState = WindowState.Maximized;
+    }
+
+    private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        var l = Vm.Layout;
+        l.Maximized = WindowState == WindowState.Maximized;
+        var bounds = l.Maximized ? RestoreBounds : new Rect(Left, Top, Width, Height);
+        l.Width = bounds.Width;
+        l.Height = bounds.Height;
+        Vm.SaveSettings();
+    }
+
     // перетаскивание zip-архивов из Проводника в список модов
     private void ModsGrid_DragOver(object sender, DragEventArgs e)
     {
