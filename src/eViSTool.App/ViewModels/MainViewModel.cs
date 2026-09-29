@@ -33,6 +33,13 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private ProfileViewModel? _editedProfile;
 
     [ObservableProperty] private bool _allowUnstable;
+    [ObservableProperty] private bool _autoCheckUpdates;
+
+    partial void OnAutoCheckUpdatesChanged(bool value)
+    {
+        _settings.AutoCheckUpdates = value;
+        Save();
+    }
 
     public string DataLocationText => Core.AppPaths.IsPortable
         ? $"{Core.AppPaths.Root}  (портабельно, рядом с программой)"
@@ -47,6 +54,7 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var p in _settings.Profiles) Profiles.Add(new ProfileViewModel(p, OnProfileChanged));
 
         _allowUnstable = _settings.AllowUnstable;
+        _autoCheckUpdates = _settings.AutoCheckUpdates;
         _activeProfile = Profiles.FirstOrDefault(p => p.Model == _settings.ActiveProfile);
         _editedProfile = _activeProfile;
 
@@ -78,6 +86,13 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     public WindowLayout Layout => _settings.Layout;
+
+    /// <summary>Перейти на вкладку «Каталог» и открыть там мод.</summary>
+    public async Task ShowInCatalogAsync(long? assetId, string? modId, string? name)
+    {
+        SelectedTab = 1;
+        await Catalog.ShowModAsync(assetId, modId, name);
+    }
 
     /// <summary>Сохранить настройки (например, после закрепления версии мода).</summary>
     public void SaveSettings() => Save();

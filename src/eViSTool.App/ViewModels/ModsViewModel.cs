@@ -85,6 +85,8 @@ public sealed partial class ModsViewModel : ObservableObject
         OnPropertyChanged(nameof(ProfileInfo));
         ReloadLocal();
         StatusText = "Моды прочитаны с диска. «Проверить обновления» — сверить с модбазой.";
+        if (_main.AutoCheckUpdates && Profile?.GameVersion is not null && CheckCommand.CanExecute(null))
+            CheckCommand.Execute(null);
     }
 
     /// <summary>Перечитать папки модов (без сети) и перестроить таблицу с уже известными статусами.</summary>
@@ -619,6 +621,13 @@ public sealed partial class ModsViewModel : ObservableObject
 
 
     // ---------- прочее ----------
+
+    [RelayCommand]
+    private async Task ShowInCatalog(ModRowViewModel? row)
+    {
+        if (row is null) return;
+        await _main.ShowInCatalogAsync(row.Result.Remote?.AssetId, row.ModId, row.Local.Info?.Name);
+    }
 
     [RelayCommand]
     private static void OpenPage(ModRowViewModel? row)

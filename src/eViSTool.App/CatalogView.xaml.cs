@@ -11,5 +11,10 @@ public partial class CatalogView : UserControl
         InitializeComponent();
     }
 
+    private void ModsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ModsList.SelectedItem is { } item) ModsList.ScrollIntoView(item);
+    }
+
     private void Splitter_DragCompleted(object sender, DragCompletedEventArgs e) => (DataContext as CatalogViewModel)?.SaveLayout();
 }

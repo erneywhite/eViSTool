@@ -99,10 +99,42 @@ public sealed partial class CatalogViewModel : ObservableObject
     partial void OnSelectedBranchChanged(Choice<string?>? value) => ApplySearch();
 
     /// <summary>Первое открытие вкладки — загрузить каталог (из кэша, если свежий).</summary>
-    public async Task EnsureLoadedAsync()
+    public Task EnsureLoadedAsync()
     {
-        if (_loaded || IsLoading) return;
-        await LoadAsync(force: false);
+        if (_loaded) return Task.CompletedTask;
+        return _loadTask ??= LoadAsync(force: false); // повторный вызов ждёт ту же загрузку
+    }
+
+    private Task? _loadTask;
+
+    /// <summary>
+    /// Открыть мод в каталоге (из вкладки «Моды»): фильтры сбрасываются, чтобы мод точно был виден,
+    /// в поиск подставляется его название, мод выбирается и открывается карточка.
+    /// </summary>
+    public async Task<bool> ShowModAsync(long? assetId, string? modId, string? name)
+    {
+        await EnsureLoadedAsync();
+        if (!_loaded) return false;
+
+        var item = (assetId is > 0 ? _catalog.Items.FirstOrDefault(i => i.AssetId == assetId) : null)
+                   ?? (modId is null ? null : _catalog.Items.FirstOrDefault(i =>
+                       i.ModIdStrs.Any(s => string.Equals(s, modId, StringComparison.OrdinalIgnoreCase))))
+                   ?? (name is null ? null : _catalog.Items.FirstOrDefault(i =>
+                       string.Equals(i.Name?.Trim(), name.Trim(), StringComparison.OrdinalIgnoreCase)));
+        if (item is null)
+        {
+            StatusText = $"«{name ?? modId}» нет в каталоге модбазы";
+            return false;
+        }
+
+        SelectedBranch = Branches[0];
+        SelectedTag = AllTags;
+        SelectedSide = Sides[0];
+        Search = item.Name ?? "";
+        _searchDelay.Stop();
+        await ApplySearchAsync();
+        Selected = Results.FirstOrDefault(r => r.Item.AssetId == item.AssetId);
+        return Selected is not null;
     }
 
     [RelayCommand]
@@ -135,10 +167,13 @@ public sealed partial class CatalogViewModel : ObservableObject
         finally
         {
             IsLoading = false;
+            if (!_loaded) _loadTask = null; // не загрузилось — следующая попытка начнёт заново
         }
     }
 
-    private async void ApplySearch()
+    private void ApplySearch() => _ = ApplySearchAsync();
+
+    private async Task ApplySearchAsync()
     {
         if (!_loaded) return;
         var generation = ++_searchGeneration;
@@ -173,7 +208,12 @@ public sealed partial class CatalogViewModel : ObservableObject
         var branchLabel = ProfileBranch is { } pb ? $"{pb}.x" : null;
         Results = found.Select(i => new CatalogItemViewModel(i, installed,
             _profileCompat is null || branchLabel is null ? null : _profileCompat.Contains(i.AssetId), branchLabel)).ToList();
-        if (keep is not null) Selected = Results.FirstOrDefault(r => r.Item.ModId == keep);
+        if (keep is not null)
+        {
+            var again = Results.FirstOrDefault(r => r.Item.ModId == keep);
+            if (again is not null) SetProperty(ref _selected, again, nameof(Selected)); // без перезагрузки карточки
+            else Selected = null;
+        }
 
         var at = _catalog.LoadedAt?.ToLocalTime().ToString("dd.MM HH:mm") ?? "—";
         StatusText = $"Найдено: {Results.Count} из {_catalog.Items.Count}   ·   каталог от {at}";

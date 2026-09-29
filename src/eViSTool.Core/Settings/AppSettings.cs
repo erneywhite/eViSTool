@@ -11,6 +11,9 @@ public sealed class AppSettings
     /// <summary>Предлагать пре-релизы модов (rc/pre) даже тем, у кого стоит стабильная версия.</summary>
     public bool AllowUnstable { get; set; }
 
+    /// <summary>Сверять моды с модбазой сразу при запуске и при смене профиля.</summary>
+    public bool AutoCheckUpdates { get; set; } = true;
+
     /// <summary>Раскладка окна: запоминается между запусками.</summary>
     public WindowLayout Layout { get; set; } = new();
 

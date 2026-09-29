@@ -166,6 +166,9 @@
                                           Command="{Binding PlacementTarget.DataContext.ClearSkippedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                 <Separator />
+                                <MenuItem Header="Показать в каталоге"
+                                          Command="{Binding PlacementTarget.DataContext.ShowInCatalogCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                 <MenuItem Header="Открыть страницу мода"
                                           Command="{Binding PlacementTarget.DataContext.OpenPageCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
@@ -324,7 +327,8 @@
                                 <Button Content="Перечитать" Command="{Binding RereadCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="12,4" />
                             </StackPanel>
 
-                            <CheckBox Content="Предлагать пре-релизы модов (rc/pre)" IsChecked="{Binding AllowUnstable}" Margin="0,28,0,0" />
+                            <CheckBox Content="Проверять обновления модов при запуске и смене профиля" IsChecked="{Binding AutoCheckUpdates}" Margin="0,28,0,0" />
+                            <CheckBox Content="Предлагать пре-релизы модов (rc/pre)" IsChecked="{Binding AllowUnstable}" Margin="0,12,0,0" />
                             <TextBlock Style="{StaticResource Hint}" Margin="28,2,0,0"
                                        Text="Общая настройка для всех профилей. Для модов, у которых уже стоит пре-релиз, они учитываются всегда." />
 

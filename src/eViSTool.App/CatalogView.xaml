@@ -48,7 +48,8 @@
             <Rectangle Grid.Column="1" Width="2" RadiusX="1" RadiusY="1" Fill="#40808080" Height="40" IsHitTestVisible="False" />
 
             <!-- список -->
-            <ListBox ItemsSource="{Binding Results}" SelectedItem="{Binding Selected}" HorizontalContentAlignment="Stretch"
+            <ListBox x:Name="ModsList" SelectionChanged="ModsList_SelectionChanged"
+                     ItemsSource="{Binding Results}" SelectedItem="{Binding Selected}" HorizontalContentAlignment="Stretch"
                      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                 <ListBox.Resources>
