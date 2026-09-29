@@ -17,6 +17,8 @@ public enum ModStatus
     Unreadable,
     /// <summary>Модбаза не ответила.</summary>
     CheckFailed,
+    /// <summary>С модбазой ещё не сверяли.</summary>
+    NotChecked,
 }
 
 public sealed record ModCheckResult
@@ -87,7 +89,7 @@ public static class UpdateChecker
             var dup = duplicates.Contains(local.Info.ModId);
 
             if (!remote.TryGetValue(local.Info.ModId, out var r))
-                return new ModCheckResult { Local = local, Status = ModStatus.CheckFailed, IsDuplicate = dup, Message = "Не проверялся" };
+                return new ModCheckResult { Local = local, Status = ModStatus.NotChecked, IsDuplicate = dup };
             if (r.Error is not null)
                 return new ModCheckResult { Local = local, Status = ModStatus.CheckFailed, IsDuplicate = dup, Message = r.Error };
             if (r.Mod is null)

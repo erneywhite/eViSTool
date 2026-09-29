@@ -7,17 +7,19 @@ namespace eViSTool.Core.Mods;
 /// <summary>Проверка обновлений для папки модов целиком.</summary>
 public sealed class ModUpdateService(ModDbClient db)
 {
-    public async Task<IReadOnlyList<ModCheckResult>> CheckAsync(
-        ResolvedProfile profile, bool allowUnstable = false,
-        IProgress<string>? progress = null, CancellationToken ct = default)
+    /// <summary>Моды профиля на диске, с отметкой «выключен». Быстро, без сети.</summary>
+    public static IReadOnlyList<LocalMod> ScanLocal(ResolvedProfile profile)
     {
-        var gameVersion = profile.GameVersion ?? throw new InvalidOperationException("Не определена версия игры");
-
-        progress?.Report("Чтение папок модов…");
         var disabled = new HashSet<string>(profile.DisabledMods); // игра сравнивает с учётом регистра
-        var locals = await Task.Run(() => ModScanner.Scan(profile.ModDirs)
+        return ModScanner.Scan(profile.ModDirs)
             .Select(l => l with { IsDisabled = IsDisabled(l, disabled) })
-            .ToList(), ct).ConfigureAwait(false);
+            .ToList();
+    }
+
+    /// <summary>Сведения из модбазы для модов (ключ — modid в нижнем регистре).</summary>
+    public async Task<Dictionary<string, ModDbResult>> FetchRemoteAsync(
+        IReadOnlyList<LocalMod> locals, IProgress<string>? progress = null, CancellationToken ct = default)
+    {
         var identified = locals.Where(l => l.Info is not null).ToList();
 
         progress?.Report($"Запрос модбазы: 0/{identified.Count}");
@@ -34,6 +36,18 @@ public sealed class ModUpdateService(ModDbClient db)
         }
 
         progress?.Report("Готово");
+        return remote;
+    }
+
+    /// <summary>Скан + модбаза + оценка — всё сразу.</summary>
+    public async Task<IReadOnlyList<ModCheckResult>> CheckAsync(
+        ResolvedProfile profile, bool allowUnstable = false,
+        IProgress<string>? progress = null, CancellationToken ct = default)
+    {
+        var gameVersion = profile.GameVersion ?? throw new InvalidOperationException("Не определена версия игры");
+        progress?.Report("Чтение папок модов…");
+        var locals = await Task.Run(() => ScanLocal(profile), ct).ConfigureAwait(false);
+        var remote = await FetchRemoteAsync(locals, progress, ct).ConfigureAwait(false);
         return UpdateChecker.Evaluate(locals, remote, gameVersion, allowUnstable);
     }
 

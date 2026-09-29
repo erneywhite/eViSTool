@@ -63,12 +63,15 @@ public sealed partial class ProfileViewModel : ObservableObject
         OnPropertyChanged(nameof(HasWarnings));
     }
 
-    [RelayCommand]
-    public void Refresh()
+    /// <summary>Перечитать файлы игры. notify=false — когда перечитывает сам список модов (без повторной перезагрузки).</summary>
+    public void Refresh(bool notify = true)
     {
         Resolved = ProfileResolver.Resolve(Model);
-        _changed(this);
+        if (notify) _changed(this);
     }
+
+    [RelayCommand]
+    private void Reread() => Refresh();
 
     [RelayCommand]
     private void BrowseGameDir()

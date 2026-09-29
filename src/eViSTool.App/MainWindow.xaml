@@ -87,6 +87,8 @@
                         <Button DockPanel.Dock="Left" Content="Проверить обновления" Command="{Binding CheckCommand}"
                                 Style="{DynamicResource AccentButtonStyle}" Padding="16,6" />
                         <Button DockPanel.Dock="Left" Content="Отмена" Command="{Binding CheckCancelCommand}" Margin="8,0,0,0" Padding="12,6" />
+                        <Button DockPanel.Dock="Left" Content="Добавить мод…" Command="{Binding AddFromFileCommand}" Margin="8,0,0,0" Padding="12,6"
+                                ToolTip="Установить мод из zip-архива. Можно просто перетащить zip в список." />
                         <Button DockPanel.Dock="Left" Content="Открыть папку" Command="{Binding OpenModsFolderCommand}" Margin="8,0,0,0" Padding="12,6" />
                         <CheckBox DockPanel.Dock="Right" Content="Только требующие внимания" IsChecked="{Binding OnlyIssues}"
                                   VerticalAlignment="Center" Margin="12,0,0,0" />
@@ -105,7 +107,8 @@
 
                     <DataGrid ItemsSource="{Binding View}" AutoGenerateColumns="False" IsReadOnly="True"
                               HeadersVisibility="Column" GridLinesVisibility="None" SelectionMode="Single"
-                              CanUserResizeRows="False" RowHeight="34">
+                              CanUserResizeRows="False" RowHeight="34"
+                              AllowDrop="True" DragOver="ModsGrid_DragOver" Drop="ModsGrid_Drop">
                         <DataGrid.Resources>
                             <!-- Кисти Fluent-темы, которые шаблоны DataGrid берут через DynamicResource.
                                  Выделение — спокойная подсветка вместо заливки акцентом (иначе не видно ссылок),
@@ -120,6 +123,13 @@
                         </DataGrid.InputBindings>
                         <DataGrid.ContextMenu>
                             <ContextMenu>
+                                <MenuItem Header="Включить / выключить"
+                                          Command="{Binding PlacementTarget.DataContext.ToggleEnabledCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                <MenuItem Header="Удалить (в Корзину)"
+                                          Command="{Binding PlacementTarget.DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                <Separator />
                                 <MenuItem Header="Открыть страницу мода"
                                           Command="{Binding PlacementTarget.DataContext.OpenPageCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
@@ -129,11 +139,13 @@
                             </ContextMenu>
                         </DataGrid.ContextMenu>
                         <DataGrid.Columns>
-                            <!-- пока только показывает; включать/выключать — этап 2b -->
+                            <!-- галочка пишет в настройки игры: disabledMods клиента или WorldConfig.DisabledMods сервера -->
                             <DataGridTemplateColumn Header="Вкл." Width="52" SortMemberPath="IsEnabled">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <CheckBox IsChecked="{Binding IsEnabled, Mode=OneWay}" IsHitTestVisible="False" Focusable="False"
+                                        <CheckBox IsChecked="{Binding IsEnabled, Mode=OneWay}" Focusable="False"
+                                                  Command="{Binding DataContext.ToggleEnabledCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                  CommandParameter="{Binding}" ToolTip="Включить / выключить мод"
                                                   HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="0" />
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
@@ -267,7 +279,7 @@
                                                    TextWrapping="Wrap" Visibility="{Binding HasWarnings, Converter={StaticResource BoolToVis}}" />
                                     </Grid>
                                 </Border>
-                                <Button Content="Перечитать" Command="{Binding RefreshCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="12,4" />
+                                <Button Content="Перечитать" Command="{Binding RereadCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="12,4" />
                             </StackPanel>
 
                             <CheckBox Content="Предлагать пре-релизы модов (rc/pre)" IsChecked="{Binding AllowUnstable}" Margin="0,28,0,0" />

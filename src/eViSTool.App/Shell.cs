@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using Microsoft.VisualBasic.FileIO;
 
 namespace eViSTool.App;
 
@@ -9,6 +10,16 @@ internal static class Shell
     public static void OpenUrl(string url) => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
 
     public static void OpenFolder(string dir) => Process.Start(new ProcessStartInfo(dir) { UseShellExecute = true });
+
+    /// <summary>Удаление в Корзину (файл или папка распакованного мода).</summary>
+    public static void MoveToRecycleBin(string path)
+    {
+        const UIOption ui = UIOption.OnlyErrorDialogs;
+        if (Directory.Exists(path))
+            FileSystem.DeleteDirectory(path, ui, RecycleOption.SendToRecycleBin);
+        else
+            FileSystem.DeleteFile(path, ui, RecycleOption.SendToRecycleBin);
+    }
 
     /// <summary>
     /// Открывает папку в Проводнике и выделяет файл.

@@ -36,6 +36,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         Mods = new ModsViewModel(this, new ModDbClient());
         Save(); // перенос настроек старого формата сразу на диск
+        Mods.OnProfileSwitched(); // список модов виден сразу, без сети
     }
 
     partial void OnActiveProfileChanged(ProfileViewModel? value)
@@ -49,6 +50,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         _settings.AllowUnstable = value;
         Save();
+        Mods.ReloadLocal();
     }
 
     private void OnProfileChanged(ProfileViewModel profile)
