@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\src\eViSTool.Core\eViSTool.Core.csproj" />
     <!-- поддельный сервер VS для тестов ServerHost: только собрать, ссылаться не нужно -->
     <ProjectReference Include="..\FakeVsServer\FakeVsServer.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\eViSTool.Agent\eViSTool.Agent.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

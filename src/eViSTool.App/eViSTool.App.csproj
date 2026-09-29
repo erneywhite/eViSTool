@@ -11,7 +11,20 @@
 
   <ItemGroup>
     <ProjectReference Include="..\eViSTool.Core\eViSTool.Core.csproj" />
+    <!-- агент собирается вместе с окном и кладётся рядом: общая папка data -->
+    <ProjectReference Include="..\eViSTool.Agent\eViSTool.Agent.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
+
+  <Target Name="CopyAgentNextToApp" AfterTargets="Build">
+    <PropertyGroup>
+      <AgentOut>..\eViSTool.Agent\bin\$(Configuration)\net10.0\</AgentOut>
+    </PropertyGroup>
+    <ItemGroup>
+      <!-- без data: там могли остаться чужие настройки -->
+      <AgentFiles Include="$(AgentOut)**\*.*" Exclude="$(AgentOut)data\**" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AgentFiles)" DestinationFiles="@(AgentFiles->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
 
   <ItemGroup>
     <Resource Include="Assets\eViSTool.ico" />

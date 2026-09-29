@@ -42,17 +42,36 @@ public sealed class ServerConsole(int capacity = 5000)
         get { lock (_lock) return _seq; }
     }
 
+    private TaskCompletionSource _newLine = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     public ConsoleLine Add(ConsoleLineKind kind, string text)
     {
         ConsoleLine line;
+        TaskCompletionSource signal;
         lock (_lock)
         {
             line = new ConsoleLine(++_seq, DateTime.Now, kind, text);
             _lines.AddLast(line);
             while (_lines.Count > capacity) _lines.RemoveFirst();
+            signal = _newLine;
+            _newLine = new(TaskCreationOptions.RunContinuationsAsynchronously);
         }
+        signal.TrySetResult();
         LineAdded?.Invoke(line);
         return line;
+    }
+
+    /// <summary>Долгий опрос: сразу вернуть строки новее seq, а если их нет — подождать до timeout.</summary>
+    public async Task<IReadOnlyList<ConsoleLine>> WaitSinceAsync(long seq, TimeSpan timeout, int max = 1000, CancellationToken ct = default)
+    {
+        Task signal;
+        lock (_lock)
+        {
+            if (_seq > seq) return _lines.Where(l => l.Seq > seq).Take(max).ToList();
+            signal = _newLine.Task;
+        }
+        await Task.WhenAny(signal, Task.Delay(timeout, ct)).ConfigureAwait(false);
+        return GetSince(seq, max);
     }
 
     /// <summary>Строки новее seq (не больше max). seq=0 — с самой старой из хранящихся.</summary>
