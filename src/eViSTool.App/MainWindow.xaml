@@ -106,6 +106,14 @@
                     <DataGrid ItemsSource="{Binding View}" AutoGenerateColumns="False" IsReadOnly="True"
                               HeadersVisibility="Column" GridLinesVisibility="None" SelectionMode="Single"
                               CanUserResizeRows="False" RowHeight="34">
+                        <DataGrid.Resources>
+                            <!-- Кисти Fluent-темы, которые шаблоны DataGrid берут через DynamicResource.
+                                 Выделение — спокойная подсветка вместо заливки акцентом (иначе не видно ссылок),
+                                 текст обычного цвета, без рамки вокруг текущей ячейки. -->
+                            <SolidColorBrush x:Key="DataGridRowSelectedBackgroundThemeBrush" Color="#38909090" />
+                            <SolidColorBrush x:Key="DataGridRowSelectedForegroundThemeBrush" Color="{DynamicResource TextFillColorPrimary}" />
+                            <SolidColorBrush x:Key="{x:Static DataGrid.FocusBorderBrushKey}" Color="Transparent" />
+                        </DataGrid.Resources>
                         <DataGrid.InputBindings>
                             <MouseBinding Gesture="LeftDoubleClick" Command="{Binding OpenPageCommand}"
                                           CommandParameter="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=DataGrid}}" />

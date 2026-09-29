@@ -7,7 +7,6 @@
     <AssemblyName>eViSTool</AssemblyName>
     <RootNamespace>eViSTool.App</RootNamespace>
     <ApplicationIcon>Assets\eViSTool.ico</ApplicationIcon>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
