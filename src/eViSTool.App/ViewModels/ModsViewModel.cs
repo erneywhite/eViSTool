@@ -19,6 +19,8 @@ public sealed partial class ModsViewModel : ObservableObject
 {
     private readonly MainViewModel _main;
     private readonly ModUpdateService _service;
+    private readonly ModDbClient _db;
+    private readonly ModUpdater _updater;
 
     // последний ответ модбазы: после локальных операций статусы не теряются
     private Dictionary<string, ModDbResult> _remote = new(StringComparer.OrdinalIgnoreCase);
@@ -32,10 +34,32 @@ public sealed partial class ModsViewModel : ObservableObject
     [ObservableProperty] private bool _onlyIssues;
     [ObservableProperty] private string _search = "";
 
+    /// <summary>Идёт скачивание/установка — кнопки операций недоступны.</summary>
+    [ObservableProperty] private bool _isBusy;
+
+    /// <summary>Проблемы с зависимостями включённых модов (считаются по диску, без сети).</summary>
+    [ObservableProperty] private IReadOnlyList<DependencyIssue> _dependencyIssues = [];
+    [ObservableProperty] private int _updateCount;
+
+    public bool HasDependencyIssues => DependencyIssues.Count > 0;
+    public string DependencyText => DependencyIssues.Count == 0 ? ""
+        : $"Проблемы с зависимостями ({DependencyIssues.Count}): " + string.Join("; ", DependencyIssues.Select(i => i.Describe()));
+    public string UpdateAllText => $"Обновить всё ({UpdateCount})";
+
+    partial void OnDependencyIssuesChanged(IReadOnlyList<DependencyIssue> value)
+    {
+        OnPropertyChanged(nameof(HasDependencyIssues));
+        OnPropertyChanged(nameof(DependencyText));
+    }
+
+    partial void OnUpdateCountChanged(int value) => OnPropertyChanged(nameof(UpdateAllText));
+
     public ModsViewModel(MainViewModel main, ModDbClient db)
     {
         _main = main;
+        _db = db;
         _service = new ModUpdateService(db);
+        _updater = new ModUpdater(db);
         View = CollectionViewSource.GetDefaultView(Rows);
         View.Filter = o => o is ModRowViewModel r
             && (!OnlyIssues || r.NeedsAttention)
@@ -85,7 +109,10 @@ public sealed partial class ModsViewModel : ObservableObject
         // без версии игры с модбазой не сравнить — покажем только локальное
         var game = Profile?.GameVersion ?? ModVersion.ParseOrNull("0.0")!;
         var remote = Profile?.GameVersion is null ? new Dictionary<string, ModDbResult>() : _remote;
-        var results = UpdateChecker.Evaluate(_locals, remote, game, _main.AllowUnstable);
+        var policy = _main.ActiveProfile?.Model.ToPolicy() ?? ModPolicy.Empty;
+        var results = UpdateChecker.Evaluate(_locals, remote, game, _main.AllowUnstable, policy);
+        UpdateCount = results.Count(r => r.Status == ModStatus.UpdateAvailable && r.LatestCompatible?.MainFile is not null);
+        DependencyIssues = Dependencies.FindIssues(_locals);
 
         Rows.Clear();
         foreach (var r in results) Rows.Add(new ModRowViewModel(r));
@@ -218,38 +245,10 @@ public sealed partial class ModsViewModel : ObservableObject
             && !Confirm("Игра/сервер сейчас запущены: новые моды подхватятся только после перезапуска, а заменяемые файлы могут быть заняты.\n\nПродолжить?"))
             return;
 
-        var backups = ModBackupStore.ForProfile(profile.Profile);
         var installed = new List<string>();
         var problems = new List<string>();
-
         foreach (var zip in zips)
-        {
-            try
-            {
-                var plan = ModInstaller.Plan(zip, profile, ModUpdateService.ScanLocal(profile));
-                var info = plan.Incoming.Info!;
-                var old = plan.Replaces.FirstOrDefault()?.Info?.Version;
-
-                if (plan.IsSameVersion && !Confirm($"«{info.Name}» {info.Version} уже установлен.\n\nПереустановить?"))
-                    continue;
-                if (plan.IsDowngrade && !Confirm($"Установлен «{info.Name}» {old}, а ставится более старая {info.Version}.\n\nОткатиться на {info.Version}?"))
-                    continue;
-
-                var disabledSet = new HashSet<string>(profile.DisabledMods);
-                var wasDisabled = plan.Replaces.Any(r => ModUpdateService.IsDisabled(r, disabledSet));
-                ModInstaller.Apply(plan, backups);
-                // выключенный мод остаётся выключенным и в новой версии
-                if (wasDisabled) ModConfigEditor.SetEnabled(profile, info, enabled: false);
-
-                installed.Add(plan.IsReplace ? $"{info.Name}: {old} → {info.Version}" : $"{info.Name} {info.Version}");
-                if (plan.MissingDependencies.Count > 0)
-                    problems.Add($"{info.Name}: не хватает зависимостей — {string.Join(", ", plan.MissingDependencies)}");
-            }
-            catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException)
-            {
-                problems.Add($"{Path.GetFileName(zip)}: {ex.Message}");
-            }
-        }
+            InstallZip(profile, zip, interactive: true, installed, problems);
 
         ReloadLocal();
         if (installed.Count > 0) StatusText = "Установлено: " + string.Join("; ", installed);
@@ -261,6 +260,307 @@ public sealed partial class ModsViewModel : ObservableObject
             MessageBox.Show(Application.Current.MainWindow, text, "eViSTool", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
+
+    /// <summary>
+    /// Ставит один zip в профиль: старая версия — в хранилище, выключенный мод остаётся выключенным.
+    /// interactive — спрашивать про ту же версию и даунгрейд (при обновлении/откате не спрашиваем: решение уже принято).
+    /// </summary>
+    private bool InstallZip(ResolvedProfile profile, string zip, bool interactive, List<string> installed, List<string> problems)
+    {
+        try
+        {
+            var plan = ModInstaller.Plan(zip, profile, ModUpdateService.ScanLocal(profile));
+            var info = plan.Incoming.Info!;
+            var old = plan.Replaces.FirstOrDefault()?.Info?.Version;
+
+            if (interactive && plan.IsSameVersion && !Confirm($"«{info.Name}» {info.Version} уже установлен.\n\nПереустановить?"))
+                return false;
+            if (interactive && plan.IsDowngrade && !Confirm($"Установлен «{info.Name}» {old}, а ставится более старая {info.Version}.\n\nОткатиться на {info.Version}?"))
+                return false;
+
+            var disabledSet = new HashSet<string>(profile.DisabledMods);
+            var wasDisabled = plan.Replaces.Any(r => ModUpdateService.IsDisabled(r, disabledSet));
+            ModInstaller.Apply(plan, ModBackupStore.ForProfile(profile.Profile));
+            // выключенный мод остаётся выключенным и в новой версии
+            if (wasDisabled) ModConfigEditor.SetEnabled(profile, info, enabled: false);
+
+            installed.Add(plan.IsReplace ? $"{info.Name}: {old} → {info.Version}" : $"{info.Name} {info.Version}");
+            if (plan.MissingDependencies.Count > 0)
+                problems.Add($"{info.Name}: не хватает зависимостей — {string.Join(", ", plan.MissingDependencies)}");
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            problems.Add($"{Path.GetFileName(zip)}: {ex.Message}");
+            return false;
+        }
+    }
+
+    private void Report(string title, List<string> installed, List<string> problems)
+    {
+        ReloadLocal();
+        _ = FetchNewModsAsync();
+        StatusText = installed.Count > 0 ? $"{title}: " + string.Join("; ", installed) : $"{title}: ничего не изменилось";
+        if (problems.Count == 0) return;
+        var text = (installed.Count > 0 ? $"{title}:\n• " + string.Join("\n• ", installed) + "\n\n" : "")
+                   + "Внимание:\n• " + string.Join("\n• ", problems);
+        MessageBox.Show(Application.Current.MainWindow, text, "eViSTool", MessageBoxButton.OK, MessageBoxImage.Warning);
+    }
+
+    private static bool ConfirmIfRunning(ResolvedProfile profile) =>
+        !GameProcess.IsRunning(profile.Profile)
+        || Confirm("Игра/сервер сейчас запущены: изменения подхватятся только после перезапуска, а заменяемые файлы могут быть заняты.\n\nПродолжить?");
+
+    /// <summary>Скачать релиз и поставить его. Ошибки — в problems.</summary>
+    private async Task<bool> DownloadAndInstallAsync(ResolvedProfile profile, string modId, string name, ModDbRelease release,
+        List<string> installed, List<string> problems)
+    {
+        string? file = null;
+        try
+        {
+            var progress = new Progress<double>(x => StatusText = $"Скачивание {name} {release.ModVersion}… {x:P0}");
+            file = await _updater.DownloadReleaseAsync(release, modId, progress);
+            return InstallZip(profile, file, interactive: false, installed, problems);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or TaskCanceledException)
+        {
+            problems.Add($"{name}: не удалось скачать {release.ModVersion} — {ex.Message}");
+            return false;
+        }
+        finally
+        {
+            if (file is not null) _updater.Cleanup(file);
+        }
+    }
+
+    /// <summary>Если модбазу уже опрашивали — досверить только что появившиеся моды, чтобы не висело «Не проверялся».</summary>
+    private async Task FetchNewModsAsync()
+    {
+        if (_remote.Count == 0) return;
+        var fresh = _locals.Where(l => l.Info is not null && !_remote.ContainsKey(l.Info.ModId)).ToList();
+        if (fresh.Count == 0) return;
+        try
+        {
+            foreach (var (id, r) in await _service.FetchRemoteAsync(fresh))
+                _remote[id] = r;
+            Rebuild();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            // не критично: статус останется «Не проверялся» до следующей проверки
+        }
+    }
+
+    // ---------- обновление ----------
+
+    [RelayCommand]
+    private async Task UpdateOneAsync(ModRowViewModel? row)
+    {
+        if (row is not { CanUpdate: true } || Profile is not { } profile || IsBusy) return;
+        if (!ConfirmIfRunning(profile)) return;
+
+        var installed = new List<string>();
+        var problems = new List<string>();
+        IsBusy = true;
+        try
+        {
+            await DownloadAndInstallAsync(profile, row.ModId, row.Name, row.Result.LatestCompatible!, installed, problems);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+        Report("Обновлено", installed, problems);
+    }
+
+    [RelayCommand]
+    private async Task UpdateAllAsync()
+    {
+        if (Profile is not { } profile || IsBusy) return;
+        var todo = Rows.Where(r => r.CanUpdate).ToList();
+        if (todo.Count == 0) return;
+
+        var list = string.Join("\n", todo.Select(r => $"• {r.Name}: {r.Installed} → {r.Latest}"));
+        if (!Confirm($"Обновить модов: {todo.Count}?\n\n{list}\n\nСтарые версии сохранятся для отката.")) return;
+        if (!ConfirmIfRunning(profile)) return;
+
+        var installed = new List<string>();
+        var problems = new List<string>();
+        IsBusy = true;
+        try
+        {
+            // по одному: понятный прогресс и никаких гонок за папку модов
+            foreach (var row in todo)
+                await DownloadAndInstallAsync(profile, row.ModId, row.Name, row.Result.LatestCompatible!, installed, problems);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+        Report("Обновлено", installed, problems);
+    }
+
+    // ---------- откат / другая версия ----------
+
+    [RelayCommand]
+    private async Task RollbackAsync(ModRowViewModel? row)
+    {
+        if (row?.Local.Info is not { } info || Profile is not { } profile || IsBusy) return;
+
+        IReadOnlyList<ModDbRelease> releases = [];
+        IsBusy = true;
+        try
+        {
+            StatusText = $"Ищу версии «{row.Name}»…";
+            var remote = row.Result.Remote ?? await _db.GetModAsync(info.ModId);
+            if (remote is not null && profile.GameVersion is { } game)
+                releases = UpdateChecker.CompatibleReleases(remote.Releases, game);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            // без сети — только сохранённые копии
+        }
+        finally
+        {
+            IsBusy = false;
+            StatusText = "";
+        }
+
+        var store = ModBackupStore.ForProfile(profile.Profile);
+        var dlg = new RollbackWindow($"{row.Name} — сейчас {row.Installed}",
+            RollbackWindow.BuildOptions(store, info.ModId, info.Version, releases))
+        {
+            Owner = Application.Current.MainWindow,
+        };
+        if (dlg.ShowDialog() != true || dlg.Selected is not { } choice) return;
+        if (!ConfirmIfRunning(profile)) return;
+
+        var installed = new List<string>();
+        var problems = new List<string>();
+        IsBusy = true;
+        try
+        {
+            if (choice.Path is not null)
+                InstallZip(profile, choice.Path, interactive: false, installed, problems);
+            else if (choice.Release is not null)
+                await DownloadAndInstallAsync(profile, info.ModId, row.Name, choice.Release, installed, problems);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+        Report("Установлено", installed, problems);
+    }
+
+    // ---------- зависимости ----------
+
+    [RelayCommand]
+    private async Task FixDependenciesAsync()
+    {
+        if (Profile is not { } start || IsBusy || DependencyIssues.Count == 0) return;
+        if (start.GameVersion is not { } game)
+        {
+            Error("Не определена версия игры — укажи папку игры в настройках профиля.");
+            return;
+        }
+
+        var list = string.Join("\n", DependencyIssues.Select(i => "• " + i.Describe()));
+        if (!Confirm($"Исправить зависимости?\n\n{list}\n\nНедостающие и устаревшие скачаются из модбазы, выключенные включатся.")) return;
+        if (!ConfirmIfRunning(start)) return;
+
+        var installed = new List<string>();
+        var problems = new List<string>();
+        var tried = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        IsBusy = true;
+        try
+        {
+            // у зависимостей бывают свои зависимости — несколько кругов, пока есть что чинить
+            for (var round = 0; round < 5; round++)
+            {
+                ReloadLocal();
+                var issues = DependencyIssues.Where(i => tried.Add(i.ModId)).ToList();
+                if (issues.Count == 0 || Profile is not { } profile) break;
+
+                foreach (var issue in issues)
+                {
+                    if (issue.IsDisabled)
+                    {
+                        var mod = _locals.First(l => string.Equals(l.Info?.ModId, issue.ModId, StringComparison.OrdinalIgnoreCase));
+                        ModConfigEditor.SetEnabled(profile, mod.Info!, enabled: true);
+                        installed.Add($"{mod.Info!.Name}: включён");
+                        continue;
+                    }
+
+                    StatusText = $"Ищу {issue.ModId} в модбазе…";
+                    var found = await _updater.FindBestReleaseAsync(issue.ModId, game, _main.AllowUnstable, profile.Profile.ToPolicy());
+                    if (found is not { } f)
+                    {
+                        problems.Add($"{issue.ModId}: нет в модбазе или нет версии для {game.Major}.{game.Minor}.x — поставь вручную");
+                        continue;
+                    }
+                    await DownloadAndInstallAsync(profile, issue.ModId, f.Mod.Name ?? issue.ModId, f.Release, installed, problems);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or InvalidOperationException)
+        {
+            problems.Add(ex.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+        Report("Зависимости", installed, problems);
+    }
+
+    // ---------- закрепление и пропуск версий ----------
+
+    [RelayCommand]
+    private void TogglePin(ModRowViewModel? row)
+    {
+        if (row?.Local.Info is not { } info || _main.ActiveProfile is not { } profile) return;
+        var pins = profile.Model.PinnedMods;
+        if (pins.Remove(info.ModId))
+            StatusText = $"«{row.Name}» откреплён — обновления снова предлагаются";
+        else
+        {
+            pins[info.ModId] = info.Version ?? "";
+            StatusText = $"«{row.Name}» закреплён на {info.Version} — обновления не предлагаются";
+        }
+        _main.SaveSettings();
+        Rebuild();
+    }
+
+    [RelayCommand]
+    private void SkipVersion(ModRowViewModel? row)
+    {
+        if (row?.Local.Info is not { } info || _main.ActiveProfile is not { } profile) return;
+        if (row.Kind != ModStatus.UpdateAvailable || row.Result.LatestCompatible?.ModVersion is not { } version)
+        {
+            StatusText = "Пропустить можно только предлагаемое обновление";
+            return;
+        }
+        if (!profile.Model.BlockedVersions.TryGetValue(info.ModId, out var list))
+            profile.Model.BlockedVersions[info.ModId] = list = [];
+        list.Add(version);
+        _main.SaveSettings();
+        StatusText = $"«{row.Name}» {version} пропущена — следующая версия снова будет предложена";
+        Rebuild();
+    }
+
+    [RelayCommand]
+    private void ClearSkipped(ModRowViewModel? row)
+    {
+        if (row?.Local.Info is not { } info || _main.ActiveProfile is not { } profile) return;
+        if (profile.Model.BlockedVersions.Remove(info.ModId))
+        {
+            _main.SaveSettings();
+            StatusText = $"«{row.Name}»: пропущенные версии снова предлагаются";
+            Rebuild();
+        }
+        else StatusText = $"У «{row.Name}» нет пропущенных версий";
+    }
+
 
     // ---------- прочее ----------
 

@@ -7,6 +7,7 @@ namespace eViSTool.App.ViewModels;
 /// <summary>Строка таблицы модов.</summary>
 public sealed partial class ModRowViewModel(ModCheckResult r)
 {
+    public ModCheckResult Result { get; } = r;
     public LocalMod Local { get; } = r.Local;
     public ModStatus Kind { get; } = r.Status;
     public bool IsDuplicate { get; } = r.IsDuplicate;
@@ -21,7 +22,10 @@ public sealed partial class ModRowViewModel(ModCheckResult r)
     public string? PageUrl { get; } = r.Remote?.PageUrl;
 
     /// <summary>Для фильтра «только требующие внимания».</summary>
-    public bool NeedsAttention { get; } = r.IsDuplicate || r.Status is not (ModStatus.UpToDate or ModStatus.NotChecked);
+    public bool NeedsAttention { get; } = r.IsDuplicate || r.Status is not (ModStatus.UpToDate or ModStatus.NotChecked or ModStatus.Pinned);
+
+    /// <summary>Можно обновить одной кнопкой: есть совместимый релиз с файлом.</summary>
+    public bool CanUpdate { get; } = r.Status == ModStatus.UpdateAvailable && r.LatestCompatible?.MainFile is not null;
 
     public string StatusText { get; } = r.Status switch
     {
@@ -32,6 +36,7 @@ public sealed partial class ModRowViewModel(ModCheckResult r)
         ModStatus.Unreadable => "Не читается",
         ModStatus.CheckFailed => "Ошибка проверки",
         ModStatus.NotChecked => "Не проверялся",
+        ModStatus.Pinned => "Закреплён",
         _ => r.Status.ToString(),
     };
 

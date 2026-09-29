@@ -19,6 +19,8 @@ public enum ModStatus
     CheckFailed,
     /// <summary>С модбазой ещё не сверяли.</summary>
     NotChecked,
+    /// <summary>Есть обновление, но версия закреплена пользователем.</summary>
+    Pinned,
 }
 
 public sealed record ModCheckResult
@@ -46,24 +48,34 @@ public static class UpdateChecker
     /// Выбор релиза. Совместимость — по ветке игры (major.minor), а не по точной версии:
     /// авторы редко отмечают каждый патч, и мод с тегом 1.22.3 нормально работает на 1.22.7.
     /// </summary>
-    public static ModDbRelease? PickLatestCompatible(IEnumerable<ModDbRelease> releases, ModVersion gameVersion, bool allowUnstable)
+    public static ModDbRelease? PickLatestCompatible(IEnumerable<ModDbRelease> releases, ModVersion gameVersion, bool allowUnstable,
+        Func<ModVersion, bool>? skip = null)
     {
-        return Candidates(releases, allowUnstable)
+        return Candidates(releases, allowUnstable, skip)
             .Where(x => x.Release.GameVersions.Any(t => ModVersion.ParseOrNull(t)?.SameBranch(gameVersion) == true))
             .MaxBy(x => x.Version)?.Release;
     }
 
-    public static ModDbRelease? PickLatest(IEnumerable<ModDbRelease> releases, bool allowUnstable) =>
-        Candidates(releases, allowUnstable).MaxBy(x => x.Version)?.Release;
+    public static ModDbRelease? PickLatest(IEnumerable<ModDbRelease> releases, bool allowUnstable, Func<ModVersion, bool>? skip = null) =>
+        Candidates(releases, allowUnstable, skip).MaxBy(x => x.Version)?.Release;
+
+    /// <summary>Релизы для ветки игры, новые сверху (для окна отката).</summary>
+    public static IReadOnlyList<ModDbRelease> CompatibleReleases(IEnumerable<ModDbRelease> releases, ModVersion gameVersion) =>
+        Candidates(releases, allowUnstable: true, skip: null)
+            .Where(x => x.Release.GameVersions.Any(t => ModVersion.ParseOrNull(t)?.SameBranch(gameVersion) == true))
+            .OrderByDescending(x => x.Version)
+            .Select(x => x.Release)
+            .ToList();
 
     private sealed record Candidate(ModDbRelease Release, ModVersion Version);
 
-    private static IEnumerable<Candidate> Candidates(IEnumerable<ModDbRelease> releases, bool allowUnstable)
+    private static IEnumerable<Candidate> Candidates(IEnumerable<ModDbRelease> releases, bool allowUnstable, Func<ModVersion, bool>? skip)
     {
         foreach (var r in releases)
         {
             if (!ModVersion.TryParse(r.ModVersion, out var v)) continue;
             if (v.IsPrerelease && !allowUnstable) continue;
+            if (skip?.Invoke(v) == true) continue;
             yield return new Candidate(r, v);
         }
     }
@@ -72,8 +84,10 @@ public static class UpdateChecker
         IReadOnlyList<LocalMod> localMods,
         IReadOnlyDictionary<string, ModDbResult> remote,
         ModVersion gameVersion,
-        bool allowUnstable = false)
+        bool allowUnstable = false,
+        ModPolicy? policy = null)
     {
+        policy ??= ModPolicy.Empty;
         var duplicates = localMods
             .Where(m => m.Info is not null)
             .GroupBy(m => m.Info!.ModId, StringComparer.OrdinalIgnoreCase)
@@ -99,8 +113,10 @@ public static class UpdateChecker
             // стоит пре-релиз — значит, человек сознательно на нестабильной ветке этого мода
             var unstable = allowUnstable || installed?.IsPrerelease == true;
 
-            var compatible = PickLatestCompatible(r.Mod.Releases, gameVersion, unstable);
-            var latest = PickLatest(r.Mod.Releases, unstable);
+            var modId = local.Info.ModId;
+            bool Skip(ModVersion v) => policy.IsBlocked(modId, v);
+            var compatible = PickLatestCompatible(r.Mod.Releases, gameVersion, unstable, Skip);
+            var latest = PickLatest(r.Mod.Releases, unstable, Skip);
             var latestVersion = ModVersion.ParseOrNull(latest?.ModVersion);
 
             // самый новый релиз интересен, только если он новее и совместимого, и установленного
@@ -135,6 +151,11 @@ public static class UpdateChecker
                 var target = ModVersion.ParseOrNull(compatible.ModVersion)!;
                 status = target > installed ? ModStatus.UpdateAvailable : ModStatus.UpToDate;
                 if (installed > target) message = "Установлена версия новее, чем в модбазе";
+                if (status == ModStatus.UpdateAvailable && policy.IsPinned(modId))
+                {
+                    status = ModStatus.Pinned;
+                    message = $"Закреплён на {installed}, в модбазе есть {target}";
+                }
             }
 
             return new ModCheckResult

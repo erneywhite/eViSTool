@@ -13,6 +13,7 @@
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <local:InvertBoolConverter x:Key="Invert" />
+        <local:CountToVisibilityConverter x:Key="CountToVis" />
 
         <Style x:Key="CellText" TargetType="TextBlock">
             <Setter Property="VerticalAlignment" Value="Center" />
@@ -42,6 +43,9 @@
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Kind}" Value="{x:Static mods:ModStatus.NoCompatibleRelease}">
                     <Setter Property="Background" Value="#55F0A020" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static mods:ModStatus.Pinned}">
+                    <Setter Property="Background" Value="#50707CB0" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Kind}" Value="{x:Static mods:ModStatus.Unreadable}">
                     <Setter Property="Background" Value="#55E04040" />
@@ -87,18 +91,33 @@
                         <Button DockPanel.Dock="Left" Content="Проверить обновления" Command="{Binding CheckCommand}"
                                 Style="{DynamicResource AccentButtonStyle}" Padding="16,6" />
                         <Button DockPanel.Dock="Left" Content="Отмена" Command="{Binding CheckCancelCommand}" Margin="8,0,0,0" Padding="12,6" />
+                        <Button DockPanel.Dock="Left" Content="{Binding UpdateAllText}" Command="{Binding UpdateAllCommand}" Margin="8,0,0,0" Padding="12,6"
+                                IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}"
+                                Visibility="{Binding UpdateCount, Converter={StaticResource CountToVis}}"
+                                ToolTip="Скачать и поставить все доступные обновления. Старые версии сохранятся для отката." />
                         <Button DockPanel.Dock="Left" Content="Добавить мод…" Command="{Binding AddFromFileCommand}" Margin="8,0,0,0" Padding="12,6"
+                                IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}"
                                 ToolTip="Установить мод из zip-архива. Можно просто перетащить zip в список." />
                         <Button DockPanel.Dock="Left" Content="Открыть папку" Command="{Binding OpenModsFolderCommand}" Margin="8,0,0,0" Padding="12,6" />
-                        <CheckBox DockPanel.Dock="Right" Content="Только требующие внимания" IsChecked="{Binding OnlyIssues}"
+                        <CheckBox DockPanel.Dock="Right" Content="Только проблемные" IsChecked="{Binding OnlyIssues}"
+                                  ToolTip="Показать только моды, которые требуют внимания"
                                   VerticalAlignment="Center" Margin="12,0,0,0" />
-                        <TextBox DockPanel.Dock="Right" Width="220" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}"
+                        <TextBox DockPanel.Dock="Right" Width="180" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}"
                                  ToolTip="Поиск по имени или modid" VerticalAlignment="Center" />
                         <TextBlock DockPanel.Dock="Right" Text="Поиск:" VerticalAlignment="Center" Margin="0,0,6,0" />
                     </DockPanel>
 
                     <TextBlock DockPanel.Dock="Top" Margin="2,0,0,8" Opacity="0.7" TextTrimming="CharacterEllipsis"
                                Text="{Binding ProfileInfo}" ToolTip="{Binding ProfileInfo}" />
+
+                    <Border DockPanel.Dock="Top" Margin="0,0,0,8" Padding="12,8" CornerRadius="6" Background="#40F0A020"
+                            Visibility="{Binding HasDependencyIssues, Converter={StaticResource BoolToVis}}">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Исправить" Command="{Binding FixDependenciesCommand}" Padding="12,4" Margin="12,0,0,0"
+                                    IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}" />
+                            <TextBlock Text="{Binding DependencyText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </DockPanel>
+                    </Border>
 
                     <DockPanel DockPanel.Dock="Bottom" Margin="2,8,0,0">
                         <TextBlock DockPanel.Dock="Right" Text="{Binding Summary}" FontWeight="SemiBold" />
@@ -128,6 +147,22 @@
                                           CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                 <MenuItem Header="Удалить (в Корзину)"
                                           Command="{Binding PlacementTarget.DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                <Separator />
+                                <MenuItem Header="Обновить"
+                                          Command="{Binding PlacementTarget.DataContext.UpdateOneCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                <MenuItem Header="Другая версия / откат…"
+                                          Command="{Binding PlacementTarget.DataContext.RollbackCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                <MenuItem Header="Закрепить / открепить версию"
+                                          Command="{Binding PlacementTarget.DataContext.TogglePinCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                <MenuItem Header="Пропустить эту версию"
+                                          Command="{Binding PlacementTarget.DataContext.SkipVersionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                <MenuItem Header="Снова предлагать пропущенные версии"
+                                          Command="{Binding PlacementTarget.DataContext.ClearSkippedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                 <Separator />
                                 <MenuItem Header="Открыть страницу мода"
@@ -166,22 +201,28 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
                             <DataGridTextColumn Header="Примечание" Binding="{Binding Note}" Width="3*" ElementStyle="{StaticResource CellText}" />
-                            <DataGridTemplateColumn Header="" Width="110">
+                            <DataGridTemplateColumn Header="" Width="190">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock VerticalAlignment="Center" Margin="4,0">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding PageUrl}" Value="{x:Null}">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                            <Hyperlink Command="{Binding DataContext.OpenPageCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                       CommandParameter="{Binding}" ToolTip="{Binding PageUrl}">На сайте ↗</Hyperlink>
-                                        </TextBlock>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0">
+                                            <TextBlock Margin="0,0,12,0" Visibility="{Binding CanUpdate, Converter={StaticResource BoolToVis}}">
+                                                <Hyperlink Command="{Binding DataContext.UpdateOneCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                           CommandParameter="{Binding}" ToolTip="{Binding Latest}">Обновить</Hyperlink>
+                                            </TextBlock>
+                                            <TextBlock>
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding PageUrl}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                                <Hyperlink Command="{Binding DataContext.OpenPageCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                           CommandParameter="{Binding}" ToolTip="{Binding PageUrl}">На сайте ↗</Hyperlink>
+                                            </TextBlock>
+                                        </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>

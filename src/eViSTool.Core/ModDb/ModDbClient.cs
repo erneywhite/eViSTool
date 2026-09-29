@@ -75,6 +75,31 @@ public sealed class ModDbClient : IDisposable
         return JsonConvert.DeserializeObject<ModDbGameVersionsResponse>(json)?.GameVersions ?? [];
     }
 
+    /// <summary>Скачивает файл (архив мода с CDN модбазы). Пишет во временный файл и переименовывает в конце.</summary>
+    public async Task DownloadAsync(string url, string destPath, IProgress<double>? progress = null, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        resp.EnsureSuccessStatusCode();
+        var total = resp.Content.Headers.ContentLength;
+
+        Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
+        var tmp = destPath + ".part";
+        await using (var src = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false))
+        await using (var dst = File.Create(tmp))
+        {
+            var buffer = new byte[81920];
+            long read = 0;
+            int n;
+            while ((n = await src.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+            {
+                await dst.WriteAsync(buffer.AsMemory(0, n), ct).ConfigureAwait(false);
+                read += n;
+                if (total > 0) progress?.Report((double)read / total.Value);
+            }
+        }
+        File.Move(tmp, destPath, overwrite: true);
+    }
+
     public void Dispose()
     {
         if (_ownsHttp) _http.Dispose();

@@ -26,6 +26,14 @@ public sealed class GameProfile
     /// <summary>Папка данных (VintagestoryData или --dataPath сервера).</summary>
     public string? DataDir { get; set; }
 
+    /// <summary>Закреплённые моды: modid → версия, на которой закреплён. Такие не обновляются.</summary>
+    public Dictionary<string, string> PinnedMods { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Пропущенные версии: modid → версии, которые не предлагать.</summary>
+    public Dictionary<string, List<string>> BlockedVersions { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public Mods.ModPolicy ToPolicy() => new(PinnedMods, BlockedVersions);
+
     public override string ToString() => Name;
 }
 
