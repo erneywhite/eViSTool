@@ -6,8 +6,7 @@ namespace eViSTool.Core.Mods;
 /// <summary>Скачивание модов из модбазы: обновления, откат на релиз, зависимости.</summary>
 public sealed class ModUpdater(ModDbClient db, string? downloadDir = null)
 {
-    public string DownloadDir { get; } = downloadDir ?? Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "eViSTool", "Downloads");
+    public string DownloadDir { get; } = downloadDir ?? AppPaths.Downloads;
 
     /// <summary>
     /// Скачивает релиз во временную папку и проверяет, что это действительно нужный мод.

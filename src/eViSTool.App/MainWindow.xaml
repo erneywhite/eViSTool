@@ -83,7 +83,7 @@
             </StackPanel>
         </DockPanel>
 
-        <TabControl Margin="8,0,8,8">
+        <TabControl Margin="8,0,8,8" SelectedIndex="{Binding SelectedTab}">
             <!-- ============ МОДЫ ============ -->
             <TabItem Header="Моды" DataContext="{Binding Mods}">
                 <DockPanel Margin="8">
@@ -233,7 +233,7 @@
 
             <!-- ============ КАТАЛОГ ============ -->
             <TabItem Header="Каталог">
-                <TextBlock Margin="16" Text="Здесь будет каталог модов из модбазы (этап 2d)." />
+                <local:CatalogView DataContext="{Binding Catalog}" />
             </TabItem>
 
             <!-- ============ СЕРВЕР ============ -->
@@ -326,6 +326,14 @@
                             <CheckBox Content="Предлагать пре-релизы модов (rc/pre)" IsChecked="{Binding AllowUnstable}" Margin="0,28,0,0" />
                             <TextBlock Style="{StaticResource Hint}" Margin="28,2,0,0"
                                        Text="Общая настройка для всех профилей. Для модов, у которых уже стоит пре-релиз, они учитываются всегда." />
+
+                            <TextBlock Text="Данные eViSTool" FontWeight="SemiBold" Margin="0,28,0,0" />
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Text="Настройки, сохранённые версии модов, скачивания и логи. Программа портабельная: перенёс папку — перенёс всё." />
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Открыть" Command="{Binding OpenDataFolderCommand}" Margin="8,0,0,0" Padding="12,4" />
+                                <TextBlock Text="{Binding DataLocationText}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                            </DockPanel>
                         </StackPanel>
                     </ScrollViewer>
                 </DockPanel>

@@ -7,9 +7,8 @@ namespace eViSTool.App;
 
 public partial class App : Application
 {
-    /// <summary>%LOCALAPPDATA%\eViSTool\logs — сюда пишутся отчёты об ошибках.</summary>
-    public static string LogDir { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "eViSTool", "logs");
+    /// <summary>Сюда пишутся отчёты об ошибках (папка logs в папке данных).</summary>
+    public static string LogDir => Core.AppPaths.Logs;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -17,6 +16,7 @@ public partial class App : Application
         DispatcherUnhandledException += OnDispatcherError;
         AppDomain.CurrentDomain.UnhandledException += (_, a) => WriteCrashLog(a.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, a) => { WriteCrashLog(a.Exception); a.SetObserved(); };
+        Core.AppPaths.MigrateLegacy(); // до первого чтения настроек
         base.OnStartup(e);
     }
 

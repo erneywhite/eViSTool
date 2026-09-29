@@ -15,6 +15,15 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly AppSettings _settings;
 
     public ModsViewModel Mods { get; }
+    public CatalogViewModel Catalog { get; }
+
+    /// <summary>Открытая вкладка: 0 — моды, 1 — каталог, …</summary>
+    [ObservableProperty] private int _selectedTab;
+
+    partial void OnSelectedTabChanged(int value)
+    {
+        if (value == 1) _ = Catalog.EnsureLoadedAsync(); // каталог грузим только когда он нужен
+    }
     public ObservableCollection<ProfileViewModel> Profiles { get; } = [];
 
     /// <summary>Профиль, с которым сейчас работаем (переключатель в шапке).</summary>
@@ -25,6 +34,13 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty] private bool _allowUnstable;
 
+    public string DataLocationText => Core.AppPaths.IsPortable
+        ? $"{Core.AppPaths.Root}  (портабельно, рядом с программой)"
+        : $"{Core.AppPaths.Root}  (рядом с программой писать нельзя — используется профиль пользователя)";
+
+    [RelayCommand]
+    private void OpenDataFolder() => Shell.OpenFolder(Core.AppPaths.Root);
+
     public MainViewModel()
     {
         _settings = _store.Load();
@@ -34,7 +50,9 @@ public sealed partial class MainViewModel : ObservableObject
         _activeProfile = Profiles.FirstOrDefault(p => p.Model == _settings.ActiveProfile);
         _editedProfile = _activeProfile;
 
-        Mods = new ModsViewModel(this, new ModDbClient());
+        var db = new ModDbClient();
+        Mods = new ModsViewModel(this, db);
+        Catalog = new CatalogViewModel(this, db);
         Save(); // перенос настроек старого формата сразу на диск
         Mods.OnProfileSwitched(); // список модов виден сразу, без сети
     }

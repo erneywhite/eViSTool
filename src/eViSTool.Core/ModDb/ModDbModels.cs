@@ -29,6 +29,7 @@ public sealed class ModDbMod
     [JsonProperty("lastreleased")] public string? LastReleased { get; set; }
     [JsonProperty("tags")] public List<string?> Tags { get; set; } = [];
     [JsonProperty("releases")] public List<ModDbRelease> Releases { get; set; } = [];
+    [JsonProperty("screenshots")] public List<ModDbScreenshot> Screenshots { get; set; } = [];
 
     /// <summary>Страница мода на сайте.</summary>
     public string PageUrl => string.IsNullOrEmpty(UrlAlias)
@@ -53,6 +54,12 @@ public sealed class ModDbRelease
     public IEnumerable<string> GameVersions => Tags.Where(t => !string.IsNullOrWhiteSpace(t))!;
 }
 
+public sealed class ModDbScreenshot
+{
+    [JsonProperty("mainfile")] public string? MainFile { get; set; }
+    [JsonProperty("thumbnailfilename")] public string? ThumbnailFileName { get; set; }
+}
+
 /// <summary>Краткая карточка из /api/mods (весь каталог).</summary>
 public sealed class ModDbListItem
 {
@@ -72,6 +79,15 @@ public sealed class ModDbListItem
     [JsonProperty("logo")] public string? Logo { get; set; }
     [JsonProperty("tags")] public List<string?> Tags { get; set; } = [];
     [JsonProperty("lastreleased")] public string? LastReleased { get; set; }
+
+    [JsonIgnore]
+    public string PageUrl => string.IsNullOrEmpty(UrlAlias)
+        ? $"https://mods.vintagestory.at/show/mod/{AssetId}"
+        : $"https://mods.vintagestory.at/{UrlAlias}";
+
+    /// <summary>Строковый modid (для установки и сверки с установленными).</summary>
+    [JsonIgnore]
+    public string? PrimaryModId => ModIdStrs.FirstOrDefault(s => !string.IsNullOrWhiteSpace(s))?.ToLowerInvariant();
 }
 
 internal sealed class ModDbListResponse

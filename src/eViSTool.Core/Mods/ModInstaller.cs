@@ -91,15 +91,14 @@ public static class ModInstaller
 }
 
 /// <summary>
-/// Хранилище старых версий модов: %LOCALAPPDATA%\eViSTool\ModBackups\&lt;профиль&gt;\&lt;modid&gt;\.
+/// Хранилище старых версий модов: &lt;папка данных&gt;\ModBackups\&lt;профиль&gt;\&lt;modid&gt;\.
 /// Отсюда — откат (этап 2c). Держим несколько последних версий каждого мода.
 /// </summary>
 public sealed class ModBackupStore(string root, int keepPerMod = 3)
 {
     public string Root { get; } = root;
 
-    public static ModBackupStore ForProfile(GameProfile profile) => new(Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "eViSTool", "ModBackups", profile.Id));
+    public static ModBackupStore ForProfile(GameProfile profile) => new(Path.Combine(AppPaths.ModBackups, profile.Id));
 
     public string DirFor(string modId) => Path.Combine(Root, modId);
 

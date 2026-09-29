@@ -1,11 +1,9 @@
-using System.Net;
-using System.Text.RegularExpressions;
 using eViSTool.Core.Mods;
 
 namespace eViSTool.App.ViewModels;
 
 /// <summary>Строка таблицы модов.</summary>
-public sealed partial class ModRowViewModel(ModCheckResult r)
+public sealed class ModRowViewModel(ModCheckResult r)
 {
     public ModCheckResult Result { get; } = r;
     public LocalMod Local { get; } = r.Local;
@@ -48,20 +46,5 @@ public sealed partial class ModRowViewModel(ModCheckResult r)
         r.LatestAny is { } any ? $"Есть {any.ModVersion} для другой версии игры ({string.Join(", ", any.GameVersions.TakeLast(1))})" : null,
     }.Where(s => !string.IsNullOrEmpty(s)));
 
-    public string? Changelog { get; } = r.Status == ModStatus.UpdateAvailable ? StripHtml(r.LatestCompatible?.Changelog) : null;
-
-    private static string? StripHtml(string? html)
-    {
-        if (string.IsNullOrWhiteSpace(html)) return null;
-        var text = BrTags().Replace(html, "\n");
-        text = Tags().Replace(text, "");
-        text = WebUtility.HtmlDecode(text).Trim();
-        return text.Length > 1500 ? text[..1500] + "…" : text;
-    }
-
-    [GeneratedRegex(@"<\s*(br|/p|/li)\s*/?>", RegexOptions.IgnoreCase)]
-    private static partial Regex BrTags();
-
-    [GeneratedRegex("<[^>]+>")]
-    private static partial Regex Tags();
+    public string? Changelog { get; } = r.Status == ModStatus.UpdateAvailable ? Html.ToPlainText(r.LatestCompatible?.Changelog, 1500) : null;
 }

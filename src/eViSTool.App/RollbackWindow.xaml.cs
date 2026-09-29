@@ -32,11 +32,11 @@ public partial class RollbackWindow : Window, INotifyPropertyChanged
     }
 
     /// <summary>Собирает варианты: сначала сохранённые копии, потом модбаза.</summary>
-    public static List<VersionOption> BuildOptions(ModBackupStore store, string modId, string? installedVersion,
+    public static List<VersionOption> BuildOptions(ModBackupStore? store, string modId, string? installedVersion,
         IReadOnlyList<ModDbRelease> releases)
     {
         var list = new List<VersionOption>();
-        foreach (var path in store.List(modId))
+        foreach (var path in store?.List(modId) ?? [])
         {
             var info = File.Exists(path) ? ModScanner.ReadZip(path).Info : null;
             var version = info?.Version ?? System.IO.Path.GetFileName(path);

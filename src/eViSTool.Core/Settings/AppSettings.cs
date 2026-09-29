@@ -29,11 +29,10 @@ public sealed class AppSettings
     }
 }
 
-/// <summary>Хранит настройки в %APPDATA%\eViSTool\settings.json. Запись атомарная: сначала во временный файл.</summary>
+/// <summary>Хранит настройки в settings.json папки данных (см. <see cref="AppPaths"/>). Запись атомарная: сначала во временный файл.</summary>
 public sealed class SettingsStore(string? path = null)
 {
-    public string Path { get; } = path ?? System.IO.Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "eViSTool", "settings.json");
+    public string Path { get; } = path ?? AppPaths.SettingsFile;
 
     public AppSettings Load()
     {

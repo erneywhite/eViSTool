@@ -102,6 +102,7 @@ public sealed partial class ModsViewModel : ObservableObject
             StatusText = $"Не удалось прочитать папку модов: {ex.Message}";
         }
         Rebuild();
+        LocalModsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void Rebuild()
@@ -285,8 +286,6 @@ public sealed partial class ModsViewModel : ObservableObject
             if (wasDisabled) ModConfigEditor.SetEnabled(profile, info, enabled: false);
 
             installed.Add(plan.IsReplace ? $"{info.Name}: {old} → {info.Version}" : $"{info.Name} {info.Version}");
-            if (plan.MissingDependencies.Count > 0)
-                problems.Add($"{info.Name}: не хватает зависимостей — {string.Join(", ", plan.MissingDependencies)}");
             return true;
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException)
@@ -300,6 +299,9 @@ public sealed partial class ModsViewModel : ObservableObject
     {
         ReloadLocal();
         _ = FetchNewModsAsync();
+        // зависимости — по итоговому состоянию, а не на момент установки каждого мода
+        if (installed.Count > 0)
+            problems.AddRange(DependencyIssues.Select(i => "зависимость " + i.Describe()));
         StatusText = installed.Count > 0 ? $"{title}: " + string.Join("; ", installed) : $"{title}: ничего не изменилось";
         if (problems.Count == 0) return;
         var text = (installed.Count > 0 ? $"{title}:\n• " + string.Join("\n• ", installed) + "\n\n" : "")
@@ -470,11 +472,27 @@ public sealed partial class ModsViewModel : ObservableObject
 
         var installed = new List<string>();
         var problems = new List<string>();
-        var tried = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         IsBusy = true;
         try
         {
-            // у зависимостей бывают свои зависимости — несколько кругов, пока есть что чинить
+            await FixDependencyIssuesAsync(game, installed, problems);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+        Report("Зависимости", installed, problems);
+    }
+
+    /// <summary>
+    /// Докачивает недостающие/устаревшие зависимости и включает выключенные. Несколько кругов:
+    /// у зависимостей бывают свои зависимости. Без вопросов — вызывающий уже спросил.
+    /// </summary>
+    private async Task FixDependencyIssuesAsync(ModVersion game, List<string> installed, List<string> problems)
+    {
+        var tried = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
             for (var round = 0; round < 5; round++)
             {
                 ReloadLocal();
@@ -506,11 +524,49 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             problems.Add(ex.Message);
         }
+    }
+
+    // ---------- установка из каталога ----------
+
+    /// <summary>modid установленных модов активного профиля (для отметки «установлен» в каталоге).</summary>
+    public IReadOnlyDictionary<string, string> InstalledVersions =>
+        _locals.Where(l => l.Info is not null)
+            .GroupBy(l => l.Info!.ModId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Info!.Version ?? "", StringComparer.OrdinalIgnoreCase);
+
+    public event EventHandler? LocalModsChanged;
+
+    /// <summary>Скачать и поставить релиз из каталога, затем предложить доставить его зависимости.</summary>
+    public async Task<bool> InstallFromCatalogAsync(string modId, string name, ModDbRelease release)
+    {
+        if (Profile is not { } profile || IsBusy) return false;
+        if (!ConfirmIfRunning(profile)) return false;
+
+        var installed = new List<string>();
+        var problems = new List<string>();
+        IsBusy = true;
+        try
+        {
+            if (!await DownloadAndInstallAsync(profile, modId, name, release, installed, problems))
+            {
+                Report("Установка", installed, problems);
+                return false;
+            }
+
+            ReloadLocal();
+            if (DependencyIssues.Count > 0 && profile.GameVersion is { } game)
+            {
+                var list = string.Join("\n", DependencyIssues.Select(i => "• " + i.Describe()));
+                if (Confirm($"«{name}» установлен. Не хватает зависимостей:\n\n{list}\n\nДоставить их из модбазы?"))
+                    await FixDependencyIssuesAsync(game, installed, problems);
+            }
+        }
         finally
         {
             IsBusy = false;
         }
-        Report("Зависимости", installed, problems);
+        Report("Установлено", installed, problems);
+        return true;
     }
 
     // ---------- закрепление и пропуск версий ----------
