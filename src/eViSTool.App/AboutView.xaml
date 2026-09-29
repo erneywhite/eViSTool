@@ -33,10 +33,22 @@
             <!-- поддержать -->
             <Border Margin="0,24,0,0" Padding="16" CornerRadius="8" Background="#1A29ABE0">
                 <DockPanel>
-                    <Button DockPanel.Dock="Right" Command="{Binding OpenKofiCommand}" Padding="18,8" Margin="16,0,0,0"
-                            Style="{DynamicResource AccentButtonStyle}" VerticalAlignment="Center">
-                        <TextBlock Text="{local:Tr about.kofiButton}" />
-                    </Button>
+                    <!-- официальная кнопка Ko-fi (картинка вшита в программу) -->
+                    <Image DockPanel.Dock="Right" Source="Assets/kofi.png" Height="44" Margin="16,0,0,0" VerticalAlignment="Center"
+                           Cursor="Hand" ToolTip="ko-fi.com/erneywhite" RenderOptions.BitmapScalingMode="HighQuality">
+                        <Image.InputBindings>
+                            <MouseBinding Gesture="LeftClick" Command="{Binding OpenKofiCommand}" />
+                        </Image.InputBindings>
+                        <Image.Style>
+                            <Style TargetType="Image">
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Opacity" Value="0.85" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Image.Style>
+                    </Image>
                     <StackPanel>
                         <TextBlock Text="{local:Tr about.supportTitle}" FontWeight="SemiBold" FontSize="15" />
                         <TextBlock Text="{local:Tr about.supportText}" Style="{StaticResource Muted}" Margin="0,4,0,0" />

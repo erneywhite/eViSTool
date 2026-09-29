@@ -16,6 +16,7 @@
   <ItemGroup>
     <Resource Include="Assets\eViSTool.ico" />
     <Resource Include="Assets\logo256.png" />
+    <Resource Include="Assets\kofi.png" />
   </ItemGroup>
 
   <ItemGroup>
