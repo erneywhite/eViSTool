@@ -1,0 +1,47 @@
+<Window x:Class="eViSTool.App.ImportPackWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:eViSTool.App"
+        Title="{local:Tr packi.title}" Icon="Assets/eViSTool.ico"
+        Width="820" Height="640" MinWidth="600" MinHeight="420"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="20">
+        <!-- о паке -->
+        <StackPanel DockPanel.Dock="Top">
+            <TextBlock x:Name="PackName" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock x:Name="PackInfo" Opacity="0.7" TextWrapping="Wrap" Margin="0,2,0,0" />
+            <TextBlock x:Name="PackDescription" TextWrapping="Wrap" Margin="0,8,0,0" />
+            <Border x:Name="WarningBox" Margin="0,10,0,0" Padding="10,6" CornerRadius="6" Background="#40F0A020" Visibility="Collapsed">
+                <TextBlock x:Name="WarningText" TextWrapping="Wrap" />
+            </Border>
+        </StackPanel>
+
+        <!-- кнопки и режим -->
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+            <RadioButton x:Name="AddMode" Content="{local:Tr packi.modeAdd}" IsChecked="True" />
+            <RadioButton x:Name="MirrorMode" Margin="0,6,0,0" />
+            <CheckBox x:Name="ConfigBox" Content="{local:Tr packi.applyConfig}" Margin="0,10,0,0" Visibility="Collapsed" />
+            <DockPanel Margin="0,14,0,0">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="{local:Tr packi.import}" IsDefault="True" Click="Import_Click" Padding="16,6"
+                            Style="{DynamicResource AccentButtonStyle}" />
+                    <Button Content="{local:Tr common.cancel}" IsCancel="True" Margin="8,0,0,0" Padding="16,6" />
+                </StackPanel>
+                <TextBlock x:Name="Summary" Opacity="0.8" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </DockPanel>
+        </StackPanel>
+
+        <!-- что произойдёт с каждым модом -->
+        <ListView x:Name="Items" Margin="0,12,0,0">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="{local:Tr col.mod}" Width="250" DisplayMemberBinding="{Binding Name}" />
+                    <GridViewColumn Header="{local:Tr packi.colPack}" Width="110" DisplayMemberBinding="{Binding PackVersion}" />
+                    <GridViewColumn Header="{local:Tr packi.colMine}" Width="110" DisplayMemberBinding="{Binding MineVersion}" />
+                    <GridViewColumn Header="{local:Tr packi.colAction}" Width="150" DisplayMemberBinding="{Binding ActionText}" />
+                    <GridViewColumn Header="{local:Tr packi.colSource}" Width="120" DisplayMemberBinding="{Binding SourceText}" />
+                </GridView>
+            </ListView.View>
+        </ListView>
+    </DockPanel>
+</Window>

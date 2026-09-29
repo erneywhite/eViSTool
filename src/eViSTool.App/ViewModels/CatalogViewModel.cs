@@ -125,10 +125,10 @@ public sealed partial class CatalogViewModel : ObservableObject
     }
 
     partial void OnSearchChanged(string value) { _searchDelay.Stop(); _searchDelay.Start(); }
-    partial void OnSelectedTagChanged(Choice<string?>? value) => ApplySearch();
-    partial void OnSelectedSideChanged(Choice<string?> value) => ApplySearch();
-    partial void OnSelectedSortChanged(Choice<CatalogSort> value) => ApplySearch();
-    partial void OnSelectedBranchChanged(Choice<string?>? value) => ApplySearch();
+    partial void OnSelectedTagChanged(Choice<string?>? value) { if (value is not null) ApplySearch(); }
+    partial void OnSelectedSideChanged(Choice<string?> value) { if (value is not null) ApplySearch(); }
+    partial void OnSelectedSortChanged(Choice<CatalogSort> value) { if (value is not null) ApplySearch(); }
+    partial void OnSelectedBranchChanged(Choice<string?>? value) { if (value is not null) ApplySearch(); }
 
     /// <summary>Первое открытие вкладки — загрузить каталог (из кэша, если свежий).</summary>
     public Task EnsureLoadedAsync()
@@ -201,7 +201,9 @@ public sealed partial class CatalogViewModel : ObservableObject
         }
     }
 
-    private void ApplySearch() => _ = ApplySearchAsync();
+    // ошибки поиска не должны теряться молча в фоновой задаче
+    private void ApplySearch() => ApplySearchAsync().ContinueWith(t => App.WriteCrashLog(t.Exception),
+        CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
 
     private async Task ApplySearchAsync()
     {
@@ -228,8 +230,8 @@ public sealed partial class CatalogViewModel : ObservableObject
         {
             Text = Search,
             Tag = SelectedTag?.Value,
-            Side = SelectedSide.Value,
-            Sort = SelectedSort.Value,
+            Side = SelectedSide?.Value,
+            Sort = SelectedSort?.Value ?? CatalogSort.Trending,
             OnlyAssets = only,
         });
 

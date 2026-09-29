@@ -13,6 +13,7 @@ using eViSTool.Core.Profiles;
 using eViSTool.Core.Versioning;
 using Microsoft.Win32;
 using eViSTool.Core.Localization;
+using eViSTool.Core.Packs;
 
 namespace eViSTool.App.ViewModels;
 
@@ -238,7 +239,13 @@ public sealed partial class ModsViewModel : ObservableObject
     {
         if (Profile is not { } profile) return;
 
-        var zips = files.Where(f => f.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)).ToList();
+        var list = files.ToList();
+        if (list.FirstOrDefault(f => f.EndsWith(PackManifest.Extension, StringComparison.OrdinalIgnoreCase)) is { } pack)
+        {
+            _ = ImportPackFileAsync(pack);
+            return;
+        }
+        var zips = list.Where(f => f.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)).ToList();
         if (zips.Count == 0)
         {
             Error(Loc.T("mods.notZip"));
@@ -305,7 +312,12 @@ public sealed partial class ModsViewModel : ObservableObject
         // зависимости — по итоговому состоянию, а не на момент установки каждого мода
         if (installed.Count > 0)
             problems.AddRange(DependencyIssues.Select(i => Loc.T("report.dependency", i.Describe())));
-        StatusText = installed.Count > 0 ? $"{title}: " + string.Join("; ", installed) : Loc.T("report.nothingChanged", title);
+        StatusText = installed.Count switch
+        {
+            0 => Loc.T("report.nothingChanged", title),
+            <= 3 => $"{title}: " + string.Join("; ", installed),
+            _ => Loc.T("report.changedCount", title, installed.Count), // длинный список — только число
+        };
         if (problems.Count == 0) return;
         var text = (installed.Count > 0 ? $"{title}:\n• " + string.Join("\n• ", installed) + "\n\n" : "")
                    + Loc.T("report.attention") + ":\n• " + string.Join("\n• ", problems);
@@ -571,6 +583,117 @@ public sealed partial class ModsViewModel : ObservableObject
         Report(Loc.T("report.installed"), installed, problems);
         return true;
     }
+
+    // ---------- модпаки ----------
+
+    [RelayCommand]
+    private async Task ExportPackAsync()
+    {
+        if (Profile is not { } profile || IsBusy) return;
+        var enabled = _locals.Count(l => l.Info is not null && !l.IsDisabled);
+        var disabled = _locals.Count(l => l.Info is not null && l.IsDisabled);
+        if (enabled + disabled == 0)
+        {
+            Error(Loc.T("packx.noMods"));
+            return;
+        }
+
+        var hasConfig = profile.Profile.DataDir is { } data && Directory.Exists(Path.Combine(data, "ModConfig"));
+        var dlg = new ExportPackWindow(profile.Profile.Name, enabled, disabled, hasConfig) { Owner = Application.Current.MainWindow };
+        if (dlg.ShowDialog() != true || dlg.Options is not { } options) return;
+
+        var save = new SaveFileDialog
+        {
+            Title = Loc.T("packx.saveTitle"),
+            Filter = Loc.T("pack.filter") + $" (*{PackManifest.Extension})|*{PackManifest.Extension}",
+            FileName = string.Concat(options.Name.Split(Path.GetInvalidFileNameChars())) + PackManifest.Extension,
+        };
+        if (save.ShowDialog() != true) return;
+
+        IsBusy = true;
+        try
+        {
+            // что есть в модбазе — можно не класть внутрь; для этого нужен ответ модбазы
+            if (!options.BundleFiles && _remote.Count == 0)
+            {
+                StatusText = Loc.T("check.querying", 0, _locals.Count);
+                _remote = await _service.FetchRemoteAsync(_locals, new Progress<string>(s => StatusText = s));
+            }
+            var onModDb = _remote.Where(r => r.Value.Mod is not null).Select(r => r.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            StatusText = Loc.T("packx.building");
+            var locals = _locals;
+            var manifest = await Task.Run(() => PackBuilder.Build(profile, locals, options, onModDb, save.FileName, $"eViSTool {AppVersion}"));
+            var size = new FileInfo(save.FileName).Length / 1024.0 / 1024.0;
+            StatusText = Loc.T("packx.done", manifest.Mods.Count, size.ToString("0.0"), save.FileName);
+            Shell.ShowInFolder(save.FileName);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException)
+        {
+            Error(Loc.T("packx.failed", ex.Message));
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportPackAsync()
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title = Loc.T("packi.openTitle"),
+            Filter = Loc.T("pack.filter") + $" (*{PackManifest.Extension})|*{PackManifest.Extension}",
+        };
+        if (dlg.ShowDialog() == true) await ImportPackFileAsync(dlg.FileName);
+    }
+
+    public async Task ImportPackFileAsync(string path)
+    {
+        if (Profile is not { } profile || IsBusy) return;
+
+        PackFile pack;
+        try
+        {
+            pack = PackFile.Open(path);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or Newtonsoft.Json.JsonException)
+        {
+            Error(Loc.T("packi.openFailed", ex.Message));
+            return;
+        }
+
+        using (pack)
+        {
+            var plan = PackImporter.Plan(pack.Manifest, profile, ModUpdateService.ScanLocal(profile));
+            var dlg = new ImportPackWindow(plan) { Owner = Application.Current.MainWindow };
+            if (dlg.ShowDialog() != true) return;
+            if (!ConfirmIfRunning(profile)) return;
+
+            IsBusy = true;
+            PackImportResult result;
+            try
+            {
+                var importer = new PackImporter(_db, _updater);
+                var progress = new Progress<string>(s => StatusText = s);
+                var (mirror, applyConfig) = (dlg.Mirror, dlg.ApplyConfig);
+                // в фоне: иначе при паке «всё внутри» импорт идёт синхронно, окно подвисает,
+                // а сообщения прогресса приходят уже после итога и затирают его
+                result = await Task.Run(() => importer.ApplyAsync(pack, plan, profile, mirror, applyConfig,
+                    ModBackupStore.ForProfile(profile.Profile), progress));
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+            Report(Loc.T("report.imported", pack.Manifest.Name), result.Done.ToList(), result.Problems.ToList());
+        }
+    }
+
+    private static string AppVersion =>
+        typeof(ModsViewModel).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion.Split('+')[0] ?? "";
 
     // ---------- закрепление и пропуск версий ----------
 

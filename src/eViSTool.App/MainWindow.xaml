@@ -99,6 +99,16 @@
                         <Button DockPanel.Dock="Left" Content="{local:Tr mods.add}" Command="{Binding AddFromFileCommand}" Margin="8,0,0,0" Padding="12,6"
                                 IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}"
                                 ToolTip="{local:Tr mods.addTip}" />
+                        <Button DockPanel.Dock="Left" Content="{local:Tr pack.menu}" Margin="8,0,0,0" Padding="12,6"
+                                IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}" Click="PackMenu_Click"
+                                ToolTip="{local:Tr pack.menuTip}">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="{local:Tr pack.export}" Command="{Binding ExportPackCommand}" />
+                                    <MenuItem Header="{local:Tr pack.import}" Command="{Binding ImportPackCommand}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
                         <Button DockPanel.Dock="Left" Content="{local:Tr mods.openFolder}" Command="{Binding OpenModsFolderCommand}" Margin="8,0,0,0" Padding="12,6" />
                         <CheckBox DockPanel.Dock="Right" Content="{local:Tr mods.onlyIssues}" IsChecked="{Binding OnlyIssues}"
                                   ToolTip="{local:Tr mods.onlyIssuesTip}"
@@ -122,7 +132,8 @@
 
                     <DockPanel DockPanel.Dock="Bottom" Margin="2,8,0,0">
                         <TextBlock DockPanel.Dock="Right" Text="{Binding Summary}" FontWeight="SemiBold" />
-                        <TextBlock Text="{Binding StatusText}" Opacity="0.8" />
+                        <TextBlock Text="{Binding StatusText}" Opacity="0.8" TextTrimming="CharacterEllipsis" Margin="0,0,16,0"
+                                   ToolTip="{Binding StatusText}" />
                     </DockPanel>
 
                     <DataGrid ItemsSource="{Binding View}" AutoGenerateColumns="False" IsReadOnly="True"

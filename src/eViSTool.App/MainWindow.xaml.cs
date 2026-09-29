@@ -34,6 +34,18 @@ public partial class MainWindow : Window
         Vm.SaveSettings();
     }
 
+    // «Модпак ▾»: меню открывается обычным кликом
+    private void PackMenu_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button { ContextMenu: { } menu } button)
+        {
+            menu.DataContext = button.DataContext;
+            menu.PlacementTarget = button;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }
+    }
+
     // перетаскивание zip-архивов из Проводника в список модов
     private void ModsGrid_DragOver(object sender, DragEventArgs e)
     {

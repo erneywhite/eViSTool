@@ -1,0 +1,32 @@
+<Window x:Class="eViSTool.App.ExportPackWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:eViSTool.App"
+        Title="{local:Tr packx.title}" Icon="Assets/eViSTool.ico"
+        Width="560" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <StackPanel Margin="20">
+        <TextBlock Text="{local:Tr packx.name}" FontWeight="SemiBold" />
+        <TextBox x:Name="NameBox" Margin="0,4,0,0" />
+
+        <TextBlock Text="{local:Tr packx.description}" FontWeight="SemiBold" Margin="0,14,0,0" />
+        <TextBox x:Name="DescriptionBox" Margin="0,4,0,0" AcceptsReturn="True" TextWrapping="Wrap" Height="60"
+                 VerticalScrollBarVisibility="Auto" />
+
+        <CheckBox x:Name="BundleBox" Content="{local:Tr packx.bundle}" IsChecked="True" Margin="0,18,0,0" />
+        <TextBlock Text="{local:Tr packx.bundleHint}" Opacity="0.7" TextWrapping="Wrap" Margin="28,2,0,0" />
+
+        <CheckBox x:Name="ConfigBox" Content="{local:Tr packx.config}" Margin="0,12,0,0" />
+        <TextBlock Text="{local:Tr packx.configHint}" Opacity="0.7" TextWrapping="Wrap" Margin="28,2,0,0" />
+
+        <CheckBox x:Name="DisabledBox" Content="{local:Tr packx.disabled}" Margin="0,12,0,0" />
+
+        <TextBlock x:Name="Summary" Opacity="0.8" TextWrapping="Wrap" Margin="0,18,0,0" />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+            <Button Content="{local:Tr packx.build}" IsDefault="True" Click="Build_Click" Padding="16,6"
+                    Style="{DynamicResource AccentButtonStyle}" />
+            <Button Content="{local:Tr common.cancel}" IsCancel="True" Margin="8,0,0,0" Padding="16,6" />
+        </StackPanel>
+    </StackPanel>
+</Window>
