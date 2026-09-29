@@ -1,18 +1,32 @@
-using eViSTool.Core.Game;
+using eViSTool.Core.Profiles;
 using Newtonsoft.Json;
 
 namespace eViSTool.Core.Settings;
 
 public sealed class AppSettings
 {
-    /// <summary>Папка игры или сервера (там, где Vintagestory.exe / VintagestoryServer.exe).</summary>
-    public string? GameDir { get; set; }
-
-    /// <summary>Папка модов, с которой работаем.</summary>
-    public string ModsDir { get; set; } = GameInstall.DefaultModsDir;
+    public List<GameProfile> Profiles { get; set; } = [];
+    public string? ActiveProfileId { get; set; }
 
     /// <summary>Предлагать пре-релизы модов (rc/pre) даже тем, у кого стоит стабильная версия.</summary>
     public bool AllowUnstable { get; set; }
+
+    /// <summary>Устаревшее (до профилей): папка игры. Переносится в профиль при загрузке.</summary>
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public string? GameDir { get; set; }
+
+    [JsonIgnore]
+    public GameProfile? ActiveProfile => Profiles.FirstOrDefault(p => p.Id == ActiveProfileId) ?? Profiles.FirstOrDefault();
+
+    /// <summary>Гарантирует хотя бы один профиль (первый запуск или настройки старого формата).</summary>
+    public void EnsureProfiles()
+    {
+        if (Profiles.Count == 0)
+            Profiles.Add(ProfileResolver.DefaultClient(GameDir));
+        GameDir = null;
+        if (Profiles.All(p => p.Id != ActiveProfileId))
+            ActiveProfileId = Profiles[0].Id;
+    }
 }
 
 /// <summary>Хранит настройки в %APPDATA%\eViSTool\settings.json. Запись атомарная: сначала во временный файл.</summary>
@@ -23,17 +37,19 @@ public sealed class SettingsStore(string? path = null)
 
     public AppSettings Load()
     {
+        var settings = new AppSettings();
         try
         {
             if (File.Exists(Path))
-                return JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText(Path)) ?? new AppSettings();
+                settings = JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText(Path)) ?? new AppSettings();
         }
         catch (Exception ex) when (ex is JsonException or IOException)
         {
             // битый файл не должен ронять приложение — сохраним копию и начнём с чистых настроек
             try { File.Copy(Path, Path + ".broken", overwrite: true); } catch (IOException) { }
         }
-        return new AppSettings();
+        settings.EnsureProfiles();
+        return settings;
     }
 
     public void Save(AppSettings settings)

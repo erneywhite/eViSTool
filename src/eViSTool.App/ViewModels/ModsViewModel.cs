@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Windows.Data;
@@ -39,32 +38,52 @@ public sealed partial class ModsViewModel : ObservableObject
     partial void OnOnlyIssuesChanged(bool value) => View.Refresh();
     partial void OnSearchChanged(string value) => View.Refresh();
 
+    /// <summary>Строка под кнопками: какие папки и какая игра.</summary>
+    public string ProfileInfo => _main.ActiveProfile?.Resolved is { } r
+        ? $"Игра: {r.GameVersion?.ToString() ?? "не найдена"}   ·   Папки модов: {string.Join("; ", r.ModDirs)}"
+        : "Профиль не выбран";
+
+    /// <summary>Сменился профиль или его настройки — старые результаты больше не про него.</summary>
+    public void OnProfileSwitched()
+    {
+        Rows.Clear();
+        Summary = "";
+        StatusText = "Нажми «Проверить обновления»";
+        OnPropertyChanged(nameof(ProfileInfo));
+    }
+
     [RelayCommand(IncludeCancelCommand = true)]
     private async Task CheckAsync(CancellationToken ct)
     {
-        if (_main.GameVersion is null)
+        var profile = _main.ActiveProfile;
+        if (profile is null) return;
+        profile.Refresh(); // игра могла поменять свои настройки, пока окно было открыто
+        var resolved = profile.Resolved;
+
+        if (resolved.GameVersion is null)
         {
-            StatusText = "Не определена версия игры — укажи папку игры в настройках.";
+            StatusText = "Не определена версия игры — укажи папку игры в настройках профиля.";
             return;
         }
-        if (!Directory.Exists(_main.ModsDir))
+        if (!resolved.ModDirs.Any(Directory.Exists))
         {
-            StatusText = $"Папка модов не найдена: {_main.ModsDir}";
+            StatusText = "Папки модов не найдены — проверь папку данных в настройках профиля.";
             return;
         }
 
         try
         {
             var progress = new Progress<string>(s => StatusText = s);
-            var results = await _service.CheckAsync(_main.ModsDir, _main.GameVersion, _main.AllowUnstable, progress, ct);
+            var results = await _service.CheckAsync(resolved, _main.AllowUnstable, progress, ct);
 
             Rows.Clear();
             foreach (var r in results) Rows.Add(new ModRowViewModel(r));
 
             var updates = results.Count(r => r.Status == ModStatus.UpdateAvailable);
             var issues = results.Count(r => r.Status is not (ModStatus.UpToDate or ModStatus.UpdateAvailable) || r.IsDuplicate);
-            Summary = $"Модов: {results.Count} · обновлений: {updates} · требуют внимания: {issues}";
-            StatusText = $"Проверено {DateTime.Now:HH:mm:ss} для игры {_main.GameVersion}";
+            var disabled = results.Count(r => r.Local.IsDisabled);
+            Summary = $"Модов: {results.Count} · выключено: {disabled} · обновлений: {updates} · требуют внимания: {issues}";
+            StatusText = $"Проверено {DateTime.Now:HH:mm:ss} для игры {resolved.GameVersion}";
         }
         catch (OperationCanceledException)
         {
@@ -79,19 +98,18 @@ public sealed partial class ModsViewModel : ObservableObject
     [RelayCommand]
     private static void OpenPage(ModRowViewModel? row)
     {
-        if (row?.PageUrl is { } url) Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        if (row?.PageUrl is { } url) Shell.OpenUrl(url);
     }
 
     [RelayCommand]
     private static void ShowFile(ModRowViewModel? row)
     {
-        if (row is not null && File.Exists(row.FilePath))
-            Process.Start("explorer.exe", $"/select,\"{row.FilePath}\"");
+        if (row is not null && File.Exists(row.FilePath)) Shell.ShowInFolder(row.FilePath);
     }
 
     [RelayCommand]
     private void OpenModsFolder()
     {
-        if (Directory.Exists(_main.ModsDir)) Process.Start(new ProcessStartInfo(_main.ModsDir) { UseShellExecute = true });
+        if (_main.ActiveProfile?.Resolved.InstallDir is { } dir && Directory.Exists(dir)) Shell.OpenFolder(dir);
     }
 }

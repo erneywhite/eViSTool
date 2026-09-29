@@ -6,7 +6,11 @@ namespace eViSTool.Core.Mods;
 public sealed record LocalMod(string Path, ModInfo? Info, string? Error)
 {
     public string FileName => System.IO.Path.GetFileName(Path);
+    public string Directory => System.IO.Path.GetDirectoryName(Path)!;
     public bool IsIdentified => Info is not null;
+
+    /// <summary>Выключен в настройках игры (disabledMods / WorldConfig.DisabledMods).</summary>
+    public bool IsDisabled { get; init; }
 }
 
 /// <summary>Сканирует папку модов: zip-архивы и распакованные папки с modinfo.json.</summary>
@@ -14,14 +18,21 @@ public static class ModScanner
 {
     private const string ModInfoFile = "modinfo.json";
 
+    /// <summary>Сканирует несколько папок; несуществующие пропускает.</summary>
+    public static IReadOnlyList<LocalMod> Scan(IEnumerable<string> modsDirs) =>
+        modsDirs.Where(System.IO.Directory.Exists)
+            .SelectMany(Scan)
+            .OrderBy(m => m.Info?.Name ?? m.FileName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
     public static IReadOnlyList<LocalMod> Scan(string modsDir)
     {
-        if (!Directory.Exists(modsDir))
+        if (!System.IO.Directory.Exists(modsDir))
             throw new DirectoryNotFoundException($"Папка модов не найдена: {modsDir}");
 
         var result = new List<LocalMod>();
 
-        foreach (var file in Directory.EnumerateFiles(modsDir))
+        foreach (var file in System.IO.Directory.EnumerateFiles(modsDir))
         {
             var ext = System.IO.Path.GetExtension(file);
             if (ext.Equals(".zip", StringComparison.OrdinalIgnoreCase))
@@ -31,7 +42,7 @@ public static class ModScanner
             // остальное (json-файлы менеджеров, архивы .rar и т. п.) игра не грузит — пропускаем
         }
 
-        foreach (var dir in Directory.EnumerateDirectories(modsDir))
+        foreach (var dir in System.IO.Directory.EnumerateDirectories(modsDir))
         {
             var infoPath = System.IO.Path.Combine(dir, ModInfoFile);
             if (!File.Exists(infoPath)) continue;

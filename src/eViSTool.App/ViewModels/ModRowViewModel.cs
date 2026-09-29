@@ -9,6 +9,7 @@ public sealed partial class ModRowViewModel(ModCheckResult r)
 {
     public ModStatus Kind { get; } = r.Status;
     public bool IsDuplicate { get; } = r.IsDuplicate;
+    public bool IsEnabled { get; } = !r.Local.IsDisabled;
 
     public string Name { get; } = r.Local.Info?.Name is { Length: > 0 } n ? n : r.Local.FileName;
     public string ModId { get; } = r.Local.Info?.ModId ?? "";
@@ -31,6 +32,7 @@ public sealed partial class ModRowViewModel(ModCheckResult r)
 
     public string Note { get; } = string.Join(" · ", new[]
     {
+        r.Local.IsDisabled ? "Выключен в настройках игры" : null,
         r.IsDuplicate ? "Дубликат: этот modid установлен несколько раз" : null,
         r.Message,
         r.LatestAny is { } any ? $"Есть {any.ModVersion} для другой версии игры ({string.Join(", ", any.GameVersions.TakeLast(1))})" : null,

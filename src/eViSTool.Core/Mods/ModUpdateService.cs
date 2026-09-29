@@ -1,4 +1,5 @@
 using eViSTool.Core.ModDb;
+using eViSTool.Core.Profiles;
 using eViSTool.Core.Versioning;
 
 namespace eViSTool.Core.Mods;
@@ -7,11 +8,16 @@ namespace eViSTool.Core.Mods;
 public sealed class ModUpdateService(ModDbClient db)
 {
     public async Task<IReadOnlyList<ModCheckResult>> CheckAsync(
-        string modsDir, ModVersion gameVersion, bool allowUnstable = false,
+        ResolvedProfile profile, bool allowUnstable = false,
         IProgress<string>? progress = null, CancellationToken ct = default)
     {
-        progress?.Report("Чтение папки модов…");
-        var locals = await Task.Run(() => ModScanner.Scan(modsDir), ct).ConfigureAwait(false);
+        var gameVersion = profile.GameVersion ?? throw new InvalidOperationException("Не определена версия игры");
+
+        progress?.Report("Чтение папок модов…");
+        var disabled = new HashSet<string>(profile.DisabledMods); // игра сравнивает с учётом регистра
+        var locals = await Task.Run(() => ModScanner.Scan(profile.ModDirs)
+            .Select(l => l with { IsDisabled = IsDisabled(l, disabled) })
+            .ToList(), ct).ConfigureAwait(false);
         var identified = locals.Where(l => l.Info is not null).ToList();
 
         progress?.Report($"Запрос модбазы: 0/{identified.Count}");
@@ -30,6 +36,11 @@ public sealed class ModUpdateService(ModDbClient db)
         progress?.Report("Готово");
         return UpdateChecker.Evaluate(locals, remote, gameVersion, allowUnstable);
     }
+
+    /// <summary>Та же проверка, что в ModLoader игры: "modid" или "modid@версия".</summary>
+    public static bool IsDisabled(LocalMod mod, IReadOnlySet<string> disabled) =>
+        mod.Info is { } info
+        && (disabled.Contains(info.OriginalModId) || disabled.Contains($"{info.OriginalModId}@{info.Version}"));
 
     /// <summary>
     /// Запасной путь, как у Rustique: modid в modinfo.json иногда не совпадает с модбазой

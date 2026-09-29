@@ -5,7 +5,11 @@ namespace eViSTool.Core.Mods;
 /// <summary>Содержимое modinfo.json (только то, что нам нужно).</summary>
 public sealed record ModInfo
 {
+    /// <summary>modid в нижнем регистре — для сравнения с модбазой.</summary>
     public string ModId { get; init; } = "";
+
+    /// <summary>modid как написан в modinfo.json — так его пишет игра в списках выключенных.</summary>
+    public string OriginalModId { get; init; } = "";
     public string Name { get; init; } = "";
     public string? Version { get; init; }
     public string? Type { get; init; }
@@ -61,6 +65,7 @@ public sealed record ModInfo
         return new ModInfo
         {
             ModId = modId.Trim().ToLowerInvariant(),
+            OriginalModId = modId.Trim(),
             Name = name,
             Version = Str("version"),
             Type = Str("type"),

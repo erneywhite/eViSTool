@@ -1,11 +1,11 @@
+using System.Collections.ObjectModel;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Game;
 using eViSTool.Core.ModDb;
+using eViSTool.Core.Profiles;
 using eViSTool.Core.Settings;
-using eViSTool.Core.Versioning;
-using Microsoft.Win32;
 
 namespace eViSTool.App.ViewModels;
 
@@ -15,38 +15,34 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly AppSettings _settings;
 
     public ModsViewModel Mods { get; }
+    public ObservableCollection<ProfileViewModel> Profiles { get; } = [];
 
-    [ObservableProperty] private string? _gameDir;
-    [ObservableProperty] private string _modsDir;
+    /// <summary>Профиль, с которым сейчас работаем (переключатель в шапке).</summary>
+    [ObservableProperty] private ProfileViewModel? _activeProfile;
+
+    /// <summary>Профиль, открытый в редакторе на вкладке «Настройки».</summary>
+    [ObservableProperty] private ProfileViewModel? _editedProfile;
+
     [ObservableProperty] private bool _allowUnstable;
-    [ObservableProperty] private string _gameVersionText = "";
-
-    public ModVersion? GameVersion { get; private set; }
 
     public MainViewModel()
     {
         _settings = _store.Load();
-        _settings.GameDir ??= GameInstall.FindGameDir();
+        foreach (var p in _settings.Profiles) Profiles.Add(new ProfileViewModel(p, OnProfileChanged));
 
-        _gameDir = _settings.GameDir;
-        _modsDir = _settings.ModsDir;
         _allowUnstable = _settings.AllowUnstable;
-        RefreshGameVersion();
+        _activeProfile = Profiles.FirstOrDefault(p => p.Model == _settings.ActiveProfile);
+        _editedProfile = _activeProfile;
 
         Mods = new ModsViewModel(this, new ModDbClient());
+        Save(); // перенос настроек старого формата сразу на диск
     }
 
-    partial void OnGameDirChanged(string? value)
+    partial void OnActiveProfileChanged(ProfileViewModel? value)
     {
-        _settings.GameDir = value;
-        RefreshGameVersion();
+        _settings.ActiveProfileId = value?.Model.Id;
         Save();
-    }
-
-    partial void OnModsDirChanged(string value)
-    {
-        _settings.ModsDir = value;
-        Save();
+        Mods.OnProfileSwitched();
     }
 
     partial void OnAllowUnstableChanged(bool value)
@@ -55,10 +51,10 @@ public sealed partial class MainViewModel : ObservableObject
         Save();
     }
 
-    private void RefreshGameVersion()
+    private void OnProfileChanged(ProfileViewModel profile)
     {
-        GameVersion = string.IsNullOrWhiteSpace(GameDir) ? null : GameInstall.DetectVersion(GameDir);
-        GameVersionText = GameVersion is null ? "игра не найдена — укажи папку в настройках" : GameVersion.ToString();
+        Save();
+        if (profile == ActiveProfile) Mods.OnProfileSwitched();
     }
 
     private void Save()
@@ -68,19 +64,41 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void BrowseGameDir()
+    private void AddClientProfile() => AddProfile(new GameProfile
     {
-        var dlg = new OpenFolderDialog { Title = "Папка игры или сервера (где Vintagestory.exe / VintagestoryServer.exe)", InitialDirectory = GameDir };
-        if (dlg.ShowDialog() == true) GameDir = dlg.FolderName;
+        Name = "Клиент " + (Profiles.Count + 1),
+        Kind = ProfileKind.Client,
+        GameDir = GameInstall.FindGameDir(),
+        DataDir = GameInstall.DefaultDataDir,
+    });
+
+    [RelayCommand]
+    private void AddServerProfile() => AddProfile(new GameProfile
+    {
+        Name = "Сервер " + (Profiles.Count + 1),
+        Kind = ProfileKind.Server,
+        // сервер по умолчанию живёт в той же папке данных, что и клиент (как у тебя на виртуалке)
+        GameDir = ActiveProfile?.GameDir,
+        DataDir = GameInstall.DefaultDataDir,
+    });
+
+    private void AddProfile(GameProfile model)
+    {
+        _settings.Profiles.Add(model);
+        var vm = new ProfileViewModel(model, OnProfileChanged);
+        Profiles.Add(vm);
+        EditedProfile = vm;
+        Save();
     }
 
     [RelayCommand]
-    private void BrowseModsDir()
+    private void RemoveProfile(ProfileViewModel? profile)
     {
-        var dlg = new OpenFolderDialog { Title = "Папка модов", InitialDirectory = ModsDir };
-        if (dlg.ShowDialog() == true) ModsDir = dlg.FolderName;
+        if (profile is null || Profiles.Count <= 1) return; // последний профиль не удаляем
+        _settings.Profiles.Remove(profile.Model);
+        Profiles.Remove(profile);
+        if (ActiveProfile == profile) ActiveProfile = Profiles[0];
+        if (EditedProfile == profile) EditedProfile = ActiveProfile;
+        Save();
     }
-
-    [RelayCommand]
-    private void ResetModsDir() => ModsDir = GameInstall.DefaultModsDir;
 }

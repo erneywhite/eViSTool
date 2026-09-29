@@ -6,10 +6,17 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>eViSTool</AssemblyName>
     <RootNamespace>eViSTool.App</RootNamespace>
+    <ApplicationIcon>Assets\eViSTool.ico</ApplicationIcon>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\eViSTool.Core\eViSTool.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\eViSTool.ico" />
+    <Resource Include="Assets\logo256.png" />
   </ItemGroup>
 
   <ItemGroup>
