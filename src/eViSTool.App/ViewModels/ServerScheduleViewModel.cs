@@ -44,6 +44,8 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     private bool _active;
     private int _generation;
     private DateTime? _lastSeenBackup;
+    private DateTime? _seenAutomationChange;
+    private bool _statusSeen; // первый статус после смены профиля — точка отсчёта для отметки изменения настроек
     private DateTime? _nextBackupAt;
     private bool _awaitingBackup; // копию запросили кнопкой, ждём сообщения агента о ней
 
@@ -104,6 +106,8 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
             : profile.DataDir is { } data ? Local(profile, data) : null;
         IsLocal = _data is LocalServerData;
         _lastSeenBackup = null;
+        _seenAutomationChange = null;
+        _statusSeen = false;
         _nextBackupAt = null;
         _loaded = false;
         StatusText = "";
@@ -168,18 +172,55 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         }
     }
 
-    /// <summary>Вкладку открыли — список копий читается заново.</summary>
+    /// <summary>Вкладку открыли — настройки и список копий читаются заново (их могли поменять в другом окне).</summary>
     public void SetActive(bool active)
     {
         _active = active;
-        if (active) _ = RefreshListAsync();
+        if (!active) return;
+        _ = ReloadSettingsAsync();
+        _ = RefreshListAsync();
     }
+
+    /// <summary>
+    /// Перечитать настройки расписания: их поменяли в другом окне (на той машине или на этой). Совпадают с тем,
+    /// что мы сами только что сохранили, — поля не трогаем; в полях сейчас ошибка ввода — тоже (человек печатает).
+    /// </summary>
+    private async Task ReloadSettingsAsync()
+    {
+        if (!_loaded || _data is not { } data) return;
+        var generation = _generation;
+        try
+        {
+            var settings = await data.LoadAutomationAsync();
+            if (generation != _generation || Same(settings, _saved)) return;
+            if (IntervalError.Length > 0 || KeepError.Length > 0 || RestartError.Length > 0) return;
+            _saved = settings;
+            Apply(settings);
+            UpdateTexts();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or IOException or TaskCanceledException
+                                       or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
+        {
+            // не прочитали — остаются прежние значения, попробуем при следующей отметке
+        }
+    }
+
+    private static bool Same(ServerAutomation a, ServerAutomation b) =>
+        Newtonsoft.Json.JsonConvert.SerializeObject(a) == Newtonsoft.Json.JsonConvert.SerializeObject(b);
 
     /// <summary>Свежий статус агента (null — агента нет или нет связи).</summary>
     public void ShowStatus(AgentStatus? status)
     {
         // удалённый сервер: связь появилась — настройки ещё не прочитаны, читаем
         if (status is not null && !_loaded && _data is { IsRemote: true }) _ = LoadAsync(_generation);
+
+        // настройки расписания поменяли (в другом окне или здесь) — перечитываем; появление файла — тоже изменение
+        if (status is not null)
+        {
+            if (_statusSeen && status.AutomationChangedAt != _seenAutomationChange) _ = ReloadSettingsAsync();
+            _statusSeen = true;
+            _seenAutomationChange = status.AutomationChangedAt;
+        }
 
         _nextBackupAt = status?.NextBackupAt;
         _nextRestartAt = status?.NextRestartAt;
