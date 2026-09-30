@@ -203,4 +203,54 @@ public sealed class AgentTests : IAsyncLifetime
         using (var late = AgentClient.ForRemote(code))
             await Assert.ThrowsAsync<HttpRequestException>(() => late.StatusAsync());
     }
+
+    [Fact]
+    public async Task RemoteSchedule_AndBackups_ThroughTheAgent()
+    {
+        // мир профиля: конфиг указывает на файл сохранения в папке данных
+        var saves = Directory.CreateDirectory(Path.Combine(_profile.DataDir!, "Saves")).FullName;
+        var save = Path.Combine(saves, "default.vcdbs");
+        File.WriteAllText(save, "world v1");
+        File.WriteAllText(Path.Combine(_profile.DataDir!, "serverconfig.json"),
+            "{ \"WorldConfig\": { \"SaveFileLocation\": \"" + save.Replace("\\", "\\\\") + "\" } }");
+
+        var remote = eViSTool.Core.Server.Remote.RemoteAccess.Enable(_profile.Id, AgentsDir);
+        string fingerprint;
+        using (var cert = eViSTool.Core.Server.Remote.RemoteAccess.EnsureCertificate(_profile.Id, AgentsDir))
+            fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
+        _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
+        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
+        using var client = AgentClient.ForRemote(new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint));
+        IServerData data = new RemoteServerData(() => client);
+
+        // настройки расписания: прочитать, поменять, прочитать снова — и файл на «сервере» тот же
+        var settings = await data.LoadAutomationAsync();
+        await data.SaveAutomationAsync(settings with { BackupEnabled = true, BackupKeep = 3, RestartMode = RestartMode.Daily });
+        var saved = await data.LoadAutomationAsync();
+        Assert.Equal((true, 3, RestartMode.Daily), (saved.BackupEnabled, saved.BackupKeep, saved.RestartMode));
+        Assert.True(ServerAutomation.Load(_profile.Id, AgentsDir).BackupEnabled);
+
+        // копия при остановленном сервере — делает агент
+        var made = await data.CopyWorldAsync();
+        Assert.StartsWith("Тест_мир-", made.Name);
+        Assert.True(made.IsOwn);
+        Assert.Null(made.LocalPath); // путь на чужой машине окну не нужен
+        Assert.Contains(await data.ListBackupsAsync(), b => b.Name == made.Name && b.Size == made.Size);
+
+        // восстановление: мир из копии, прежний — рядом
+        File.WriteAllText(save, "world v2");
+        var restored = await data.RestoreAsync(made.Name);
+        Assert.Equal("world v1", File.ReadAllText(save));
+        Assert.Contains("before-restore", restored.SafetyName);
+
+        // чужие пути и несуществующие копии — отказ
+        await Assert.ThrowsAsync<InvalidOperationException>(() => data.RestoreAsync(@"..\..\serverconfig.json"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => data.DeleteBackupAsync("нет-такой.vcdbs"));
+
+        // сервер работает — файл мира не трогаем
+        await client.StartAsync();
+        await Until(async () => (await client.StatusAsync()).State == ServerState.Running);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => data.CopyWorldAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => data.RestoreAsync(made.Name));
+    }
 }

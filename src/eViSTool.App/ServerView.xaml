@@ -70,7 +70,8 @@
                             <TextBlock Text="{local:Tr server.serverMods}" />
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding OpenLogsCommand}" Padding="10,8" Margin="0,0,16,0" ToolTip="{local:Tr server.logs}">
+                    <Button Command="{Binding OpenLogsCommand}" Padding="10,8" Margin="0,0,16,0" ToolTip="{local:Tr server.logs}"
+                            Visibility="{Binding IsRemoteProfile, Converter={StaticResource InvertVis}}">
                         <Path Data="{StaticResource Icon.Folder}" Style="{StaticResource Forest.Icon}" Width="16" Height="16" />
                     </Button>
                     <Button Content="{local:Tr server.start}" Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}"
@@ -105,7 +106,6 @@
                     </StackPanel>
                 </RadioButton>
                 <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr sched.tab}"
-                             Visibility="{Binding IsRemoteProfile, Converter={StaticResource InvertVis}}"
                              IsChecked="{Binding Tab, Converter={StaticResource EnumEq}, ConverterParameter=Schedule}"
                              AutomationProperties.AutomationId="SrvTabSchedule" />
                 <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr remote.tab}"
