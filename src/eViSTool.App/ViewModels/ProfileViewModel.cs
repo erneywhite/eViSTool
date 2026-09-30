@@ -31,11 +31,8 @@ public sealed partial class ProfileViewModel : ObservableObject
         _resolved = ProfileResolver.Resolve(model);
     }
 
-    public bool IsServer
-    {
-        get => Kind == ProfileKind.Server;
-        set => Kind = value ? ProfileKind.Server : ProfileKind.Client;
-    }
+    /// <summary>Тип задаётся при создании профиля и дальше не меняется.</summary>
+    public bool IsServer => Kind == ProfileKind.Server;
 
     public string KindText => Loc.T(Kind == ProfileKind.Server ? "profile.kindServer" : "profile.kindClient");
     public string GameVersionText => Resolved.GameVersion?.ToString() ?? Loc.T("common.notFound");
@@ -70,12 +67,6 @@ public sealed partial class ProfileViewModel : ObservableObject
         Resolved = ProfileResolver.Resolve(Model);
         if (notify) _changed(this);
     }
-
-    [RelayCommand]
-    private void MakeClient() => Kind = ProfileKind.Client;
-
-    [RelayCommand]
-    private void MakeServer() => Kind = ProfileKind.Server;
 
     [RelayCommand]
     private void Reread() => Refresh();

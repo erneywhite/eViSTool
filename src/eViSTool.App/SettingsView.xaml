@@ -131,14 +131,9 @@
                             <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" MaxLength="60" />
 
                             <TextBlock Text="{local:Tr settings.type}" Style="{StaticResource FieldLabel}" />
-                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                <!-- только показ + команда: двусторонняя привязка пары кнопок при смене выбранного профиля
-                                     записывала «клиент» в следующий профиль (выключаемая кнопка отдавала своё значение) -->
-                                <RadioButton Content="{local:Tr settings.kindClient}" IsChecked="{Binding IsServer, Converter={StaticResource Invert}, Mode=OneWay}"
-                                             Command="{Binding MakeClientCommand}" Margin="0,0,20,0" AutomationProperties.AutomationId="KindClient" />
-                                <RadioButton Content="{local:Tr tab.server}" IsChecked="{Binding IsServer, Mode=OneWay}"
-                                             Command="{Binding MakeServerCommand}" AutomationProperties.AutomationId="KindServer" />
-                            </StackPanel>
+                            <!-- тип задаётся при создании профиля и не меняется: у клиента и сервера разные папки и файлы -->
+                            <TextBlock Text="{Binding KindText}" FontSize="13" Foreground="{StaticResource Forest.Text}" Margin="0,6,0,0"
+                                       AutomationProperties.AutomationId="ProfileKind" />
 
                             <TextBlock Text="{local:Tr settings.gameDir}" Style="{StaticResource FieldLabel}" />
                             <TextBlock Style="{StaticResource Hint}" Text="{local:Tr settings.gameDirHint}" />
