@@ -9,6 +9,7 @@ using eViSTool.Core.Game;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Server;
+using eViSTool.Core.Server.Remote;
 
 namespace eViSTool.App.ViewModels;
 
@@ -52,6 +53,10 @@ public sealed partial class ServerViewModel : ObservableObject
     private bool _stateKnown;
 
     [ObservableProperty] private bool _isServerProfile;
+
+    /// <summary>Сервер на другом компьютере: всё через агента по сети, своих папок у профиля нет.</summary>
+    [ObservableProperty] private bool _isRemoteProfile;
+    private string? _remoteGameVersion;
     [ObservableProperty] private ServerState _state = ServerState.Stopped;
     [ObservableProperty] private bool _agentRunning;
     [ObservableProperty] private string _stateText = "";
@@ -65,7 +70,10 @@ public sealed partial class ServerViewModel : ObservableObject
     [ObservableProperty] private string _stateNote = "";
 
     /// <summary>Подзаголовок: профиль и версия игры; путь к данным — в подсказке.</summary>
-    public string HeaderSubtitle => _main.ActiveProfile is { } p ? Loc.T("server.subtitle", p.Name, p.GameVersionText) : "";
+    public string HeaderSubtitle => _main.ActiveProfile is not { } p ? ""
+        : p.Model.IsRemote ? Loc.T("server.subtitleRemote", p.Name, RemoteSecret.Unprotect(p.Model.RemoteCode) is { } c ? $"{c.Host}:{c.Port}" : "?",
+            _remoteGameVersion ?? "?")
+        : Loc.T("server.subtitle", p.Name, p.GameVersionText);
     public string DataDir => _main.ActiveProfile?.Model.DataDir ?? "";
 
     [RelayCommand]
@@ -82,7 +90,7 @@ public sealed partial class ServerViewModel : ObservableObject
 
     public bool HasForeign => ForeignPid is not null;
     public string ForeignText => ForeignPid is { } pid ? Loc.T("server.foreign", pid) : "";
-    public bool CanStart => IsServerProfile && !IsBusy && ForeignPid is null && State == ServerState.Stopped;
+    public bool CanStart => IsServerProfile && !IsBusy && ForeignPid is null && State == ServerState.Stopped && (!IsRemoteProfile || AgentRunning);
     public bool CanStop => AgentRunning && !IsBusy && State is ServerState.Running or ServerState.Starting;
     public bool CanCommand => AgentRunning && State is ServerState.Running or ServerState.Starting;
 
@@ -124,7 +132,9 @@ public sealed partial class ServerViewModel : ObservableObject
         OnPropertyChanged(nameof(CanStart));
         OnPropertyChanged(nameof(CanStop));
         OnPropertyChanged(nameof(CanCommand));
-        (StateText, StateTone) = !IsServerProfile ? ("", RowTone.Muted) : (AgentRunning ? State : ServerState.Stopped) switch
+        (StateText, StateTone) = !IsServerProfile ? ("", RowTone.Muted)
+            : IsRemoteProfile && !AgentRunning ? (Loc.T("server.stateOffline"), RowTone.Warn)
+            : (AgentRunning ? State : ServerState.Stopped) switch
         {
             ServerState.Starting => (Loc.T("server.stateStarting"), RowTone.Update),
             ServerState.Running => (Loc.T("server.stateRunning"), RowTone.Good),
@@ -173,13 +183,18 @@ public sealed partial class ServerViewModel : ObservableObject
         _agentPid = 0;
 
         IsServerProfile = _main.ActiveProfile?.Kind == ProfileKind.Server;
+        IsRemoteProfile = _main.ActiveProfile?.Model.IsRemote == true;
+        _remoteGameVersion = null;
+        // у удалённого профиля пока только консоль и управление; конфиг, расписание и доступ — на компьютере с сервером
+        if (IsRemoteProfile) Tab = ServerTab.Console;
+        var local = IsServerProfile && !IsRemoteProfile;
         Refresh();
         // сюда попадаем и при правке имени профиля: редактор сам разберётся, сменился ли файл
-        Config.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model.DataDir : null, _main.ActiveProfile?.Name ?? "",
+        Config.OnProfileSwitched(local ? _main.ActiveProfile?.Model.DataDir : null, _main.ActiveProfile?.Name ?? "",
             _main.ActiveProfile?.Model.GameDir);
         Schedule.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model.Id : null,
-            IsServerProfile ? _main.ActiveProfile?.Model.DataDir : null, _main.ActiveProfile?.Name ?? "");
-        Remote.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model : null);
+            local ? _main.ActiveProfile?.Model.DataDir : null, _main.ActiveProfile?.Name ?? "");
+        Remote.OnProfileSwitched(local ? _main.ActiveProfile?.Model : null);
         if (!IsServerProfile) return;
 
         _session = new CancellationTokenSource();
@@ -193,6 +208,12 @@ public sealed partial class ServerViewModel : ObservableObject
         {
             var profile = _main.ActiveProfile?.Model;
             if (profile is null) return;
+
+            if (profile.IsRemote)
+            {
+                if (!await WatchRemoteAsync(profile, ct)) return;
+                continue;
+            }
 
             if (_client is null && AgentClient.TryConnect(profile.Id) is { } found)
                 Attach(found, ct);
@@ -225,11 +246,63 @@ public sealed partial class ServerViewModel : ObservableObject
 
     private int? _serverPid;
 
+    /// <summary>
+    /// Один проход слежения за удалённым сервером: подключиться по коду (если ещё нет) и взять статус.
+    /// Связь пропала — сообщение и новая попытка через несколько секунд. false — сеанс закончен.
+    /// </summary>
+    private async Task<bool> WatchRemoteAsync(GameProfile profile, CancellationToken ct)
+    {
+        try
+        {
+            if (_client is null)
+            {
+                if (RemoteSecret.Unprotect(profile.RemoteCode) is not { } code)
+                {
+                    ErrorText = Loc.T("remote.errDecrypt");
+                    _stateKnown = true;
+                    return false; // без кода ждать нечего: его нужно вставить заново в настройках
+                }
+                var client = AgentClient.ForRemote(code);
+                try
+                {
+                    var status = await client.StatusAsync(ct);
+                    Attach(client, ct);
+                    Apply(status);
+                }
+                catch
+                {
+                    client.Dispose();
+                    throw;
+                }
+            }
+            else
+            {
+                Apply(await _client.StatusAsync(ct));
+            }
+            if (ErrorText.Length > 0 && !IsBusy) ErrorText = "";
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
+        {
+            if (ct.IsCancellationRequested) return false;
+            if (_client is not null) Detach();
+            ErrorText = RemoteSecret.Describe(ex);
+        }
+        _stateKnown = true;
+        Refresh();
+        try { await Task.Delay(_client is null ? 5000 : 1500, ct); } catch (TaskCanceledException) { return false; }
+        return true;
+    }
+
     private void Apply(AgentStatus s)
     {
         AgentRunning = true;
         State = s.State;
         _serverPid = s.ServerPid;
+        if (IsRemoteProfile && s.GameVersion != _remoteGameVersion)
+        {
+            _remoteGameVersion = s.GameVersion;
+            OnPropertyChanged(nameof(HeaderSubtitle));
+        }
 
         // агент перезапускался — нумерация строк началась заново
         if (s.AgentPid != _agentPid || s.LastSeq < _lastSeq)
@@ -341,6 +414,13 @@ public sealed partial class ServerViewModel : ObservableObject
     private Task Start() => !Config.ConfirmBeforeServerStart() ? Task.CompletedTask : Do(async () =>
     {
         if (_main.ActiveProfile?.Model is not { } profile) return;
+        if (profile.IsRemote)
+        {
+            // удалённый агент уже работает там — просто просим запустить сервер
+            if (_client is null) throw new InvalidOperationException(Loc.T("server.stateOffline"));
+            Apply(await _client.StartAsync());
+            return;
+        }
         var client = await AgentLauncher.EnsureRunningAsync(profile, startServer: true);
         if (!ReferenceEquals(client, _client))
         {

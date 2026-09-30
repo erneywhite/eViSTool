@@ -4,6 +4,7 @@
              xmlns:local="clr-namespace:eViSTool.App">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:InvertBoolToVisibilityConverter x:Key="InvertVis" />
         <local:InvertBoolConverter x:Key="Invert" />
 
         <!-- заголовок карточки и пояснение к нему -->
@@ -135,6 +136,17 @@
                             <TextBlock Text="{Binding KindText}" FontSize="13" Foreground="{StaticResource Forest.Text}" Margin="0,6,0,0"
                                        AutomationProperties.AutomationId="ProfileKind" />
 
+                            <!-- удалённый сервер: вместо папок — куда подключаемся; сам код не показываем -->
+                            <StackPanel Visibility="{Binding IsRemote, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{local:Tr settings.remoteTarget}" Style="{StaticResource FieldLabel}" />
+                                <TextBlock Style="{StaticResource Hint}" Text="{local:Tr settings.remoteTargetHint}" />
+                                <DockPanel Margin="0,6,0,0">
+                                    <Button DockPanel.Dock="Right" Content="{local:Tr settings.remoteReplace}" Command="{Binding ReplaceCodeCommand}" Margin="8,0,0,0" />
+                                    <TextBox Text="{Binding RemoteTarget, Mode=OneWay}" IsReadOnly="True" VerticalContentAlignment="Center" FontFamily="Consolas" />
+                                </DockPanel>
+                            </StackPanel>
+
+                            <StackPanel Visibility="{Binding IsRemote, Converter={StaticResource InvertVis}}">
                             <TextBlock Text="{local:Tr settings.gameDir}" Style="{StaticResource FieldLabel}" />
                             <TextBlock Style="{StaticResource Hint}" Text="{local:Tr settings.gameDirHint}" />
                             <DockPanel>
@@ -185,6 +197,7 @@
                                     </Grid>
                                 </DockPanel>
                             </Border>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 

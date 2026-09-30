@@ -256,6 +256,13 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (AskNewProfile(ProfileKind.Server, Loc.T("profile.newServer", Profiles.Count + 1)) is not { DataDir: { } dataDir } dlg) return;
 
+        // сервер на другом компьютере: профиль без папок, код подключения — зашифрованным
+        if (dlg.Existing == NewProfileWindow.ExistingMode.Remote && dlg.RemoteCode is { } code)
+        {
+            AddProfile(new GameProfile { Name = dlg.ProfileName, Kind = ProfileKind.Server, RemoteCode = Core.Server.Remote.RemoteSecret.Protect(code) });
+            return;
+        }
+
         // данные сервера уже есть: взять папку как есть или скопировать её в профиль (как клон: мир, конфиги, данные модов и игроков)
         if (dlg.Existing == NewProfileWindow.ExistingMode.UseInPlace && dlg.ExistingDir is { } inPlace)
         {
@@ -314,7 +321,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task CloneProfile(ProfileViewModel? profile)
     {
-        if (profile is null) return;
+        if (profile is null || profile.Model.IsRemote) return; // удалённый сервер клонируется на своём компьютере
         if (profile.Kind == ProfileKind.Client)
         {
             var window = new ClientProfileWindow(profile.Model, clone: true, Loc.T("clone.copySuffix", profile.Name))

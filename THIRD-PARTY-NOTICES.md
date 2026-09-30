@@ -43,6 +43,7 @@ with the copyright line given below.
 | Component | Copyright | Source |
 |---|---|---|
 | .NET runtime and ASP.NET Core (bundled into `eViSTool.Agent.exe`) | © .NET Foundation and Contributors | https://github.com/dotnet/runtime, https://github.com/dotnet/aspnetcore |
+| .NET libraries (System.Security.Cryptography.ProtectedData) | © .NET Foundation and Contributors | https://github.com/dotnet/runtime |
 | CommunityToolkit.Mvvm | © .NET Foundation and Contributors | https://github.com/CommunityToolkit/dotnet |
 | Newtonsoft.Json | © 2007 James Newton-King | https://github.com/JamesNK/Newtonsoft.Json |
 

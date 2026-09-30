@@ -26,6 +26,15 @@ public sealed class GameProfile
     /// <summary>Папка данных (VintagestoryData или --dataPath сервера).</summary>
     public string? DataDir { get; set; }
 
+    /// <summary>
+    /// Удалённый сервер: код подключения к агенту на другой машине, зашифрованный (<see cref="Server.Remote.RemoteSecret"/>).
+    /// У такого профиля нет своих папок — всё идёт через агента по сети.
+    /// </summary>
+    public string? RemoteCode { get; set; }
+
+    [JsonIgnore]
+    public bool IsRemote => !string.IsNullOrEmpty(RemoteCode);
+
     /// <summary>Закреплённые моды: modid → версия, на которой закреплён. Такие не обновляются.</summary>
     public Dictionary<string, string> PinnedMods { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 

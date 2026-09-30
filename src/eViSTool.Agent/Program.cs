@@ -1,5 +1,6 @@
 using System.Reflection;
 using eViSTool.Core;
+using eViSTool.Core.Game;
 using eViSTool.Core.Server;
 using eViSTool.Core.Server.Remote;
 using Microsoft.AspNetCore.Builder;
@@ -151,7 +152,8 @@ builder.Logging.ClearProviders();
 builder.WebHost.UseKestrel(k => k.Listen(System.Net.IPAddress.Loopback, 0)); // свободный порт выберет система
 var app = builder.Build();
 
-// ключ — на каждом запросе; запросы окна с этой машины держат агента живым (окно открыто — агент нужен)
+// ключ — на каждом запросе. При включённом удалённом доступе запросы окна с этой машины держат агента живым:
+// окно открыто — к серверу можно подключиться снаружи. Доступ выключен — агент, как и прежде, уходит после простоя.
 app.Use(async (ctx, next) =>
 {
     if (!ctx.Request.Headers.TryGetValue(AgentProtocol.KeyHeader, out var got) || got != key)
@@ -159,12 +161,15 @@ app.Use(async (ctx, next) =>
         ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
         return;
     }
-    lastActivity = DateTime.Now;
+    if (remote.Enabled) lastActivity = DateTime.Now;
     await next();
 });
 
+var gameVersion = GameInstall.DetectVersion(Path.GetDirectoryName(Path.GetFullPath(opts.ExePath)) ?? "")?.ToString();
+
 AgentStatus Status() => new()
 {
+    GameVersion = gameVersion,
     State = host.State,
     ServerPid = host.Pid,
     StartedAt = host.StartedAt,
@@ -239,8 +244,9 @@ async Task ApplyRemoteAsync()
     var stamp = File.Exists(remoteFile) ? File.GetLastWriteTimeUtc(remoteFile) : default;
     if (stamp == remoteStamp) return;
     remoteStamp = stamp;
-    remote = RemoteAccess.Load(opts.ProfileId, opts.AgentsDir);
 
+    var wasPort = remoteApp is not null ? remote.Port : (int?)null;
+    remote = RemoteAccess.Load(opts.ProfileId, opts.AgentsDir);
     if (remoteApp is not null)
     {
         await remoteApp.StopAsync();
@@ -248,7 +254,12 @@ async Task ApplyRemoteAsync()
         remoteApp = null;
     }
     remoteError = null;
-    if (!remote.Enabled || remote.Port <= 0 || remote.Key.Length < 32) return;
+    if (!remote.Enabled || remote.Port <= 0 || remote.Key.Length < 32)
+    {
+        // выключили — видно и в консоли: снаружи больше не подключиться
+        if (wasPort is { } closed) host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("remote.closed", closed));
+        return;
+    }
 
     try
     {
