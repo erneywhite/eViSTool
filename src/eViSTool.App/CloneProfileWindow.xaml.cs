@@ -40,6 +40,7 @@ public partial class CloneProfileWindow : Window
 
         Heading.Text = Loc.T("clone.heading", source.Name);
         RunningBox.Visibility = serverRunning ? Visibility.Visible : Visibility.Collapsed;
+        SharedModsHint.Text = Loc.T("clone.modsSharedHint", ProfileResolver.Resolve(source).InstallDir ?? "—");
 
         if (_configs.Count > 1)
         {
@@ -90,6 +91,7 @@ public partial class CloneProfileWindow : Window
         NewWorld = NewWorld.IsChecked == true,
         WorldName = WorldNameBox.Text.Trim(),
         IncludeBackups = BackupsBox.IsChecked == true,
+        ShareMods = SharedMods.IsChecked == true,
         ConfigFile = (ConfigBox.SelectedItem as Choice<ServerConfigInfo>)?.Value.FileName ?? ProfileCloner.MainConfig,
     };
 

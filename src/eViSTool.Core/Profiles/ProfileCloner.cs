@@ -21,6 +21,12 @@ public sealed record CloneOptions
     /// <summary>Копировать Backups/BackupSaves (только для «того же мира»: бэкапы чужого мира новому не нужны).</summary>
     public bool IncludeBackups { get; init; }
 
+    /// <summary>
+    /// true — моды общие с исходным профилем: папка Mods не копируется, ModPaths клона ведут в папку модов исходного.
+    /// false — у клона своя копия модов.
+    /// </summary>
+    public bool ShareMods { get; init; }
+
     /// <summary>Какой конфиг исходной папки станет serverconfig.json клона (в папке их может быть несколько).</summary>
     public string ConfigFile { get; init; } = ProfileCloner.MainConfig;
 }
@@ -54,16 +60,18 @@ public sealed record ClonePlan
 public sealed record CloneProgress(long DoneBytes, long TotalBytes, string File);
 
 /// <summary>
-/// Клонирование серверного профиля в новую папку данных. Мир = профиль: у клона свои моды, настройки модов,
-/// данные игроков и своё сохранение. Пути внутри serverconfig.json перенацеливаются на новую папку —
+/// Клонирование серверного профиля в новую папку данных. Мир = профиль: у клона свои настройки модов,
+/// данные игроков и своё сохранение; моды — общие с исходным профилем или своя копия.
+/// Пути внутри serverconfig.json перенацеливаются на новую папку —
 /// в том числе записанные под другим пользователем (…\Administrator\…\VintagestoryData\… на машине с «Администратор»).
 /// </summary>
 public static class ProfileCloner
 {
     public const string MainConfig = "serverconfig.json";
 
-    // не копируются никогда: журналы и кэш сервер создаст заново
-    private static readonly string[] AlwaysSkipped = ["Logs", "Cache"];
+    // не копируются никогда: журналы и кэш сервер создаст заново, а ServerProfiles — это папки других профилей
+    private static readonly string[] AlwaysSkipped = ["Logs", "Cache", ServerProfileLayout.ContainerName];
+    private const string ModsDir = "Mods";
     private static readonly string[] BackupDirs = ["Backups", "BackupSaves"];
     private const string SavesDir = "Saves";
     private const string SaveExtension = ".vcdbs";
@@ -92,17 +100,8 @@ public static class ProfileCloner
             .ToList();
     }
 
-    /// <summary>Папка для клона рядом с исходной: «VintagestoryData-duo».</summary>
-    public static string SuggestTargetDir(string sourceDir, string name)
-    {
-        var full = Path.GetFullPath(sourceDir).TrimEnd('\\', '/');
-        var slug = string.Concat(name.Trim().Select(c => Path.GetInvalidFileNameChars().Contains(c) || c == ' ' ? '_' : c)).Trim('_', '.');
-        if (slug.Length == 0) slug = "copy";
-        var candidate = $"{full}-{slug}";
-        for (var n = 2; Directory.Exists(candidate) && Directory.EnumerateFileSystemEntries(candidate).Any(); n++)
-            candidate = $"{full}-{slug}-{n}";
-        return candidate;
-    }
+    /// <summary>Папка для клона: «…\VintagestoryData\ServerProfiles\duo» (см. <see cref="ServerProfileLayout"/>).</summary>
+    public static string SuggestTargetDir(string sourceDir, string name) => ServerProfileLayout.SuggestDir(sourceDir, name);
 
     /// <summary>Что будет скопировано. Бросает InvalidOperationException с понятным текстом, если клонировать нельзя.</summary>
     public static ClonePlan Plan(GameProfile source, CloneOptions options)
@@ -114,7 +113,8 @@ public static class ProfileCloner
 
         var from = Path.GetFullPath(source.DataDir).TrimEnd('\\', '/');
         var to = Path.GetFullPath(options.TargetDir).TrimEnd('\\', '/');
-        if (IsSameOrInside(to, from) || IsSameOrInside(from, to))
+        // внутрь исходной нельзя — кроме её контейнера ServerProfiles: он при копировании пропускается
+        if (IsSameOrInside(from, to) || (IsSameOrInside(to, from) && !ServerProfileLayout.IsInsideContainerOf(to, from)))
             throw new InvalidOperationException(Loc.T("clone.errNested"));
         if (Directory.Exists(to) && Directory.EnumerateFileSystemEntries(to).Any())
             throw new InvalidOperationException(Loc.T("clone.errNotEmpty", to));
@@ -134,6 +134,7 @@ public static class ProfileCloner
             {
                 if (AlwaysSkipped.Contains(name, StringComparer.OrdinalIgnoreCase)) continue;
                 if (BackupDirs.Contains(name, StringComparer.OrdinalIgnoreCase) && (options.NewWorld || !options.IncludeBackups)) continue;
+                if (options.ShareMods && string.Equals(name, ModsDir, StringComparison.OrdinalIgnoreCase)) continue;
                 if (string.Equals(name, SavesDir, StringComparison.OrdinalIgnoreCase))
                 {
                     if (!options.NewWorld) AddSaves(files, entry, from, sourceSave);
@@ -231,9 +232,17 @@ public static class ProfileCloner
         var root = ModConfigEditor.Load(plan.ConfigPath!);
 
         if (root["ModPaths"] is JArray paths)
+        {
             for (var i = 0; i < paths.Count; i++)
                 if (paths[i].Type == JTokenType.String)
-                    paths[i] = RebasePath(paths[i].ToString(), from, to);
+                    paths[i] = plan.Options.ShareMods ? RealPath(paths[i].ToString(), from) : RebasePath(paths[i].ToString(), from, to);
+
+            // общие моды: папка модов исходного профиля должна быть в списке, даже если конфиг на неё не ссылался
+            var shared = Path.Combine(from, ModsDir);
+            if (plan.Options.ShareMods && Directory.Exists(shared)
+                && !paths.Any(p => p.Type == JTokenType.String && Path.IsPathRooted(p.ToString()) && IsSameOrInside(p.ToString(), shared) && IsSameOrInside(shared, p.ToString())))
+                paths.Add(shared);
+        }
 
         if (root["WorldConfig"] is JObject world)
         {
@@ -257,6 +266,17 @@ public static class ProfileCloner
         if (string.IsNullOrWhiteSpace(path) || !Path.IsPathRooted(path)) return path;
         var rel = RelativeToData(path, sourceDir);
         return rel is null ? path : rel.Length == 0 ? targetDir : Path.Combine(targetDir, rel);
+    }
+
+    /// <summary>
+    /// Путь внутри исходной папки данных — таким, какой он на этой машине (записанный под другим пользователем
+    /// превращается в настоящий). Относительные и посторонние пути не меняются.
+    /// </summary>
+    private static string RealPath(string path, string sourceDir)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathRooted(path)) return path;
+        var rel = RelativeToData(path, sourceDir);
+        return rel is null ? path : rel.Length == 0 ? sourceDir : Path.Combine(sourceDir, rel);
     }
 
     /// <summary>Путь относительно папки данных (null — путь не про неё).</summary>

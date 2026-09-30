@@ -75,6 +75,26 @@
                     </StackPanel>
                 </StackPanel>
             </Border>
+
+            <TextBlock Text="{local:Tr clone.mods}" Style="{StaticResource Label}" />
+            <Border Style="{StaticResource Forest.Card}" Padding="14,12" Margin="0,6,0,0">
+                <StackPanel>
+                    <RadioButton x:Name="SharedMods" GroupName="Mods" IsChecked="True" Checked="Option_Changed">
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr clone.modsShared}" FontSize="13" Foreground="{StaticResource Forest.Text}" />
+                            <TextBlock x:Name="SharedModsHint" Style="{StaticResource Hint}" />
+                        </StackPanel>
+                    </RadioButton>
+                    <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Margin="0,12,0,0" Padding="0,12,0,0">
+                        <RadioButton x:Name="OwnMods" GroupName="Mods" Checked="Option_Changed">
+                            <StackPanel>
+                                <TextBlock Text="{local:Tr clone.modsOwn}" FontSize="13" Foreground="{StaticResource Forest.Text}" />
+                                <TextBlock Text="{local:Tr clone.modsOwnHint}" Style="{StaticResource Hint}" />
+                            </StackPanel>
+                        </RadioButton>
+                    </Border>
+                </StackPanel>
+            </Border>
         </StackPanel>
 
         <!-- что получится / почему нельзя -->

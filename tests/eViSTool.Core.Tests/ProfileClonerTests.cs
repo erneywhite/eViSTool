@@ -194,13 +194,61 @@ public sealed class ProfileClonerTests : IDisposable
     }
 
     [Fact]
-    public void SuggestTargetDir_IsNextToSource_AndFree()
+    public void SuggestTargetDir_IsInsideServerProfiles_AndFree()
     {
+        var container = Path.Combine(_data, "ServerProfiles");
         var first = ProfileCloner.SuggestTargetDir(_data, "Мой мир");
-        Assert.Equal(_data + "-Мой_мир", first);
+        Assert.Equal(Path.Combine(container, "Мой_мир"), first);
         Directory.CreateDirectory(first);
         File.WriteAllText(Path.Combine(first, "x"), "");
-        Assert.Equal(_data + "-Мой_мир-2", ProfileCloner.SuggestTargetDir(_data, "Мой мир"));
+        Assert.Equal(Path.Combine(container, "Мой_мир-2"), ProfileCloner.SuggestTargetDir(_data, "Мой мир"));
+
+        // клон профиля, который сам лежит в ServerProfiles, встаёт рядом с ним, а не вглубь
+        Assert.Equal(Path.Combine(container, "третий"), ProfileCloner.SuggestTargetDir(first, "третий"));
+        Assert.Equal(_data, ServerProfileLayout.HomeOf(first));
+        Assert.Equal(Path.Combine(_data, "Mods"), ServerProfileLayout.SharedModsDir(first));
+        Assert.True(ServerProfileLayout.IsInContainer(first));
+        Assert.False(ServerProfileLayout.IsInContainer(_data));
+    }
+
+    [Fact]
+    public async Task CloneIntoServerProfiles_IsAllowed_AndOtherProfilesAreNotCopied()
+    {
+        // чужой профиль уже лежит в контейнере исходной папки
+        Write("ServerProfiles/other/serverconfig.json", "{}");
+        Write("ServerProfiles/other/Saves/default.vcdbs", "other-world");
+
+        var to = ProfileCloner.SuggestTargetDir(_data, "duo");
+        var plan = ProfileCloner.Plan(_source, new CloneOptions { Name = "duo", TargetDir = to });
+        await ProfileCloner.ApplyAsync(plan);
+
+        Assert.Equal(Path.Combine(_data, "ServerProfiles", "duo"), to);
+        Assert.True(File.Exists(Path.Combine(to, "Saves", "duo", "default.vcdbs")));
+        Assert.False(Directory.Exists(Path.Combine(to, "ServerProfiles")));
+        Assert.True(File.Exists(Path.Combine(_data, "ServerProfiles", "other", "Saves", "default.vcdbs")));
+
+        // а вот просто «внутрь исходной» по-прежнему нельзя
+        Assert.Throws<InvalidOperationException>(() => ProfileCloner.Plan(_source, new CloneOptions { Name = "X", TargetDir = Path.Combine(_data, "Mods", "x") }));
+    }
+
+    [Fact]
+    public async Task SharedMods_AreNotCopied_AndConfigPointsToSourceMods()
+    {
+        var to = ProfileCloner.SuggestTargetDir(_data, "shared");
+        var plan = ProfileCloner.Plan(_source, new CloneOptions { Name = "shared", TargetDir = to, ShareMods = true });
+        await ProfileCloner.ApplyAsync(plan);
+
+        Assert.False(Directory.Exists(Path.Combine(to, "Mods")));
+        Assert.True(File.Exists(Path.Combine(to, "ModConfig", "carryon.json"))); // настройки модов — свои
+        // путь, записанный под другим пользователем, стал настоящим путём к модам исходного профиля
+        Assert.Equal(["Mods", Path.Combine(_data, "Mods")], Config(to)["ModPaths"]!.Select(t => t.ToString()));
+
+        // клон общего профиля остаётся на тех же общих модах
+        var shared = new GameProfile { Name = "shared", Kind = ProfileKind.Server, DataDir = to };
+        var to2 = ProfileCloner.SuggestTargetDir(to, "second");
+        await ProfileCloner.ApplyAsync(ProfileCloner.Plan(shared, new CloneOptions { Name = "second", TargetDir = to2, NewWorld = true }));
+        Assert.Equal(Path.Combine(_data, "ServerProfiles", "second"), to2);
+        Assert.Equal(["Mods", Path.Combine(_data, "Mods")], Config(to2)["ModPaths"]!.Select(t => t.ToString()));
     }
 
     private sealed class SyncProgress(Action<CloneProgress> action) : IProgress<CloneProgress>

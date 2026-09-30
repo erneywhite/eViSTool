@@ -157,14 +157,18 @@ public sealed partial class MainViewModel : ObservableObject
     });
 
     [RelayCommand]
-    private void AddServerProfile() => AddProfile(new GameProfile
+    private void AddServerProfile()
     {
-        Name = Loc.T("profile.newServer", Profiles.Count + 1),
-        Kind = ProfileKind.Server,
-        // сервер по умолчанию живёт в той же папке данных, что и клиент (как у тебя на виртуалке)
-        GameDir = ActiveProfile?.GameDir,
-        DataDir = GameInstall.DefaultDataDir,
-    });
+        var name = Loc.T("profile.newServer", Profiles.Count + 1);
+        AddProfile(new GameProfile
+        {
+            Name = name,
+            Kind = ProfileKind.Server,
+            GameDir = ActiveProfile?.GameDir,
+            // своя папка данных внутри VintagestoryData\ServerProfiles: мир, конфиг и бэкапы — свои, моды — общие
+            DataDir = ServerProfileLayout.SuggestDir(GameInstall.DefaultDataDir, name),
+        });
+    }
 
     private void AddProfile(GameProfile model)
     {
