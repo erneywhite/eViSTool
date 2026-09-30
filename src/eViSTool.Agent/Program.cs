@@ -185,6 +185,7 @@ AgentStatus Status() => new()
     NextBackupAt = scheduler.NextAt(automation, host.State, host.StartedAt),
     NextRestartAt = RestartScheduler.NextAt(automation, host.State, host.StartedAt),
     RemotePort = remoteApp is not null ? remote.Port : null,
+    AutomationChangedAt = File.Exists(automationFile) ? File.GetLastWriteTimeUtc(automationFile) : null,
     RemoteError = remoteError,
 };
 
