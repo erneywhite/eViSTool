@@ -48,6 +48,19 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     [ObservableProperty] private string _keepText = "7";
     [ObservableProperty] private bool _onlyWhenPlayed = true;
     [ObservableProperty] private bool _announce = true;
+
+    // перезапуски по расписанию
+    [ObservableProperty] private RestartMode _restartMode;
+    [ObservableProperty] private string _restartIntervalText = "12";
+    [ObservableProperty] private string _restartTimesText = "05:00";
+    [ObservableProperty] private string _restartWarnText = "10, 5, 4, 3, 2, 1";
+    [ObservableProperty] private string _restartError = "";
+    [ObservableProperty] private string _nextRestartText = "";
+    private DateTime? _nextRestartAt;
+
+    public bool IsRestartInterval => RestartMode == RestartMode.Interval;
+    public bool IsRestartDaily => RestartMode == RestartMode.Daily;
+    public bool IsRestartOn => RestartMode != RestartMode.Off;
     [ObservableProperty] private string _intervalError = "";
     [ObservableProperty] private string _keepError = "";
 
@@ -80,6 +93,11 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
             KeepText = settings.BackupKeep.ToString();
             OnlyWhenPlayed = settings.BackupOnlyWhenPlayed;
             Announce = settings.BackupAnnounce;
+            RestartMode = settings.RestartMode;
+            RestartIntervalText = settings.RestartIntervalHours.ToString("0.##", CultureInfo.CurrentCulture);
+            RestartTimesText = string.Join(", ", settings.RestartTimes);
+            RestartWarnText = string.Join(", ", settings.RestartWarnMinutes);
+            RestartError = "";
             IntervalError = KeepError = "";
         }
         finally
@@ -101,6 +119,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     public void ShowStatus(AgentStatus? status)
     {
         _nextBackupAt = status?.NextBackupAt;
+        _nextRestartAt = status?.NextRestartAt;
         // агент сообщил о новой копии — список устарел
         if (status?.LastBackupAt is { } last && last != _lastSeenBackup)
         {
@@ -126,6 +145,17 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     partial void OnKeepTextChanged(string value) => SaveSettings();
     partial void OnOnlyWhenPlayedChanged(bool value) => SaveSettings();
     partial void OnAnnounceChanged(bool value) => SaveSettings();
+    partial void OnRestartIntervalTextChanged(string value) => SaveSettings();
+    partial void OnRestartTimesTextChanged(string value) => SaveSettings();
+    partial void OnRestartWarnTextChanged(string value) => SaveSettings();
+
+    partial void OnRestartModeChanged(RestartMode value)
+    {
+        OnPropertyChanged(nameof(IsRestartInterval));
+        OnPropertyChanged(nameof(IsRestartDaily));
+        OnPropertyChanged(nameof(IsRestartOn));
+        SaveSettings();
+    }
 
     /// <summary>Папка копий профиля; «свои» копии — с именем профиля в названии файла.</summary>
     private BackupStore Store(string dataDir) => new(dataDir, BackupStore.Slug(_profileName));
@@ -139,7 +169,31 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         var keepOk = int.TryParse(KeepText.Trim(), out var keep) && keep is >= 0 and <= 1000;
         IntervalError = intervalOk ? "" : Loc.T("sched.intervalError");
         KeepError = keepOk ? "" : Loc.T("sched.keepError");
-        if (!intervalOk || !keepOk) return;
+
+        // перезапуски: проверяем только поля выбранного режима; скрытые поля остаются в файле как были
+        var saved = ServerAutomation.Load(_profileId);
+        var restartHours = saved.RestartIntervalHours;
+        var times = saved.RestartTimes;
+        var warns = saved.RestartWarnMinutes;
+        RestartError = "";
+        if (RestartMode == RestartMode.Interval)
+        {
+            if (TryNumber(RestartIntervalText, out var h) && h is >= 5.0 / 60 and <= 720) restartHours = h;
+            else RestartError = Loc.T("sched.intervalError");
+        }
+        else if (RestartMode == RestartMode.Daily)
+        {
+            var parts = Split(RestartTimesText);
+            if (parts.Count > 0 && parts.All(t => ServerAutomation.TryTimeOfDay(t, out _))) times = parts;
+            else RestartError = Loc.T("sched.timesError");
+        }
+        if (RestartMode != RestartMode.Off && RestartError.Length == 0)
+        {
+            var parts = Split(RestartWarnText);
+            if (parts.All(w => int.TryParse(w, out var m) && m is >= 1 and <= 180)) warns = [.. parts.Select(w => int.Parse(w))];
+            else RestartError = Loc.T("sched.warnError");
+        }
+        if (!intervalOk || !keepOk || RestartError.Length > 0) return;
 
         try
         {
@@ -150,6 +204,10 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
                 BackupKeep = keep,
                 BackupOnlyWhenPlayed = OnlyWhenPlayed,
                 BackupAnnounce = Announce,
+                RestartMode = RestartMode,
+                RestartIntervalHours = restartHours,
+                RestartTimes = times,
+                RestartWarnMinutes = warns,
             }.Save(_profileId);
             StatusText = "";
         }
@@ -159,6 +217,10 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         }
         UpdateTexts();
     }
+
+    // «05:00, 17:30» или «10 5 1» → части
+    private static List<string> Split(string text) =>
+        [.. text.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
 
     // «1,5» и «1.5» — оба годятся
     private static bool TryNumber(string text, out double value) =>
@@ -171,6 +233,9 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         NextBackupText = !BackupEnabled ? Loc.T("sched.nextOff")
             : _nextBackupAt is { } next ? Loc.T("sched.next", When(next))
             : Loc.T("sched.nextStopped");
+        NextRestartText = RestartMode == RestartMode.Off ? ""
+            : _nextRestartAt is { } restart ? Loc.T("sched.restartNext", When(restart))
+            : Loc.T("sched.restartNextStopped");
     }
 
     private static string When(DateTime time) =>

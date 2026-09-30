@@ -6,6 +6,7 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <local:InvertBoolToVisibilityConverter x:Key="InvertVis" />
         <local:TextToVisibilityConverter x:Key="TextToVis" />
+        <local:EnumEqualsConverter x:Key="EnumEq" />
 
         <Style x:Key="CardTitle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="15" />
@@ -105,6 +106,67 @@
                             </StackPanel>
                         </DockPanel>
                     </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- ===== перезапуски по расписанию ===== -->
+            <Border Style="{StaticResource ScheduleCard}">
+                <StackPanel>
+                    <TextBlock Text="{local:Tr sched.restartTitle}" Style="{StaticResource CardTitle}" />
+                    <TextBlock Text="{local:Tr sched.restartHint}" Style="{StaticResource Hint}" />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                        <RadioButton Style="{StaticResource Forest.Chip}" GroupName="RestartMode" Content="{local:Tr sched.restartOff}"
+                                     IsChecked="{Binding RestartMode, Converter={StaticResource EnumEq}, ConverterParameter=Off}"
+                                     AutomationProperties.AutomationId="SchedRestartOff" />
+                        <RadioButton Style="{StaticResource Forest.Chip}" GroupName="RestartMode" Content="{local:Tr sched.restartInterval}"
+                                     IsChecked="{Binding RestartMode, Converter={StaticResource EnumEq}, ConverterParameter=Interval}"
+                                     AutomationProperties.AutomationId="SchedRestartInterval" />
+                        <RadioButton Style="{StaticResource Forest.Chip}" GroupName="RestartMode" Content="{local:Tr sched.restartDaily}"
+                                     IsChecked="{Binding RestartMode, Converter={StaticResource EnumEq}, ConverterParameter=Daily}"
+                                     AutomationProperties.AutomationId="SchedRestartDaily" />
+                    </StackPanel>
+
+                    <Border Style="{StaticResource Row}" Visibility="{Binding IsRestartInterval, Converter={StaticResource BoolToVis}}">
+                        <DockPanel>
+                            <TextBox DockPanel.Dock="Right" Width="130" Text="{Binding RestartIntervalText, UpdateSourceTrigger=PropertyChanged}"
+                                     VerticalContentAlignment="Center" VerticalAlignment="Top"
+                                     AutomationProperties.AutomationId="SchedRestartHours" AutomationProperties.Name="{local:Tr sched.restartHours}" />
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{local:Tr sched.restartHours}" Style="{StaticResource Label}" />
+                                <TextBlock Text="{local:Tr sched.restartHoursHint}" Style="{StaticResource Hint}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Row}" Visibility="{Binding IsRestartDaily, Converter={StaticResource BoolToVis}}">
+                        <DockPanel>
+                            <TextBox DockPanel.Dock="Right" Width="220" Text="{Binding RestartTimesText, UpdateSourceTrigger=PropertyChanged}"
+                                     VerticalContentAlignment="Center" VerticalAlignment="Top"
+                                     AutomationProperties.AutomationId="SchedRestartTimes" AutomationProperties.Name="{local:Tr sched.restartTimes}" />
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{local:Tr sched.restartTimes}" Style="{StaticResource Label}" />
+                                <TextBlock Text="{local:Tr sched.restartTimesHint}" Style="{StaticResource Hint}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Row}" Visibility="{Binding IsRestartOn, Converter={StaticResource BoolToVis}}">
+                        <DockPanel>
+                            <TextBox DockPanel.Dock="Right" Width="220" Text="{Binding RestartWarnText, UpdateSourceTrigger=PropertyChanged}"
+                                     VerticalContentAlignment="Center" VerticalAlignment="Top"
+                                     AutomationProperties.AutomationId="SchedRestartWarn" AutomationProperties.Name="{local:Tr sched.restartWarn}" />
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{local:Tr sched.restartWarn}" Style="{StaticResource Label}" />
+                                <TextBlock Text="{local:Tr sched.restartWarnHint}" Style="{StaticResource Hint}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <TextBlock Text="{Binding RestartError}" FontSize="12" Foreground="{StaticResource Forest.Danger}" Margin="0,10,0,0"
+                               Visibility="{Binding RestartError, Converter={StaticResource TextToVis}}" />
+                    <TextBlock Text="{Binding NextRestartText}" FontSize="12" Foreground="{StaticResource Forest.Accent}" Margin="0,12,0,0"
+                               Visibility="{Binding NextRestartText, Converter={StaticResource TextToVis}}" AutomationProperties.AutomationId="SchedRestartNext" />
                 </StackPanel>
             </Border>
 

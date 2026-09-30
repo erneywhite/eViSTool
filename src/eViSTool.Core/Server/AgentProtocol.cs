@@ -50,6 +50,9 @@ public sealed record AgentStatus
     public DateTime? LastBackupAt { get; init; }
     public DateTime? NextBackupAt { get; init; }
 
+    /// <summary>Ближайший перезапуск по расписанию (null — расписание выключено или сервер не работает).</summary>
+    public DateTime? NextRestartAt { get; init; }
+
     /// <summary>Кто сейчас на сервере (по времени входа).</summary>
     public IReadOnlyList<OnlinePlayer> Players { get; init; } = [];
 }

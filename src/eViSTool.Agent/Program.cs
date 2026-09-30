@@ -65,6 +65,7 @@ var backups = new BackupStore(opts.DataPath, opts.BackupName);
 var scheduler = new BackupScheduler();
 scheduler.Seed(backups.List().FirstOrDefault(b => b.IsOwn)?.Time);
 string? pendingBackup = null; // имя копии, которую сервер делает по нашей просьбе
+var restarts = new RestartScheduler(); // перезапуски по расписанию с предупреждениями в чат
 
 // Копия мира на работающем сервере: её делает сам сервер, мы задаём имя «<профиль>-<время>.vcdbs»
 // (без имени сервер назвал бы её по файлу мира — «default-…», и было бы не понять, чей это мир).
@@ -144,6 +145,7 @@ AgentStatus Status() => new()
     Players = players.Players,
     LastBackupAt = scheduler.LastBackupAt,
     NextBackupAt = scheduler.NextAt(automation, host.State, host.StartedAt),
+    NextRestartAt = RestartScheduler.NextAt(automation, host.State, host.StartedAt),
 };
 
 IResult Json(object value) => Results.Text(JsonConvert.SerializeObject(value), "application/json");
@@ -221,6 +223,29 @@ try
         {
             automationStamp = stamp;
             automation = ServerAutomation.Load(opts.ProfileId, opts.AgentsDir);
+        }
+
+        // перезапуск по расписанию: сначала предупреждения игрокам, в срок — сам перезапуск
+        if (restarts.Tick(automation, DateTime.Now, host.State, host.StartedAt) is { } step)
+        {
+            try
+            {
+                if (step.Restart)
+                {
+                    host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.now"));
+                    await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.T("restart.announceNow"));
+                    _ = host.RestartAsync();
+                }
+                else
+                {
+                    host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.warn", step.MinutesLeft));
+                    await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.Plural("restart.announce", step.MinutesLeft));
+                }
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException)
+            {
+                host.Console.Add(ConsoleLineKind.System, ex.Message);
+            }
         }
 
         scheduler.NotePlayers(players.Players.Count);

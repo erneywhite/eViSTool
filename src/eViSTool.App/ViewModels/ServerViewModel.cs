@@ -244,6 +244,7 @@ public sealed partial class ServerViewModel : ObservableObject
         Schedule.ShowStatus(s);
         StateNote = s.RestartScheduledAt is { } at ? Loc.T("server.restartIn", Math.Max(0, (int)(at - DateTime.Now).TotalSeconds))
             : s.State == ServerState.Stopped && s.LastExitCode is { } code ? Loc.T("server.lastExit", code)
+            : s.NextRestartAt is { } planned ? Loc.T("server.restartPlanned", planned.ToString("HH:mm"))
             : "";
     }
 
