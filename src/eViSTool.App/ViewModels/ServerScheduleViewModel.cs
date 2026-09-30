@@ -116,6 +116,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         }
         UpdateTexts();
         BackupNowCommand.NotifyCanExecuteChanged();
+        RestoreCommand.NotifyCanExecuteChanged();
     }
 
     public void OnLanguageChanged() => UpdateTexts();
@@ -205,7 +206,11 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
                                  && (_server.State == ServerState.Running && _server.AgentRunning
                                      || _server.State == ServerState.Stopped && !_server.HasForeign);
 
-    partial void OnIsBusyChanged(bool value) => BackupNowCommand.NotifyCanExecuteChanged();
+    partial void OnIsBusyChanged(bool value)
+    {
+        BackupNowCommand.NotifyCanExecuteChanged();
+        RestoreCommand.NotifyCanExecuteChanged();
+    }
 
     [RelayCommand(CanExecute = nameof(CanBackupNow))]
     private async Task BackupNow()
@@ -255,6 +260,39 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         if (ServerConfigDocument.Load(config).Get("WorldConfig.SaveFileLocation") is not JValue { Value: string path } || path.Trim().Length == 0)
             return null;
         return Path.IsPathRooted(path) ? path : Path.Combine(dataDir, path);
+    }
+
+    // восстановление подменяет файл мира — только при полностью остановленном сервере
+    private bool CanRestore(BackupRowViewModel? row) =>
+        row is not null && !IsBusy && _dataDir is not null && _server.State == ServerState.Stopped && !_server.HasForeign;
+
+    /// <summary>Вернуть мир из копии. Текущий мир перед этим сохраняется рядом с копиями — восстановление можно откатить.</summary>
+    [RelayCommand(CanExecute = nameof(CanRestore))]
+    private async Task Restore(BackupRowViewModel? row)
+    {
+        if (row is null || _dataDir is not { } dataDir) return;
+        var text = Loc.T("sched.restoreAsk", row.Name, row.TimeText, row.SizeText)
+                   + (row.File.IsOwn ? "" : "\n\n" + Loc.T("sched.restoreForeign"));
+        if (MessageBox.Show(Application.Current.MainWindow!, text, "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No)
+            != MessageBoxResult.Yes)
+            return;
+
+        IsBusy = true;
+        try
+        {
+            var save = SaveFile(dataDir) ?? throw new InvalidOperationException(Loc.T("sched.noConfig"));
+            var safety = await Task.Run(() => Store(dataDir).Restore(row.File, save, DateTime.Now));
+            StatusText = safety is null ? Loc.T("sched.restored", row.Name) : Loc.T("sched.restoredKept", row.Name, safety.Name);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
+        {
+            StatusText = Loc.T("sched.failed", ex.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+        RefreshList();
     }
 
     [RelayCommand]

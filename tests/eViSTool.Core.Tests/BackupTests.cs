@@ -101,6 +101,58 @@ public sealed class BackupTests : IDisposable
         Assert.Null(store.Find("nope.vcdbs"));
     }
 
+    [Fact]
+    public void Restore_PutsBackupInPlace_AndKeepsTheReplacedWorld()
+    {
+        var save = Path.Combine(_data, "Saves", "default.vcdbs");
+        Directory.CreateDirectory(Path.GetDirectoryName(save)!);
+        File.WriteAllText(save, "current world");
+        File.WriteAllText(save + "-wal", "journal of the current world");
+        File.WriteAllText(save + "-shm", "index");
+        var store = new BackupStore(_data, "Дуо");
+        Backup("Дуо-2026-09-29_10-00-00.vcdbs", "yesterday's world");
+        var backup = store.Find("Дуо-2026-09-29_10-00-00.vcdbs")!;
+
+        var safety = store.Restore(backup, save, T0);
+
+        Assert.Equal("yesterday's world", File.ReadAllText(save));
+        // журнал прежнего мира восстановленному не нужен
+        Assert.False(File.Exists(save + "-wal"));
+        Assert.False(File.Exists(save + "-shm"));
+        Assert.False(File.Exists(save + ".evistool.restore"));
+
+        // прежний мир — в Backups, вместе с журналом; ротация его не трогает
+        Assert.NotNull(safety);
+        Assert.Equal("Дуо-before-restore-2026-09-30_12-00-00.vcdbs", safety.Name);
+        Assert.Equal("current world", File.ReadAllText(safety.Path));
+        Assert.Equal("journal of the current world", File.ReadAllText(safety.Path + "-wal"));
+        Assert.False(store.Find(safety.Name)!.IsOwn);
+        Assert.Empty(store.Prune(1).Where(b => b.Name == safety.Name));
+        Assert.True(File.Exists(backup.Path)); // сама копия остаётся
+
+        // откат восстановления — тем же способом
+        store.Restore(store.Find(safety.Name)!, save, T0.AddMinutes(1));
+        Assert.Equal("current world", File.ReadAllText(save));
+    }
+
+    [Fact]
+    public void Restore_WithoutCurrentWorld_JustCopies_AndRefusesBrokenBackups()
+    {
+        var save = Path.Combine(_data, "Saves", "fresh", "default.vcdbs"); // папки ещё нет
+        var store = new BackupStore(_data, "Дуо");
+        Backup("Дуо-2026-09-29_10-00-00.vcdbs", "world");
+        Backup("Дуо-2026-09-28_10-00-00.vcdbs", "");
+
+        Assert.Null(store.Restore(store.Find("Дуо-2026-09-29_10-00-00.vcdbs")!, save, T0));
+        Assert.Equal("world", File.ReadAllText(save));
+
+        Assert.Throws<InvalidOperationException>(() => store.Restore(store.Find("Дуо-2026-09-28_10-00-00.vcdbs")!, save, T0)); // пустой файл
+        var gone = store.Find("Дуо-2026-09-29_10-00-00.vcdbs")!;
+        File.Delete(gone.Path);
+        Assert.Throws<FileNotFoundException>(() => store.Restore(gone, save, T0));
+        Assert.Equal("world", File.ReadAllText(save)); // мир при отказе не тронут
+    }
+
     // ---------- расписание ----------
 
     private static readonly ServerAutomation Hourly = new() { BackupEnabled = true, BackupIntervalHours = 1, BackupOnlyWhenPlayed = false };

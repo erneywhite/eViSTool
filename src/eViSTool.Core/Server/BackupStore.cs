@@ -95,6 +95,45 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
         return new BackupFile(target, name, now, new FileInfo(target).Length) { IsStamped = true, IsOwn = true };
     }
 
+    /// <summary>
+    /// Восстановить мир из копии — только при ОСТАНОВЛЕННОМ сервере. Текущий мир сначала сохраняется в Backups как
+    /// «&lt;профиль&gt;-before-restore-&lt;время&gt;.vcdbs» (вместе с журналом SQLite, если он остался) — восстановление можно откатить;
+    /// ротация такой файл не удаляет. Затем копия встаёт на место файла мира, а остатки журнала убираются:
+    /// они от прежнего мира и испортили бы восстановленный.
+    /// Возвращает страховочную копию (null — файла мира не было).
+    /// </summary>
+    public BackupFile? Restore(BackupFile backup, string saveFile, DateTime now)
+    {
+        var source = new FileInfo(backup.Path);
+        if (!source.Exists) throw new FileNotFoundException(Loc.T("backup.noSave", backup.Path), backup.Path);
+        if (source.Length == 0) throw new InvalidOperationException(Loc.T("backup.empty", backup.Name));
+
+        BackupFile? safety = null;
+        if (File.Exists(saveFile))
+        {
+            Directory.CreateDirectory(Dir);
+            var name = $"{prefix ?? "world"}-{BeforeRestore}-{now.ToString(StampFormat, CultureInfo.InvariantCulture)}{Extension}";
+            var target = Path.Combine(Dir, name);
+            File.Copy(saveFile, target, overwrite: false);
+            foreach (var tail in JournalTails)
+                if (File.Exists(saveFile + tail)) File.Copy(saveFile + tail, target + tail, overwrite: true);
+            safety = new BackupFile(target, name, now, new FileInfo(target).Length) { IsStamped = true };
+        }
+
+        // сначала рядом, потом подмена: оборванное копирование не оставит на месте мира половину файла
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(saveFile)!);
+        var tmp = saveFile + ".evistool.restore";
+        File.Copy(backup.Path, tmp, overwrite: true);
+        File.Move(tmp, saveFile, overwrite: true);
+        foreach (var tail in JournalTails) File.Delete(saveFile + tail);
+        return safety;
+    }
+
+    /// <summary>Часть имени страховочной копии, сделанной перед восстановлением.</summary>
+    public const string BeforeRestore = "before-restore";
+
+    private static readonly string[] JournalTails = ["-wal", "-shm"];
+
     /// <summary>Файл копии по имени (null — такого нет).</summary>
     public BackupFile? Find(string name) => List().FirstOrDefault(b => string.Equals(b.Name, name, StringComparison.OrdinalIgnoreCase));
 

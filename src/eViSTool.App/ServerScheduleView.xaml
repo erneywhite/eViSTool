@@ -140,12 +140,16 @@
                     <TextBlock Text="{local:Tr sched.empty}" Style="{StaticResource Hint}" FontSize="12" Margin="0,14,0,0"
                                Visibility="{Binding HasBackups, Converter={StaticResource InvertVis}}" />
 
-                    <ItemsControl ItemsSource="{Binding Backups}" Margin="0,6,0,0">
+                    <ItemsControl ItemsSource="{Binding Backups}" Margin="0,6,0,0" Focusable="False">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Padding="0,9" Margin="0,4,0,0">
                                     <DockPanel>
                                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Button Style="{StaticResource Forest.LinkButton}" Content="{local:Tr sched.restore}" Margin="0,0,14,0"
+                                                    ToolTip="{local:Tr sched.restoreTip}" ToolTipService.ShowOnDisabled="True"
+                                                    Command="{Binding DataContext.RestoreCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                    CommandParameter="{Binding}" />
                                             <Button Style="{StaticResource Forest.LinkButton}" Content="{local:Tr sched.show}" Margin="0,0,14,0"
                                                     Command="{Binding DataContext.ShowInFolderCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                     CommandParameter="{Binding}" />
