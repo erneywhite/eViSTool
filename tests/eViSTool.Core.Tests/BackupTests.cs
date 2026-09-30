@@ -155,6 +155,24 @@ public sealed class BackupTests : IDisposable
 
     // ---------- расписание ----------
 
+    [Fact]
+    public void Scheduler_NeedsCopy_UnlessNobodyPlayedSinceOurOwnCopy()
+    {
+        var onlyPlayed = new ServerAutomation { BackupOnlyWhenPlayed = true };
+        var s = new BackupScheduler();
+        s.Seed(T0.AddDays(-3));
+        Assert.True(s.NeedsCopy(onlyPlayed)); // копия на диске — от прошлого запуска агента: кто играл с тех пор, неизвестно
+
+        s.MarkDone(T0, playersOnline: 0);
+        Assert.False(s.NeedsCopy(onlyPlayed)); // сами только что сделали, никто не заходил
+        Assert.True(s.NeedsCopy(onlyPlayed with { BackupOnlyWhenPlayed = false }));
+
+        s.NotePlayers(1);
+        Assert.True(s.NeedsCopy(onlyPlayed));
+        s.MarkDone(T0.AddHours(1), playersOnline: 1);
+        Assert.True(s.NeedsCopy(onlyPlayed)); // игрок остался на сервере — мир меняется дальше
+    }
+
     private static readonly ServerAutomation Hourly = new() { BackupEnabled = true, BackupIntervalHours = 1, BackupOnlyWhenPlayed = false };
 
     [Fact]

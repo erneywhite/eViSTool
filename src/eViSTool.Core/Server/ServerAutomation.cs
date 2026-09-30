@@ -55,6 +55,12 @@ public sealed record ServerAutomation
     [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
     public IReadOnlyList<int> RestartWarnMinutes { get; init; } = [10, 5, 4, 3, 2, 1];
 
+    /// <summary>Перед перезапуском по расписанию сделать резервную копию мира: перезапуск пройдёт неудачно — копия под рукой.</summary>
+    public bool RestartBackup { get; init; } = true;
+
+    /// <summary>Сколько ждать копию перед перезапуском; не успела — перезапуск идёт без неё.</summary>
+    public static readonly TimeSpan RestartBackupWait = TimeSpan.FromMinutes(10);
+
     /// <summary>Сервер должен проработать хотя бы столько, прежде чем его перезапустят по расписанию.</summary>
     public static readonly TimeSpan MinRestartUptime = TimeSpan.FromMinutes(5);
 

@@ -163,6 +163,17 @@
                         </DockPanel>
                     </Border>
 
+                    <Border Style="{StaticResource Row}" Visibility="{Binding IsRestartOn, Converter={StaticResource BoolToVis}}">
+                        <DockPanel>
+                            <CheckBox DockPanel.Dock="Right" Style="{StaticResource Forest.Switch}" IsChecked="{Binding RestartBackup}" VerticalAlignment="Center"
+                                      AutomationProperties.AutomationId="SchedRestartBackup" AutomationProperties.Name="{local:Tr sched.restartBackup}" />
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{local:Tr sched.restartBackup}" Style="{StaticResource Label}" />
+                                <TextBlock Text="{local:Tr sched.restartBackupHint}" Style="{StaticResource Hint}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
                     <TextBlock Text="{Binding RestartError}" FontSize="12" Foreground="{StaticResource Forest.Danger}" Margin="0,10,0,0"
                                Visibility="{Binding RestartError, Converter={StaticResource TextToVis}}" />
                     <TextBlock Text="{Binding NextRestartText}" FontSize="12" Foreground="{StaticResource Forest.Accent}" Margin="0,12,0,0"

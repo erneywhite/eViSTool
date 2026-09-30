@@ -66,6 +66,7 @@ var scheduler = new BackupScheduler();
 scheduler.Seed(backups.List().FirstOrDefault(b => b.IsOwn)?.Time);
 string? pendingBackup = null; // имя копии, которую сервер делает по нашей просьбе
 var restarts = new RestartScheduler(); // перезапуски по расписанию с предупреждениями в чат
+DateTime? restartAfterBackup = null; // перезапуск ждёт копию мира — до этого срока
 
 // Копия мира на работающем сервере: её делает сам сервер, мы задаём имя «<профиль>-<время>.vcdbs»
 // (без имени сервер назвал бы её по файлу мира — «default-…», и было бы не понять, чей это мир).
@@ -78,6 +79,21 @@ async Task RequestBackup()
     await host.SendCommandAsync("/genbackup " + name);
 }
 
+// Сам перезапуск по расписанию: последнее слово игрокам — и сервер уходит на перезапуск.
+async Task RestartBySchedule()
+{
+    host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.now"));
+    try
+    {
+        await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.T("restart.announceNow"));
+    }
+    catch (Exception ex) when (ex is InvalidOperationException or IOException)
+    {
+        // не дошло объявление — перезапуску это не мешает
+    }
+    _ = host.RestartAsync();
+}
+
 host.Console.LineAdded += line =>
 {
     // сервер закончил копию (по расписанию, по кнопке или по команде из консоли)
@@ -85,6 +101,8 @@ host.Console.LineAdded += line =>
     scheduler.MarkDone(line.Time, players.Players.Count);
     var name = pendingBackup;
     pendingBackup = null;
+    var beforeRestart = restartAfterBackup is not null; // этой копии ждал перезапуск по расписанию
+    restartAfterBackup = null;
     var settings = automation;
     _ = Task.Run(async () =>
     {
@@ -101,14 +119,18 @@ host.Console.LineAdded += line =>
                     await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.T("backup.announce", file.Name, size, file.Time.ToString("dd.MM.yyyy HH:mm")));
             }
 
-            if (!settings.BackupEnabled || settings.BackupKeep <= 0) return;
-            var removed = backups.Prune(settings.BackupKeep);
-            if (removed.Count > 0) host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.pruned", removed.Count, settings.BackupKeep));
+            // ротация — при копиях по расписанию; копии перед перезапуском тоже не должны копиться без конца
+            if ((settings.BackupEnabled || beforeRestart) && settings.BackupKeep > 0)
+            {
+                var removed = backups.Prune(settings.BackupKeep);
+                if (removed.Count > 0) host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.pruned", removed.Count, settings.BackupKeep));
+            }
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
         {
             host.Console.Add(ConsoleLineKind.System, ex.Message);
         }
+        if (beforeRestart && host.State == ServerState.Running) await RestartBySchedule();
     });
 };
 
@@ -230,21 +252,48 @@ try
         {
             try
             {
-                if (step.Restart)
-                {
-                    host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.now"));
-                    await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.T("restart.announceNow"));
-                    _ = host.RestartAsync();
-                }
-                else
+                if (!step.Restart)
                 {
                     host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.warn", step.MinutesLeft));
                     await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.Plural("restart.announce", step.MinutesLeft));
+                }
+                else if (!automation.RestartBackup)
+                {
+                    await RestartBySchedule();
+                }
+                else if (!scheduler.NeedsCopy(automation))
+                {
+                    host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.backupSkipped"));
+                    await RestartBySchedule();
+                }
+                else
+                {
+                    // сначала копия мира; перезапуск — когда сервер её закончит (строка «Backup complete!» выше)
+                    restartAfterBackup = DateTime.Now + ServerAutomation.RestartBackupWait;
+                    host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.backupFirst"));
+                    await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.T("restart.announceBackup"));
+                    if (pendingBackup is null) await RequestBackup(); // копия уже идёт — ждём её
                 }
             }
             catch (Exception ex) when (ex is InvalidOperationException or IOException)
             {
                 host.Console.Add(ConsoleLineKind.System, ex.Message);
+                if (restartAfterBackup is not null) restartAfterBackup = DateTime.Now; // копию запросить не вышло — не ждём её
+            }
+        }
+
+        // перезапуск ждёт копию: сервер за это время остановили — перезапускать нечего; копия не успела — идём без неё
+        if (restartAfterBackup is { } deadline)
+        {
+            if (host.State != ServerState.Running)
+            {
+                restartAfterBackup = null;
+            }
+            else if (DateTime.Now >= deadline)
+            {
+                restartAfterBackup = null;
+                host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.backupFailed"));
+                await RestartBySchedule();
             }
         }
 

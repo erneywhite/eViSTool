@@ -54,6 +54,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     [ObservableProperty] private string _restartIntervalText = "12";
     [ObservableProperty] private string _restartTimesText = "05:00";
     [ObservableProperty] private string _restartWarnText = "10, 5, 4, 3, 2, 1";
+    [ObservableProperty] private bool _restartBackup = true;
     [ObservableProperty] private string _restartError = "";
     [ObservableProperty] private string _nextRestartText = "";
     private DateTime? _nextRestartAt;
@@ -97,6 +98,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
             RestartIntervalText = settings.RestartIntervalHours.ToString("0.##", CultureInfo.CurrentCulture);
             RestartTimesText = string.Join(", ", settings.RestartTimes);
             RestartWarnText = string.Join(", ", settings.RestartWarnMinutes);
+            RestartBackup = settings.RestartBackup;
             RestartError = "";
             IntervalError = KeepError = "";
         }
@@ -148,6 +150,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     partial void OnRestartIntervalTextChanged(string value) => SaveSettings();
     partial void OnRestartTimesTextChanged(string value) => SaveSettings();
     partial void OnRestartWarnTextChanged(string value) => SaveSettings();
+    partial void OnRestartBackupChanged(bool value) => SaveSettings();
 
     partial void OnRestartModeChanged(RestartMode value)
     {
@@ -208,6 +211,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
                 RestartIntervalHours = restartHours,
                 RestartTimes = times,
                 RestartWarnMinutes = warns,
+                RestartBackup = RestartBackup,
             }.Save(_profileId);
             StatusText = "";
         }

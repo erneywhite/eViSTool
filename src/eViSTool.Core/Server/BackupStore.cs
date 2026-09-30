@@ -160,6 +160,7 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
 public sealed class BackupScheduler
 {
     private bool _played;
+    private bool _copiedHere; // копию делали при этом планировщике — «никто не заходил» отсчитано от неё
     private DateTime? _base;
 
     /// <summary>Время последней копии (сделанной этим планировщиком или найденной на диске при старте).</summary>
@@ -190,9 +191,17 @@ public sealed class BackupScheduler
         return true;
     }
 
+    /// <summary>
+    /// Нужна ли внеочередная копия (перед перезапуском по расписанию). Не нужна, только если включено «только когда
+    /// играли», прошлую копию делали при нас и с тех пор никто не заходил — она была бы той же самой и лишь вытеснила
+    /// бы из ротации более старую.
+    /// </summary>
+    public bool NeedsCopy(ServerAutomation settings) => !settings.BackupOnlyWhenPlayed || _played || !_copiedHere;
+
     /// <summary>Копия запущена.</summary>
     public void MarkDone(DateTime now, int playersOnline)
     {
+        _copiedHere = true;
         LastBackupAt = now;
         _base = now;
         _played = playersOnline > 0; // кто остался на сервере — продолжает менять мир

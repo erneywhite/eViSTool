@@ -88,6 +88,7 @@ public sealed class RestartSchedulerTests
     public void Settings_ParseTimesAndWarnings()
     {
         Assert.Equal([10, 5, 4, 3, 2, 1], new ServerAutomation().RestartWarnings); // по умолчанию: за 10, за 5 и дальше каждую минуту
+        Assert.True(new ServerAutomation().RestartBackup); // и с копией мира перед перезапуском
 
         Assert.True(ServerAutomation.TryTimeOfDay(" 5:00 ", out var t));
         Assert.Equal(new TimeSpan(5, 0, 0), t);
@@ -104,9 +105,10 @@ public sealed class RestartSchedulerTests
         var dir = Path.Combine(Path.GetTempPath(), "evistool-tests-" + Guid.NewGuid().ToString("N"));
         try
         {
-            (settings with { RestartMode = RestartMode.Daily }).Save("p", dir);
+            (settings with { RestartMode = RestartMode.Daily, RestartBackup = false }).Save("p", dir);
             var loaded = ServerAutomation.Load("p", dir);
             Assert.Equal(RestartMode.Daily, loaded.RestartMode);
+            Assert.False(loaded.RestartBackup);
             Assert.Equal(["17:30", "05:00", "5:00"], loaded.RestartTimes);
             Assert.Equal([1, 10, 5, 5, 0, 999], loaded.RestartWarnMinutes); // сохранённое, а не значения по умолчанию
             Assert.Contains("\"Daily\"", File.ReadAllText(ServerAutomation.FileFor("p", dir)));
