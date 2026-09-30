@@ -714,6 +714,8 @@
   "queue.titleRunning": "Установка модов · {0} из {1}",
   "queue.waiting": "В очереди",
   "queue.working": "Ставлю…",
+  "remote.failed": "▸ Удалённый доступ не запустился на порту {0}: {1}",
+  "remote.listening": "▸ Удалённый доступ: принимаю подключения на порту {0}",
   "report.attention": "Внимание",
   "report.changedCount": "{0}: изменений — {1}",
   "report.dependencies": "Зависимости",
