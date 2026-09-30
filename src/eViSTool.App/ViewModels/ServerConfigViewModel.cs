@@ -32,6 +32,7 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     private ServerConfigDocument? _doc;
     private string? _path;
     private string _profileName = "";
+    private string? _gameDir;
 
     // вкладка «Конфигурация» сейчас открыта: только тогда файл читается и перечитывается
     private bool _active;
@@ -129,14 +130,17 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     /// Активный профиль сменился или его правят в настройках (этот вызов приходит на каждую букву имени).
     /// Пока путь к файлу тот же — документ не трогаем. dataDir = null — профиль не серверный.
     /// </summary>
-    public void OnProfileSwitched(string? dataDir, string profileName)
+    public void OnProfileSwitched(string? dataDir, string profileName, string? gameDir = null)
     {
         var path = string.IsNullOrWhiteSpace(dataDir) ? null : Path.Combine(dataDir, ProfileResolver.ServerConfigName);
+        _gameDir = gameDir;
+        GenerateCommand.NotifyCanExecuteChanged();
         if (string.Equals(path, _path, StringComparison.OrdinalIgnoreCase))
         {
             _profileName = profileName;
             return;
         }
+        GenerateError = "";
 
         // уходим с файла, в котором остались правки: молча их не теряем
         if (_doc is { IsDirty: true } && Ask(Loc.T("srvcfg.askSaveOnSwitch", _profileName), MessageBoxButton.YesNo) == MessageBoxResult.Yes)
@@ -498,6 +502,7 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     {
         IsServerRunning = _serverRunning == true;
         IsReadOnly = _serverRunning != false;
+        GenerateCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnIsReadOnlyChanged(bool value)
@@ -508,6 +513,43 @@ public sealed partial class ServerConfigViewModel : ObservableObject
         SaveCommand.NotifyCanExecuteChanged();
         AddWorldSettingCommand.NotifyCanExecuteChanged();
     }
+
+    // ---------- создание конфига для нового профиля ----------
+
+    /// <summary>Идёт создание конфига (сервер на секунду запускается с «--setconfig»).</summary>
+    [ObservableProperty] private bool _isGenerating;
+    [ObservableProperty] private string _generateError = "";
+
+    private bool CanGenerate => State == ConfigLoadState.Missing && !IsGenerating && _serverRunning != true
+                                && _path is not null && !string.IsNullOrWhiteSpace(_gameDir);
+
+    /// <summary>Файла ещё нет: попросить сервер записать конфиг по умолчанию — чтобы настроить профиль до первого запуска.</summary>
+    [RelayCommand(CanExecute = nameof(CanGenerate))]
+    private async Task Generate()
+    {
+        if (_path is not { } path || Path.GetDirectoryName(path) is not { } dataDir) return;
+        var exe = Path.Combine(_gameDir ?? "", "VintagestoryServer.exe");
+        IsGenerating = true;
+        GenerateError = "";
+        try
+        {
+            await ServerConfigGenerator.GenerateAsync(exe, dataDir);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException
+                                       or System.ComponentModel.Win32Exception)
+        {
+            GenerateError = Loc.T("srvcfg.generateFailed", ex.Message);
+        }
+        finally
+        {
+            IsGenerating = false;
+        }
+        // пока создавали, профиль могли сменить — тогда этот файл уже не наш
+        if (string.Equals(path, _path, StringComparison.OrdinalIgnoreCase) && _active) Load();
+        GenerateCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsGeneratingChanged(bool value) => GenerateCommand.NotifyCanExecuteChanged();
 
     // ---------- команды ----------
 
@@ -590,6 +632,7 @@ public sealed partial class ServerConfigViewModel : ObservableObject
         SaveCommand.NotifyCanExecuteChanged();
         RevertCommand.NotifyCanExecuteChanged();
         AddWorldSettingCommand.NotifyCanExecuteChanged();
+        GenerateCommand.NotifyCanExecuteChanged();
     }
 
     private static MessageBoxResult Ask(string text, MessageBoxButton buttons) =>

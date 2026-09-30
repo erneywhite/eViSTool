@@ -145,7 +145,8 @@ public sealed partial class ServerViewModel : ObservableObject
         IsServerProfile = _main.ActiveProfile?.Kind == ProfileKind.Server;
         Refresh();
         // сюда попадаем и при правке имени профиля: редактор сам разберётся, сменился ли файл
-        Config.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model.DataDir : null, _main.ActiveProfile?.Name ?? "");
+        Config.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model.DataDir : null, _main.ActiveProfile?.Name ?? "",
+            _main.ActiveProfile?.Model.GameDir);
         if (!IsServerProfile) return;
 
         _session = new CancellationTokenSource();

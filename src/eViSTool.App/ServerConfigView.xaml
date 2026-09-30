@@ -402,6 +402,18 @@
                            Foreground="{StaticResource Forest.Text}" />
                 <TextBlock Text="{local:Tr srvcfg.missingHint}" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,0" />
                 <TextBlock Text="{Binding FilePath}" Style="{StaticResource JsonName}" FontSize="11" TextAlignment="Center" Margin="0,10,0,0" />
+                <!-- сервер сам запишет конфиг по умолчанию (ключ setconfig) и выйдет: мир не создаётся -->
+                <Button Style="{StaticResource Forest.PrimaryButton}" Command="{Binding GenerateCommand}" HorizontalAlignment="Center"
+                        Margin="0,18,0,0" Padding="22,8" AutomationProperties.AutomationId="CfgGenerate">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource Icon.Plus}" Style="{StaticResource Forest.Icon}" Width="12" Height="12" Margin="0,0,8,0" />
+                        <TextBlock Text="{local:Tr srvcfg.generate}" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Text="{local:Tr srvcfg.generating}" Foreground="{StaticResource Forest.Muted}" FontSize="12" TextAlignment="Center"
+                           Margin="0,10,0,0" Visibility="{Binding IsGenerating, Converter={StaticResource BoolToVis}}" />
+                <TextBlock Text="{Binding GenerateError}" Foreground="{StaticResource Forest.Danger}" FontSize="12" TextAlignment="Center"
+                           TextWrapping="Wrap" Margin="0,10,0,0" Visibility="{Binding GenerateError, Converter={StaticResource TextToVis}}" />
             </StackPanel>
 
             <!-- ===== файл не читается: ничего не перезаписываем ===== -->
