@@ -66,8 +66,13 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     private DateTime? _savedAt;
     private string _saveError = "";
 
+    // Свой сервер: пока вкладка открыта, файл могли поменять снаружи (правка с другого компьютера через агента, сервер,
+    // вкладка «Моды») — раз в пару секунд сверяем отметку файла. У удалённого сервера о том же сообщает статус агента.
+    private readonly System.Windows.Threading.DispatcherTimer _diskWatch = new() { Interval = TimeSpan.FromSeconds(2) };
+
     public ServerConfigViewModel()
     {
+        _diskWatch.Tick += (_, _) => { if (!IsRemote) RefreshIfChangedOnDisk(); };
         Roles = new RolesEditorViewModel(OnRolesChanged) { IsReadOnly = true };
 
         var keys = new ListCollectionView(_keyOptions);
@@ -181,6 +186,8 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     public void SetActive(bool active)
     {
         _active = active;
+        if (active) _diskWatch.Start();
+        else _diskWatch.Stop();
         if (!active) return;
         if (State == ConfigLoadState.NotLoaded)
         {
