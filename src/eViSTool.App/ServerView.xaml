@@ -106,6 +106,9 @@
                 <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr sched.tab}"
                              IsChecked="{Binding Tab, Converter={StaticResource EnumEq}, ConverterParameter=Schedule}"
                              AutomationProperties.AutomationId="SrvTabSchedule" />
+                <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr remote.tab}"
+                             IsChecked="{Binding Tab, Converter={StaticResource EnumEq}, ConverterParameter=Remote}"
+                             AutomationProperties.AutomationId="SrvTabRemote" />
             </StackPanel>
 
             <!-- ===== показатели ===== -->
@@ -180,6 +183,11 @@
             <!-- ===== конфигурация (вместо плиток и консоли) ===== -->
             <Grid Visibility="{Binding IsConfigTab, Converter={StaticResource BoolToVis}}">
                 <local:ServerConfigView DataContext="{Binding Config}" />
+            </Grid>
+
+            <!-- ===== удалённый доступ ===== -->
+            <Grid Visibility="{Binding IsRemoteTab, Converter={StaticResource BoolToVis}}">
+                <local:ServerRemoteView DataContext="{Binding Remote}" />
             </Grid>
 
             <!-- ===== расписание: резервные копии ===== -->

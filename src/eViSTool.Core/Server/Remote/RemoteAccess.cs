@@ -101,7 +101,8 @@ public static class RemoteAccess
             var port = RandomNumberGenerator.GetInt32(MinPort, MaxPort + 1);
             try
             {
-                var probe = new TcpListener(IPAddress.Any, port);
+                // проба — только на локальном адресе: слушать все адреса ради проверки значило бы вызвать окно брандмауэра
+                var probe = new TcpListener(IPAddress.Loopback, port);
                 probe.Start();
                 probe.Stop();
                 return port;

@@ -18,6 +18,10 @@ $dist = Join-Path $root 'dist'
 $out = Join-Path $dist $name
 $zip = Join-Path $dist "$name-win-x64.zip"
 Remove-Item -Recurse -Force $out, $zip -ErrorAction SilentlyContinue
+# релиз — всегда с чистого листа: иначе сборка может счесть старые файлы актуальными (например, после перевода часов назад)
+Get-ChildItem (Join-Path $root 'src') -Directory | ForEach-Object {
+    Remove-Item -Recurse -Force (Join-Path $_.FullName 'bin/Release'), (Join-Path $_.FullName 'obj/Release') -ErrorAction SilentlyContinue
+}
 
 $common = @('-c', 'Release', '-r', 'win-x64', "-p:Version=$Version", '-p:PublishSingleFile=true', '-p:DebugType=None', '-p:DebugSymbols=false')
 
