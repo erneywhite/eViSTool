@@ -81,9 +81,12 @@ public static class ModConfigEditor
     }
 
     /// <summary>Читает как есть: строки не превращаются в даты, дробные числа не теряют точность.</summary>
-    internal static JObject Load(string path)
+    internal static JObject Load(string path) => Parse(File.ReadAllText(path));
+
+    /// <summary>Текст конфига → дерево, как при чтении файла (даты остаются строками, дроби — точными).</summary>
+    internal static JObject Parse(string text)
     {
-        using var reader = new JsonTextReader(new StringReader(File.ReadAllText(path)))
+        using var reader = new JsonTextReader(new StringReader(text))
         {
             DateParseHandling = DateParseHandling.None,
             FloatParseHandling = FloatParseHandling.Decimal,

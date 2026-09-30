@@ -186,6 +186,7 @@ AgentStatus Status() => new()
     NextRestartAt = RestartScheduler.NextAt(automation, host.State, host.StartedAt),
     RemotePort = remoteApp is not null ? remote.Port : null,
     AutomationChangedAt = File.Exists(automationFile) ? File.GetLastWriteTimeUtc(automationFile) : null,
+    ConfigChangedAt = File.Exists(files.ConfigPath) ? File.GetLastWriteTimeUtc(files.ConfigPath) : null,
     RemoteError = remoteError,
 };
 
@@ -269,6 +270,28 @@ web.MapGet("/backups", () => Guard(files.ListBackups));
 web.MapPost("/backups/copy", () => WhenStopped(() => files.CopyWorld(DateTime.Now)));
 web.MapPost("/backups/restore", async (HttpContext ctx) =>
     await ReadName(ctx) is { Length: > 0 } name ? WhenStopped(() => files.Restore(name, DateTime.Now)) : Results.BadRequest());
+// serverconfig.json — для окна на другой машине; писать можно только в остановленный сервер (иначе он перезапишет файл)
+web.MapGet("/config", () => Guard(files.ReadConfig));
+web.MapPut("/config", async (HttpContext ctx) =>
+{
+    using var reader = new StreamReader(ctx.Request.Body);
+    var request = JsonConvert.DeserializeObject<ConfigSaveRequest>(await reader.ReadToEndAsync());
+    return request is null ? Results.BadRequest() : WhenStopped(() => files.WriteConfig(request));
+});
+web.MapPost("/config/generate", async () =>
+{
+    if (host.State != ServerState.Stopped)
+        return Results.Problem(eViSTool.Core.Localization.Loc.T("sched.needStopped"), statusCode: StatusCodes.Status409Conflict);
+    try
+    {
+        await eViSTool.Core.Server.Config.ServerConfigGenerator.GenerateAsync(opts.ExePath, opts.DataPath);
+        return Json(files.ReadConfig());
+    }
+    catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+    {
+        return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
+    }
+});
 web.MapPost("/backups/delete", async (HttpContext ctx) =>
     await ReadName(ctx) is { Length: > 0 } name ? Guard(() => { files.DeleteBackup(name); return Status(); }) : Results.BadRequest());
 if (isRemote) return;

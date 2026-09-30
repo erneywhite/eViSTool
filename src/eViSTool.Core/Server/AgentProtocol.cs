@@ -64,6 +64,9 @@ public sealed record AgentStatus
     public DateTime? LastBackupAt { get; init; }
     public DateTime? NextBackupAt { get; init; }
 
+    /// <summary>Когда последний раз менялся serverconfig.json (null — его нет): удалённое окно перечитывает конфиг.</summary>
+    public DateTime? ConfigChangedAt { get; init; }
+
     /// <summary>Когда последний раз менялись настройки расписания — окна по ней замечают чужую правку и перечитывают их.</summary>
     public DateTime? AutomationChangedAt { get; init; }
 

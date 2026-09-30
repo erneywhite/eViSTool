@@ -190,13 +190,13 @@ public sealed partial class ServerViewModel : ObservableObject
         IsServerProfile = _main.ActiveProfile?.Kind == ProfileKind.Server;
         IsRemoteProfile = _main.ActiveProfile?.Model.IsRemote == true;
         _remoteGameVersion = null;
-        // у удалённого профиля пока нет конфигурации и удалённого доступа (их настраивают на компьютере с сервером)
-        if (IsRemoteProfile && Tab is ServerTab.Config or ServerTab.Remote) Tab = ServerTab.Console;
+        // удалённый доступ настраивают на компьютере с сервером — у удалённого профиля этой вкладки нет
+        if (IsRemoteProfile && Tab == ServerTab.Remote) Tab = ServerTab.Console;
         var local = IsServerProfile && !IsRemoteProfile;
         Refresh();
         // сюда попадаем и при правке имени профиля: редактор сам разберётся, сменился ли файл
         Config.OnProfileSwitched(local ? _main.ActiveProfile?.Model.DataDir : null, _main.ActiveProfile?.Name ?? "",
-            _main.ActiveProfile?.Model.GameDir);
+            _main.ActiveProfile?.Model.GameDir, IsRemoteProfile ? _main.ActiveProfile?.Model : null, () => _client);
         Schedule.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model : null, () => _client);
         Remote.OnProfileSwitched(local ? _main.ActiveProfile?.Model : null);
         if (!IsServerProfile) return;
@@ -313,6 +313,7 @@ public sealed partial class ServerViewModel : ObservableObject
         AgentRunning = true;
         State = s.State;
         _serverPid = s.ServerPid;
+        if (IsRemoteProfile) Config.ShowRemoteStatus(s);
         AgentNote = !AgentProtocol.IsOutdated(s) ? ""
             : IsRemoteProfile ? Loc.T("server.agentOutdatedRemote", s.AgentVersion, AgentProtocol.AppVersion)
             : Loc.T("server.agentOutdatedLocal", s.AgentVersion);
