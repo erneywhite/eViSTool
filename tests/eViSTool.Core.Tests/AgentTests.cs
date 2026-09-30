@@ -253,4 +253,52 @@ public sealed class AgentTests : IAsyncLifetime
         await Assert.ThrowsAsync<InvalidOperationException>(() => data.CopyWorldAsync());
         await Assert.ThrowsAsync<InvalidOperationException>(() => data.RestoreAsync(made.Name));
     }
+
+    [Fact]
+    public async Task RemoteConfig_ReadWrite_WithVersionCheck()
+    {
+        var config = Path.Combine(_profile.DataDir!, "serverconfig.json");
+        File.WriteAllText(config, "{ \"ServerName\": \"Old\", \"Port\": 42420 }");
+
+        var remote = eViSTool.Core.Server.Remote.RemoteAccess.Enable(_profile.Id, AgentsDir);
+        string fingerprint;
+        using (var cert = eViSTool.Core.Server.Remote.RemoteAccess.EnsureCertificate(_profile.Id, AgentsDir))
+            fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
+        _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
+        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
+        using var client = AgentClient.ForRemote(new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint));
+
+        var file = await client.GetConfigAsync();
+        Assert.True(file.Exists);
+        Assert.Contains("Old", file.Text);
+        Assert.NotNull((await client.StatusAsync()).ConfigChangedAt);
+
+        // версия та, что читали, — записывается (с копией прежнего файла рядом)
+        var saved = await client.SaveConfigAsync(new ConfigSaveRequest("{ \"ServerName\": \"New\", \"Port\": 42420 }", file.Stamp, Force: false));
+        Assert.False(saved.Conflict);
+        Assert.Contains("New", File.ReadAllText(config));
+        Assert.True(File.Exists(config + ".evistool.bak"));
+
+        // файл на сервере успел поменяться — отказ, ничего не записано
+        await Task.Delay(20);
+        File.WriteAllText(config, "{ \"ServerName\": \"Changed on server\", \"Port\": 42420 }");
+        var conflict = await client.SaveConfigAsync(new ConfigSaveRequest("{ \"ServerName\": \"Mine\" }", saved.File.Stamp, Force: false));
+        Assert.True(conflict.Conflict);
+        Assert.Contains("Changed on server", File.ReadAllText(config));
+        Assert.Contains("Changed on server", conflict.File.Text);
+
+        // перезаписать по согласию
+        var forced = await client.SaveConfigAsync(new ConfigSaveRequest("{ \"ServerName\": \"Mine\" }", saved.File.Stamp, Force: true));
+        Assert.False(forced.Conflict);
+        Assert.Contains("Mine", File.ReadAllText(config));
+
+        // не JSON — отказ, файл цел
+        await Assert.ThrowsAsync<InvalidOperationException>(() => client.SaveConfigAsync(new ConfigSaveRequest("не json", forced.File.Stamp, Force: true)));
+        Assert.Contains("Mine", File.ReadAllText(config));
+
+        // сервер работает — конфиг не трогаем (он перезапишет файл при остановке)
+        await client.StartAsync();
+        await Until(async () => (await client.StatusAsync()).State == ServerState.Running);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => client.SaveConfigAsync(new ConfigSaveRequest("{}", forced.File.Stamp, Force: true)));
+    }
 }

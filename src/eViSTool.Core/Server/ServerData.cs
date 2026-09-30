@@ -81,6 +81,41 @@ public sealed class ServerFiles(string profileId, string dataDir, string? backup
         RecycleBin.Send(backup.Path);
     }
 
+    // ---- serverconfig.json — для окна на другой машине
+
+    public string ConfigPath => Path.Combine(dataDir, ProfileResolver.ServerConfigName);
+
+    public RemoteConfigFile ReadConfig()
+    {
+        var path = ConfigPath;
+        if (!File.Exists(path)) return new RemoteConfigFile(false, "", StampOf(path), null, false);
+        var stamp = StampOf(path); // до чтения: успеют поменять между ними — увидим это как расхождение
+        var text = File.ReadAllText(path);
+        var save = SaveFileOf(dataDir);
+        return new RemoteConfigFile(true, text, stamp, File.GetLastWriteTimeUtc(path), save is not null && File.Exists(save));
+    }
+
+    /// <summary>
+    /// Записать конфиг, если он не поменялся с тех пор, как его читали (или если просят перезаписать). Текст проверяется
+    /// как JSON; пишется атомарно, прежний файл остаётся рядом (*.evistool.bak). Сервер должен быть остановлен — это
+    /// проверяет вызывающий (агент).
+    /// </summary>
+    public ConfigSaveResult WriteConfig(ConfigSaveRequest request)
+    {
+        var path = ConfigPath;
+        if (!request.Force && StampOf(path) != request.ExpectedStamp) return new ConfigSaveResult(true, ReadConfig());
+        var root = ModConfigEditor.Parse(request.Text);
+        ModConfigEditor.Save(path, root);
+        return new ConfigSaveResult(false, ReadConfig());
+    }
+
+    /// <summary>Отметка версии файла: время записи и длина; нет файла — «-».</summary>
+    public static string StampOf(string path)
+    {
+        var info = new FileInfo(path);
+        return info.Exists ? $"{info.LastWriteTimeUtc.Ticks}:{info.Length}" : "-";
+    }
+
     /// <summary>Файл мира профиля — из его serverconfig.json (null — конфига или пути в нём нет).</summary>
     public static string? SaveFileOf(string dataDir)
     {
@@ -120,6 +155,16 @@ public sealed class RemoteServerData(Func<AgentClient?> client) : IServerData
 }
 
 public sealed record BackupNameRequest(string Name);
+
+/// <summary>serverconfig.json удалённого сервера: текст и отметка версии (время записи и длина) — по ней агент узнаёт,
+/// не поменялся ли файл с тех пор, как окно его читало.</summary>
+public sealed record RemoteConfigFile(bool Exists, string Text, string Stamp, DateTime? ChangedAt, bool WorldExists);
+
+/// <summary>Сохранить конфиг удалённого сервера. Force — перезаписать, даже если файл на сервере успел измениться.</summary>
+public sealed record ConfigSaveRequest(string Text, string ExpectedStamp, bool Force);
+
+/// <summary>Conflict — файл на сервере уже другой (ничего не записано), File — каким он стал.</summary>
+public sealed record ConfigSaveResult(bool Conflict, RemoteConfigFile File);
 
 /// <summary>Удаление в Корзину без диалогов: агент работает без окна, и вопрос на экране повесил бы запрос.</summary>
 public static class RecycleBin

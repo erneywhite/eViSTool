@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -7,7 +8,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;
+using eViSTool.Core.Server;
 using eViSTool.Core.Server.Config;
+using eViSTool.Core.Server.Remote;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -31,6 +34,17 @@ public sealed partial class ServerConfigViewModel : ObservableObject
 
     private ServerConfigDocument? _doc;
     private string? _path;
+
+    // Удалённый сервер: редактор работает с копией конфига в кэше (файл _path), а читает и пишет через агента.
+    // _remoteStamp — версия файла на сервере, которую мы читали: по ней агент откажет, если файл успел поменяться.
+    private Func<AgentClient?>? _remote;
+    private string _remoteStamp = "-";
+    private DateTime? _remoteLoadedAt;  // когда менялся конфиг на сервере — на момент чтения
+    private DateTime? _remoteLatestAt;  // и по последнему статусу агента
+    private bool _remoteWorldExists;
+
+    /// <summary>Конфиг удалённого сервера (файла на этой машине нет — «Показать файл» не показываем).</summary>
+    [ObservableProperty] private bool _isRemote;
     private string _profileName = "";
     private string? _gameDir;
 
@@ -130,8 +144,13 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     /// Активный профиль сменился или его правят в настройках (этот вызов приходит на каждую букву имени).
     /// Пока путь к файлу тот же — документ не трогаем. dataDir = null — профиль не серверный.
     /// </summary>
-    public void OnProfileSwitched(string? dataDir, string profileName, string? gameDir = null)
+    public void OnProfileSwitched(string? dataDir, string profileName, string? gameDir = null,
+        GameProfile? remoteProfile = null, Func<AgentClient?>? remoteClient = null)
     {
+        // удалённый сервер: копия его конфига живёт в кэше этого окна
+        if (remoteProfile is not null) dataDir = Path.Combine(Core.AppPaths.Cache, "remote", remoteProfile.Id);
+        _remote = remoteProfile is null ? null : remoteClient;
+        IsRemote = remoteProfile is not null;
         var path = string.IsNullOrWhiteSpace(dataDir) ? null : Path.Combine(dataDir, ProfileResolver.ServerConfigName);
         _gameDir = gameDir;
         GenerateCommand.NotifyCanExecuteChanged();
@@ -148,7 +167,10 @@ public sealed partial class ServerConfigViewModel : ObservableObject
 
         _path = path;
         _profileName = profileName;
-        FilePath = path;
+        FilePath = IsRemote ? Loc.T("srvcfg.remoteFile") : path;
+        _remoteStamp = "-";
+        _remoteLoadedAt = _remoteLatestAt = null;
+        _remoteWorldExists = false;
         _serverRunning = null;
         ApplyServerState();
         Unload();
@@ -185,12 +207,59 @@ public sealed partial class ServerConfigViewModel : ObservableObject
         if (!_active || _path is null) return;
         switch (State)
         {
-            case ConfigLoadState.Missing when File.Exists(_path):
-            case ConfigLoadState.Failed:
-            case ConfigLoadState.Loaded when _doc is { IsDirty: false } doc && _inputErrors == 0 && doc.ChangedOnDisk():
+            case ConfigLoadState.Missing when IsRemote ? _remoteLatestAt is not null : File.Exists(_path):
+            case ConfigLoadState.Failed when !IsRemote || _remoteLatestAt is not null:
+            case ConfigLoadState.Loaded when _doc is { IsDirty: false } doc && _inputErrors == 0 && ChangedExternally(doc):
                 Load();
                 break;
         }
+    }
+
+    /// <summary>Статус удалённого агента: когда менялся конфиг на сервере. Поменялся, а своих правок нет — перечитываем.</summary>
+    public void ShowRemoteStatus(AgentStatus status)
+    {
+        if (!IsRemote || status.ConfigChangedAt == _remoteLatestAt) return;
+        _remoteLatestAt = status.ConfigChangedAt;
+        RefreshIfChangedOnDisk();
+    }
+
+    /// <summary>Файл поменяли не мы: на этой машине — по отметке файла, у удалённого сервера — по статусу агента.</summary>
+    private bool ChangedExternally(ServerConfigDocument doc) => IsRemote ? _remoteLatestAt != _remoteLoadedAt : doc.ChangedOnDisk();
+
+    private AgentClient RemoteClient => _remote?.Invoke() ?? throw new InvalidOperationException(Loc.T("server.stateOffline"));
+
+    /// <summary>
+    /// Запрос к удалённому агенту из синхронного кода редактора: конфиг — несколько килобайт по локальной сети,
+    /// ждём не дольше 15 секунд (связи нет — ошибка, а не зависшее окно).
+    /// </summary>
+    private static T Sync<T>(Func<CancellationToken, Task<T>> call)
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        return Task.Run(() => call(cts.Token)).GetAwaiter().GetResult();
+    }
+
+    /// <summary>Конфиг, полученный от агента, — в копию в кэше; запомнить его версию.</summary>
+    private void ApplyRemote(RemoteConfigFile file)
+    {
+        if (_path is null) return;
+        Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+        if (file.Exists) File.WriteAllText(_path, file.Text);
+        else if (File.Exists(_path)) File.Delete(_path);
+        _remoteStamp = file.Stamp;
+        _remoteLoadedAt = _remoteLatestAt = file.ChangedAt;
+        _remoteWorldExists = file.WorldExists;
+    }
+
+    /// <summary>Отправить документ удалённому агенту. false — файл на сервере уже другой, ничего не записано.</summary>
+    private bool UploadRemote(ServerConfigDocument doc, bool force)
+    {
+        var text = doc.Root.ToString(Newtonsoft.Json.Formatting.Indented);
+        var result = Sync(ct => RemoteClient.SaveConfigAsync(new ConfigSaveRequest(text, _remoteStamp, force), ct));
+        if (result.Conflict) return false;
+        _remoteStamp = result.File.Stamp;
+        _remoteLoadedAt = _remoteLatestAt = result.File.ChangedAt;
+        _remoteWorldExists = result.File.WorldExists;
+        return true;
     }
 
     /// <summary>Сменился язык: тексты, собранные в коде, — заново (модели полей не пересоздаются, правки остаются).</summary>
@@ -238,14 +307,16 @@ public sealed partial class ServerConfigViewModel : ObservableObject
             Warn(Loc.T("srvcfg.notSavedRoleErrors", string.Join(Environment.NewLine, _roleErrors)));
             return;
         }
-        if (doc.ChangedOnDisk() && Ask(Loc.T("srvcfg.askOverwrite"), MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        if (ChangedExternally(doc) && Ask(Loc.T("srvcfg.askOverwrite"), MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
         try
         {
+            if (IsRemote) UploadRemote(doc, force: true); // о перезаписи уже спросили
             doc.Save();
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException or InvalidOperationException
+                                       or TaskCanceledException)
         {
-            Warn(Loc.T("srvcfg.statusSaveFailed", ex.Message));
+            Warn(Loc.T("srvcfg.statusSaveFailed", IsRemote ? RemoteSecret.Describe(ex) : ex.Message));
         }
     }
 
@@ -264,12 +335,20 @@ public sealed partial class ServerConfigViewModel : ObservableObject
 
         try
         {
+            // удалённый сервер: сначала свежую копию от агента
+            if (IsRemote) ApplyRemote(Sync(ct => RemoteClient.GetConfigAsync(ct)));
             if (!File.Exists(_path))
             {
                 Unload(ConfigLoadState.Missing);
                 return;
             }
             _doc = ServerConfigDocument.Load(_path);
+        }
+        catch (Exception ex) when (IsRemote && ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
+        {
+            Unload(ConfigLoadState.Failed);
+            LoadError = RemoteSecret.Describe(ex);
+            return;
         }
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
         {
@@ -483,6 +562,11 @@ public sealed partial class ServerConfigViewModel : ObservableObject
 
     private void UpdateWorldExists()
     {
+        if (IsRemote)
+        {
+            WorldExists = _remoteWorldExists; // файл мира — на той машине, о нём знает агент
+            return;
+        }
         var file = _doc?.Get(SaveFilePath) is JValue { Value: string text } ? text.Trim() : "";
         if (file.Length > 0 && !Path.IsPathRooted(file) && Path.GetDirectoryName(_path) is { } dataDir)
             file = Path.Combine(dataDir, file);
@@ -521,7 +605,7 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     [ObservableProperty] private string _generateError = "";
 
     private bool CanGenerate => State == ConfigLoadState.Missing && !IsGenerating && _serverRunning != true
-                                && _path is not null && !string.IsNullOrWhiteSpace(_gameDir);
+                                && _path is not null && (IsRemote || !string.IsNullOrWhiteSpace(_gameDir));
 
     /// <summary>Файла ещё нет: попросить сервер записать конфиг по умолчанию — чтобы настроить профиль до первого запуска.</summary>
     [RelayCommand(CanExecute = nameof(CanGenerate))]
@@ -533,12 +617,14 @@ public sealed partial class ServerConfigViewModel : ObservableObject
         GenerateError = "";
         try
         {
-            await ServerConfigGenerator.GenerateAsync(exe, dataDir);
+            // удалённый сервер: конфиг по умолчанию запишет агент на той машине
+            if (IsRemote) ApplyRemote(await RemoteClient.GenerateConfigAsync());
+            else await ServerConfigGenerator.GenerateAsync(exe, dataDir);
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException
-                                       or System.ComponentModel.Win32Exception)
+                                       or System.ComponentModel.Win32Exception or HttpRequestException or TaskCanceledException)
         {
-            GenerateError = Loc.T("srvcfg.generateFailed", ex.Message);
+            GenerateError = Loc.T("srvcfg.generateFailed", IsRemote ? RemoteSecret.Describe(ex) : ex.Message);
         }
         finally
         {
@@ -566,28 +652,28 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     {
         if (_doc is not { } doc) return false;
 
-        // файл уже не тот, что мы читали (сервер запускали, мод выключили на вкладке «Моды»)
-        if (doc.ChangedOnDisk())
+        // файл уже не тот, что мы читали (сервер запускали, мод выключили на вкладке «Моды», правили с другого компьютера)
+        var force = false;
+        if (ChangedExternally(doc))
         {
-            switch (Ask(Loc.T("srvcfg.askChangedOnDisk"), MessageBoxButton.YesNoCancel))
-            {
-                case MessageBoxResult.Yes:
-                    break; // перезаписать
-                case MessageBoxResult.No:
-                    Load(); // перечитать, правки отбросить
-                    return false;
-                default:
-                    return false;
-            }
+            if (!AskOverwrite()) return false;
+            force = true;
         }
 
         try
         {
+            // удалённый сервер: сначала агенту (он проверит, что файл тот же, что мы читали), потом — копия в кэше
+            if (IsRemote && !UploadRemote(doc, force))
+            {
+                if (!AskOverwrite()) return false;
+                UploadRemote(doc, force: true);
+            }
             doc.Save();
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException or InvalidOperationException
+                                       or TaskCanceledException)
         {
-            _saveError = ex.Message;
+            _saveError = IsRemote ? RemoteSecret.Describe(ex) : ex.Message;
             Recalculate();
             return false;
         }
@@ -598,6 +684,21 @@ public sealed partial class ServerConfigViewModel : ObservableObject
         _savedAt = DateTime.Now;
         Recalculate();
         return true;
+    }
+
+    /// <summary>«Файл уже другой: перезаписать?» Да — перезаписать; Нет — перечитать и отбросить правки; Отмена — ничего.</summary>
+    private bool AskOverwrite()
+    {
+        switch (Ask(Loc.T("srvcfg.askChangedOnDisk"), MessageBoxButton.YesNoCancel))
+        {
+            case MessageBoxResult.Yes:
+                return true;
+            case MessageBoxResult.No:
+                Load();
+                return false;
+            default:
+                return false;
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanRevert))]

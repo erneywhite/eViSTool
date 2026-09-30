@@ -1083,6 +1083,7 @@
   "srvcfg.notSavedRoleErrors": "Not saved — the roles have errors:\n{0}",
   "srvcfg.reload": "Reload",
   "srvcfg.reloadTip": "Read serverconfig.json from disk again",
+  "srvcfg.remoteFile": "serverconfig.json on the server computer",
   "srvcfg.revert": "Discard changes",
   "srvcfg.runningReadOnly": "The server is running — read-only. A running server keeps its settings in memory and rewrites the file itself, so edits made now would be lost. Stop the server to change settings.",
   "srvcfg.save": "Save",

@@ -98,6 +98,20 @@ public sealed class AgentClient : IDisposable
     public Task<RestoreResult> RestoreAsync(string name, CancellationToken ct = default) => Post<RestoreResult>("backups/restore", new BackupNameRequest(name), ct);
     public Task DeleteBackupAsync(string name, CancellationToken ct = default) => Post<AgentStatus>("backups/delete", new BackupNameRequest(name), ct);
 
+    // ---- serverconfig.json удалённого сервера
+
+    public Task<RemoteConfigFile> GetConfigAsync(CancellationToken ct = default) => Get<RemoteConfigFile>("config", ct);
+
+    public async Task<ConfigSaveResult> SaveConfigAsync(ConfigSaveRequest request, CancellationToken ct = default)
+    {
+        using var content = new StringContent(JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json");
+        using var resp = await _http.PutAsync("config", content, ct).ConfigureAwait(false);
+        return await Read<ConfigSaveResult>(resp, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Конфига ещё нет — агент попросит сервер записать конфиг по умолчанию.</summary>
+    public Task<RemoteConfigFile> GenerateConfigAsync(CancellationToken ct = default) => Post<RemoteConfigFile>("config/generate", null, ct);
+
     private async Task<T> Get<T>(string path, CancellationToken ct)
     {
         using var resp = await _http.GetAsync(path, ct).ConfigureAwait(false);
