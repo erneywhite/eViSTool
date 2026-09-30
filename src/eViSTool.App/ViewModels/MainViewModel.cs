@@ -148,23 +148,26 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void AddClientProfile() => AddProfile(new GameProfile
+    private void AddClientProfile()
     {
-        Name = Loc.T("profile.newClient", Profiles.Count + 1),
-        Kind = ProfileKind.Client,
-        GameDir = GameInstall.FindGameDir(),
-        DataDir = GameInstall.DefaultDataDir,
-    });
+        if (AskNewProfile(ProfileKind.Client, Loc.T("profile.newClient", Profiles.Count + 1)) is not { } dlg) return;
+        AddProfile(new GameProfile
+        {
+            Name = dlg.ProfileName,
+            Kind = ProfileKind.Client,
+            GameDir = KnownGameDir(),
+            DataDir = GameInstall.DefaultDataDir,
+        });
+    }
 
     [RelayCommand]
     private void AddServerProfile()
     {
-        var name = Loc.T("profile.newServer", Profiles.Count + 1);
-        // своя папка данных внутри VintagestoryData\ServerProfiles: мир, конфиг и бэкапы — свои, моды — общие
-        var dataDir = ServerProfileLayout.SuggestDir(GameInstall.DefaultDataDir, name);
+        if (AskNewProfile(ProfileKind.Server, Loc.T("profile.newServer", Profiles.Count + 1)) is not { DataDir: { } dataDir } dlg) return;
         try
         {
-            // папку создаём сразу: профиль с несуществующей папкой выглядел бы сломанным («папка данных не найдена»)
+            // своя папка данных внутри VintagestoryData\ServerProfiles, названная как профиль: мир, конфиг и бэкапы — свои,
+            // моды — общие. Создаём сразу: профиль с несуществующей папкой выглядел бы сломанным («папка данных не найдена»)
             Directory.CreateDirectory(dataDir);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -172,16 +175,20 @@ public sealed partial class MainViewModel : ObservableObject
             // не вышло — её создаст «Создать конфиг» или первый запуск сервера
         }
 
-        AddProfile(new GameProfile
-        {
-            Name = name,
-            Kind = ProfileKind.Server,
-            // папка игры — как у текущего профиля; нет — как у любого другого; нет и там — ищем установку
-            GameDir = new[] { ActiveProfile?.GameDir }.Concat(Profiles.Select(p => p.GameDir))
-                          .FirstOrDefault(d => !string.IsNullOrWhiteSpace(d)) ?? GameInstall.FindGameDir(),
-            DataDir = dataDir,
-        });
+        AddProfile(new GameProfile { Name = dlg.ProfileName, Kind = ProfileKind.Server, GameDir = KnownGameDir(), DataDir = dataDir });
     }
+
+    /// <summary>Спросить название нового профиля (у серверного от него зависит имя папки данных). null — отменили.</summary>
+    private static NewProfileWindow? AskNewProfile(ProfileKind kind, string suggestedName)
+    {
+        var dlg = new NewProfileWindow(kind, suggestedName) { Owner = System.Windows.Application.Current.MainWindow };
+        return dlg.ShowDialog() == true ? dlg : null;
+    }
+
+    /// <summary>Папка игры для нового профиля: как у текущего; нет — как у любого другого; нет и там — ищем установку.</summary>
+    private string? KnownGameDir() =>
+        new[] { ActiveProfile?.GameDir }.Concat(Profiles.Select(p => p.GameDir)).FirstOrDefault(d => !string.IsNullOrWhiteSpace(d))
+        ?? GameInstall.FindGameDir();
 
     private void AddProfile(GameProfile model)
     {

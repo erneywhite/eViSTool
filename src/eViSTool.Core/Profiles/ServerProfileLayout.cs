@@ -31,7 +31,8 @@ public static class ServerProfileLayout
     public static string SuggestDir(string dataDir, string name)
     {
         var container = ContainerFor(dataDir);
-        var slug = string.Concat(name.Trim().Select(c => Path.GetInvalidFileNameChars().Contains(c) || c == ' ' ? '_' : c)).Trim('_', '.');
+        // имя папки — как название профиля (пробелы остаются); заменяем только то, что в имени файла недопустимо
+        var slug = string.Concat(name.Trim().Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)).Trim(' ', '_', '.');
         if (slug.Length == 0) slug = "server";
         var candidate = Path.Combine(container, slug);
         for (var n = 2; Directory.Exists(candidate) && Directory.EnumerateFileSystemEntries(candidate).Any(); n++)

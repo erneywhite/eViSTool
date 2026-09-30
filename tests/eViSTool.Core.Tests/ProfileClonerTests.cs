@@ -198,16 +198,19 @@ public sealed class ProfileClonerTests : IDisposable
     {
         var container = Path.Combine(_data, "ServerProfiles");
         var first = ProfileCloner.SuggestTargetDir(_data, "Мой мир");
-        Assert.Equal(Path.Combine(container, "Мой_мир"), first);
+        Assert.Equal(Path.Combine(container, "Мой мир"), first);
         Directory.CreateDirectory(first);
         File.WriteAllText(Path.Combine(first, "x"), "");
-        Assert.Equal(Path.Combine(container, "Мой_мир-2"), ProfileCloner.SuggestTargetDir(_data, "Мой мир"));
+        Assert.Equal(Path.Combine(container, "Мой мир-2"), ProfileCloner.SuggestTargetDir(_data, "Мой мир"));
 
         // клон профиля, который сам лежит в ServerProfiles, встаёт рядом с ним, а не вглубь
         Assert.Equal(Path.Combine(container, "третий"), ProfileCloner.SuggestTargetDir(first, "третий"));
         Assert.Equal(_data, ServerProfileLayout.HomeOf(first));
         Assert.Equal(Path.Combine(_data, "Mods"), ServerProfileLayout.SharedModsDir(first));
         Assert.True(ServerProfileLayout.IsInContainer(first));
+        // недопустимое в имени папки заменяется, пустое имя получает запасное
+        Assert.Equal(Path.Combine(container, "a_b_c"), ProfileCloner.SuggestTargetDir(_data, " a:b?c. "));
+        Assert.Equal(Path.Combine(container, "server"), ProfileCloner.SuggestTargetDir(_data, "  "));
         Assert.False(ServerProfileLayout.IsInContainer(_data));
     }
 

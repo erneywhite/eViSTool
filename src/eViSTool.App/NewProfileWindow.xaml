@@ -1,0 +1,29 @@
+<Window x:Class="eViSTool.App.NewProfileWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:eViSTool.App"
+        Icon="Assets/eViSTool.ico" Width="560" SizeToContent="Height" ResizeMode="NoResize"
+        Background="{StaticResource Forest.Base}" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <StackPanel Margin="24,20,24,22">
+        <TextBlock x:Name="Heading" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" />
+
+        <TextBlock Text="{local:Tr newprofile.name}" FontSize="12" Foreground="{StaticResource Forest.Text}" Margin="0,16,0,0" />
+        <TextBox x:Name="NameBox" Margin="0,6,0,0" MaxLength="60" TextChanged="NameBox_TextChanged"
+                 AutomationProperties.AutomationId="NewProfileName" />
+
+        <!-- серверный профиль: папка данных получает имя профиля -->
+        <StackPanel x:Name="FolderPanel" Margin="0,14,0,0" Visibility="Collapsed">
+            <TextBlock Text="{local:Tr newprofile.folder}" FontSize="12" Foreground="{StaticResource Forest.Text}" />
+            <TextBlock x:Name="FolderText" FontFamily="Consolas" FontSize="12" Foreground="{StaticResource Forest.Accent}" TextWrapping="Wrap"
+                       Margin="0,4,0,0" />
+            <TextBlock Text="{local:Tr newprofile.folderHint}" FontSize="11" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap"
+                       Margin="0,6,0,0" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button x:Name="OkButton" Content="{local:Tr newprofile.create}" IsDefault="True" Click="Ok_Click" Padding="18,8"
+                    Style="{StaticResource Forest.PrimaryButton}" AutomationProperties.AutomationId="NewProfileCreate" />
+            <Button Content="{local:Tr common.cancel}" IsCancel="True" Margin="8,0,0,0" Padding="16,8" />
+        </StackPanel>
+    </StackPanel>
+</Window>
