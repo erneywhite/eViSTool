@@ -160,13 +160,26 @@ public sealed partial class MainViewModel : ObservableObject
     private void AddServerProfile()
     {
         var name = Loc.T("profile.newServer", Profiles.Count + 1);
+        // своя папка данных внутри VintagestoryData\ServerProfiles: мир, конфиг и бэкапы — свои, моды — общие
+        var dataDir = ServerProfileLayout.SuggestDir(GameInstall.DefaultDataDir, name);
+        try
+        {
+            // папку создаём сразу: профиль с несуществующей папкой выглядел бы сломанным («папка данных не найдена»)
+            Directory.CreateDirectory(dataDir);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // не вышло — её создаст «Создать конфиг» или первый запуск сервера
+        }
+
         AddProfile(new GameProfile
         {
             Name = name,
             Kind = ProfileKind.Server,
-            GameDir = ActiveProfile?.GameDir,
-            // своя папка данных внутри VintagestoryData\ServerProfiles: мир, конфиг и бэкапы — свои, моды — общие
-            DataDir = ServerProfileLayout.SuggestDir(GameInstall.DefaultDataDir, name),
+            // папка игры — как у текущего профиля; нет — как у любого другого; нет и там — ищем установку
+            GameDir = new[] { ActiveProfile?.GameDir }.Concat(Profiles.Select(p => p.GameDir))
+                          .FirstOrDefault(d => !string.IsNullOrWhiteSpace(d)) ?? GameInstall.FindGameDir(),
+            DataDir = dataDir,
         });
     }
 
@@ -189,6 +202,26 @@ public sealed partial class MainViewModel : ObservableObject
         if (dlg.ShowDialog() == true && dlg.Result is { } clone) AddProfile(clone);
     }
 
+    private static bool SameOrInside(string? path, string dir)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        var p = Path.GetFullPath(path).TrimEnd('\\', '/');
+        var d = Path.GetFullPath(dir).TrimEnd('\\', '/');
+        return p.Equals(d, StringComparison.OrdinalIgnoreCase) || p.StartsWith(d + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static long FolderSize(string dir)
+    {
+        try
+        {
+            return new DirectoryInfo(dir).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return 0;
+        }
+    }
+
     /// <summary>Работает ли сервер профиля под нашим агентом (копировать мир работающего сервера нельзя).</summary>
     private static async Task<bool> IsServerRunningAsync(GameProfile profile)
     {
@@ -205,9 +238,64 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void RemoveProfile(ProfileViewModel? profile)
+    private async Task RemoveProfile(ProfileViewModel? profile)
     {
         if (profile is null || Profiles.Count <= 1) return; // последний профиль не удаляем
+        var model = profile.Model;
+        var owner = System.Windows.Application.Current.MainWindow!;
+
+        if (model.Kind == ProfileKind.Server && await IsServerRunningAsync(model))
+        {
+            System.Windows.MessageBox.Show(owner, Loc.T("settings.removeRunning", model.Name), "eViSTool",
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            return;
+        }
+
+        // Папку данных предлагаем удалить только там, где её завела сама программа (…\ServerProfiles\имя)
+        // и где она не нужна другому профилю. Чужие папки (VintagestoryData клиента и т. п.) не трогаем никогда.
+        var dir = model.DataDir;
+        var ownFolder = model.Kind == ProfileKind.Server && !string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir)
+                        && ServerProfileLayout.IsInContainer(dir)
+                        && !Profiles.Any(p => p != profile && SameOrInside(p.DataDir, dir));
+        var deleteData = false;
+        if (ownFolder)
+        {
+            var size = await Task.Run(() => FolderSize(dir!));
+            // по умолчанию — «Нет»: случайный Enter не должен уносить мир
+            var answer = System.Windows.MessageBox.Show(owner, Loc.T("settings.removeAskData", model.Name, dir, Sizes.Format(size)), "eViSTool",
+                System.Windows.MessageBoxButton.YesNoCancel, System.Windows.MessageBoxImage.Warning, System.Windows.MessageBoxResult.No);
+            if (answer == System.Windows.MessageBoxResult.Cancel) return;
+            deleteData = answer == System.Windows.MessageBoxResult.Yes;
+        }
+        else if (System.Windows.MessageBox.Show(owner, Loc.T("settings.removeAsk", model.Name, string.IsNullOrWhiteSpace(dir) ? "—" : dir), "eViSTool",
+                     System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question, System.Windows.MessageBoxResult.No)
+                 != System.Windows.MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        if (deleteData)
+        {
+            try
+            {
+                Shell.MoveToRecycleBin(dir!); // в Корзину, не насовсем: мир можно вернуть
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
+            {
+                // папку убрать не удалось — профиль оставляем, чтобы можно было повторить
+                System.Windows.MessageBox.Show(owner, Loc.T("settings.removeDataFailed", dir, ex.Message), "eViSTool",
+                    System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                return;
+            }
+        }
+
+        // ключ и адрес агента этого профиля больше не нужны
+        foreach (var file in new[] { Core.Server.AgentProtocol.StateFile(model.Id), Core.Server.AgentProtocol.KeyFile(model.Id) })
+        {
+            try { File.Delete(file); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
+
         _settings.Profiles.Remove(profile.Model);
         Profiles.Remove(profile);
         if (ActiveProfile == profile) ActiveProfile = Profiles[0];
