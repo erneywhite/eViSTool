@@ -139,6 +139,7 @@
     <Geometry x:Key="Icon.Plus">M12,5 V19 M5,12 H19</Geometry>
     <Geometry x:Key="Icon.Download">M12,3 V15 M7,10 L12,15 L17,10 M4,16 V21 H20 V16</Geometry>
     <Geometry x:Key="Icon.Warning">M12,3 L22,21 H2 Z M12,9 V14 M12,17 V18</Geometry>
+    <Geometry x:Key="Icon.Client">M3,4 H21 V16 H3 Z M8,20 H16 M12,16 V20</Geometry>
     <Geometry x:Key="Icon.Search">M4,10 A6,6 0 1 1 16,10 A6,6 0 1 1 4,10 Z M15,15 L20,20</Geometry>
     <Geometry x:Key="Icon.Folder">M3,6 V19 H21 V8 H11 L9,6 Z</Geometry>
     <Geometry x:Key="Icon.Package">M12,3 L20,7 V17 L12,21 L4,17 V7 Z M4,7 L12,11 L20,7 M12,11 V21</Geometry>

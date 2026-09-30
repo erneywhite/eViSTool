@@ -11,18 +11,6 @@
         <vm:MainViewModel />
     </Window.DataContext>
 
-    <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis" />
-        <local:InvertBoolConverter x:Key="Invert" />
-        <local:CountToVisibilityConverter x:Key="CountToVis" />
-
-        <Style x:Key="Hint" TargetType="TextBlock">
-            <Setter Property="Opacity" Value="0.7" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-            <Setter Property="Margin" Value="0,2,0,6" />
-        </Style>
-    </Window.Resources>
-
     <Grid Background="{StaticResource Forest.Base}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="210" />
@@ -155,105 +143,7 @@
 
             <!-- ============ НАСТРОЙКИ ============ -->
             <TabItem Header="{local:Tr tab.settings}">
-                <DockPanel Margin="8">
-                    <!-- список профилей -->
-                    <DockPanel DockPanel.Dock="Left" Width="260" Margin="0,0,20,0">
-                        <TextBlock DockPanel.Dock="Top" Text="{local:Tr settings.profiles}" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,8" />
-                        <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-                            <Button Content="{local:Tr settings.addClient}" Command="{Binding AddClientProfileCommand}" HorizontalAlignment="Stretch" Margin="0,0,0,6" />
-                            <Button Content="{local:Tr settings.addServer}" Command="{Binding AddServerProfileCommand}" HorizontalAlignment="Stretch" Margin="0,0,0,6" />
-                            <Button Content="{local:Tr settings.removeProfile}" Command="{Binding RemoveProfileCommand}" CommandParameter="{Binding EditedProfile}"
-                                    HorizontalAlignment="Stretch" />
-                        </StackPanel>
-                        <ListBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding EditedProfile}">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Margin="0,2">
-                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                        <TextBlock Opacity="0.7">
-                                            <Run Text="{Binding KindText, Mode=OneWay}" /><Run Text="{local:Tr settings.gameShort}" /><Run Text="{Binding GameVersionText, Mode=OneWay}" />
-                                        </TextBlock>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </DockPanel>
-
-                    <!-- редактор выбранного профиля -->
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel MaxWidth="820" HorizontalAlignment="Stretch">
-                            <StackPanel DataContext="{Binding EditedProfile}">
-                                <TextBlock Text="{local:Tr settings.name}" FontWeight="SemiBold" />
-                                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
-
-                                <TextBlock Text="{local:Tr settings.type}" FontWeight="SemiBold" Margin="0,16,0,0" />
-                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                    <RadioButton Content="{local:Tr settings.kindClient}" IsChecked="{Binding IsServer, Converter={StaticResource Invert}}" Margin="0,0,16,0" />
-                                    <RadioButton Content="{local:Tr tab.server}" IsChecked="{Binding IsServer}" />
-                                </StackPanel>
-
-                                <TextBlock Text="{local:Tr settings.gameDir}" FontWeight="SemiBold" Margin="0,16,0,0" />
-                                <TextBlock Style="{StaticResource Hint}"
-                                           Text="{local:Tr settings.gameDirHint}" />
-                                <DockPanel>
-                                    <Button DockPanel.Dock="Right" Content="{local:Tr common.browse}" Command="{Binding BrowseGameDirCommand}" Margin="8,0,0,0" Padding="12,4" />
-                                    <TextBox Text="{Binding GameDir, UpdateSourceTrigger=LostFocus}" />
-                                </DockPanel>
-
-                                <TextBlock Text="{local:Tr settings.dataDir}" FontWeight="SemiBold" Margin="0,16,0,0" />
-                                <TextBlock Style="{StaticResource Hint}"
-                                           Text="{local:Tr settings.dataDirHint}" />
-                                <DockPanel>
-                                    <Button DockPanel.Dock="Right" Content="{local:Tr common.open}" Command="{Binding OpenDataDirCommand}" Margin="8,0,0,0" Padding="12,4" />
-                                    <Button DockPanel.Dock="Right" Content="{local:Tr common.browse}" Command="{Binding BrowseDataDirCommand}" Margin="8,0,0,0" Padding="12,4" />
-                                    <TextBox Text="{Binding DataDir, UpdateSourceTrigger=LostFocus}" />
-                                </DockPanel>
-
-                                <!-- что удалось прочитать из файлов игры -->
-                                <Border Margin="0,20,0,0" Padding="12" CornerRadius="6" Background="#1A808080">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                        </Grid.RowDefinitions>
-                                        <TextBlock Text="{local:Tr settings.gameVersion}" Opacity="0.7" Margin="0,0,12,6" />
-                                        <TextBlock Grid.Column="1" Text="{Binding GameVersionText}" FontWeight="SemiBold" />
-                                        <TextBlock Grid.Row="1" Text="{local:Tr settings.configFile}" Opacity="0.7" Margin="0,0,12,6" />
-                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ConfigText}" TextWrapping="Wrap" />
-                                        <TextBlock Grid.Row="2" Text="{local:Tr settings.modDirs}" Opacity="0.7" Margin="0,0,12,6" />
-                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ModDirsText}" TextWrapping="Wrap" Margin="0,0,0,6" />
-                                        <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="{Binding WarningsText}" Foreground="#E0A030"
-                                                   TextWrapping="Wrap" Visibility="{Binding HasWarnings, Converter={StaticResource BoolToVis}}" />
-                                    </Grid>
-                                </Border>
-                                <Button Content="{local:Tr settings.reread}" Command="{Binding RereadCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="12,4" />
-                            </StackPanel>
-
-                            <TextBlock Text="{local:Tr settings.language}" FontWeight="SemiBold" Margin="0,28,0,0" />
-                            <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedLanguage}" Width="220"
-                                      HorizontalAlignment="Left" Margin="0,4,0,0" />
-
-                            <CheckBox Content="{local:Tr settings.autoCheck}" IsChecked="{Binding AutoCheckUpdates}" Margin="0,20,0,0" />
-                            <CheckBox Content="{local:Tr settings.allowUnstable}" IsChecked="{Binding AllowUnstable}" Margin="0,12,0,0" />
-                            <TextBlock Style="{StaticResource Hint}" Margin="28,2,0,0"
-                                       Text="{local:Tr settings.allowUnstableHint}" />
-
-                            <TextBlock Text="{local:Tr settings.appData}" FontWeight="SemiBold" Margin="0,28,0,0" />
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Text="{local:Tr settings.appDataHint}" />
-                            <DockPanel>
-                                <Button DockPanel.Dock="Right" Content="{local:Tr common.open}" Command="{Binding OpenDataFolderCommand}" Margin="8,0,0,0" Padding="12,4" />
-                                <TextBlock Text="{Binding DataLocationText}" VerticalAlignment="Center" TextWrapping="Wrap" />
-                            </DockPanel>
-                        </StackPanel>
-                    </ScrollViewer>
-                </DockPanel>
+                <local:SettingsView />
             </TabItem>
 
             <!-- ============ О ПРОГРАММЕ ============ -->

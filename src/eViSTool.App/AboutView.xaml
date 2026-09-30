@@ -3,94 +3,154 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:eViSTool.App">
     <UserControl.Resources>
-        <Style x:Key="Section" TargetType="TextBlock">
+        <local:TextToVisibilityConverter x:Key="TextToVis" />
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="FontSize" Value="16" />
-            <Setter Property="Margin" Value="0,24,0,6" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+            <Setter Property="Margin" Value="0,0,0,10" />
         </Style>
         <Style x:Key="Muted" TargetType="TextBlock">
-            <Setter Property="Opacity" Value="0.75" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="AboutCard" TargetType="Border" BasedOn="{StaticResource Forest.Card}">
+            <Setter Property="Padding" Value="20,16" />
+        </Style>
+        <!-- строка-ссылка: иконка «↗» справа, вся строка кликабельна -->
+        <Style x:Key="LinkRow" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,0,0,1" Padding="0,9">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Right" Text="↗" Foreground="{StaticResource Forest.Accent}" />
+                                <ContentPresenter />
+                            </DockPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource Forest.Accent}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="24" MaxWidth="760" HorizontalAlignment="Left">
-            <!-- шапка -->
-            <DockPanel>
-                <Image DockPanel.Dock="Left" Source="Assets/logo256.png" Width="112" Height="112" Margin="0,0,20,0"
-                       RenderOptions.BitmapScalingMode="HighQuality" />
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="eViSTool" FontSize="30" FontWeight="SemiBold" />
-                    <TextBlock Style="{StaticResource Muted}">
-                        <Run Text="{local:Tr about.version}" /><Run Text=" " /><Run Text="{Binding AppVersion, Mode=OneWay}" FontWeight="SemiBold" />
-                        <Run Text="   ·   Erney White" />
-                    </TextBlock>
-                    <TextBlock Text="{local:Tr about.tagline}" Style="{StaticResource Muted}" Margin="0,6,0,0" />
-                </StackPanel>
-            </DockPanel>
-
-            <!-- поддержать -->
-            <Border Margin="0,24,0,0" Padding="16" CornerRadius="8" Background="{StaticResource Forest.Surface}"
-                    BorderBrush="{StaticResource Forest.Line}" BorderThickness="1">
-                <DockPanel>
-                    <!-- официальная кнопка Ko-fi (картинка вшита в программу) -->
-                    <Image DockPanel.Dock="Right" Source="Assets/kofi.png" Height="44" Margin="16,0,0,0" VerticalAlignment="Center"
-                           Cursor="Hand" ToolTip="ko-fi.com/erneywhite" RenderOptions.BitmapScalingMode="HighQuality">
-                        <Image.InputBindings>
-                            <MouseBinding Gesture="LeftClick" Command="{Binding OpenKofiCommand}" />
-                        </Image.InputBindings>
-                        <Image.Style>
-                            <Style TargetType="Image">
-                                <Style.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Opacity" Value="0.85" />
-                                    </Trigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Image.Style>
-                    </Image>
-                    <StackPanel>
-                        <TextBlock Text="{local:Tr about.supportTitle}" FontWeight="SemiBold" FontSize="15" />
-                        <TextBlock Text="{local:Tr about.supportText}" Style="{StaticResource Muted}" Margin="0,4,0,0" />
-                    </StackPanel>
-                </DockPanel>
-            </Border>
-
-            <!-- обновления программы -->
-            <TextBlock Text="{local:Tr about.updates}" Style="{StaticResource Section}" />
-            <StackPanel Orientation="Horizontal">
-                <Button Content="{local:Tr about.checkUpdates}" Command="{Binding CheckAppUpdateCommand}" Padding="12,6" />
-                <TextBlock Text="{Binding UpdateStatus}" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="12,0,0,0" />
-            </StackPanel>
-
-            <!-- ссылки -->
-            <TextBlock Text="{local:Tr about.links}" Style="{StaticResource Section}" />
-            <TextBlock>
-                <Hyperlink Command="{Binding OpenUrlCommand}" CommandParameter="https://github.com/erneywhite/eViSTool"><Run Text="{local:Tr about.github}" /></Hyperlink>
-            </TextBlock>
-            <TextBlock Margin="0,4,0,0">
-                <Hyperlink Command="{Binding OpenUrlCommand}" CommandParameter="https://github.com/erneywhite/eViSTool/issues"><Run Text="{local:Tr about.issues}" /></Hyperlink>
-            </TextBlock>
-            <TextBlock Margin="0,4,0,0">
-                <Hyperlink Command="{Binding OpenUrlCommand}" CommandParameter="https://mods.vintagestory.at/"><Run Text="{local:Tr about.moddb}" /></Hyperlink>
-            </TextBlock>
-
-            <!-- благодарности -->
-            <TextBlock Text="{local:Tr about.credits}" Style="{StaticResource Section}" />
-            <TextBlock Style="{StaticResource Muted}">
-                <Hyperlink Command="{Binding OpenUrlCommand}" CommandParameter="https://github.com/Tekunogosu/Rustique">Rustique</Hyperlink>
-                <Run Text="{local:Tr about.creditRustique}" />
-            </TextBlock>
-            <TextBlock Style="{StaticResource Muted}" Margin="0,4,0,0">
-                <Hyperlink Command="{Binding OpenUrlCommand}" CommandParameter="https://mods.vintagestory.at/show/mod/17652">ViSST Server Tool</Hyperlink>
-                <Run Text="{local:Tr about.creditVisst}" />
-            </TextBlock>
-            <TextBlock Style="{StaticResource Muted}" Margin="0,4,0,0">
-                <Run Text="{local:Tr about.creditGame}" />
-            </TextBlock>
-
-            <TextBlock Text="© 2026 Erney White" Style="{StaticResource Muted}" Margin="0,24,0,0" />
+    <DockPanel Margin="10,4,10,0">
+        <StackPanel DockPanel.Dock="Top">
+            <TextBlock Text="{local:Tr nav.about}" Style="{StaticResource Forest.PageTitle}" />
+            <TextBlock Text="{local:Tr about.tagline}" Foreground="{StaticResource Forest.Accent}" FontSize="12" Margin="0,4,0,0" />
         </StackPanel>
-    </ScrollViewer>
+        <Border DockPanel.Dock="Top" BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,0,0,1" Margin="0,14,0,14" />
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel MaxWidth="900" HorizontalAlignment="Left" Margin="0,0,14,0">
+                <!-- ===== программа и обновления ===== -->
+                <Border Style="{StaticResource AboutCard}" Padding="20">
+                    <DockPanel>
+                        <Image DockPanel.Dock="Left" Source="Assets/logo256.png" Width="96" Height="96" Margin="0,0,20,0"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
+                        <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Margin="20,0,0,0" MinWidth="200">
+                            <Button Command="{Binding CheckAppUpdateCommand}" HorizontalAlignment="Right">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="{StaticResource Icon.Refresh}" Style="{StaticResource Forest.Icon}" Width="14" Height="14" Margin="0,0,8,0" />
+                                    <TextBlock Text="{local:Tr about.checkUpdates}" />
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text="{Binding UpdateStatus}" Style="{StaticResource Muted}" TextAlignment="Right" Margin="0,8,0,0" MaxWidth="260"
+                                       HorizontalAlignment="Right" Visibility="{Binding UpdateStatus, Converter={StaticResource TextToVis}}" />
+                        </StackPanel>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="eViSTool" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" />
+                            <TextBlock FontSize="13" Foreground="{StaticResource Forest.Muted}" Margin="0,2,0,0">
+                                <Run Text="{local:Tr about.version}" /><Run Text=" " /><Run Text="{Binding AppVersion, Mode=OneWay}" FontWeight="SemiBold"
+                                     Foreground="{StaticResource Forest.Accent}" /><Run Text="   ·   Erney White" />
+                            </TextBlock>
+                            <TextBlock Text="{local:Tr shell.slogan}" Foreground="{StaticResource Forest.Muted}" FontSize="12" Margin="0,8,0,0" FontStyle="Italic" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <!-- ===== поддержать ===== -->
+                <Border Style="{StaticResource AboutCard}" Margin="0,14,0,0" Background="{StaticResource Forest.Raised}">
+                    <DockPanel>
+                        <!-- официальная кнопка Ko-fi (картинка вшита в программу) -->
+                        <Image DockPanel.Dock="Right" Source="Assets/kofi.png" Height="44" Margin="16,0,0,0" VerticalAlignment="Center"
+                               Cursor="Hand" ToolTip="ko-fi.com/erneywhite" RenderOptions.BitmapScalingMode="HighQuality">
+                            <Image.InputBindings>
+                                <MouseBinding Gesture="LeftClick" Command="{Binding OpenKofiCommand}" />
+                            </Image.InputBindings>
+                            <Image.Style>
+                                <Style TargetType="Image">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="0.85" />
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Image.Style>
+                        </Image>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{local:Tr about.supportTitle}" FontWeight="SemiBold" FontSize="15" Foreground="{StaticResource Forest.Text}" />
+                            <TextBlock Text="{local:Tr about.supportText}" Style="{StaticResource Muted}" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <!-- ===== ссылки и благодарности ===== -->
+                <Grid Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="14" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource AboutCard}">
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr about.links}" Style="{StaticResource CardTitle}" />
+                            <Button Style="{StaticResource LinkRow}" Command="{Binding OpenUrlCommand}" CommandParameter="https://github.com/erneywhite/eViSTool">
+                                <TextBlock Text="{local:Tr about.github}" FontSize="13" />
+                            </Button>
+                            <Button Style="{StaticResource LinkRow}" Command="{Binding OpenUrlCommand}" CommandParameter="https://github.com/erneywhite/eViSTool/issues">
+                                <TextBlock Text="{local:Tr about.issues}" FontSize="13" />
+                            </Button>
+                            <Button Style="{StaticResource LinkRow}" Command="{Binding OpenUrlCommand}" CommandParameter="https://mods.vintagestory.at/">
+                                <TextBlock Text="{local:Tr about.moddb}" FontSize="13" />
+                            </Button>
+                            <Button Style="{StaticResource LinkRow}" Command="{Binding OpenKofiCommand}">
+                                <TextBlock Text="Ko-fi · erneywhite" FontSize="13" />
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="2" Style="{StaticResource AboutCard}">
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr about.credits}" Style="{StaticResource CardTitle}" />
+                            <Button Style="{StaticResource LinkRow}" Command="{Binding OpenUrlCommand}" CommandParameter="https://github.com/Tekunogosu/Rustique">
+                                <StackPanel>
+                                    <TextBlock Text="Rustique" FontSize="13" />
+                                    <TextBlock Text="{local:Tr about.creditRustique}" Style="{StaticResource Muted}" Margin="0,2,12,0" />
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource LinkRow}" Command="{Binding OpenUrlCommand}" CommandParameter="https://mods.vintagestory.at/show/mod/17652">
+                                <StackPanel>
+                                    <TextBlock Text="ViSST Server Tool" FontSize="13" />
+                                    <TextBlock Text="{local:Tr about.creditVisst}" Style="{StaticResource Muted}" Margin="0,2,12,0" />
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text="{local:Tr about.creditGame}" Style="{StaticResource Muted}" Margin="0,12,0,0" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <TextBlock Text="© 2026 Erney White" Style="{StaticResource Muted}" Margin="2,16,0,16" />
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
 </UserControl>
