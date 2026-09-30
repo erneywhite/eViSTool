@@ -111,6 +111,7 @@ public sealed partial class ServerViewModel : ObservableObject
         OnPropertyChanged(nameof(IsRemoteTab));
         Config.SetActive(value == ServerTab.Config);
         Schedule.SetActive(value == ServerTab.Schedule);
+        if (value != ServerTab.Remote) Remote.Hide(); // ушли с вкладки — код подключения снова закрыт
     }
 
     /// <summary>Попросить агента сделать копию мира на работающем сервере.</summary>

@@ -25,7 +25,10 @@ public sealed partial class ServerRemoteViewModel : ObservableObject
     private bool _loading;
     private string _fingerprint = "";
     private RemoteSettings _settings = new();
-    private CancellationTokenSource? _hide;
+    // код открыт — через RevealFor закрывается сам; кнопка «Скрыть» при этом работает всегда
+    private readonly System.Windows.Threading.DispatcherTimer _hideTimer = new() { Interval = RevealFor };
+
+    public ServerRemoteViewModel() => _hideTimer.Tick += (_, _) => Hide();
 
     [ObservableProperty] private bool _enabled;
     [ObservableProperty] private string _host = "";
@@ -52,7 +55,7 @@ public sealed partial class ServerRemoteViewModel : ObservableObject
     public void OnProfileSwitched(GameProfile? profile)
     {
         _profile = profile;
-        Revealed = false;
+        Hide();
         Message = "";
         _loading = true;
         try
@@ -157,22 +160,25 @@ public sealed partial class ServerRemoteViewModel : ObservableObject
         }
     }
 
-    /// <summary>Показать код на несколько секунд — потом он снова закрывается сам.</summary>
+    /// <summary>Показать код на несколько секунд (потом он закрывается сам) или сразу закрыть.</summary>
     [RelayCommand]
-    private async Task ToggleReveal()
+    private void ToggleReveal()
     {
-        _hide?.Cancel();
-        Revealed = !Revealed;
-        if (!Revealed) return;
-        var hide = _hide = new CancellationTokenSource();
-        try
+        if (Revealed)
         {
-            await Task.Delay(RevealFor, hide.Token);
-            Revealed = false;
+            Hide();
+            return;
         }
-        catch (TaskCanceledException)
-        {
-        }
+        Revealed = true;
+        _hideTimer.Stop();
+        _hideTimer.Start();
+    }
+
+    /// <summary>Закрыть код точками (и при уходе с вкладки).</summary>
+    public void Hide()
+    {
+        _hideTimer.Stop();
+        Revealed = false;
     }
 
     [RelayCommand]
@@ -198,7 +204,7 @@ public sealed partial class ServerRemoteViewModel : ObservableObject
                 MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
             return;
         _settings = RemoteAccess.RegenerateKey(_profile.Id);
-        Revealed = false;
+        Hide();
         Message = Loc.T("remote.newKeyDone");
         OnPropertyChanged(nameof(CodeText));
     }
