@@ -204,14 +204,21 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void AddClientProfile()
     {
-        if (AskNewProfile(ProfileKind.Client, Loc.T("profile.newClient", Profiles.Count + 1)) is not { } dlg) return;
-        AddProfile(new GameProfile
+        // новый профиль — со своей папкой данных (…\ClientProfiles\имя) на основе существующего клиентского:
+        // текущего, если он клиентский, иначе первого; нет ни одного — на основе стандартной папки игры
+        var source = (ActiveProfile is { Kind: ProfileKind.Client } ? ActiveProfile : Profiles.FirstOrDefault(p => p.Kind == ProfileKind.Client))?.Model
+                     ?? new GameProfile
+                     {
+                         Name = Loc.T("profile.defaultClientName"),
+                         Kind = ProfileKind.Client,
+                         GameDir = KnownGameDir(),
+                         DataDir = GameInstall.DefaultDataDir,
+                     };
+        var dlg = new ClientProfileWindow(source, clone: false, Loc.T("profile.newClient", Profiles.Count + 1))
         {
-            Name = dlg.ProfileName,
-            Kind = ProfileKind.Client,
-            GameDir = KnownGameDir(),
-            DataDir = GameInstall.DefaultDataDir,
-        });
+            Owner = System.Windows.Application.Current.MainWindow,
+        };
+        if (dlg.ShowDialog() == true && dlg.Result is { } created) AddProfile(created);
     }
 
     [RelayCommand]
@@ -253,11 +260,24 @@ public sealed partial class MainViewModel : ObservableObject
         Save();
     }
 
-    /// <summary>Клон серверного профиля со своей папкой данных («тот же мир» или «новый мир»).</summary>
+    /// <summary>
+    /// Клон профиля со своей папкой данных: серверного — «тот же мир» или «новый мир»,
+    /// клиентского — с общими или своими модами, с настройками и мирами по выбору.
+    /// </summary>
     [RelayCommand]
     private async Task CloneProfile(ProfileViewModel? profile)
     {
-        if (profile is not { Kind: ProfileKind.Server }) return;
+        if (profile is null) return;
+        if (profile.Kind == ProfileKind.Client)
+        {
+            var window = new ClientProfileWindow(profile.Model, clone: true, Loc.T("clone.copySuffix", profile.Name))
+            {
+                Owner = System.Windows.Application.Current.MainWindow,
+            };
+            if (window.ShowDialog() == true && window.Result is { } copy) AddProfile(copy);
+            return;
+        }
+
         var running = await IsServerRunningAsync(profile.Model);
         var dlg = new CloneProfileWindow(profile.Model, running) { Owner = System.Windows.Application.Current.MainWindow };
         if (dlg.ShowDialog() == true && dlg.Result is { } clone) AddProfile(clone);
@@ -312,11 +332,11 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        // Папку данных предлагаем удалить только там, где её завела сама программа (…\ServerProfiles\имя)
+        // Папку данных предлагаем удалить только там, где её завела сама программа (…\ServerProfiles\имя, …\ClientProfiles\имя)
         // и где она не нужна другому профилю. Чужие папки (VintagestoryData клиента и т. п.) не трогаем никогда.
         var dir = model.DataDir;
-        var ownFolder = model.Kind == ProfileKind.Server && !string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir)
-                        && ServerProfileLayout.IsInContainer(dir)
+        var ownFolder = !string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir)
+                        && (model.Kind == ProfileKind.Server ? ServerProfileLayout.IsInContainer(dir) : ClientProfileLayout.IsInContainer(dir))
                         && !Profiles.Any(p => p != profile && SameOrInside(p.DataDir, dir));
         var deleteData = false;
         if (ownFolder)

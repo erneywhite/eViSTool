@@ -64,6 +64,21 @@ public sealed class ProfileResolverTests : IDisposable
     }
 
     [Fact]
+    public void SharedMods_OwnUnlistedModsFolderDoesNotCount()
+    {
+        // профиль с общими модами: игра завела в его папке данных пустую Mods, но в списке её нет — она её не читает
+        var shared = Directory.CreateDirectory(Path.Combine(_root, "home", "Mods")).FullName;
+        File.WriteAllText(Path.Combine(_data, "serverconfig.json"), $$"""
+        { "ModPaths": ["Mods", "{{Json(shared)}}"] }
+        """);
+
+        var r = ProfileResolver.Resolve(new GameProfile { Kind = ProfileKind.Server, GameDir = _game, DataDir = _data });
+
+        Assert.Equal([shared], r.ModDirs);
+        Assert.Equal(shared, r.InstallDir); // новые моды — в общую папку, а не в свою пустую
+    }
+
+    [Fact]
     public void MissingConfigStillGivesDefaultModsDir()
     {
         var r = ProfileResolver.Resolve(new GameProfile { Kind = ProfileKind.Server, GameDir = _game, DataDir = _data });

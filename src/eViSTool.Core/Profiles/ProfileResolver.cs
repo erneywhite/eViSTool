@@ -56,9 +56,11 @@ public static class ProfileResolver
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        // папка по умолчанию игра использует всегда, даже если её нет в списке
+        // Игра ищет моды только в папках из своего списка: «<данные>\Mods», которой в списке нет, она не читает
+        // (проверено на сервере 1.22.7) — у профиля с общими модами своя пустая Mods в счёт не идёт.
+        // Списка ещё нет (игра не запускалась) — она заведёт его с папкой по умолчанию.
         var defaultMods = Path.Combine(profile.DataDir, "Mods");
-        if (!dirs.Contains(defaultMods, StringComparer.OrdinalIgnoreCase)) dirs.Insert(0, defaultMods);
+        if (dirs.Count == 0) dirs.Add(defaultMods);
 
         return new ResolvedProfile
         {
@@ -66,7 +68,7 @@ public static class ProfileResolver
             GameVersion = version,
             ConfigPath = configPath,
             ModDirs = dirs,
-            InstallDir = dirs.FirstOrDefault(Directory.Exists) ?? defaultMods,
+            InstallDir = dirs.FirstOrDefault(Directory.Exists) ?? dirs[0],
             DisabledMods = disabled,
             Warnings = warnings,
         };

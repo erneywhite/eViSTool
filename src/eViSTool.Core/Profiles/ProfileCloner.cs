@@ -69,8 +69,8 @@ public static class ProfileCloner
 {
     public const string MainConfig = "serverconfig.json";
 
-    // не копируются никогда: журналы и кэш сервер создаст заново, а ServerProfiles — это папки других профилей
-    private static readonly string[] AlwaysSkipped = ["Logs", "Cache", ServerProfileLayout.ContainerName];
+    // не копируются никогда: журналы и кэш сервер создаст заново, а ServerProfiles и ClientProfiles — это папки других профилей
+    private static readonly string[] AlwaysSkipped = ["Logs", "Cache", ServerProfileLayout.ContainerName, ClientProfileLayout.ContainerName];
     private const string ModsDir = "Mods";
     private static readonly string[] BackupDirs = ["Backups", "BackupSaves"];
     private const string SavesDir = "Saves";
@@ -175,36 +175,10 @@ public static class ProfileCloner
     {
         var from = Path.GetFullPath(plan.Source.DataDir!).TrimEnd('\\', '/');
         var to = Path.GetFullPath(plan.Options.TargetDir).TrimEnd('\\', '/');
-        var total = plan.TotalBytes;
-        long done = 0;
 
         try
         {
-            Directory.CreateDirectory(to);
-            foreach (var dir in plan.Directories) Directory.CreateDirectory(Path.Combine(to, dir));
-            var buffer = new byte[1 << 20];
-            foreach (var file in plan.Files)
-            {
-                ct.ThrowIfCancellationRequested();
-                var dest = Path.Combine(to, file.Relative);
-                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                progress?.Report(new CloneProgress(done, total, file.Relative));
-
-                // ReadWrite: остановленный сервер файлы не держит, но антивирус или проводник — могут
-                await using (var src = new FileStream(file.Source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, buffer.Length, useAsync: true))
-                await using (var dst = new FileStream(dest, FileMode.CreateNew, FileAccess.Write, FileShare.None, buffer.Length, useAsync: true))
-                {
-                    int read;
-                    while ((read = await src.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
-                    {
-                        await dst.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
-                        done += read;
-                        progress?.Report(new CloneProgress(done, total, file.Relative));
-                    }
-                }
-                File.SetLastWriteTimeUtc(dest, File.GetLastWriteTimeUtc(file.Source));
-            }
-
+            await CopyAsync(plan.Files, plan.Directories, to, progress, ct).ConfigureAwait(false);
             if (plan.ConfigPath is not null) WriteConfig(plan, from, to);
         }
         catch
@@ -224,6 +198,38 @@ public static class ProfileCloner
             PinnedMods = new(plan.Source.PinnedMods, StringComparer.OrdinalIgnoreCase),
             BlockedVersions = plan.Source.BlockedVersions.ToDictionary(kv => kv.Key, kv => kv.Value.ToList(), StringComparer.OrdinalIgnoreCase),
         };
+    }
+
+    /// <summary>Создать папку профиля и скопировать в неё файлы по плану (общее для серверных и клиентских профилей).</summary>
+    internal static async Task CopyAsync(IReadOnlyList<CloneFile> files, IEnumerable<string> directories, string to,
+        IProgress<CloneProgress>? progress, CancellationToken ct)
+    {
+        var total = files.Sum(f => f.Size);
+        long done = 0;
+        Directory.CreateDirectory(to);
+        foreach (var dir in directories) Directory.CreateDirectory(Path.Combine(to, dir));
+        var buffer = new byte[1 << 20];
+        foreach (var file in files)
+        {
+            ct.ThrowIfCancellationRequested();
+            var dest = Path.Combine(to, file.Relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+            progress?.Report(new CloneProgress(done, total, file.Relative));
+
+            // ReadWrite: остановленный сервер файлы не держит, но антивирус или проводник — могут
+            await using (var src = new FileStream(file.Source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, buffer.Length, useAsync: true))
+            await using (var dst = new FileStream(dest, FileMode.CreateNew, FileAccess.Write, FileShare.None, buffer.Length, useAsync: true))
+            {
+                int read;
+                while ((read = await src.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+                {
+                    await dst.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
+                    done += read;
+                    progress?.Report(new CloneProgress(done, total, file.Relative));
+                }
+            }
+            File.SetLastWriteTimeUtc(dest, File.GetLastWriteTimeUtc(file.Source));
+        }
     }
 
     /// <summary>serverconfig.json клона: пути — на новую папку; для нового мира — свой файл сохранения, пустой сид, своё имя.</summary>
@@ -353,7 +359,7 @@ public static class ProfileCloner
                || name.EndsWith(SaveExtension + "-wal", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsSameOrInside(string path, string dir)
+    internal static bool IsSameOrInside(string path, string dir)
     {
         var p = Path.GetFullPath(path).TrimEnd('\\', '/');
         var d = Path.GetFullPath(dir).TrimEnd('\\', '/');
