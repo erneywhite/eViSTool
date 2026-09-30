@@ -37,6 +37,12 @@ public sealed record ConfigFieldSpec
     /// <summary>Текстовое поле нельзя оставить пустым: с пустым значением сервер не заработает как надо (имя сервера, файл мира).</summary>
     public bool Required { get; init; }
 
+    /// <summary>Сервер читает поле только при создании мира: для уже созданного мира правка ничего не изменит.</summary>
+    public bool WorldCreationOnly { get; init; }
+
+    /// <summary>Устаревшее или не используемое сервером поле — показывается с пометкой.</summary>
+    public bool Legacy { get; init; }
+
     /// <summary>Последний сегмент пути — имя поля в JSON.</summary>
     public string Name => Path[(Path.LastIndexOf('.') + 1)..];
 
