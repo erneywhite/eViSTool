@@ -10,6 +10,7 @@
         <local:PixelsToGridLengthConverter x:Key="PxToGrid" />
         <local:EnumEqualsConverter x:Key="EnumEq" />
         <local:TextToVisibilityConverter x:Key="TextToVis" />
+        <local:ZeroToVisibleConverter x:Key="ZeroVis" />
         <local:InvertBoolToVisibilityConverter x:Key="InvertVis" />
 
         <!-- цвет состояния: точка и текст (DataContext — строка мода) -->
@@ -437,12 +438,18 @@
                         </ScrollViewer.Style>
                         <StackPanel>
                             <!-- шапка: логотип с модбазы или буквы -->
-                            <Border Background="{StaticResource Forest.Raised}" CornerRadius="8,8,0,0" Height="104">
+                            <Border Background="{StaticResource Forest.Raised}" CornerRadius="8,8,0,0" Height="150">
                                 <Grid>
                                     <!-- буквы всегда под картинкой: логотип не загрузился или его нет — видно их -->
-                                    <TextBlock Text="{Binding Row.Initials}" FontSize="40" FontWeight="Bold" Foreground="{StaticResource Forest.Accent}"
+                                    <TextBlock Visibility="{Binding ActualWidth, ElementName=Logo1, Converter={StaticResource ZeroVis}}" Text="{Binding Row.Initials}" FontSize="40" FontWeight="Bold" Foreground="{StaticResource Forest.Accent}"
                                                Margin="20,0,0,0" VerticalAlignment="Center" Opacity="0.85" />
-                                    <Image Source="{Binding Logo, TargetNullValue={x:Null}}" Stretch="UniformToFill" Opacity="0.9"
+                                    <!-- логотип целиком, по краям — он же, размытый -->
+                                    <Image Source="{Binding Logo, TargetNullValue={x:Null}}" Stretch="UniformToFill" Opacity="0.35">
+                                        <Image.Effect>
+                                            <BlurEffect Radius="24" />
+                                        </Image.Effect>
+                                    </Image>
+                                    <Image x:Name="Logo1" Source="{Binding Logo, TargetNullValue={x:Null}}" Stretch="Uniform"
                                            RenderOptions.BitmapScalingMode="HighQuality" />
                                     <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,12,0" Padding="8,2" CornerRadius="4"
                                             Background="#CC19231D" Visibility="{Binding Tag, Converter={StaticResource TextToVis}}">
