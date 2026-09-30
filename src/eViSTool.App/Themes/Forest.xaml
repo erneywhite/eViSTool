@@ -141,6 +141,7 @@
     <Geometry x:Key="Icon.Settings">M3,7 H6 M12,7 H21 M3,17 H13 M19,17 H21 M6,7 A3,3 0 1 1 12,7 A3,3 0 1 1 6,7 Z M13,17 A3,3 0 1 1 19,17 A3,3 0 1 1 13,17 Z</Geometry>
     <Geometry x:Key="Icon.About">M3,12 A9,9 0 1 1 21,12 A9,9 0 1 1 3,12 Z M12,11 V17 M12,7 V8</Geometry>
     <Geometry x:Key="Icon.Refresh">M20,7 A9,9 0 1 0 21,14 M20,2 V8 H14</Geometry>
+    <Geometry x:Key="Icon.Play">M7,4 L20,12 L7,20 Z</Geometry>
     <Geometry x:Key="Icon.Plus">M12,5 V19 M5,12 H19</Geometry>
     <Geometry x:Key="Icon.Download">M12,3 V15 M7,10 L12,15 L17,10 M4,16 V21 H20 V16</Geometry>
     <Geometry x:Key="Icon.Warning">M12,3 L22,21 H2 Z M12,9 V14 M12,17 V18</Geometry>

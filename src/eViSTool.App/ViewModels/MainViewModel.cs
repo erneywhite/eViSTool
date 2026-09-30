@@ -46,6 +46,57 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Профиль, открытый в редакторе на вкладке «Настройки».</summary>
     [ObservableProperty] private ProfileViewModel? _editedProfile;
 
+    // ---- запуск игры с активным клиентским профилем
+
+    /// <summary>Кнопка «Играть» — только для клиентского профиля (у серверного свой раздел «Сервер»).</summary>
+    public bool CanPlay => ActiveProfile is { Kind: ProfileKind.Client };
+
+    [ObservableProperty] private bool _isLaunching;
+
+    public string PlayText => Loc.T(IsLaunching ? "play.starting" : "play.button");
+
+    public string PlayTip => ActiveProfile is not { Kind: ProfileKind.Client } profile ? ""
+        : GameLauncher.DataPathFor(profile.Model) is { } dataPath ? Loc.T("play.tipOwnData", profile.Name, dataPath)
+        : Loc.T("play.tip", profile.Name);
+
+    partial void OnIsLaunchingChanged(bool value) => OnPropertyChanged(nameof(PlayText));
+
+    private void NotifyPlay()
+    {
+        OnPropertyChanged(nameof(CanPlay));
+        OnPropertyChanged(nameof(PlayText));
+        OnPropertyChanged(nameof(PlayTip));
+    }
+
+    [RelayCommand]
+    private async Task Play()
+    {
+        if (ActiveProfile is not { Kind: ProfileKind.Client } profile) return;
+        var owner = System.Windows.Application.Current.MainWindow!;
+
+        // вторая копия игры с той же папкой данных перезапишет настройки первой — спрашиваем
+        if (GameProcess.IsRunning(profile.Model)
+            && System.Windows.MessageBox.Show(owner, Loc.T("play.alreadyRunning"), "eViSTool", System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxImage.Question, System.Windows.MessageBoxResult.No) != System.Windows.MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            GameLauncher.Launch(profile.Model);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            System.Windows.MessageBox.Show(owner, Loc.T("play.failed", ex.Message), "eViSTool",
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            return;
+        }
+
+        // окно игры появляется не сразу — пока не даём нажать второй раз
+        IsLaunching = true;
+        try { await Task.Delay(TimeSpan.FromSeconds(8)); }
+        finally { IsLaunching = false; }
+    }
+
     [ObservableProperty] private bool _allowUnstable;
     [ObservableProperty] private bool _autoCheckUpdates;
 
@@ -65,6 +116,7 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(DataLocationText));
         OnPropertyChanged(nameof(PageTitle));
         foreach (var p in Profiles) p.NotifyLanguageChanged();
+        NotifyPlay();
         Mods.OnProfileSwitched();
         Catalog.OnLanguageChanged();
         Server.OnLanguageChanged();
@@ -108,6 +160,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         _settings.ActiveProfileId = value?.Model.Id;
         Save();
+        NotifyPlay();
         Mods.OnProfileSwitched();
         Server.OnProfileSwitched();
     }
@@ -124,6 +177,7 @@ public sealed partial class MainViewModel : ObservableObject
         Save();
         if (profile == ActiveProfile)
         {
+            NotifyPlay(); // имя, тип или папка данных профиля — в кнопке «Играть» и её подсказке
             Mods.OnProfileSwitched();
             Server.OnProfileSwitched();
         }

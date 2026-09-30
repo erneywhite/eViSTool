@@ -11,6 +11,10 @@
         <vm:MainViewModel />
     </Window.DataContext>
 
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Window.Resources>
+
     <Grid Background="{StaticResource Forest.Base}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="210" />
@@ -102,6 +106,15 @@
             <!-- полоса: раздел и активный профиль -->
             <Border DockPanel.Dock="Top" Height="60" BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,0,0,1">
                 <DockPanel Margin="24,0,20,0">
+                    <!-- игра с активным клиентским профилем: его папка данных, его моды -->
+                    <Button DockPanel.Dock="Right" Style="{StaticResource Forest.PrimaryButton}" Command="{Binding PlayCommand}"
+                            VerticalAlignment="Center" Margin="12,0,0,0" ToolTip="{Binding PlayTip}" ToolTipService.ShowOnDisabled="True"
+                            Visibility="{Binding CanPlay, Converter={StaticResource BoolToVis}}" AutomationProperties.AutomationId="PlayButton">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource Icon.Play}" Style="{StaticResource Forest.Icon}" Width="13" Height="13" Margin="0,0,8,0" />
+                            <TextBlock Text="{Binding PlayText}" />
+                        </StackPanel>
+                    </Button>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="{local:Tr shell.activeProfile}" VerticalAlignment="Center" Margin="0,0,10,0"
                                    Foreground="{StaticResource Forest.Muted}" FontSize="12" />
