@@ -4,164 +4,311 @@
              xmlns:local="clr-namespace:eViSTool.App">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:InvertBoolConverter x:Key="Invert" />
+        <local:InvertBoolToVisibilityConverter x:Key="InvertVis" />
         <local:PixelsToGridLengthConverter x:Key="PxToGrid" />
-        <Style x:Key="Muted" TargetType="TextBlock">
-            <Setter Property="Opacity" Value="0.7" />
-            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <local:TextToVisibilityConverter x:Key="TextToVis" />
+
+        <Style x:Key="Filter" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
         </Style>
-        <!-- плашка «установлен» -->
-        <Style x:Key="InstalledBadge" TargetType="Border">
+
+        <!-- плашка «установлен» / «доступен» -->
+        <Style x:Key="StateBadge" TargetType="Border">
             <Setter Property="CornerRadius" Value="4" />
-            <Setter Property="Padding" Value="6,1" />
-            <Setter Property="Background" Value="#4028A745" />
-            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Padding" Value="7,1" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Background" Value="{StaticResource Forest.Raised}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsInstalled}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource Forest.Selected}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="StateBadgeText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsInstalled}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource Forest.Good}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CardKey" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="0,4,12,4" />
+        </Style>
+        <Style x:Key="CardValue" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="0,4,0,4" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="TextAlignment" Value="Right" />
+            <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
     </UserControl.Resources>
 
-    <DockPanel Margin="8">
-        <!-- фильтры -->
-        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-            <Button DockPanel.Dock="Right" Content="{local:Tr catalog.refresh}" Command="{Binding RefreshCommand}" Padding="12,6" Margin="8,0,0,0"
-                    ToolTip="{local:Tr catalog.refreshTip}" />
-            <ComboBox DockPanel.Dock="Right" Width="200" Margin="8,0,0,0" ItemsSource="{Binding Sorts}" SelectedItem="{Binding SelectedSort}" />
-            <ComboBox DockPanel.Dock="Right" Width="170" Margin="8,0,0,0" ItemsSource="{Binding Sides}" SelectedItem="{Binding SelectedSide}" />
-            <ComboBox DockPanel.Dock="Right" Width="170" Margin="8,0,0,0" ItemsSource="{Binding Tags}" SelectedItem="{Binding SelectedTag}" />
-            <ComboBox DockPanel.Dock="Right" Width="230" Margin="8,0,0,0" ItemsSource="{Binding Branches}" SelectedItem="{Binding SelectedBranch}"
-                      ToolTip="{local:Tr catalog.branchTip}" />
-            <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
-                     ToolTip="{local:Tr catalog.searchTip}" />
+    <DockPanel Margin="10,4,10,0">
+        <!-- ===== заголовок ===== -->
+        <DockPanel DockPanel.Dock="Top">
+            <Button DockPanel.Dock="Right" VerticalAlignment="Top" Command="{Binding RefreshCommand}" ToolTip="{local:Tr catalog.refreshTip}"
+                    IsEnabled="{Binding IsLoading, Converter={StaticResource Invert}}">
+                <StackPanel Orientation="Horizontal">
+                    <Path Data="{StaticResource Icon.Refresh}" Style="{StaticResource Forest.Icon}" Width="14" Height="14" Margin="0,0,8,0" />
+                    <TextBlock Text="{local:Tr catalog.refresh}" />
+                </StackPanel>
+            </Button>
+            <StackPanel>
+                <TextBlock Text="{local:Tr nav.catalog}" Style="{StaticResource Forest.PageTitle}" />
+                <TextBlock Text="{Binding HeaderSubtitle}" Foreground="{StaticResource Forest.Accent}" FontSize="12" Margin="0,4,0,0"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
         </DockPanel>
 
-        <TextBlock DockPanel.Dock="Bottom" Margin="2,8,0,0" Text="{Binding StatusText}" Opacity="0.8" />
+        <Border DockPanel.Dock="Top" BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,0,0,1" Margin="0,14,0,0" />
 
-        <Grid>
+        <!-- ===== строка статуса ===== -->
+        <TextBlock DockPanel.Dock="Bottom" Margin="0,8,0,8" Text="{Binding StatusText}" Foreground="{StaticResource Forest.Muted}" FontSize="12"
+                   TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}" />
+
+        <Grid Margin="0,14,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="300" />
-                <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="{Binding DetailsWidth, Mode=TwoWay, Converter={StaticResource PxToGrid}}" MinWidth="320" />
+                <ColumnDefinition Width="*" MinWidth="360" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="{Binding DetailsWidth, Mode=TwoWay, Converter={StaticResource PxToGrid}}" MinWidth="340" />
             </Grid.ColumnDefinitions>
 
             <!-- разделитель: тяни, чтобы сделать карточку шире/уже (ширина запоминается) -->
-            <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext"
+            <GridSplitter Grid.Column="1" Width="14" HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext"
                           Background="Transparent" Cursor="SizeWE" ToolTip="{local:Tr catalog.splitterTip}"
                           DragCompleted="Splitter_DragCompleted" />
-            <Rectangle Grid.Column="1" Width="2" RadiusX="1" RadiusY="1" Fill="#40808080" Height="40" IsHitTestVisible="False" />
 
-            <!-- список -->
-            <ListBox x:Name="ModsList" SelectionChanged="ModsList_SelectionChanged"
-                     ItemsSource="{Binding Results}" SelectedItem="{Binding Selected}" HorizontalContentAlignment="Stretch"
-                     VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
-                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                <ListBox.Resources>
-                    <!-- кисти Fluent-темы: спокойное выделение вместо заливки акцентом, строки плотнее -->
-                    <SolidColorBrush x:Key="ListBoxItemSelectedBackgroundThemeBrush" Color="#38909090" />
-                    <SolidColorBrush x:Key="ListBoxItemSelectedBackgroundPointerOverThemeBrush" Color="#48909090" />
-                    <SolidColorBrush x:Key="ListBoxItemSelectedBackgroundPressedThemeBrush" Color="#48909090" />
-                    <SolidColorBrush x:Key="ListBoxItemSelectedForegroundThemeBrush" Color="{DynamicResource TextFillColorPrimary}" />
-                    <Thickness x:Key="ListBoxItemPadding">10,6</Thickness>
-                </ListBox.Resources>
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <DockPanel Margin="0,4">
-                            <Border DockPanel.Dock="Left" Width="48" Height="48" CornerRadius="6" Background="#20808080" Margin="0,0,12,0" ClipToBounds="True">
-                                <Image Source="{Binding Logo, TargetNullValue={x:Null}}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
-                            </Border>
-                            <StackPanel>
-                                <DockPanel>
-                                    <Border DockPanel.Dock="Right" Style="{StaticResource InstalledBadge}" Margin="8,0,0,0"
-                                            Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVis}}">
-                                        <TextBlock Text="{Binding InstalledText}" FontSize="12" />
-                                    </Border>
-                                    <TextBlock TextTrimming="CharacterEllipsis">
-                                        <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" />
-                                        <Run Text="{Binding Author, Mode=OneWay}" Foreground="Gray" FontSize="12" />
-                                    </TextBlock>
-                                </DockPanel>
-                                <TextBlock Text="{Binding Summary}" Style="{StaticResource Muted}" Margin="0,2,0,0" />
-                                <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0">
-                                    <Run Text="{Binding Stats, Mode=OneWay}" />
-                                    <Run Text="{Binding NoVersionText, Mode=OneWay}" Foreground="#E0A030" />
-                                </TextBlock>
-                            </StackPanel>
-                        </DockPanel>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-
-            <!-- карточка мода -->
-            <Border Grid.Column="2" CornerRadius="6" Background="#12808080" Padding="16">
-                <Grid>
-                    <TextBlock Text="{local:Tr catalog.pickMod}" Opacity="0.6" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <!-- ===== поиск, фильтры, список ===== -->
+            <DockPanel>
+                <Grid DockPanel.Dock="Top">
+                    <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" Padding="34,7,10,7" VerticalContentAlignment="Center"
+                             ToolTip="{local:Tr catalog.searchTip}" />
+                    <Path Data="{StaticResource Icon.Search}" Style="{StaticResource Forest.Icon}" Stroke="{StaticResource Forest.Muted}"
+                          Width="14" Height="14" HorizontalAlignment="Left" Margin="12,0,0,0" IsHitTestVisible="False" />
+                    <TextBlock Text="{local:Tr catalog.searchPlaceholder}" Foreground="{StaticResource Forest.Muted}" Margin="35,0,0,0"
+                               VerticalAlignment="Center" IsHitTestVisible="False">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
+                                <Setter Property="Opacity" Value="0" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Search}" Value="">
+                                        <Setter Property="Opacity" Value="1" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+
+                <!-- фильтры ровной сеткой: три в ряд -->
+                <UniformGrid DockPanel.Dock="Top" Columns="3" Margin="0,12,-8,4">
+                    <ComboBox Style="{StaticResource Filter}" ItemsSource="{Binding Branches}" SelectedItem="{Binding SelectedBranch}"
+                              ToolTip="{local:Tr catalog.branchTip}" />
+                    <ComboBox Style="{StaticResource Filter}" ItemsSource="{Binding Tags}" SelectedItem="{Binding SelectedTag}" />
+                    <ComboBox Style="{StaticResource Filter}" ItemsSource="{Binding Sides}" SelectedItem="{Binding SelectedSide}" />
+                    <ComboBox Style="{StaticResource Filter}" ItemsSource="{Binding InstallFilters}" SelectedItem="{Binding SelectedInstallFilter}" />
+                    <ComboBox Style="{StaticResource Filter}" ItemsSource="{Binding Sorts}" SelectedItem="{Binding SelectedSort}" />
+                </UniformGrid>
+
+                <!-- плитки: список виртуализирован — в модбазе тысячи модов -->
+                <ListBox x:Name="ModsList" SelectionChanged="ModsList_SelectionChanged"
+                         ItemsSource="{Binding Results}" SelectedItem="{Binding Selected}"
+                         ItemContainerStyle="{StaticResource Forest.CardItem}" Background="Transparent" BorderThickness="0" Padding="0"
+                         VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                         VirtualizingPanel.ScrollUnit="Pixel" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel>
+                                <!-- логотип; под ним буквы — если картинки нет или она не загрузилась -->
+                                <Border DockPanel.Dock="Left" Width="46" Height="46" CornerRadius="6" Margin="0,0,14,0" ClipToBounds="True"
+                                        Background="{StaticResource Forest.Raised}" BorderBrush="{StaticResource Forest.Line}" BorderThickness="1"
+                                        VerticalAlignment="Top">
+                                    <Grid>
+                                        <TextBlock Text="{Binding Initials}" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Image Source="{Binding Logo, TargetNullValue={x:Null}}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                    </Grid>
+                                </Border>
+                                <Border DockPanel.Dock="Right" Style="{StaticResource StateBadge}" Margin="10,0,0,0">
+                                    <TextBlock Text="{Binding InstalledText}" Style="{StaticResource StateBadgeText}" />
+                                </Border>
+                                <StackPanel>
+                                    <TextBlock TextTrimming="CharacterEllipsis">
+                                        <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource Forest.Text}" />
+                                        <Run Text="{Binding Author, Mode=OneWay}" FontSize="12" Foreground="{StaticResource Forest.Muted}" />
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding Summary}" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap"
+                                               TextTrimming="CharacterEllipsis" MaxHeight="38" Margin="0,3,0,0" />
+                                    <TextBlock FontSize="11" Foreground="{StaticResource Forest.Muted}" Margin="0,6,0,0" TextTrimming="CharacterEllipsis">
+                                        <Run Text="{Binding Tag, Mode=OneWay}" Foreground="{StaticResource Forest.Accent}" />
+                                        <Run Text="   " />
+                                        <Run Text="{Binding Stats, Mode=OneWay}" />
+                                        <Run Text="   " />
+                                        <Run Text="{Binding NoVersionText, Mode=OneWay}" Foreground="{StaticResource Forest.Warn}" />
+                                    </TextBlock>
+                                </StackPanel>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+
+            <!-- ===== инспектор выбранного мода ===== -->
+            <Border Grid.Column="2" Style="{StaticResource Forest.Card}">
+                <Grid>
+                    <TextBlock Text="{local:Tr catalog.pickMod}" Foreground="{StaticResource Forest.Muted}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Details}" Value="{x:Null}">
                                         <Setter Property="Visibility" Value="Visible" />
                                     </DataTrigger>
                                 </Style.Triggers>
-                                <Setter Property="Visibility" Value="Collapsed" />
                             </Style>
                         </TextBlock.Style>
                     </TextBlock>
 
-                    <DockPanel DataContext="{Binding Details}">
-                        <DockPanel.Style>
-                            <Style TargetType="DockPanel">
+                    <ScrollViewer DataContext="{Binding Details}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ScrollViewer.Style>
+                            <Style TargetType="ScrollViewer">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding}" Value="{x:Null}">
                                         <Setter Property="Visibility" Value="Collapsed" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </DockPanel.Style>
-
-                        <DockPanel DockPanel.Dock="Top">
-                            <Border DockPanel.Dock="Left" Width="80" Height="80" CornerRadius="8" Background="#20808080" Margin="0,0,14,0" ClipToBounds="True">
-                                <Image Source="{Binding Logo, TargetNullValue={x:Null}}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                        </ScrollViewer.Style>
+                        <StackPanel>
+                            <!-- шапка: логотип или буквы, тег -->
+                            <Border Background="{StaticResource Forest.Raised}" CornerRadius="8,8,0,0" Height="104" ClipToBounds="True">
+                                <Grid>
+                                    <TextBlock Text="{Binding Initials}" FontSize="40" FontWeight="Bold" Foreground="{StaticResource Forest.Accent}"
+                                               Margin="20,0,0,0" VerticalAlignment="Center" Opacity="0.85" />
+                                    <Image Source="{Binding Logo, TargetNullValue={x:Null}}" Stretch="UniformToFill" Opacity="0.9"
+                                           RenderOptions.BitmapScalingMode="HighQuality" />
+                                    <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,12,0" Padding="8,2" CornerRadius="4"
+                                            Background="#CC19231D" Visibility="{Binding Tag, Converter={StaticResource TextToVis}}">
+                                        <TextBlock Text="{Binding Tag}" FontSize="11" Foreground="{StaticResource Forest.Accent}" />
+                                    </Border>
+                                </Grid>
                             </Border>
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Name}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                <TextBlock Text="{Binding Author}" Opacity="0.7" />
-                                <TextBlock Text="{Binding Stats}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0" />
-                            </StackPanel>
-                        </DockPanel>
 
-                        <StackPanel DockPanel.Dock="Top" Margin="0,12,0,0">
-                            <TextBlock TextWrapping="Wrap" Opacity="0.8">
-                                <Run Text="{Binding Side, Mode=OneWay}" /><Run Text="   ·   " /><Run Text="{Binding TagsText, Mode=OneWay}" />
-                            </TextBlock>
-                            <TextBlock Text="{Binding Compatibility}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,8,0,0" />
-                            <WrapPanel Margin="0,12,0,0">
-                                <Button Content="{Binding InstallText}" Command="{Binding InstallCommand}" IsEnabled="{Binding CanInstall}"
-                                        Style="{DynamicResource AccentButtonStyle}" Padding="16,6" Margin="0,0,8,8" />
-                                <Button Content="{local:Tr card.otherVersion}" Command="{Binding ChooseVersionCommand}" Padding="12,6" Margin="0,0,8,8" />
-                                <Button Content="{local:Tr card.website}" Command="{Binding OpenPageCommand}" Padding="12,6" Margin="0,0,8,8" />
-                            </WrapPanel>
-                        </StackPanel>
+                            <StackPanel Margin="18,14,18,16">
+                                <TextBlock Text="{Binding Name}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding Author}" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="0,2,0,0" />
 
-                        <!-- скриншоты и описание — одна прокрутка, чтобы описанию хватало места -->
-                        <ScrollViewer Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
-                            <StackPanel>
-                                <ItemsControl ItemsSource="{Binding Screenshots}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Button Padding="0" Margin="0,0,6,6" Cursor="Hand" ToolTip="{local:Tr card.screenshotTip}"
-                                            Command="{Binding DataContext.OpenScreenshotCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                            CommandParameter="{Binding}">
-                                        <Image Source="{Binding}" Width="160" Height="90" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,0,0,1" Margin="0,14,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="CatalogTab" Content="{local:Tr mcard.tabOverview}"
+                                                     IsChecked="{Binding IsVersionsTab, Converter={StaticResource Invert}}" />
+                                        <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="CatalogTab" Content="{local:Tr mcard.tabVersions}"
+                                                     IsChecked="{Binding IsVersionsTab}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- ===== «Обзор» ===== -->
+                                <StackPanel Visibility="{Binding IsVersionsTab, Converter={StaticResource InvertVis}}">
+                                    <Grid Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Text="{local:Tr mcard.compat}" Style="{StaticResource CardKey}" />
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Compatibility}" Style="{StaticResource CardValue}" />
+                                        <TextBlock Grid.Row="1" Text="{local:Tr mcard.installed}" Style="{StaticResource CardKey}" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource CardValue}" FontFamily="Consolas">
+                                            <TextBlock.Text>
+                                                <Binding Path="InstalledVersion" TargetNullValue="—" />
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                        <TextBlock Grid.Row="2" Text="{local:Tr mcard.side}" Style="{StaticResource CardKey}" />
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Side}" Style="{StaticResource CardValue}" />
+                                        <TextBlock Grid.Row="3" Text="{local:Tr catalog.popularity}" Style="{StaticResource CardKey}" />
+                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Stats}" Style="{StaticResource CardValue}" />
+                                    </Grid>
+
+                                    <Button Style="{StaticResource Forest.PrimaryButton}" Margin="0,14,0,0" HorizontalAlignment="Stretch"
+                                            Command="{Binding InstallCommand}" IsEnabled="{Binding CanInstall}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Data="{StaticResource Icon.Download}" Style="{StaticResource Forest.Icon}" Width="14" Height="14" Margin="0,0,8,0" />
+                                            <TextBlock Text="{Binding InstallText}" />
+                                        </StackPanel>
                                     </Button>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                                <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                    <WrapPanel Margin="0,12,0,0">
+                                        <Button Style="{StaticResource Forest.LinkButton}" Content="{local:Tr mcard.modDb}" Margin="0,0,14,4"
+                                                Command="{Binding OpenPageCommand}" />
+                                    </WrapPanel>
+
+                                    <!-- скриншоты и описание -->
+                                    <ItemsControl ItemsSource="{Binding Screenshots}" Margin="0,14,0,0">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Padding="0" Margin="0,0,6,6" Cursor="Hand" ToolTip="{local:Tr card.screenshotTip}" MinHeight="0"
+                                                        Command="{Binding DataContext.OpenScreenshotCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                        CommandParameter="{Binding}">
+                                                    <Image Source="{Binding}" Width="120" Height="68" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="{local:Tr mcard.about}" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" FontSize="13" Margin="0,10,0,0" />
+                                    <TextBlock Text="{Binding Description}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="0,6,0,0" />
+                                </StackPanel>
+
+                                <!-- ===== «Версии» ===== -->
+                                <StackPanel Visibility="{Binding IsVersionsTab, Converter={StaticResource BoolToVis}}" Margin="0,12,0,0">
+                                    <TextBlock Text="{Binding VersionsStatus}" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap"
+                                               Margin="0,0,0,8" Visibility="{Binding VersionsStatus, Converter={StaticResource TextToVis}}" />
+                                    <ItemsControl ItemsSource="{Binding Versions}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,0,0,1" Padding="0,9">
+                                                    <DockPanel>
+                                                        <Button DockPanel.Dock="Right" Content="{local:Tr mcard.installThis}" Padding="12,4" MinHeight="0" FontSize="12"
+                                                                VerticalAlignment="Center"
+                                                                Command="{Binding DataContext.InstallVersionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                CommandParameter="{Binding}"
+                                                                Visibility="{Binding IsInstalled, Converter={StaticResource InvertVis}}" />
+                                                        <Border DockPanel.Dock="Right" CornerRadius="4" Padding="8,2" VerticalAlignment="Center"
+                                                                Background="{StaticResource Forest.Selected}"
+                                                                Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVis}}">
+                                                            <TextBlock Text="{local:Tr mcard.installedBadge}" FontSize="11" Foreground="{StaticResource Forest.Good}" />
+                                                        </Border>
+                                                        <StackPanel VerticalAlignment="Center">
+                                                            <TextBlock>
+                                                                <Run Text="{Binding Version, Mode=OneWay}" FontFamily="Consolas" FontSize="13" Foreground="{StaticResource Forest.Text}" />
+                                                                <Run Text="{Binding PreText, Mode=OneWay}" FontSize="11" Foreground="{StaticResource Forest.Warn}" />
+                                                            </TextBlock>
+                                                            <TextBlock Text="{Binding Meta}" FontSize="11" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2,8,0" />
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
                             </StackPanel>
-                        </ScrollViewer>
-                    </DockPanel>
+                        </StackPanel>
+                    </ScrollViewer>
                 </Grid>
             </Border>
         </Grid>

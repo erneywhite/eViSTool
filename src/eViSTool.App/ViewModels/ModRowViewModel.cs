@@ -106,7 +106,7 @@ public sealed class ModRowViewModel
     /// <summary>Порядок «сначала важное»: проблемы, обновления, остальное.</summary>
     public int Importance => IsProblem ? 0 : CanUpdate ? 1 : !IsEnabled ? 3 : 2;
 
-    private static string MakeInitials(string name)
+    public static string MakeInitials(string name)
     {
         var words = name.Split([' ', '-', '_', '.', ':'], StringSplitOptions.RemoveEmptyEntries)
                         .Where(w => char.IsLetterOrDigit(w[0])).ToList();

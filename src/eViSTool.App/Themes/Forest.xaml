@@ -338,6 +338,34 @@
         </Setter>
     </Style>
 
+    <!-- плитка-карточка в списке (ListBoxItem): поверхность и линия; выбранная — песочная рамка -->
+    <Style x:Key="Forest.CardItem" TargetType="ListBoxItem">
+        <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+        <Setter Property="Margin" Value="0,0,0,8" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="Bd" Background="{StaticResource Forest.Surface}" BorderBrush="{StaticResource Forest.Line}"
+                            BorderThickness="1" CornerRadius="7" Padding="14,12" SnapsToDevicePixels="True">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#2C372E" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Forest.Accent}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource Forest.Raised}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- тонкая полоска прогресса -->
     <Style x:Key="Forest.Progress" TargetType="ProgressBar">
         <Setter Property="Height" Value="4" />
