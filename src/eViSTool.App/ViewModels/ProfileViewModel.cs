@@ -72,6 +72,12 @@ public sealed partial class ProfileViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void MakeClient() => Kind = ProfileKind.Client;
+
+    [RelayCommand]
+    private void MakeServer() => Kind = ProfileKind.Server;
+
+    [RelayCommand]
     private void Reread() => Refresh();
 
     /// <summary>Сменился язык: пересчитать тексты (предупреждения тоже приходят из Core на текущем языке).</summary>

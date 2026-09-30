@@ -132,8 +132,12 @@
 
                             <TextBlock Text="{local:Tr settings.type}" Style="{StaticResource FieldLabel}" />
                             <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                <RadioButton Content="{local:Tr settings.kindClient}" IsChecked="{Binding IsServer, Converter={StaticResource Invert}}" Margin="0,0,20,0" />
-                                <RadioButton Content="{local:Tr tab.server}" IsChecked="{Binding IsServer}" />
+                                <!-- только показ + команда: двусторонняя привязка пары кнопок при смене выбранного профиля
+                                     записывала «клиент» в следующий профиль (выключаемая кнопка отдавала своё значение) -->
+                                <RadioButton Content="{local:Tr settings.kindClient}" IsChecked="{Binding IsServer, Converter={StaticResource Invert}, Mode=OneWay}"
+                                             Command="{Binding MakeClientCommand}" Margin="0,0,20,0" AutomationProperties.AutomationId="KindClient" />
+                                <RadioButton Content="{local:Tr tab.server}" IsChecked="{Binding IsServer, Mode=OneWay}"
+                                             Command="{Binding MakeServerCommand}" AutomationProperties.AutomationId="KindServer" />
                             </StackPanel>
 
                             <TextBlock Text="{local:Tr settings.gameDir}" Style="{StaticResource FieldLabel}" />
