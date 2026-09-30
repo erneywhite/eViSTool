@@ -1,6 +1,335 @@
 <UserControl x:Class="eViSTool.App.RolesView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <!-- ЗАГЛУШКА: редактор ролей (список ролей слева, выбранная роль справа) -->
-    <Grid />
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:eViSTool.App">
+    <!-- Вкладка «Роли»: слева список ролей и роль для новых игроков, справа редактор выбранной роли.
+         DataContext — RolesEditorViewModel; правая часть — RoleItemViewModel выбранной роли. -->
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:InvertBoolToVisibilityConverter x:Key="InvertVis" />
+        <local:TextToVisibilityConverter x:Key="TextToVis" />
+        <local:RoleColorBrushConverter x:Key="ColorBrush" />
+
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+            <Setter Property="Margin" Value="0,16,0,0" />
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,2,0,6" />
+        </Style>
+        <!-- ошибка под полем -->
+        <Style x:Key="ErrorText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Danger}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
+        <Style x:Key="RoleCard" TargetType="Border" BasedOn="{StaticResource Forest.Card}">
+            <Setter Property="Padding" Value="20,16,20,20" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+        <!-- точка «изменено, не сохранено» -->
+        <Style x:Key="ChangedDot" TargetType="Ellipse">
+            <Setter Property="Width" Value="7" />
+            <Setter Property="Height" Value="7" />
+            <Setter Property="Fill" Value="{StaticResource Forest.Accent}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <!-- строка списка ролей: для автоматизации имя элемента — код роли -->
+        <Style x:Key="RoleItem" TargetType="ListBoxItem" BasedOn="{StaticResource Forest.NavItem}">
+            <Setter Property="AutomationProperties.Name" Value="{Binding Code}" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <!-- файла конфигурации нет -->
+        <TextBlock Text="{local:Tr roles.noDocument}" Foreground="{StaticResource Forest.Muted}" FontSize="13"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Visibility="{Binding HasDocument, Converter={StaticResource InvertVis}}" />
+
+        <Grid Visibility="{Binding HasDocument, Converter={StaticResource BoolToVis}}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="18" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- ===== список ролей ===== -->
+            <Border Style="{StaticResource Forest.Card}" Padding="12" Margin="0,0,0,14">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Margin="6,2,6,10">
+                        <TextBlock Text="{local:Tr roles.listTitle}" Style="{StaticResource CardTitle}" />
+                        <TextBlock Text="{local:Tr roles.listHint}" Style="{StaticResource Hint}" />
+
+                        <!-- роль для новых игроков (DefaultRoleCode) -->
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <TextBlock Text="{local:Tr roles.defaultRole}" FontSize="12" Foreground="{StaticResource Forest.Text}" />
+                            <Ellipse Style="{StaticResource ChangedDot}" Margin="7,1,0,0" ToolTip="{local:Tr roles.changedTip}"
+                                     Visibility="{Binding IsDefaultRoleChanged, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
+                        <TextBlock Text="{local:Tr roles.defaultRoleHint}" Style="{StaticResource Hint}" />
+                        <ComboBox ItemsSource="{Binding Roles}" SelectedItem="{Binding DefaultRole}" IsEnabled="{Binding CanEdit}"
+                                  HorizontalAlignment="Stretch" AutomationProperties.AutomationId="DefaultRole"
+                                  AutomationProperties.Name="{local:Tr roles.defaultRole}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock TextTrimming="CharacterEllipsis">
+                                        <Run Text="{Binding DisplayName, Mode=OneWay}" /><Run Text="  " /><Run Text="{Binding Code, Mode=OneWay}" FontFamily="Consolas" Foreground="{StaticResource Forest.Muted}" />
+                                    </TextBlock>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock Text="{Binding DefaultRoleError}" Style="{StaticResource ErrorText}"
+                                   Visibility="{Binding DefaultRoleError, Converter={StaticResource TextToVis}}" />
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                        <Button Command="{Binding DuplicateCommand}" HorizontalAlignment="Stretch" Margin="0,0,0,8"
+                                ToolTip="{Binding DuplicateTip}" ToolTipService.ShowOnDisabled="True"
+                                AutomationProperties.AutomationId="RoleDuplicate" AutomationProperties.Name="{local:Tr roles.duplicate}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource Icon.Copy}" Style="{StaticResource Forest.Icon}" Width="13" Height="13" Margin="0,0,8,0" />
+                                <TextBlock Text="{local:Tr roles.duplicate}" />
+                            </StackPanel>
+                        </Button>
+                        <!-- стандартную роль и роль для новых игроков удалить нельзя — почему, говорит подсказка -->
+                        <Button Content="{local:Tr roles.delete}" Command="{Binding DeleteCommand}" Style="{StaticResource Forest.DangerButton}"
+                                HorizontalAlignment="Stretch" ToolTip="{Binding DeleteTip}" ToolTipService.ShowOnDisabled="True"
+                                AutomationProperties.AutomationId="RoleDelete" />
+                    </StackPanel>
+
+                    <ListBox ItemsSource="{Binding Roles}" SelectedItem="{Binding SelectedRole}" Background="Transparent" BorderThickness="0"
+                             ItemContainerStyle="{StaticResource RoleItem}" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             AutomationProperties.AutomationId="RolesList" AutomationProperties.Name="{local:Tr roles.listTitle}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel>
+                                    <!-- метка цветом роли; цвет не распознан — пустой кружок -->
+                                    <Border DockPanel.Dock="Left" Width="14" Height="14" CornerRadius="7" VerticalAlignment="Center" Margin="0,0,12,0"
+                                            BorderBrush="{StaticResource Forest.Line}" BorderThickness="1"
+                                            Background="{Binding Swatch, Converter={StaticResource ColorBrush}}" />
+                                    <Ellipse DockPanel.Dock="Right" Style="{StaticResource ChangedDot}" Margin="8,0,0,0"
+                                             ToolTip="{local:Tr roles.changedTip}"
+                                             Visibility="{Binding IsChanged, Converter={StaticResource BoolToVis}}" />
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock FontSize="11" Foreground="{StaticResource Forest.Muted}" TextTrimming="CharacterEllipsis">
+                                            <Run Text="{Binding Code, Mode=OneWay}" FontFamily="Consolas" /><Run Text="  ·  " /><Run Text="{Binding LevelText, Mode=OneWay}" />
+                                        </TextBlock>
+                                        <TextBlock Text="{local:Tr roles.defaultBadge}" FontSize="11" Foreground="{StaticResource Forest.Accent}"
+                                                   Visibility="{Binding IsDefault, Converter={StaticResource BoolToVis}}" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- ===== выбранная роль ===== -->
+            <Grid Grid.Column="2">
+                <TextBlock Text="{Binding PickText}" Foreground="{StaticResource Forest.Muted}" FontSize="13"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Visibility="{Binding HasSelection, Converter={StaticResource InvertVis}}" />
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              Visibility="{Binding HasSelection, Converter={StaticResource BoolToVis}}">
+                    <StackPanel Margin="0,0,14,0" DataContext="{Binding SelectedRole}">
+
+                        <!-- роль: код, название, описание, уровень, автовыдача -->
+                        <Border Style="{StaticResource RoleCard}">
+                            <StackPanel>
+                                <TextBlock Text="{local:Tr roles.cardRole}" Style="{StaticResource CardTitle}" />
+
+                                <TextBlock Text="{local:Tr roles.code}" Style="{StaticResource FieldLabel}" />
+                                <TextBlock Text="{Binding CodeHint}" Style="{StaticResource Hint}" />
+                                <TextBox Text="{Binding CodeText, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding IsCodeLocked}"
+                                         FontFamily="Consolas" MaxLength="60" Width="360" HorizontalAlignment="Left"
+                                         AutomationProperties.AutomationId="RoleCode" AutomationProperties.Name="{local:Tr roles.code}" />
+                                <TextBlock Text="{Binding CodeError}" Style="{StaticResource ErrorText}"
+                                           Visibility="{Binding CodeError, Converter={StaticResource TextToVis}}" />
+
+                                <TextBlock Text="{local:Tr roles.name}" Style="{StaticResource FieldLabel}" />
+                                <TextBlock Text="{local:Tr roles.nameHint}" Style="{StaticResource Hint}" />
+                                <TextBox Text="{Binding NameText, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding IsLocked}"
+                                         MaxLength="80" Width="360" HorizontalAlignment="Left"
+                                         AutomationProperties.AutomationId="RoleName" AutomationProperties.Name="{local:Tr roles.name}" />
+
+                                <TextBlock Text="{local:Tr roles.description}" Style="{StaticResource FieldLabel}" />
+                                <TextBox Text="{Binding DescriptionText, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding IsLocked}"
+                                         AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" MaxHeight="160" Margin="0,6,0,0"
+                                         VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top"
+                                         AutomationProperties.AutomationId="RoleDescription" AutomationProperties.Name="{local:Tr roles.description}" />
+
+                                <TextBlock Text="{local:Tr roles.level}" Style="{StaticResource FieldLabel}" />
+                                <TextBlock Text="{local:Tr roles.levelHint}" Style="{StaticResource Hint}" />
+                                <TextBox Text="{Binding PrivilegeLevelText, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding IsLocked}"
+                                         MaxLength="12" Width="160" HorizontalAlignment="Left"
+                                         AutomationProperties.AutomationId="RolePrivilegeLevel" AutomationProperties.Name="{local:Tr roles.level}" />
+                                <TextBlock Text="{Binding PrivilegeLevelError}" Style="{StaticResource ErrorText}"
+                                           Visibility="{Binding PrivilegeLevelError, Converter={StaticResource TextToVis}}" />
+
+                                <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Margin="0,18,0,0" Padding="0,14,0,0">
+                                    <DockPanel>
+                                        <CheckBox DockPanel.Dock="Right" Style="{StaticResource Forest.Switch}" IsChecked="{Binding AutoGrant}"
+                                                  IsEnabled="{Binding CanEdit}" VerticalAlignment="Center"
+                                                  AutomationProperties.AutomationId="RoleAutoGrant" AutomationProperties.Name="{local:Tr roles.autoGrant}" />
+                                        <StackPanel Margin="0,0,16,0">
+                                            <TextBlock Text="{local:Tr roles.autoGrant}" FontSize="13" Foreground="{StaticResource Forest.Text}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{local:Tr roles.autoGrantHint}" Style="{StaticResource Hint}" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- оформление и режим: оба поля сервер 1.22.7 не читает -->
+                        <Border Style="{StaticResource RoleCard}">
+                            <StackPanel>
+                                <TextBlock Text="{local:Tr roles.cardLook}" Style="{StaticResource CardTitle}" />
+                                <TextBlock Text="{local:Tr roles.unusedNote}" Style="{StaticResource Hint}" Foreground="{StaticResource Forest.Warn}"
+                                           Margin="0,2,0,0" />
+
+                                <TextBlock Text="{local:Tr roles.color}" Style="{StaticResource FieldLabel}" />
+                                <TextBlock Text="{local:Tr roles.colorHint}" Style="{StaticResource Hint}" />
+                                <DockPanel Width="320" HorizontalAlignment="Left">
+                                    <!-- образец того, что сейчас в поле -->
+                                    <Border DockPanel.Dock="Left" Width="22" Height="22" CornerRadius="4" Margin="0,0,10,0" VerticalAlignment="Center"
+                                            BorderBrush="{StaticResource Forest.Line}" BorderThickness="1"
+                                            Background="{Binding Swatch, Converter={StaticResource ColorBrush}}" />
+                                    <!-- с вводом: название из списка или #RRGGBB. Текст выбранного элемента — его Name (TextSearch.TextPath) -->
+                                    <ComboBox IsEditable="True" ItemsSource="{Binding ColorChoices}" TextSearch.TextPath="Name"
+                                              Text="{Binding ColorText, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanEdit}"
+                                              MaxDropDownHeight="320" HorizontalAlignment="Stretch"
+                                              AutomationProperties.AutomationId="RoleColor" AutomationProperties.Name="{local:Tr roles.color}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Border Width="14" Height="14" CornerRadius="3" Margin="0,0,8,0" VerticalAlignment="Center"
+                                                            BorderBrush="{StaticResource Forest.Line}" BorderThickness="1"
+                                                            Background="{Binding Rgb, Converter={StaticResource ColorBrush}}" />
+                                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </DockPanel>
+                                <TextBlock Text="{Binding ColorError}" Style="{StaticResource ErrorText}"
+                                           Visibility="{Binding ColorError, Converter={StaticResource TextToVis}}" />
+
+                                <TextBlock Text="{local:Tr roles.gameMode}" Style="{StaticResource FieldLabel}" />
+                                <ComboBox ItemsSource="{Binding GameModes}" SelectedItem="{Binding SelectedGameMode}" IsEnabled="{Binding CanEdit}"
+                                          Width="240" HorizontalAlignment="Left" Margin="0,6,0,0"
+                                          AutomationProperties.AutomationId="RoleGameMode" AutomationProperties.Name="{local:Tr roles.gameMode}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- приват -->
+                        <Border Style="{StaticResource RoleCard}">
+                            <StackPanel>
+                                <TextBlock Text="{local:Tr roles.cardClaims}" Style="{StaticResource CardTitle}" />
+
+                                <TextBlock Text="{local:Tr roles.claimAllowance}" Style="{StaticResource FieldLabel}" />
+                                <TextBlock Text="{local:Tr roles.claimAllowanceHint}" Style="{StaticResource Hint}" />
+                                <TextBox Text="{Binding ClaimAllowanceText, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding IsLocked}"
+                                         MaxLength="12" Width="160" HorizontalAlignment="Left"
+                                         AutomationProperties.AutomationId="RoleClaimAllowance" AutomationProperties.Name="{local:Tr roles.claimAllowance}" />
+                                <TextBlock Text="{Binding ClaimAllowanceError}" Style="{StaticResource ErrorText}"
+                                           Visibility="{Binding ClaimAllowanceError, Converter={StaticResource TextToVis}}" />
+
+                                <TextBlock Text="{local:Tr roles.claimMaxAreas}" Style="{StaticResource FieldLabel}" />
+                                <TextBlock Text="{local:Tr roles.claimMaxAreasHint}" Style="{StaticResource Hint}" />
+                                <TextBox Text="{Binding ClaimMaxAreasText, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding IsLocked}"
+                                         MaxLength="12" Width="160" HorizontalAlignment="Left"
+                                         AutomationProperties.AutomationId="RoleClaimMaxAreas" AutomationProperties.Name="{local:Tr roles.claimMaxAreas}" />
+                                <TextBlock Text="{Binding ClaimMaxAreasError}" Style="{StaticResource ErrorText}"
+                                           Visibility="{Binding ClaimMaxAreasError, Converter={StaticResource TextToVis}}" />
+
+                                <TextBlock Text="{local:Tr roles.claimMinSize}" Style="{StaticResource FieldLabel}" />
+                                <TextBlock Text="{local:Tr roles.claimMinSizeHint}" Style="{StaticResource Hint}" />
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="X" FontSize="12" Foreground="{StaticResource Forest.Muted}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <TextBox Text="{Binding ClaimMinXText, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding IsLocked}"
+                                             MaxLength="12" Width="90" AutomationProperties.AutomationId="RoleClaimMinX" AutomationProperties.Name="X" />
+                                    <TextBlock Text="Y" FontSize="12" Foreground="{StaticResource Forest.Muted}" VerticalAlignment="Center" Margin="16,0,8,0" />
+                                    <TextBox Text="{Binding ClaimMinYText, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding IsLocked}"
+                                             MaxLength="12" Width="90" AutomationProperties.AutomationId="RoleClaimMinY" AutomationProperties.Name="Y" />
+                                    <TextBlock Text="Z" FontSize="12" Foreground="{StaticResource Forest.Muted}" VerticalAlignment="Center" Margin="16,0,8,0" />
+                                    <TextBox Text="{Binding ClaimMinZText, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding IsLocked}"
+                                             MaxLength="12" Width="90" AutomationProperties.AutomationId="RoleClaimMinZ" AutomationProperties.Name="Z" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding ClaimMinError}" Style="{StaticResource ErrorText}"
+                                           Visibility="{Binding ClaimMinError, Converter={StaticResource TextToVis}}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- привилегии -->
+                        <Border Style="{StaticResource RoleCard}">
+                            <StackPanel>
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,0,0,0">
+                                        <Button Content="{local:Tr roles.grantAll}" Command="{Binding GrantAllCommand}" Padding="12,5" MinHeight="0" FontSize="12"
+                                                ToolTip="{local:Tr roles.grantAllTip}" AutomationProperties.AutomationId="PrivGrantAll" />
+                                        <Button Content="{local:Tr roles.revokeAll}" Command="{Binding RevokeAllCommand}" Padding="12,5" MinHeight="0" FontSize="12"
+                                                Margin="8,0,0,0" AutomationProperties.AutomationId="PrivRevokeAll" />
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="{local:Tr roles.privileges}" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="{Binding PrivilegeCountText}" Style="{StaticResource Hint}" Margin="0,2,0,0"
+                                                   AutomationProperties.AutomationId="PrivCount" />
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <!-- при автовыдаче галочки мало что значат: сервер допишет всё сам -->
+                                <Border Style="{StaticResource Forest.Warning}" Margin="0,12,0,0"
+                                        Visibility="{Binding AutoGrant, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{local:Tr roles.autoGrantNote}" Foreground="{StaticResource Forest.Warn}" FontSize="12" TextWrapping="Wrap" />
+                                </Border>
+
+                                <!-- сетка переключателей: колонок столько, сколько влезает по ширине (до трёх) -->
+                                <ItemsControl ItemsSource="{Binding Privileges}" Margin="0,16,0,0" Focusable="False">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <local:ColumnsPanel MinColumnWidth="250" MaxColumns="3" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,0,16,14">
+                                                <CheckBox DockPanel.Dock="Left" Style="{StaticResource Forest.Switch}" VerticalAlignment="Top" Margin="0,2,10,0"
+                                                          IsChecked="{Binding IsGranted}"
+                                                          IsEnabled="{Binding DataContext.CanEdit, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                          AutomationProperties.AutomationId="{Binding AutomationId}"
+                                                          AutomationProperties.Name="{Binding Label}" />
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Label}" FontSize="13" Foreground="{StaticResource Forest.Text}" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Hint}" Style="{StaticResource Hint}" Margin="0,2,0,0" />
+                                                    <TextBlock Text="{Binding CodeLine}" FontFamily="Consolas" FontSize="11" Foreground="{StaticResource Forest.Muted}"
+                                                               Opacity="0.75" Margin="0,2,0,0"
+                                                               Visibility="{Binding CodeLine, Converter={StaticResource TextToVis}}" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- RuntimePrivileges ведёт сам сервер: только показываем -->
+                                <TextBlock Text="{Binding RuntimePrivilegesText}" Style="{StaticResource Hint}" Margin="0,4,0,0"
+                                           Visibility="{Binding RuntimePrivilegesText, Converter={StaticResource TextToVis}}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+    </Grid>
 </UserControl>
