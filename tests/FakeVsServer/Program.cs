@@ -47,6 +47,19 @@ var reader = new Thread(() =>
         else if (line == "/crash") Environment.Exit(1);
         else if (line == "/hang") { hang = true; Log("Notification", "Now ignoring /stop"); }
         else if (line.StartsWith("/spam ")) { for (var n = 0; n < int.Parse(line[6..]); n++) Console.Error.WriteLine($"stderr line {n} " + new string('x', 200)); }
+        // вход и выход игрока — теми же строками, что печатает настоящий сервер
+        else if (line.StartsWith("/fakejoin "))
+        {
+            var parts = line.Split(' ');
+            Log("Notification", $"A Client attempts connecting via TCP on 10.0.0.{parts[1]}:5000, assigning client id {parts[1]}");
+            Log("Notification", $"Client {parts[1]} uid 00000000-0000-0000-0000-00000000000{parts[1]} attempting identification. Name: {parts[2]}");
+            Log("Event", $"{parts[2]} 10.0.0.{parts[1]}:5000 joins.");
+        }
+        else if (line.StartsWith("/fakeleave "))
+        {
+            Log("Notification", $"Client {line.Split(' ')[1]} disconnected: ");
+            Log("Event", $"Client {line.Split(' ')[1]} disconnected.");
+        }
         else Log("Notification", $"Handling Console Command {line}");
     }
 }) { IsBackground = true };

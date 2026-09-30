@@ -132,12 +132,20 @@
                     <StackPanel>
                         <TextBlock Text="{local:Tr server.tileMemory}" Style="{StaticResource TileLabel}" />
                         <TextBlock Text="{Binding MemoryText}" Style="{StaticResource TileValue}" />
+                        <!-- номер процесса сервера — мелко: нужен редко (диспетчер задач) -->
+                        <TextBlock FontSize="11" Foreground="{StaticResource Forest.Muted}" Margin="0,2,0,0">
+                            <Run Text="PID" /><Run Text=" " /><Run Text="{Binding PidText, Mode=OneWay}" />
+                        </TextBlock>
                     </StackPanel>
                 </Border>
-                <Border Grid.Column="3" Style="{StaticResource Tile}">
+                <!-- кто на сервере: число, имена; подсказка — кто с какого времени -->
+                <Border Grid.Column="3" Style="{StaticResource Tile}" ToolTip="{Binding PlayersTip}" ToolTipService.ShowDuration="60000"
+                        AutomationProperties.AutomationId="SrvPlayers">
                     <StackPanel>
-                        <TextBlock Text="{local:Tr server.tileProcess}" Style="{StaticResource TileLabel}" />
-                        <TextBlock Text="{Binding PidText}" Style="{StaticResource TileValue}" FontFamily="Consolas" />
+                        <TextBlock Text="{local:Tr server.tilePlayers}" Style="{StaticResource TileLabel}" />
+                        <TextBlock Text="{Binding PlayersText}" Style="{StaticResource TileValue}" />
+                        <TextBlock Text="{Binding PlayerNames}" FontSize="11" Foreground="{StaticResource Forest.Muted}" Margin="0,2,0,0"
+                                   TextTrimming="CharacterEllipsis" Visibility="{Binding PlayerNames, Converter={StaticResource TextToVis}}" />
                     </StackPanel>
                 </Border>
             </Grid>

@@ -212,6 +212,7 @@ public sealed partial class ServerViewModel : ObservableObject
         UptimeText = s.StartedAt is { } started && s.State != ServerState.Stopped ? FormatUptime(DateTime.Now - started) : "—";
         MemoryText = s.MemoryMb is { } mb && s.State != ServerState.Stopped ? Loc.T("server.memoryMb", mb.ToString("N0")) : "—";
         PidText = s.ServerPid is { } pid && s.State != ServerState.Stopped ? pid.ToString() : "—";
+        ShowPlayers(s.Players, running: s.State == ServerState.Running);
         StateNote = s.RestartScheduledAt is { } at ? Loc.T("server.restartIn", Math.Max(0, (int)(at - DateTime.Now).TotalSeconds))
             : s.State == ServerState.Stopped && s.LastExitCode is { } code ? Loc.T("server.lastExit", code)
             : "";
@@ -221,6 +222,22 @@ public sealed partial class ServerViewModel : ObservableObject
     {
         UptimeText = MemoryText = PidText = "—";
         StateNote = "";
+        ShowPlayers([], running: false);
+    }
+
+    // ---------- игроки на сервере ----------
+
+    /// <summary>Плитка «Игроки»: число, имена одной строкой и подсказка «кто с какого времени».</summary>
+    [ObservableProperty] private string _playersText = "—";
+    [ObservableProperty] private string _playerNames = "";
+    [ObservableProperty] private string? _playersTip;
+
+    private void ShowPlayers(IReadOnlyList<OnlinePlayer> players, bool running)
+    {
+        PlayersText = running ? players.Count.ToString() : "—";
+        PlayerNames = !running ? "" : players.Count == 0 ? Loc.T("server.playersNone") : string.Join(" · ", players.Select(p => p.Name));
+        PlayersTip = players.Count == 0 ? null : string.Join(Environment.NewLine,
+            players.Select(p => Loc.T("server.playerSince", p.Name, p.Since.ToString("HH:mm"), FormatUptime(DateTime.Now - p.Since))));
     }
 
     private static string FormatUptime(TimeSpan t) =>

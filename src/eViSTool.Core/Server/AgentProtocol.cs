@@ -45,6 +45,9 @@ public sealed record AgentStatus
     public long LastSeq { get; init; }
     public int AgentPid { get; init; }
     public string AgentVersion { get; init; } = "";
+
+    /// <summary>Кто сейчас на сервере (по времени входа).</summary>
+    public IReadOnlyList<OnlinePlayer> Players { get; init; } = [];
 }
 
 public sealed record CommandRequest(string Text);

@@ -46,6 +46,17 @@ var host = new ServerHost(new ServerHostOptions
     ExtraArgs = opts.ExtraArgs,
 }, new SharedConsoleCtrlC());
 
+// кто на сервере — по строкам консоли; остановился или запускается заново — никого
+var players = new PlayerTracker();
+host.Console.LineAdded += line =>
+{
+    if (line.Kind == ConsoleLineKind.Output) players.Process(line.Text, line.Time);
+};
+host.StateChanged += state =>
+{
+    if (state is ServerState.Stopped or ServerState.Starting) players.Reset();
+};
+
 var builder = WebApplication.CreateSlimBuilder();
 builder.Logging.ClearProviders();
 builder.WebHost.UseKestrel(k => k.Listen(System.Net.IPAddress.Loopback, 0)); // свободный порт выберет система
@@ -76,6 +87,7 @@ AgentStatus Status() => new()
     LastSeq = host.Console.LastSeq,
     AgentPid = Environment.ProcessId,
     AgentVersion = version,
+    Players = players.Players,
 };
 
 IResult Json(object value) => Results.Text(JsonConvert.SerializeObject(value), "application/json");

@@ -79,6 +79,30 @@ public sealed class AgentTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AgentReportsWhoIsOnline()
+    {
+        _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: true, AgentExe, AgentsDir);
+        await Until(async () => (await _client.StatusAsync()).State == ServerState.Running);
+        Assert.Empty((await _client.StatusAsync()).Players);
+
+        await _client.CommandAsync("/fakejoin 1 Erney");
+        await _client.CommandAsync("/fakejoin 2 toristarm");
+        await Until(async () => (await _client.StatusAsync()).Players.Count == 2);
+        var players = (await _client.StatusAsync()).Players;
+        Assert.Equal(["Erney", "toristarm"], players.Select(p => p.Name));
+        Assert.Equal("10.0.0.1:5000", players[0].Address);
+
+        await _client.CommandAsync("/fakeleave 1");
+        await Until(async () => (await _client.StatusAsync()).Players.Count == 1);
+        Assert.Equal("toristarm", (await _client.StatusAsync()).Players[0].Name);
+
+        // сервер остановлен — на нём никого
+        await _client.StopAsync();
+        await Until(async () => (await _client.StatusAsync()).State == ServerState.Stopped);
+        Assert.Empty((await _client.StatusAsync()).Players);
+    }
+
+    [Fact]
     public async Task RejectsWrongKey()
     {
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
