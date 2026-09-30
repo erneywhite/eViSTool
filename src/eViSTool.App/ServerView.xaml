@@ -5,6 +5,7 @@
              xmlns:vm="clr-namespace:eViSTool.App.ViewModels">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:InvertBoolConverter x:Key="Invert" />
         <local:InvertBoolToVisibilityConverter x:Key="InvertVis" />
         <local:TextToVisibilityConverter x:Key="TextToVis" />
 
@@ -85,8 +86,25 @@
                 </StackPanel>
             </DockPanel>
 
+            <!-- ===== два вида раздела: консоль и редактор serverconfig.json ===== -->
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,16,0,0">
+                <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr srvcfg.modeConsole}"
+                             IsChecked="{Binding IsConfigTab, Converter={StaticResource Invert}}"
+                             AutomationProperties.AutomationId="SrvTabConsole" />
+                <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" IsChecked="{Binding IsConfigTab}"
+                             AutomationProperties.Name="{local:Tr srvcfg.modeConfig}" AutomationProperties.AutomationId="SrvTabConfig">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{local:Tr srvcfg.modeConfig}" />
+                        <!-- в конфигурации есть несохранённые правки -->
+                        <Ellipse Width="7" Height="7" Margin="7,2,0,0" VerticalAlignment="Center" Fill="{StaticResource Forest.Accent}"
+                                 ToolTip="{local:Tr srvcfg.modified}"
+                                 Visibility="{Binding Config.IsDirty, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+                </RadioButton>
+            </StackPanel>
+
             <!-- ===== показатели ===== -->
-            <Grid DockPanel.Dock="Top" Margin="0,18,-12,0">
+            <Grid DockPanel.Dock="Top" Margin="0,18,-12,0" Visibility="{Binding IsConfigTab, Converter={StaticResource InvertVis}}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="1.3*" />
                     <ColumnDefinition Width="*" />
@@ -144,8 +162,16 @@
             <TextBlock DockPanel.Dock="Top" Text="{Binding ErrorText}" Foreground="{StaticResource Forest.Danger}" TextWrapping="Wrap" Margin="0,12,0,0"
                        Visibility="{Binding ErrorText, Converter={StaticResource TextToVis}}" />
 
+            <!-- остаток места: консоль или редактор конфигурации -->
+            <Grid>
+            <!-- ===== конфигурация (вместо плиток и консоли) ===== -->
+            <Grid Visibility="{Binding IsConfigTab, Converter={StaticResource BoolToVis}}">
+                <local:ServerConfigView DataContext="{Binding Config}" />
+            </Grid>
+
             <!-- ===== консоль ===== -->
-            <Border Style="{StaticResource Forest.Card}" Margin="0,14,0,12" ClipToBounds="True">
+            <Border Style="{StaticResource Forest.Card}" Margin="0,14,0,12" ClipToBounds="True"
+                    Visibility="{Binding IsConfigTab, Converter={StaticResource InvertVis}}">
                 <DockPanel>
                     <DockPanel DockPanel.Dock="Top" Margin="16,10,10,8">
                         <Button DockPanel.Dock="Right" Content="{local:Tr server.clear}" Command="{Binding ClearConsoleCommand}" Padding="12,4" MinHeight="0" FontSize="12" />
@@ -216,6 +242,7 @@
                     </Border>
                 </DockPanel>
             </Border>
+            </Grid>
         </DockPanel>
     </Grid>
 </UserControl>

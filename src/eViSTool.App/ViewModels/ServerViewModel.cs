@@ -30,6 +30,15 @@ public sealed partial class ServerViewModel : ObservableObject
 
     public ObservableCollection<ConsoleLineViewModel> Lines { get; } = [];
 
+    /// <summary>Редактор serverconfig.json — второй вид раздела, рядом с консолью.</summary>
+    public ServerConfigViewModel Config { get; } = new();
+
+    /// <summary>Открыта «Конфигурация» (иначе — «Консоль»). Консоль при этом продолжает получать строки.</summary>
+    [ObservableProperty] private bool _isConfigTab;
+
+    // состояние сервера профиля выяснено (первый проход слежения после смены профиля завершён)
+    private bool _stateKnown;
+
     [ObservableProperty] private bool _isServerProfile;
     [ObservableProperty] private ServerState _state = ServerState.Stopped;
     [ObservableProperty] private bool _agentRunning;
@@ -70,6 +79,8 @@ public sealed partial class ServerViewModel : ObservableObject
 
     public ServerViewModel(MainViewModel main) => _main = main;
 
+    partial void OnIsConfigTabChanged(bool value) => Config.SetActive(value);
+
     partial void OnStateChanged(ServerState value) => Refresh();
     partial void OnAgentRunningChanged(bool value) => Refresh();
     partial void OnIsBusyChanged(bool value) => Refresh();
@@ -92,11 +103,31 @@ public sealed partial class ServerViewModel : ObservableObject
             ServerState.Stopping => (Loc.T("server.stateStopping"), RowTone.Warn),
             _ => (Loc.T("server.stateStopped"), RowTone.Muted),
         };
+        PushServerState();
+    }
+
+    /// <summary>
+    /// Редактору конфига: работает ли сервер. «Работает» — всё, кроме полностью остановленного, и чужой сервер тоже.
+    /// Пока состояние не выяснено, молчим: сброс полей при смене профиля — ещё не «сервер остановлен».
+    /// </summary>
+    private void PushServerState()
+    {
+        if (_stateKnown) Config.SetServerRunning((AgentRunning && State != ServerState.Stopped) || HasForeign);
+    }
+
+    /// <summary>Сменился язык: тексты, собранные в коде, — заново.</summary>
+    public void OnLanguageChanged()
+    {
+        OnPropertyChanged(nameof(HeaderSubtitle));
+        OnPropertyChanged(nameof(ForeignText));
+        Refresh();
+        Config.OnLanguageChanged();
     }
 
     /// <summary>Сменился профиль: отключиться от старого агента, подключиться к агенту нового (если он работает).</summary>
     public void OnProfileSwitched()
     {
+        _stateKnown = false;
         _session?.Cancel();
         _client?.Dispose();
         _client = null;
@@ -113,6 +144,8 @@ public sealed partial class ServerViewModel : ObservableObject
 
         IsServerProfile = _main.ActiveProfile?.Kind == ProfileKind.Server;
         Refresh();
+        // сюда попадаем и при правке имени профиля: редактор сам разберётся, сменился ли файл
+        Config.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model.DataDir : null, _main.ActiveProfile?.Name ?? "");
         if (!IsServerProfile) return;
 
         _session = new CancellationTokenSource();
@@ -146,7 +179,11 @@ public sealed partial class ServerViewModel : ObservableObject
             // чужой сервер: из папки игры профиля, но не наш
             var ours = _client is not null ? State != ServerState.Stopped : false;
             var pids = await Task.Run(() => GameProcess.FindServerPids(profile), ct);
+            if (ct.IsCancellationRequested) return; // профиль уже сменили — найденное относится не к нему
             ForeignPid = pids.Where(pid => !(ours && pid == _serverPid)).Select(pid => (int?)pid).FirstOrDefault();
+
+            _stateKnown = true;
+            PushServerState();
 
             try { await Task.Delay(1500, ct); } catch (TaskCanceledException) { return; }
         }
@@ -243,8 +280,9 @@ public sealed partial class ServerViewModel : ObservableObject
         finally { IsBusy = false; }
     }
 
+    // сервер читает конфиг с диска: несохранённые правки редактора сначала предлагаем сохранить
     [RelayCommand]
-    private Task Start() => Do(async () =>
+    private Task Start() => !Config.ConfirmBeforeServerStart() ? Task.CompletedTask : Do(async () =>
     {
         if (_main.ActiveProfile?.Model is not { } profile) return;
         var client = await AgentLauncher.EnsureRunningAsync(profile, startServer: true);

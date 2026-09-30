@@ -61,6 +61,16 @@ public sealed class EnumEqualsConverter : IValueConverter
         value is true && parameter is string name ? Enum.Parse(targetType, name) : Binding.DoNothing;
 }
 
+/// <summary>Перечисление равно ConverterParameter — видно, иначе скрыто (содержимое вкладок, состояния экрана).</summary>
+public sealed class EnumToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value?.ToString() == parameter?.ToString() ? Visibility.Visible : Visibility.Collapsed;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 /// <summary>Пустая строка или null — скрыто.</summary>
 public sealed class TextToVisibilityConverter : IValueConverter
 {

@@ -149,6 +149,7 @@
     <Geometry x:Key="Icon.Search">M4,10 A6,6 0 1 1 16,10 A6,6 0 1 1 4,10 Z M15,15 L20,20</Geometry>
     <Geometry x:Key="Icon.Folder">M3,6 V19 H21 V8 H11 L9,6 Z</Geometry>
     <Geometry x:Key="Icon.Package">M12,3 L20,7 V17 L12,21 L4,17 V7 Z M4,7 L12,11 L20,7 M12,11 V21</Geometry>
+    <Geometry x:Key="Icon.Close">M6,6 L18,18 M18,6 L6,18</Geometry>
 
     <!-- контурная иконка: Tag = геометрия, цвет — от родителя -->
     <Style x:Key="Forest.Icon" TargetType="Path">
@@ -496,6 +497,27 @@
         <Setter Property="FontSize" Value="26" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+    </Style>
+
+    <!-- текст, который можно выделить и скопировать, но не править (TextBox без рамки и фона) -->
+    <Style x:Key="Forest.SelectableText" TargetType="TextBox">
+        <Setter Property="IsReadOnly" Value="True" />
+        <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="SelectionBrush" Value="#6B6044" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <ScrollViewer x:Name="PART_ContentHost" Focusable="False" Background="Transparent"
+                                  HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- панель/карточка -->

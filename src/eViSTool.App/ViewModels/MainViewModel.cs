@@ -67,6 +67,7 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var p in Profiles) p.NotifyLanguageChanged();
         Mods.OnProfileSwitched();
         Catalog.OnLanguageChanged();
+        Server.OnLanguageChanged();
     }
 
     partial void OnAutoCheckUpdatesChanged(bool value)

@@ -9,6 +9,7 @@ namespace eViSTool.App;
 public partial class ServerView : UserControl
 {
     private ServerViewModel? _vm;
+    private Window? _window;
 
     public ServerView()
     {
@@ -18,6 +19,24 @@ public partial class ServerView : UserControl
             if (_vm is not null) _vm.LinesAppended -= OnLinesAppended;
             _vm = DataContext as ServerViewModel;
             if (_vm is not null) _vm.LinesAppended += OnLinesAppended;
+        };
+
+        // окно закрывают с несохранёнными правками конфигурации — спросить (правки появляются только после
+        // захода в раздел, так что подписки при первом показе достаточно)
+        Loaded += (_, _) =>
+        {
+            if (_window is not null || Window.GetWindow(this) is not { } window) return;
+            _window = window;
+            window.Closing += (_, e) =>
+            {
+                if (!e.Cancel && _vm is not null && !_vm.Config.ConfirmClose()) e.Cancel = true;
+            };
+        };
+
+        // пока была открыта «Конфигурация», строки копились без прокрутки — вернулись к консоли, догоняем
+        ConsoleList.IsVisibleChanged += (_, e) =>
+        {
+            if (e.NewValue is true) OnLinesAppended(force: false);
         };
     }
 
