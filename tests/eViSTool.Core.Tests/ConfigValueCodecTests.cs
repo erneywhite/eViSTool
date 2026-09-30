@@ -59,10 +59,21 @@ public sealed class ConfigValueCodecTests : IDisposable
                 continue;
             }
 
+            // так поле и сохраняется: текст не тронут — токен тот же, документ не меняется
+            Assert.True(ConfigValueCodec.TryParse(text, spec, token, out var kept, out var errorKey, out _), $"{spec.Path}: {errorKey}");
+            Assert.True(JToken.DeepEquals(token, kept), spec.Path);
+            doc.Set(spec.Path, kept);
+
+            // единственное значение образцов, которое схема уже не принимает: 4096 МБ в живом конфиге (см. тесты схемы)
+            if (spec.Path == "DieBelowDiskSpaceMb" && sample == ConfigSamples.Real)
+            {
+                Fails(text, spec, "cfgerr.range");
+                continue;
+            }
+
+            // и без исходного значения текст разбирается в тот же токен
             var parsed = Parse(text, spec);
             Assert.True(JToken.DeepEquals(token, parsed), $"{spec.Path}: {token.ToString(Formatting.None)} → «{text}» → {parsed.ToString(Formatting.None)}");
-
-            // и значение, записанное обратно, документ не меняет
             doc.Set(spec.Path, parsed);
         }
 
@@ -81,7 +92,10 @@ public sealed class ConfigValueCodecTests : IDisposable
         Assert.Equal("false", Text("Upnp"));
         Assert.Equal("1", Text("WhitelistMode"));
         Assert.Equal("", Text("StartupCommands")); // null
-        Assert.Equal("null", Text("MasterserverUrl")); // null в поле сырого JSON
+        Assert.Equal("", Text("MasterserverUrl")); // null
+        Assert.Equal("null", Text("DefaultSpawn")); // null в поле сырого JSON
+        Assert.Equal("16", Text("NextPlayerGroupUid")); // только для чтения — тоже как записано
+        Assert.Equal("false", Text("RepairMode"));
         Assert.Equal("Mods\nC:\\Users\\Admin\\AppData\\Roaming\\VintagestoryData\\Mods", Text("ModPaths"));
 
         Assert.Equal("", ConfigValueCodec.ToText(null, Spec(ConfigValueKind.Integer)));
@@ -191,13 +205,114 @@ public sealed class ConfigValueCodecTests : IDisposable
         Fails("   ", Known("ServerName"), "cfgerr.required");
         Fails("", Known("WorldConfig.WorldName"), "cfgerr.required");
         Fails("", Known("WorldConfig.SaveFileLocation"), "cfgerr.required");
-        Fails("", Known("ServerLanguage"), "cfgerr.required");
+        Fails("", Known("ServerLanguage"), "cfgerr.notChoice"); // язык — выбор из списка
         Assert.Equal("My server", (string?)Parse("My server", Known("ServerName")));
 
         // остальным текстовым пустота разрешена
         Assert.Equal("", (string?)Parse("", Known("WorldConfig.PlayStyleLangCode")));
+        Assert.Equal("", (string?)Parse("", Known("ModDbUrl")));
         AssertNull("", Known("Password"));
         AssertNull("", Known("WorldConfig.Seed"));
+        AssertNull("", Known("MasterserverUrl"));
+    }
+
+    [Fact]
+    public void EmptyIsNull_EmptyInputIsAlwaysNull()
+    {
+        var ip = Known("Ip");
+
+        AssertNull("", ip);
+        AssertNull("   ", ip); // адрес из пробелов — тоже «пусто»
+        AssertNull(null, ip);
+        Assert.Equal("192.168.0.10", (string?)Parse("192.168.0.10", ip));
+
+        // в файле "" — нетронутое пустое поле всё равно даёт null, а не возвращает "" обратно
+        Assert.True(ConfigValueCodec.TryParse("", ip, new JValue(""), out var token, out var errorKey, out _));
+        Assert.Null(errorKey);
+        Assert.Equal(JTokenType.Null, token!.Type);
+        Assert.True(ConfigValueCodec.TryParse("  ", ip, new JValue("  "), out token, out _, out _));
+        Assert.Equal(JTokenType.Null, token!.Type);
+
+        // null и непустое значение возвращаются как были
+        Assert.True(ConfigValueCodec.TryParse("", ip, JValue.CreateNull(), out token, out _, out _));
+        Assert.Equal(JTokenType.Null, token!.Type);
+        Assert.True(ConfigValueCodec.TryParse("10.0.0.1", ip, new JValue("10.0.0.1"), out token, out _, out _));
+        Assert.Equal("10.0.0.1", (string?)token);
+
+        // признак работает и сам по себе, без Nullable
+        AssertNull("", Spec(ConfigValueKind.Text) with { EmptyIsNull = true });
+
+        // списки клиентских модов: пустой список игра сама пишет как null
+        var blackList = Known("ModIdBlackList");
+        AssertNull("", blackList);
+        AssertNull(" \n ", blackList);
+        Assert.True(ConfigValueCodec.TryParse("", blackList, new JArray(), out token, out _, out _));
+        Assert.Equal(JTokenType.Null, token!.Type);
+        Assert.True(JToken.DeepEquals(new JArray("a", "b"), Parse("a\nb", blackList)));
+
+        // обычному Nullable-полю нетронутая "" остаётся ""
+        Assert.True(ConfigValueCodec.TryParse("", Known("Password"), new JValue(""), out token, out _, out _));
+        Assert.Equal(JTokenType.String, token!.Type);
+    }
+
+    [Fact]
+    public void NeverNull_EmptyInputIsEmptyStringOrList()
+    {
+        // приветствие: null роняет сервер при входе игрока
+        var welcome = Known("WelcomeMessage");
+        Assert.Equal("", (string?)Parse("", welcome));
+        Assert.Equal(JTokenType.String, Parse(null, welcome).Type);
+        Assert.Equal("Hi, {0}!\nRules: /rules", (string?)Parse("Hi, {0}!\r\nRules: /rules", welcome));
+
+        // в файле null — нетронутое пустое поле даёт "", а не возвращает null обратно
+        Assert.True(ConfigValueCodec.TryParse("", welcome, JValue.CreateNull(), out var token, out var errorKey, out _));
+        Assert.Null(errorKey);
+        Assert.Equal("", (string?)token);
+        // даже если описание поля кто-то сделал Nullable
+        Assert.Equal(JTokenType.String, Parse("", welcome with { Nullable = true }).Type);
+
+        // папки модов: null роняет сервер при загрузке модов
+        var modPaths = Known("ModPaths");
+        Assert.Equal(JTokenType.Array, Parse("", modPaths).Type);
+        Assert.True(ConfigValueCodec.TryParse("", modPaths, JValue.CreateNull(), out token, out _, out _));
+        Assert.Equal(JTokenType.Array, token!.Type);
+        Assert.Empty(token);
+        Assert.Equal(JTokenType.Array, Parse("", modPaths with { Nullable = true }).Type);
+
+        // поля нет в файле вовсе — править нечего
+        Assert.True(ConfigValueCodec.TryParse("", welcome, null, out token, out _, out _));
+        Assert.Equal(JTokenType.Null, token!.Type);
+    }
+
+    [Fact]
+    public void KnownNumericFields_EnforceGameLimits()
+    {
+        // ошибка игры: от 2048 МБ защита по свободному месту молча отключается
+        var disk = Known("DieBelowDiskSpaceMb");
+        Assert.Equal(2047, (int)Parse("2047", disk));
+        Assert.Equal(0, (int)Parse("0", disk));
+        Assert.Equal([0m, 2047m], Fails("2048", disk, "cfgerr.range"));
+        Assert.Equal([0m, 2047m], Fails("4096", disk, "cfgerr.range"));
+        Assert.Equal([0m, 2047m], Fails("-1", disk, "cfgerr.range"));
+
+        // uint в игре: больше int, но не больше 4294967295
+        var split = Known("LogFileSplitAfterLine");
+        Assert.Equal(4294967295, (long)Parse("4294967295", split));
+        Assert.Equal([0m, 4294967295m], Fails("4294967296", split, "cfgerr.range"));
+
+        Assert.Equal(16384, (int)Parse("16384", Known("MapSizeY")));
+        Assert.Equal([0m, 16384m], Fails("16385", Known("MapSizeY"), "cfgerr.range"));
+        Assert.Equal([0m, 67108864m], Fails("67108865", Known("MapSizeX"), "cfgerr.range"));
+
+        // дробные
+        Assert.Equal("33.333332", Parse("33.333332", Known("TickTime")).ToString(Formatting.None));
+        Assert.Equal([1m], Fails("0.5", Known("TickTime"), "cfgerr.min"));
+        Assert.Equal(0m, (decimal)Parse("0", Known("SpawnCapPlayerScaling")));
+        Assert.Equal([0m], Fails("-1", Known("AntiAbuseBlockBurstAbuseBanDays"), "cfgerr.min"));
+
+        // числовой выбор
+        Assert.Equal(JTokenType.Integer, Parse("1", Known("AntiAbuse")).Type);
+        Fails("3", Known("AntiAbuse"), "cfgerr.notChoice");
     }
 
     [Fact]
