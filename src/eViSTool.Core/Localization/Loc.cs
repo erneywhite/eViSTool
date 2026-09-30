@@ -51,6 +51,25 @@ public sealed class Loc : INotifyPropertyChanged
         return args.Length == 0 ? text : string.Format(CultureInfo.CurrentCulture, text, args);
     }
 
+    /// <summary>
+    /// Слово при числе: в словаре формы через «|» — en: «one|other», ru: «один|два-четыре|пять» (1 мод, 2 мода, 5 модов).
+    /// {0} в форме заменяется на число.
+    /// </summary>
+    public static string Plural(string key, long n)
+    {
+        var forms = Instance.Get(key).Split('|');
+        var i = Instance.Language == "ru" ? RuForm(n) : n == 1 ? 0 : 1;
+        return string.Format(CultureInfo.CurrentCulture, forms[Math.Min(i, forms.Length - 1)], n);
+    }
+
+    private static int RuForm(long n)
+    {
+        n = Math.Abs(n);
+        if (n % 10 == 1 && n % 100 != 11) return 0;
+        if (n % 10 is >= 2 and <= 4 && n % 100 is < 12 or > 14) return 1;
+        return 2;
+    }
+
     private string Get(string key) =>
         _current.TryGetValue(key, out var s) ? s : _fallback.TryGetValue(key, out var f) ? f : key;
 

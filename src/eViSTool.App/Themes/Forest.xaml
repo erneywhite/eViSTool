@@ -139,6 +139,9 @@
     <Geometry x:Key="Icon.Plus">M12,5 V19 M5,12 H19</Geometry>
     <Geometry x:Key="Icon.Download">M12,3 V15 M7,10 L12,15 L17,10 M4,16 V21 H20 V16</Geometry>
     <Geometry x:Key="Icon.Warning">M12,3 L22,21 H2 Z M12,9 V14 M12,17 V18</Geometry>
+    <Geometry x:Key="Icon.Search">M4,10 A6,6 0 1 1 16,10 A6,6 0 1 1 4,10 Z M15,15 L20,20</Geometry>
+    <Geometry x:Key="Icon.Folder">M3,6 V19 H21 V8 H11 L9,6 Z</Geometry>
+    <Geometry x:Key="Icon.Package">M12,3 L20,7 V17 L12,21 L4,17 V7 Z M4,7 L12,11 L20,7 M12,11 V21</Geometry>
 
     <!-- контурная иконка: Tag = геометрия, цвет — от родителя -->
     <Style x:Key="Forest.Icon" TargetType="Path">
@@ -227,6 +230,139 @@
         <Setter Property="Foreground" Value="{StaticResource Forest.Danger}" />
     </Style>
 
+    <!-- кнопка-ссылка: подчёркнутый текст без рамки («Модбаза ↗», «Удалить») -->
+    <Style x:Key="Forest.LinkButton" TargetType="Button">
+        <Setter Property="Foreground" Value="{StaticResource Forest.Accent}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <TextBlock x:Name="T" Text="{TemplateBinding Content}" TextDecorations="Underline" Background="Transparent" />
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="T" Property="Opacity" Value="0.8" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="T" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- переключатель вкл/выкл (CheckBox): песочная дорожка, тёмная ручка -->
+    <Style x:Key="Forest.Switch" TargetType="CheckBox">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Border x:Name="Track" Width="30" Height="17" CornerRadius="8.5" Background="{StaticResource Forest.Raised}"
+                            BorderBrush="{StaticResource Forest.Line}" BorderThickness="1" SnapsToDevicePixels="True">
+                        <Ellipse x:Name="Knob" Width="11" Height="11" Margin="2,0" HorizontalAlignment="Left" Fill="{StaticResource Forest.Muted}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Track" Property="Background" Value="{StaticResource Forest.Accent}" />
+                            <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource Forest.Accent}" />
+                            <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+                            <Setter TargetName="Knob" Property="Fill" Value="{StaticResource Forest.AccentInk}" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Track" Property="Opacity" Value="0.85" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Track" Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- чип-фильтр (RadioButton): выбранный — приподнятый фон и светлый текст -->
+    <Style x:Key="Forest.Chip" TargetType="RadioButton">
+        <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Margin" Value="0,0,6,0" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Bd" CornerRadius="6" Padding="10,5" Background="Transparent" BorderThickness="1" BorderBrush="Transparent">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource Forest.Raised}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Forest.Line}" />
+                            <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- большое число-счётчик над таблицей (кликабельное: включает фильтр) -->
+    <Style x:Key="Forest.StatButton" TargetType="Button">
+        <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Margin" Value="0,0,28,0" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="C" Background="Transparent">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="C" Property="Opacity" Value="0.8" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- заголовок колонки таблицы: мелкий приглушённый текст, стрелка сортировки -->
+    <Style x:Key="Forest.ColumnHeader" TargetType="DataGridColumnHeader">
+        <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridColumnHeader">
+                    <Border Background="Transparent" BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,0,0,1" Padding="10,10">
+                        <StackPanel Orientation="Horizontal">
+                            <ContentPresenter VerticalAlignment="Center" />
+                            <TextBlock x:Name="Arrow" Margin="4,0,0,0" FontSize="9" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="SortDirection" Value="Ascending">
+                            <Setter TargetName="Arrow" Property="Text" Value="▲" />
+                        </Trigger>
+                        <Trigger Property="SortDirection" Value="Descending">
+                            <Setter TargetName="Arrow" Property="Text" Value="▼" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- пункт боковой навигации: RadioButton в ListBox не нужен — ListBoxItem со своим видом -->
     <Style x:Key="Forest.NavItem" TargetType="ListBoxItem">
         <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
@@ -260,7 +396,12 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TabControl">
-                    <ContentPresenter ContentSource="SelectedContent" />
+                    <!-- Для автоматизации (UIA, экранные дикторы): вкладки создаются панелью заголовков — она есть, но скрыта
+                         и нулевой высоты; содержимое TabItem отдаёт через presenter с именем PART_SelectedContentHost. -->
+                    <Grid>
+                        <TabPanel IsItemsHost="True" Height="0" Visibility="Hidden" VerticalAlignment="Top" />
+                        <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent" />
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

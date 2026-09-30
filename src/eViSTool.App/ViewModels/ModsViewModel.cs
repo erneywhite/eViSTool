@@ -17,6 +17,9 @@ using eViSTool.Core.Packs;
 
 namespace eViSTool.App.ViewModels;
 
+/// <summary>Чипы над таблицей модов.</summary>
+public enum ModFilter { All, Updates, Problems, Pinned, Disabled }
+
 public sealed partial class ModsViewModel : ObservableObject
 {
     private readonly MainViewModel _main;
@@ -32,9 +35,22 @@ public sealed partial class ModsViewModel : ObservableObject
     public ICollectionView View { get; }
 
     [ObservableProperty] private string _statusText = "";
-    [ObservableProperty] private string _summary = "";
-    [ObservableProperty] private bool _onlyIssues;
+    [ObservableProperty] private ModFilter _filter = ModFilter.All;
     [ObservableProperty] private string _search = "";
+
+    /// <summary>Сортировка: 0 — сначала важное, 1 — по имени.</summary>
+    [ObservableProperty] private int _sortIndex;
+
+    /// <summary>Выбранный в таблице мод и его карточка справа.</summary>
+    [ObservableProperty] private ModRowViewModel? _selected;
+    [ObservableProperty] private ModCardViewModel? _card;
+    private CancellationTokenSource? _cardLoad;
+
+    // счётчики над таблицей и на чипах
+    [ObservableProperty] private int _updatesAvailable;
+    [ObservableProperty] private int _problemCount;
+    [ObservableProperty] private int _pinnedCount;
+    [ObservableProperty] private int _disabledCount;
 
     /// <summary>Идёт скачивание/установка — кнопки операций недоступны.</summary>
     [ObservableProperty] private bool _isBusy;
@@ -48,8 +64,44 @@ public sealed partial class ModsViewModel : ObservableObject
 
     public bool HasDependencyIssues => DependencyIssues.Count > 0;
     public string DependencyText => DependencyIssues.Count == 0 ? ""
-        : Loc.T("mods.depBanner", DependencyIssues.Count, string.Join("; ", DependencyIssues.Select(i => i.Describe())));
+        : string.Join("; ", DependencyIssues.Select(i => i.Describe()));
     public string UpdateAllText => Loc.T("mods.updateAll", UpdateCount);
+
+    public string InstalledLabel => Loc.Plural("mods.cntInstalled", ModCount);
+    public string UpdatesLabel => Loc.Plural("mods.cntUpdates", UpdatesAvailable);
+    public string ProblemsLabel => Loc.Plural("mods.cntProblems", ProblemCount);
+    public string DisabledLabel => Loc.Plural("mods.cntDisabled", DisabledCount);
+    public string ShownText => Loc.T("mods.shown", View.Cast<object>().Count(), Rows.Count);
+
+    public IReadOnlyList<string> SortModes { get; } = [Loc.T("mods.sortImportant"), Loc.T("mods.sortName")];
+
+    /// <summary>Ширина карточки (тянется разделителем, запоминается).</summary>
+    public double CardWidth
+    {
+        get => _main.Layout.ModsCardWidth;
+        set { _main.Layout.ModsCardWidth = Math.Max(340, value); OnPropertyChanged(); }
+    }
+
+    public void SaveLayout() => _main.SaveSettings();
+
+    partial void OnModCountChanged(int value) => OnPropertyChanged(nameof(InstalledLabel));
+    partial void OnUpdatesAvailableChanged(int value) => OnPropertyChanged(nameof(UpdatesLabel));
+    partial void OnProblemCountChanged(int value) => OnPropertyChanged(nameof(ProblemsLabel));
+    partial void OnDisabledCountChanged(int value) => OnPropertyChanged(nameof(DisabledLabel));
+
+    partial void OnSelectedChanged(ModRowViewModel? value)
+    {
+        // null приходит и когда таблицу перестраивают после операции — тогда карточку не трогаем,
+        // её заменит та же строка из новой таблицы
+        if (value is null) return;
+        _cardLoad?.Cancel();
+        _cardLoad = new CancellationTokenSource();
+        Card = new ModCardViewModel(value, this, Profile?.GameVersion, _main.ActiveProfile?.Name ?? "");
+        _ = Card.LoadAsync(_db, _cardLoad.Token);
+    }
+
+    [RelayCommand]
+    private void SetFilter(ModFilter filter) => Filter = filter;
 
     partial void OnDependencyIssuesChanged(IReadOnlyList<DependencyIssue> value)
     {
@@ -67,16 +119,46 @@ public sealed partial class ModsViewModel : ObservableObject
         _updater = new ModUpdater(db);
         View = CollectionViewSource.GetDefaultView(Rows);
         View.Filter = o => o is ModRowViewModel r
-            && (!OnlyIssues || r.NeedsAttention)
+            && Filter switch
+            {
+                ModFilter.Updates => r.Kind == ModStatus.UpdateAvailable,
+                ModFilter.Problems => r.IsProblem,
+                ModFilter.Pinned => r.IsPinned,
+                ModFilter.Disabled => !r.IsEnabled,
+                _ => true,
+            }
             && (Search.Length == 0
                 || r.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)
                 || r.ModId.Contains(Search, StringComparison.OrdinalIgnoreCase));
+        ApplySort();
     }
 
-    partial void OnOnlyIssuesChanged(bool value) => View.Refresh();
-    partial void OnSearchChanged(string value) => View.Refresh();
+    partial void OnFilterChanged(ModFilter value) => RefreshView();
+    partial void OnSearchChanged(string value) => RefreshView();
+    partial void OnSortIndexChanged(int value) => ApplySort();
+
+    private void RefreshView()
+    {
+        View.Refresh();
+        OnPropertyChanged(nameof(ShownText));
+    }
+
+    private void ApplySort()
+    {
+        using (View.DeferRefresh())
+        {
+            View.SortDescriptions.Clear();
+            if (SortIndex == 0) View.SortDescriptions.Add(new SortDescription(nameof(ModRowViewModel.Importance), ListSortDirection.Ascending));
+            View.SortDescriptions.Add(new SortDescription(nameof(ModRowViewModel.Name), ListSortDirection.Ascending));
+        }
+    }
 
     private ResolvedProfile? Profile => _main.ActiveProfile?.Resolved;
+
+    /// <summary>Подзаголовок страницы: «Мой мир · клиент / Vintage Story 1.22.7».</summary>
+    public string HeaderSubtitle => _main.ActiveProfile is { } p
+        ? Loc.T("mods.subtitle", p.Name, p.KindText, Profile?.GameVersion?.ToString() ?? Loc.T("common.notFound"))
+        : Loc.T("mods.noProfile");
 
     /// <summary>Строка под кнопками: какие папки и какая игра.</summary>
     public string ProfileInfo => Profile is { } r
@@ -88,6 +170,9 @@ public sealed partial class ModsViewModel : ObservableObject
     {
         _remote = new(StringComparer.OrdinalIgnoreCase);
         OnPropertyChanged(nameof(ProfileInfo));
+        OnPropertyChanged(nameof(HeaderSubtitle));
+        Selected = null;
+        Card = null;
         ReloadLocal();
         StatusText = Loc.T("mods.readFromDisk");
         if (_main.AutoCheckUpdates && Profile?.GameVersion is not null && CheckCommand.CanExecute(null))
@@ -123,17 +208,27 @@ public sealed partial class ModsViewModel : ObservableObject
         ModCount = results.Count;
         DependencyIssues = Dependencies.FindIssues(_locals);
 
+        // после операции таблица строится заново — выбор остаётся на том же моде
+        var keep = Card?.Row;
+        var pins = _main.ActiveProfile?.Model.PinnedMods ?? new Dictionary<string, string>();
         Rows.Clear();
-        foreach (var r in results) Rows.Add(new ModRowViewModel(r));
+        foreach (var r in results)
+            Rows.Add(new ModRowViewModel(r, DependencyIssues, r.Local.Info?.ModId is { } id && pins.ContainsKey(id)));
 
-        var disabled = results.Count(r => r.Local.IsDisabled);
-        var parts = new List<string> { Loc.T("mods.sumMods", results.Count), Loc.T("mods.sumDisabled", disabled) };
-        if (_remote.Count > 0)
+        UpdatesAvailable = Rows.Count(r => r.Kind == ModStatus.UpdateAvailable);
+        ProblemCount = Rows.Count(r => r.IsProblem);
+        PinnedCount = Rows.Count(r => r.IsPinned);
+        DisabledCount = Rows.Count(r => !r.IsEnabled);
+        OnPropertyChanged(nameof(ShownText));
+
+        if (keep is not null)
         {
-            parts.Add(Loc.T("mods.sumUpdates", results.Count(r => r.Status == ModStatus.UpdateAvailable)));
-            parts.Add(Loc.T("mods.sumAttention", Rows.Count(r => r.NeedsAttention)));
+            var same = Rows.FirstOrDefault(r => r.FilePath == keep.FilePath)
+                       ?? Rows.FirstOrDefault(r => r.ModId.Length > 0 && r.ModId == keep.ModId);
+            if (same is null) Card = null; // мод удалили
+            else if (same == Selected) OnSelectedChanged(same);
+            else Selected = same;
         }
-        Summary = string.Join(" · ", parts);
     }
 
     [RelayCommand(IncludeCancelCommand = true)]

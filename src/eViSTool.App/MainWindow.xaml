@@ -3,7 +3,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:eViSTool.App.ViewModels"
         xmlns:local="clr-namespace:eViSTool.App"
-        xmlns:mods="clr-namespace:eViSTool.Core.Mods;assembly=eViSTool.Core"
         Title="eViSTool" Icon="Assets/eViSTool.ico" Height="860" Width="1400" MinHeight="480" MinWidth="860"
         Loaded="Window_Loaded" Closing="Window_Closing"
         WindowStartupLocation="CenterScreen" Background="{StaticResource Forest.Base}"
@@ -16,47 +15,6 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <local:InvertBoolConverter x:Key="Invert" />
         <local:CountToVisibilityConverter x:Key="CountToVis" />
-
-        <Style x:Key="CellText" TargetType="TextBlock">
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Margin" Value="4,0" />
-            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-            <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}" />
-            <Style.Triggers>
-                <!-- выключенные моды — бледнее -->
-                <DataTrigger Binding="{Binding IsEnabled}" Value="False">
-                    <Setter Property="Opacity" Value="0.45" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- цвета плашек статуса: полупрозрачные, чтобы читались и в светлой, и в тёмной теме -->
-        <Style x:Key="StatusBadge" TargetType="Border">
-            <Setter Property="CornerRadius" Value="4" />
-            <Setter Property="Padding" Value="8,2" />
-            <Setter Property="HorizontalAlignment" Value="Left" />
-            <Setter Property="Background" Value="#3380808F" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding Kind}" Value="{x:Static mods:ModStatus.UpToDate}">
-                    <Setter Property="Background" Value="#4028A745" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Kind}" Value="{x:Static mods:ModStatus.UpdateAvailable}">
-                    <Setter Property="Background" Value="#552F80ED" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Kind}" Value="{x:Static mods:ModStatus.NoCompatibleRelease}">
-                    <Setter Property="Background" Value="#55F0A020" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Kind}" Value="{x:Static mods:ModStatus.Pinned}">
-                    <Setter Property="Background" Value="#50707CB0" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Kind}" Value="{x:Static mods:ModStatus.Unreadable}">
-                    <Setter Property="Background" Value="#55E04040" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Kind}" Value="{x:Static mods:ModStatus.CheckFailed}">
-                    <Setter Property="Background" Value="#55E04040" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
 
         <Style x:Key="Hint" TargetType="TextBlock">
             <Setter Property="Opacity" Value="0.7" />
@@ -100,7 +58,12 @@
                         </StackPanel>
                     </DockPanel>
                 </Border>
-                <TextBlock Text="{local:Tr shell.madeBy}" FontSize="11" Foreground="{StaticResource Forest.Muted}" Margin="4,10,0,0" />
+                <TextBlock FontSize="11" Margin="4,10,0,0" ToolTip="https://github.com/erneywhite/eViSTool">
+                    <Hyperlink Command="{Binding About.OpenUrlCommand}" CommandParameter="https://github.com/erneywhite/eViSTool"
+                               Foreground="{StaticResource Forest.Muted}">
+                        <Run Text="{local:Tr shell.madeBy}" />
+                    </Hyperlink>
+                </TextBlock>
             </StackPanel>
 
             <!-- навигация: порядок пунктов = порядок разделов -->
@@ -176,164 +139,8 @@
 
         <TabControl Margin="16,12,16,12" SelectedIndex="{Binding SelectedTab}" Style="{StaticResource Forest.PagesHost}">
             <!-- ============ МОДЫ ============ -->
-            <TabItem Header="{local:Tr tab.mods}" DataContext="{Binding Mods}">
-                <DockPanel Margin="8">
-                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8" LastChildFill="False">
-                        <Button DockPanel.Dock="Left" Content="{local:Tr mods.check}" Command="{Binding CheckCommand}"
-                                Style="{DynamicResource AccentButtonStyle}" Padding="16,6" />
-                        <Button DockPanel.Dock="Left" Content="{local:Tr common.cancel}" Command="{Binding CheckCancelCommand}" Margin="8,0,0,0" Padding="12,6" />
-                        <Button DockPanel.Dock="Left" Content="{Binding UpdateAllText}" Command="{Binding UpdateAllCommand}" Margin="8,0,0,0" Padding="12,6"
-                                IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}"
-                                Visibility="{Binding UpdateCount, Converter={StaticResource CountToVis}}"
-                                ToolTip="{local:Tr mods.updateAllTip}" />
-                        <Button DockPanel.Dock="Left" Content="{local:Tr mods.add}" Command="{Binding AddFromFileCommand}" Margin="8,0,0,0" Padding="12,6"
-                                IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}"
-                                ToolTip="{local:Tr mods.addTip}" />
-                        <Button DockPanel.Dock="Left" Content="{local:Tr pack.menu}" Margin="8,0,0,0" Padding="12,6"
-                                IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}" Click="PackMenu_Click"
-                                ToolTip="{local:Tr pack.menuTip}">
-                            <Button.ContextMenu>
-                                <ContextMenu>
-                                    <MenuItem Header="{local:Tr pack.export}" Command="{Binding ExportPackCommand}" />
-                                    <MenuItem Header="{local:Tr pack.import}" Command="{Binding ImportPackCommand}" />
-                                </ContextMenu>
-                            </Button.ContextMenu>
-                        </Button>
-                        <Button DockPanel.Dock="Left" Content="{local:Tr mods.openFolder}" Command="{Binding OpenModsFolderCommand}" Margin="8,0,0,0" Padding="12,6" />
-                        <CheckBox DockPanel.Dock="Right" Content="{local:Tr mods.onlyIssues}" IsChecked="{Binding OnlyIssues}"
-                                  ToolTip="{local:Tr mods.onlyIssuesTip}"
-                                  VerticalAlignment="Center" Margin="12,0,0,0" />
-                        <TextBox DockPanel.Dock="Right" Width="180" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}"
-                                 ToolTip="{local:Tr mods.searchTip}" VerticalAlignment="Center" />
-                        <TextBlock DockPanel.Dock="Right" Text="{local:Tr mods.search}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                    </DockPanel>
-
-                    <TextBlock DockPanel.Dock="Top" Margin="2,0,0,8" Opacity="0.7" TextTrimming="CharacterEllipsis"
-                               Text="{Binding ProfileInfo}" ToolTip="{Binding ProfileInfo}" />
-
-                    <Border DockPanel.Dock="Top" Margin="0,0,0,8" Padding="12,8" CornerRadius="6" Background="#40F0A020"
-                            Visibility="{Binding HasDependencyIssues, Converter={StaticResource BoolToVis}}">
-                        <DockPanel>
-                            <Button DockPanel.Dock="Right" Content="{local:Tr mods.fix}" Command="{Binding FixDependenciesCommand}" Padding="12,4" Margin="12,0,0,0"
-                                    IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}" />
-                            <TextBlock Text="{Binding DependencyText}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                        </DockPanel>
-                    </Border>
-
-                    <DockPanel DockPanel.Dock="Bottom" Margin="2,8,0,0">
-                        <TextBlock DockPanel.Dock="Right" Text="{Binding Summary}" FontWeight="SemiBold" />
-                        <TextBlock Text="{Binding StatusText}" Opacity="0.8" TextTrimming="CharacterEllipsis" Margin="0,0,16,0"
-                                   ToolTip="{Binding StatusText}" />
-                    </DockPanel>
-
-                    <DataGrid ItemsSource="{Binding View}" AutoGenerateColumns="False" IsReadOnly="True"
-                              HeadersVisibility="Column" GridLinesVisibility="None" SelectionMode="Single"
-                              CanUserResizeRows="False" RowHeight="34"
-                              AllowDrop="True" DragOver="ModsGrid_DragOver" Drop="ModsGrid_Drop">
-                        <DataGrid.Resources>
-                            <!-- Кисти Fluent-темы, которые шаблоны DataGrid берут через DynamicResource.
-                                 Выделение — спокойная подсветка вместо заливки акцентом (иначе не видно ссылок),
-                                 текст обычного цвета, без рамки вокруг текущей ячейки. -->
-                            <SolidColorBrush x:Key="DataGridRowSelectedBackgroundThemeBrush" Color="#38909090" />
-                            <SolidColorBrush x:Key="DataGridRowSelectedForegroundThemeBrush" Color="{DynamicResource TextFillColorPrimary}" />
-                            <SolidColorBrush x:Key="{x:Static DataGrid.FocusBorderBrushKey}" Color="Transparent" />
-                        </DataGrid.Resources>
-                        <DataGrid.InputBindings>
-                            <MouseBinding Gesture="LeftDoubleClick" Command="{Binding OpenPageCommand}"
-                                          CommandParameter="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
-                        </DataGrid.InputBindings>
-                        <DataGrid.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="{local:Tr menu.toggle}"
-                                          Command="{Binding PlacementTarget.DataContext.ToggleEnabledCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <MenuItem Header="{local:Tr menu.delete}"
-                                          Command="{Binding PlacementTarget.DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <Separator />
-                                <MenuItem Header="{local:Tr menu.update}"
-                                          Command="{Binding PlacementTarget.DataContext.UpdateOneCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <MenuItem Header="{local:Tr menu.rollback}"
-                                          Command="{Binding PlacementTarget.DataContext.RollbackCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <MenuItem Header="{local:Tr menu.pin}"
-                                          Command="{Binding PlacementTarget.DataContext.TogglePinCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <MenuItem Header="{local:Tr menu.skip}"
-                                          Command="{Binding PlacementTarget.DataContext.SkipVersionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <MenuItem Header="{local:Tr menu.unskip}"
-                                          Command="{Binding PlacementTarget.DataContext.ClearSkippedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <Separator />
-                                <MenuItem Header="{local:Tr menu.showInCatalog}"
-                                          Command="{Binding PlacementTarget.DataContext.ShowInCatalogCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <MenuItem Header="{local:Tr menu.openPage}"
-                                          Command="{Binding PlacementTarget.DataContext.OpenPageCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <MenuItem Header="{local:Tr menu.showFile}"
-                                          Command="{Binding PlacementTarget.DataContext.ShowFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                            </ContextMenu>
-                        </DataGrid.ContextMenu>
-                        <DataGrid.Columns>
-                            <!-- галочка пишет в настройки игры: disabledMods клиента или WorldConfig.DisabledMods сервера -->
-                            <DataGridTemplateColumn Header="{local:Tr col.on}" Width="52" SortMemberPath="IsEnabled">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <CheckBox IsChecked="{Binding IsEnabled, Mode=OneWay}" Focusable="False"
-                                                  Command="{Binding DataContext.ToggleEnabledCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                  CommandParameter="{Binding}" ToolTip="{local:Tr col.onTip}"
-                                                  HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="0" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="{local:Tr col.mod}" Binding="{Binding Name}" Width="2*" ElementStyle="{StaticResource CellText}" />
-                            <DataGridTextColumn Header="modid" Binding="{Binding ModId}" Width="1.3*" ElementStyle="{StaticResource CellText}" />
-                            <DataGridTextColumn Header="{local:Tr col.installed}" Binding="{Binding Installed}" Width="100" ElementStyle="{StaticResource CellText}" />
-                            <DataGridTextColumn Header="{local:Tr col.latest}" Binding="{Binding Latest}" Width="100" ElementStyle="{StaticResource CellText}" />
-                            <DataGridTemplateColumn Header="{local:Tr col.status}" Width="160" SortMemberPath="StatusText">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <!-- при наведении на «Есть обновление» — что изменилось -->
-                                        <Border Style="{StaticResource StatusBadge}" VerticalAlignment="Center"
-                                                ToolTip="{Binding Changelog}" ToolTipService.ShowDuration="60000">
-                                            <TextBlock Text="{Binding StatusText}" />
-                                        </Border>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="{local:Tr col.note}" Binding="{Binding Note}" Width="3*" ElementStyle="{StaticResource CellText}" />
-                            <DataGridTemplateColumn Header="" Width="190">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0">
-                                            <TextBlock Margin="0,0,12,0" Visibility="{Binding CanUpdate, Converter={StaticResource BoolToVis}}">
-                                                <Hyperlink Command="{Binding DataContext.UpdateOneCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                           CommandParameter="{Binding}" ToolTip="{Binding Latest}"><Run Text="{local:Tr menu.update}" /></Hyperlink>
-                                            </TextBlock>
-                                            <TextBlock>
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding PageUrl}" Value="{x:Null}">
-                                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                                <Hyperlink Command="{Binding DataContext.OpenPageCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                           CommandParameter="{Binding}" ToolTip="{Binding PageUrl}"><Run Text="{local:Tr card.website}" /></Hyperlink>
-                                            </TextBlock>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </DockPanel>
+            <TabItem Header="{local:Tr tab.mods}">
+                <local:ModsView DataContext="{Binding Mods}" />
             </TabItem>
 
             <!-- ============ КАТАЛОГ ============ -->

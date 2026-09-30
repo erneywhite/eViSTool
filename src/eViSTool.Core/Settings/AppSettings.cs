@@ -46,6 +46,9 @@ public sealed class WindowLayout
 
     /// <summary>Ширина карточки мода в каталоге (перетаскивается разделителем).</summary>
     public double CatalogDetailsWidth { get; set; } = 760;
+
+    /// <summary>Ширина карточки мода во вкладке «Мои моды».</summary>
+    public double ModsCardWidth { get; set; } = 420;
 }
 
 /// <summary>Хранит настройки в settings.json папки данных (см. <see cref="AppPaths"/>). Запись атомарная: сначала во временный файл.</summary>

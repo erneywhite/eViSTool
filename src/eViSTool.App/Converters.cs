@@ -50,3 +50,23 @@ public sealed class IsNotNullConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         throw new NotSupportedException();
 }
+
+/// <summary>Перечисление равно ConverterParameter — для чипов-фильтров (RadioButton ↔ enum).</summary>
+public sealed class EnumEqualsConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value?.ToString() == parameter?.ToString();
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is true && parameter is string name ? Enum.Parse(targetType, name) : Binding.DoNothing;
+}
+
+/// <summary>Пустая строка или null — скрыто.</summary>
+public sealed class TextToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is string { Length: > 0 } ? Visibility.Visible : Visibility.Collapsed;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}

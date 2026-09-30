@@ -47,6 +47,23 @@ public partial class LocalizationTests
         Loc.Instance.SetLanguage("en");
     }
 
-    [GeneratedRegex("""(?:Loc\.T\(\s*"|local:Tr\s+)(?<k>[a-zA-Z]+\.[a-zA-Z0-9.]+)""")]
+    [Fact]
+    public void PluralPicksRussianAndEnglishForms()
+    {
+        Loc.Instance.SetLanguage("ru");
+        Assert.Equal("проблема", Loc.Plural("mods.cntProblems", 1));
+        Assert.Equal("проблемы", Loc.Plural("mods.cntProblems", 3));
+        Assert.Equal("проблем", Loc.Plural("mods.cntProblems", 5));
+        Assert.Equal("проблем", Loc.Plural("mods.cntProblems", 11));
+        Assert.Equal("проблем", Loc.Plural("mods.cntProblems", 12));
+        Assert.Equal("проблема", Loc.Plural("mods.cntProblems", 21));
+        Assert.Equal("проблемы", Loc.Plural("mods.cntProblems", 22));
+        Assert.Equal("проблем", Loc.Plural("mods.cntProblems", 0));
+        Loc.Instance.SetLanguage("en");
+        Assert.Equal("problem", Loc.Plural("mods.cntProblems", 1));
+        Assert.Equal("problems", Loc.Plural("mods.cntProblems", 2));
+    }
+
+    [GeneratedRegex("""(?:Loc\.(?:T|Plural)\(\s*"|local:Tr\s+)(?<k>[a-zA-Z]+\.[a-zA-Z0-9.]+)""")]
     private static partial Regex KeyUse();
 }

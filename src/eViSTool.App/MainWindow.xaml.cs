@@ -46,29 +46,4 @@ public partial class MainWindow : Window
         l.Height = bounds.Height;
         Vm.SaveSettings();
     }
-
-    // «Модпак ▾»: меню открывается обычным кликом
-    private void PackMenu_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is System.Windows.Controls.Button { ContextMenu: { } menu } button)
-        {
-            menu.DataContext = button.DataContext;
-            menu.PlacementTarget = button;
-            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
-            menu.IsOpen = true;
-        }
-    }
-
-    // перетаскивание zip-архивов из Проводника в список модов
-    private void ModsGrid_DragOver(object sender, DragEventArgs e)
-    {
-        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
-        e.Handled = true;
-    }
-
-    private void ModsGrid_Drop(object sender, DragEventArgs e)
-    {
-        if (e.Data.GetData(DataFormats.FileDrop) is string[] files)
-            Vm.Mods.AddFiles(files);
-    }
 }
