@@ -1,4 +1,6 @@
 using System.IO.Compression;
+using System.Net;
+using System.Xml.Linq;
 using System.Security.Cryptography;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Versioning;
@@ -23,6 +25,9 @@ public sealed record AppRelease
 
     /// <summary>SHA-256 архива в hex (из отпечатка, который GitHub считает сам при загрузке файла); null — неизвестен.</summary>
     public string? Sha256 { get; init; }
+
+    /// <summary>Файл с контрольной суммой рядом с архивом («….zip.sha256») — когда отпечатка от API нет.</summary>
+    public string? ChecksumUrl { get; init; }
 }
 
 /// <summary>
@@ -52,9 +57,49 @@ public sealed class AppUpdater
         using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{Repo}/releases?per_page=30");
         request.Headers.Accept.ParseAdd("application/vnd.github+json");
         using var response = await _http.SendAsync(request, ct).ConfigureAwait(false);
+        // API без входа — 60 запросов в час на внешний адрес (у всех за одним роутером он общий): исчерпали — берём ленту
+        // релизов с самого github.com, у неё такого лимита нет
+        if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests)
+            return PickUpdate(await FeedReleasesAsync(ct).ConfigureAwait(false), current);
         if (!response.IsSuccessStatusCode)
             throw new HttpRequestException(Loc.T("update.httpFailed", (int)response.StatusCode));
         return PickUpdate(ParseReleases(await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false)), current);
+    }
+
+    /// <summary>Релизы из ленты github.com (Atom): версии и ссылки. Архив и его контрольная сумма — по прямым ссылкам.</summary>
+    public async Task<IReadOnlyList<AppRelease>> FeedReleasesAsync(CancellationToken ct = default)
+    {
+        using var response = await _http.GetAsync($"https://github.com/{Repo}/releases.atom", ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) throw new HttpRequestException(Loc.T("update.rateLimited"));
+        return ParseFeed(await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
+    }
+
+    /// <summary>Лента релизов → релизы. Черновиков в ленте нет; альфа/бета/rc — по версии.</summary>
+    public static IReadOnlyList<AppRelease> ParseFeed(string xml)
+    {
+        XNamespace atom = "http://www.w3.org/2005/Atom";
+        var result = new List<AppRelease>();
+        foreach (var entry in XDocument.Parse(xml).Root?.Elements(atom + "entry") ?? [])
+        {
+            var page = entry.Elements(atom + "link").FirstOrDefault(l => (string?)l.Attribute("rel") is null or "alternate")?.Attribute("href")?.Value ?? "";
+            var at = page.LastIndexOf("/releases/tag/", StringComparison.Ordinal);
+            if (at < 0) continue;
+            var tag = Uri.UnescapeDataString(page[(at + "/releases/tag/".Length)..]);
+            if (!ModVersion.TryParse(tag.TrimStart('v', 'V'), out var version)) continue;
+            var asset = $"eViSTool-{tag.TrimStart('v', 'V')}{AssetSuffix}";
+            var url = $"https://github.com/{Repo}/releases/download/{Uri.EscapeDataString(tag)}/{asset}";
+            result.Add(new AppRelease
+            {
+                Version = version,
+                Tag = tag,
+                Prerelease = version.IsPrerelease,
+                PageUrl = page,
+                AssetName = asset,
+                AssetUrl = url,
+                ChecksumUrl = url + ".sha256",
+            });
+        }
+        return result;
     }
 
     /// <summary>
@@ -99,7 +144,8 @@ public sealed class AppUpdater
     /// <summary>Скачать архив и сверить отпечаток. Без отпечатка не ставим: файл мог подмениться по дороге.</summary>
     public async Task<string> DownloadAsync(AppRelease release, string downloadsDir, IProgress<double>? progress = null, CancellationToken ct = default)
     {
-        if (release.Sha256 is null) throw new InvalidOperationException(Loc.T("update.noHash"));
+        var expected = release.Sha256 ?? (release.ChecksumUrl is { } checksumUrl ? await ReadChecksumAsync(checksumUrl, ct).ConfigureAwait(false) : null);
+        if (expected is null) throw new InvalidOperationException(Loc.T("update.noHash"));
         Directory.CreateDirectory(downloadsDir);
         var path = Path.Combine(downloadsDir, release.AssetName);
 
@@ -120,12 +166,21 @@ public sealed class AppUpdater
             }
         }
 
-        if (!string.Equals(Sha256Of(path), release.Sha256, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(Sha256Of(path), expected, StringComparison.OrdinalIgnoreCase))
         {
             File.Delete(path);
             throw new InvalidOperationException(Loc.T("update.badHash"));
         }
         return path;
+    }
+
+    /// <summary>«<hex>  имя-файла» → hex; нет файла или внутри не контрольная сумма — null.</summary>
+    private async Task<string?> ReadChecksumAsync(string url, CancellationToken ct)
+    {
+        using var response = await _http.GetAsync(url, ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) return null;
+        var first = (await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false)).Trim().Split(' ', '\t', '\n').FirstOrDefault() ?? "";
+        return first.Length == 64 && first.All(Uri.IsHexDigit) ? first.ToLowerInvariant() : null;
     }
 
     public static string Sha256Of(string path)
