@@ -23,7 +23,7 @@ public sealed class AgentTests : IAsyncLifetime
         foreach (var f in Directory.GetFiles(FakeBin)) File.Copy(f, Path.Combine(game, Path.GetFileName(f)));
         File.Copy(Path.Combine(FakeBin, "FakeVsServer.exe"), Path.Combine(game, "VintagestoryServer.exe"));
         var data = Directory.CreateDirectory(Path.Combine(_tmp, "data")).FullName;
-        _profile = new GameProfile { Kind = ProfileKind.Server, GameDir = game, DataDir = data };
+        _profile = new GameProfile { Name = "Тест мир", Kind = ProfileKind.Server, GameDir = game, DataDir = data };
         return Task.CompletedTask;
     }
 
@@ -105,28 +105,34 @@ public sealed class AgentTests : IAsyncLifetime
     [Fact]
     public async Task BackupOnRunningServer_IsRotatedByTheAgent()
     {
-        // расписание включено, хранить две копии; на диске уже лежат три старые и одна «ручная»
+        // расписание включено, хранить две копии; на диске уже лежат три старые свои, прежняя «default-…» и «ручная»
         new ServerAutomation { BackupEnabled = true, BackupIntervalHours = 24, BackupKeep = 2 }.Save(_profile.Id, AgentsDir);
         var dir = Directory.CreateDirectory(Path.Combine(_profile.DataDir!, "Backups")).FullName;
-        foreach (var day in new[] { "01", "02", "03" }) File.WriteAllText(Path.Combine(dir, $"default-2026-09-{day}_10-00-00.vcdbs"), "old");
+        foreach (var day in new[] { "01", "02", "03" }) File.WriteAllText(Path.Combine(dir, $"Тест_мир-2026-09-{day}_10-00-00.vcdbs"), "old");
+        File.WriteAllText(Path.Combine(dir, "default-2026-08-01_10-00-00.vcdbs"), "legacy");
         File.WriteAllText(Path.Combine(dir, "before-update.vcdbs"), "manual");
 
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: true, AgentExe, AgentsDir);
         await Until(async () => (await _client.StatusAsync()).State == ServerState.Running);
         var status = await _client.StatusAsync();
-        Assert.Equal(new DateTime(2026, 9, 3, 10, 0, 0), status.LastBackupAt); // самая свежая на диске
+        Assert.Equal(new DateTime(2026, 9, 3, 10, 0, 0), status.LastBackupAt); // самая свежая своя на диске
         Assert.NotNull(status.NextBackupAt);
 
-        await _client.CommandAsync("/genbackup");
-        var store = new BackupStore(_profile.DataDir!);
-        await Until(() => Task.FromResult(store.List().Count(b => b.IsStamped) == 2));
+        await _client.BackupAsync();
+        var store = new BackupStore(_profile.DataDir!, BackupStore.Slug(_profile.Name));
+        await Until(() => Task.FromResult(store.List().Count(b => b.IsOwn) == 2));
 
         var names = store.List().Select(b => b.Name).ToList();
-        Assert.Contains("default-2026-09-03_10-00-00.vcdbs", names); // вторая по свежести осталась
-        Assert.DoesNotContain("default-2026-09-01_10-00-00.vcdbs", names);
-        Assert.Contains("before-update.vcdbs", names); // ручную копию ротация не трогает
+        var fresh = Assert.Single(names, n => n.StartsWith($"Тест_мир-{DateTime.Now:yyyy-MM-dd}")); // имя профиля — в имени копии
+        Assert.Contains("Тест_мир-2026-09-03_10-00-00.vcdbs", names); // вторая по свежести осталась
+        Assert.DoesNotContain("Тест_мир-2026-09-01_10-00-00.vcdbs", names);
+        Assert.Contains("default-2026-08-01_10-00-00.vcdbs", names); // чужие и ручные копии ротация не трогает
+        Assert.Contains("before-update.vcdbs", names);
         Assert.True((await _client.StatusAsync()).LastBackupAt > DateTime.Now.AddMinutes(-1));
-        Assert.Contains(await _client.ConsoleAsync(0, 0), l => l.Kind == ConsoleLineKind.System && l.Text.Contains('2'));
+
+        // о готовой копии — строка в консоли и объявление игрокам в чат
+        await Until(async () => (await _client.ConsoleAsync(0, 0)).Any(l => l.Text.Contains("/announce") && l.Text.Contains(fresh)));
+        Assert.Contains(await _client.ConsoleAsync(0, 0), l => l.Kind == ConsoleLineKind.System && l.Text.Contains(fresh));
     }
 
     [Fact]

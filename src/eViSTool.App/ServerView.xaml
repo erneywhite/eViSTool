@@ -193,7 +193,17 @@
                 <DockPanel>
                     <DockPanel DockPanel.Dock="Top" Margin="16,10,10,8">
                         <Button DockPanel.Dock="Right" Content="{local:Tr server.clear}" Command="{Binding ClearConsoleCommand}" Padding="12,4" MinHeight="0" FontSize="12" />
-                        <TextBlock Text="{local:Tr server.console}" Foreground="{StaticResource Forest.Text}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <!-- копия мира сейчас — та же команда, что на вкладке «Расписание» -->
+                        <Button DockPanel.Dock="Right" Command="{Binding Schedule.BackupNowCommand}" Padding="12,4" MinHeight="0" FontSize="12" Margin="0,0,8,0"
+                                ToolTip="{local:Tr sched.nowTip}" ToolTipService.ShowOnDisabled="True" AutomationProperties.AutomationId="SrvBackupNow">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource Icon.Download}" Style="{StaticResource Forest.Icon}" Width="12" Height="12" Margin="0,0,7,0" />
+                                <TextBlock Text="{local:Tr server.backupNow}" />
+                            </StackPanel>
+                        </Button>
+                        <TextBlock DockPanel.Dock="Left" Text="{local:Tr server.console}" Foreground="{StaticResource Forest.Text}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Schedule.StatusText}" FontSize="12" Foreground="{StaticResource Forest.Accent}" VerticalAlignment="Center"
+                                   Margin="16,0,16,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Schedule.StatusText}" />
                     </DockPanel>
 
                     <!-- ввод команды: Enter — отправить, ↑/↓ — история -->

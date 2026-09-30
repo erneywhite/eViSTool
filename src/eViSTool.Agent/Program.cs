@@ -61,20 +61,53 @@ host.StateChanged += state =>
 var automation = ServerAutomation.Load(opts.ProfileId, opts.AgentsDir);
 var automationFile = ServerAutomation.FileFor(opts.ProfileId, opts.AgentsDir);
 var automationStamp = File.Exists(automationFile) ? File.GetLastWriteTimeUtc(automationFile) : default;
-var backups = new BackupStore(opts.DataPath);
+var backups = new BackupStore(opts.DataPath, opts.BackupName);
 var scheduler = new BackupScheduler();
-scheduler.Seed(backups.List().FirstOrDefault(b => b.IsStamped)?.Time);
+scheduler.Seed(backups.List().FirstOrDefault(b => b.IsOwn)?.Time);
+string? pendingBackup = null; // имя копии, которую сервер делает по нашей просьбе
+
+// Копия мира на работающем сервере: её делает сам сервер, мы задаём имя «<профиль>-<время>.vcdbs»
+// (без имени сервер назвал бы её по файлу мира — «default-…», и было бы не понять, чей это мир).
+async Task RequestBackup()
+{
+    var now = DateTime.Now;
+    var name = backups.NameFor(now);
+    pendingBackup = name;
+    scheduler.MarkDone(now, players.Players.Count); // чтобы следующий тик расписания не запустил копию повторно
+    await host.SendCommandAsync("/genbackup " + name);
+}
+
 host.Console.LineAdded += line =>
 {
-    // сервер закончил копию (по расписанию или по команде из консоли): отсчёт — от неё, лишние копии — долой
+    // сервер закончил копию (по расписанию, по кнопке или по команде из консоли)
     if (line.Kind != ConsoleLineKind.Output || !line.Text.EndsWith("Backup complete!", StringComparison.Ordinal)) return;
     scheduler.MarkDone(line.Time, players.Players.Count);
+    var name = pendingBackup;
+    pendingBackup = null;
     var settings = automation;
-    if (!settings.BackupEnabled || settings.BackupKeep <= 0) return;
-    _ = Task.Run(() =>
+    _ = Task.Run(async () =>
     {
-        var removed = backups.Prune(settings.BackupKeep);
-        if (removed.Count > 0) host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.pruned", removed.Count, settings.BackupKeep));
+        try
+        {
+            // копию просили из консоли без имени — это самый свежий файл в папке
+            var file = (name is null ? null : backups.Find(name)) ?? backups.List().FirstOrDefault();
+            if (file is not null)
+            {
+                var size = eViSTool.Core.Localization.SizeText.Format(file.Size);
+                host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.created", file.Name, size));
+                // игрокам — в чат: что копия есть, как называется и сколько весит
+                if (settings.BackupAnnounce && host.State == ServerState.Running)
+                    await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.T("backup.announce", file.Name, size, file.Time.ToString("dd.MM.yyyy HH:mm")));
+            }
+
+            if (!settings.BackupEnabled || settings.BackupKeep <= 0) return;
+            var removed = backups.Prune(settings.BackupKeep);
+            if (removed.Count > 0) host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.pruned", removed.Count, settings.BackupKeep));
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            host.Console.Add(ConsoleLineKind.System, ex.Message);
+        }
     });
 };
 
@@ -149,6 +182,8 @@ app.MapPost("/command", async (HttpContext ctx) =>
     if (string.IsNullOrWhiteSpace(req?.Text)) return Results.BadRequest();
     return await Run(() => host.SendCommandAsync(req.Text.Trim()));
 });
+// копия мира сейчас (кнопка в окне); на остановленном сервере копию делает само окно
+app.MapPost("/backup", () => Run(RequestBackup));
 app.MapPost("/shutdown", () =>
 {
     shutdown.Cancel(); // сервер остановим при выходе (finally ниже)
@@ -191,11 +226,10 @@ try
         scheduler.NotePlayers(players.Players.Count);
         if (scheduler.IsDue(automation, DateTime.Now, host.State, host.StartedAt))
         {
-            scheduler.MarkDone(DateTime.Now, players.Players.Count); // чтобы следующий тик не запустил копию повторно
             try
             {
                 host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.scheduled"));
-                await host.SendCommandAsync("/genbackup");
+                await RequestBackup();
             }
             catch (Exception ex) when (ex is InvalidOperationException or IOException)
             {
@@ -215,7 +249,7 @@ finally
 }
 return 0;
 
-internal sealed record AgentOptions(string ProfileId, string ExePath, string DataPath, IReadOnlyList<string> ExtraArgs, bool StartServer, TimeSpan IdleExit, string? AgentsDir, string? Language)
+internal sealed record AgentOptions(string ProfileId, string ExePath, string DataPath, IReadOnlyList<string> ExtraArgs, bool StartServer, TimeSpan IdleExit, string? AgentsDir, string? Language, string? BackupName)
 {
     public static AgentOptions? Parse(string[] args)
     {
@@ -223,7 +257,7 @@ internal sealed record AgentOptions(string ProfileId, string ExePath, string Dat
         var extra = new List<string>();
         var start = false;
         var idle = TimeSpan.FromMinutes(2);
-        string? agentsDir = null, lang = null;
+        string? agentsDir = null, lang = null, backupName = null;
         for (var i = 0; i < args.Length; i++)
         {
             string Next() => i + 1 < args.Length ? args[++i] : "";
@@ -237,8 +271,9 @@ internal sealed record AgentOptions(string ProfileId, string ExePath, string Dat
                 case "--idle-exit": idle = TimeSpan.FromSeconds(int.Parse(Next())); break;
                 case "--agents-dir": agentsDir = Next(); break;
                 case "--lang": lang = Next(); break;
+                case "--backup-name": backupName = Next(); break;
             }
         }
-        return profile is null || exe is null || data is null ? null : new AgentOptions(profile, exe, data, extra, start, idle, agentsDir, lang);
+        return profile is null || exe is null || data is null ? null : new AgentOptions(profile, exe, data, extra, start, idle, agentsDir, lang, string.IsNullOrWhiteSpace(backupName) ? null : backupName);
     }
 }

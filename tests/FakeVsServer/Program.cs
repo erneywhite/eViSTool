@@ -53,12 +53,14 @@ var reader = new Thread(() =>
         else if (line == "/crash") Environment.Exit(1);
         else if (line == "/hang") { hang = true; Log("Notification", "Now ignoring /stop"); }
         else if (line.StartsWith("/spam ")) { for (var n = 0; n < int.Parse(line[6..]); n++) Console.Error.WriteLine($"stderr line {n} " + new string('x', 200)); }
-        else if (line == "/genbackup")
+        else if (line == "/genbackup" || line.StartsWith("/genbackup "))
         {
-            Log("Notification", "Handling Console Command /genbackup ");
+            // имя задано — файл называется ровно так (настоящий сервер расширение не дописывает)
+            var name = line.Length > 11 ? line[11..].Trim() : $"default-{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.vcdbs";
+            Log("Notification", $"Handling Console Command {line}");
             Log("Notification", "Ok, generating backup, this might take a while");
             var dir = Directory.CreateDirectory(Path.Combine(dataPath, "Backups")).FullName;
-            File.WriteAllText(Path.Combine(dir, $"default-{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.vcdbs"), "world");
+            File.WriteAllText(Path.Combine(dir, name), "world");
             Log("Notification", "Backup complete!");
         }
         // вход и выход игрока — теми же строками, что печатает настоящий сервер

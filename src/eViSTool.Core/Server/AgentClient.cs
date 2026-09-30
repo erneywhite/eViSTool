@@ -67,6 +67,9 @@ public sealed class AgentClient : IDisposable
     public Task<AgentStatus> ShutdownAsync(CancellationToken ct = default) => Post("shutdown", null, ct);
     public Task<AgentStatus> CommandAsync(string text, CancellationToken ct = default) => Post("command", new CommandRequest(text), ct);
 
+    /// <summary>Сделать копию мира сейчас (сервер должен работать).</summary>
+    public Task<AgentStatus> BackupAsync(CancellationToken ct = default) => Post("backup", null, ct);
+
     private async Task<T> Get<T>(string path, CancellationToken ct)
     {
         using var resp = await _http.GetAsync(path, ct).ConfigureAwait(false);
@@ -143,6 +146,8 @@ public static class AgentLauncher
         psi.ArgumentList.Add("--data"); psi.ArgumentList.Add(profile.DataDir);
         if (agentsDir is not null) { psi.ArgumentList.Add("--agents-dir"); psi.ArgumentList.Add(agentsDir); }
         if (startServer) psi.ArgumentList.Add("--start");
+        // имя профиля — в имена резервных копий: по файлу видно, чей это мир
+        psi.ArgumentList.Add("--backup-name"); psi.ArgumentList.Add(BackupStore.Slug(profile.Name));
         // сообщения агента (запуск, сторож, остановка) — на языке окна
         psi.ArgumentList.Add("--lang"); psi.ArgumentList.Add(Loc.Instance.Language);
 

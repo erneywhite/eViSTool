@@ -94,6 +94,17 @@
                             </StackPanel>
                         </DockPanel>
                     </Border>
+
+                    <Border Style="{StaticResource Row}">
+                        <DockPanel>
+                            <CheckBox DockPanel.Dock="Right" Style="{StaticResource Forest.Switch}" IsChecked="{Binding Announce}" VerticalAlignment="Center"
+                                      AutomationProperties.AutomationId="SchedAnnounce" AutomationProperties.Name="{local:Tr sched.announce}" />
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{local:Tr sched.announce}" Style="{StaticResource Label}" />
+                                <TextBlock Text="{local:Tr sched.announceHint}" Style="{StaticResource Hint}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
                 </StackPanel>
             </Border>
 

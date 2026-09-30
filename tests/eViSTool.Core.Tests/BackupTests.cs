@@ -63,7 +63,7 @@ public sealed class BackupTests : IDisposable
         var store = new BackupStore(_data);
 
         var copy = store.CopySave(save, T0);
-        Assert.Equal("default-2026-09-30_12-00-00.vcdbs", copy.Name);
+        Assert.Equal("world-2026-09-30_12-00-00.vcdbs", copy.Name);
         Assert.Equal("world", File.ReadAllText(copy.Path));
         Assert.True(store.List().Single().IsStamped);
 
@@ -71,6 +71,34 @@ public sealed class BackupTests : IDisposable
         File.WriteAllText(save + "-wal", "pending");
         Assert.Throws<InvalidOperationException>(() => store.CopySave(save, T0.AddMinutes(1)));
         Assert.Throws<FileNotFoundException>(() => store.CopySave(Path.Combine(_data, "Saves", "none.vcdbs"), T0));
+    }
+
+    [Fact]
+    public void ProfileName_GoesIntoFileName_AndRotationTouchesOnlyOwnCopies()
+    {
+        Assert.Equal("Дуо_с_женой", BackupStore.Slug("  Дуо с женой "));
+        Assert.Equal("a_b_c", BackupStore.Slug("a:b?c."));
+        Assert.Equal("world", BackupStore.Slug("  "));
+
+        var store = new BackupStore(_data, "Дуо_с_женой");
+        Assert.Equal("Дуо_с_женой-2026-09-30_12-00-00.vcdbs", store.NameFor(T0));
+
+        for (var day = 1; day <= 4; day++) Backup($"Дуо_с_женой-2026-09-0{day}_10-00-00.vcdbs");
+        Backup("default-2026-08-01_10-00-00.vcdbs");            // прежняя копия сервера
+        Backup("Соло-2026-08-02_10-00-00.vcdbs");               // принесли из другого профиля
+        Backup("Дуо_с_женой-before-2026-08-03_10-00-00.vcdbs"); // своя приставка, но имя не по шаблону
+
+        var list = store.List();
+        Assert.Equal(7, list.Count(b => b.IsStamped));
+        Assert.Equal(4, list.Count(b => b.IsOwn));
+
+        var removed = store.Prune(1);
+        Assert.Equal(3, removed.Count);
+        Assert.All(removed, b => Assert.StartsWith("Дуо_с_женой-2026-09-0", b.Name));
+        Assert.Equal(["default-2026-08-01_10-00-00.vcdbs", "Дуо_с_женой-2026-09-04_10-00-00.vcdbs", "Дуо_с_женой-before-2026-08-03_10-00-00.vcdbs", "Соло-2026-08-02_10-00-00.vcdbs"],
+            store.List().Select(b => b.Name).Order(StringComparer.Ordinal));
+        Assert.NotNull(store.Find("соло-2026-08-02_10-00-00.vcdbs"));
+        Assert.Null(store.Find("nope.vcdbs"));
     }
 
     // ---------- расписание ----------

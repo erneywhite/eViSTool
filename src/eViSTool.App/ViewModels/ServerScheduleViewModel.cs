@@ -21,8 +21,8 @@ public sealed class BackupRowViewModel(BackupFile file)
     public string TimeText { get; } = file.Time.ToString("dd.MM.yyyy HH:mm");
     public string SizeText { get; } = Sizes.Format(file.Size);
 
-    /// <summary>Копия без отметки времени в имени — положена руками: ротация её не трогает.</summary>
-    public bool IsManual => !File.IsStamped;
+    /// <summary>Не «своя» копия (другой профиль, прежнее имя «default-…», положена руками): ротация её не трогает.</summary>
+    public bool IsManual => !File.IsOwn;
 }
 
 /// <summary>
@@ -34,10 +34,12 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     private readonly ServerViewModel _server;
     private string? _profileId;
     private string? _dataDir;
+    private string _profileName = "";
     private bool _loading;
     private bool _active;
     private DateTime? _lastSeenBackup;
     private DateTime? _nextBackupAt;
+    private bool _awaitingBackup; // копию запросили кнопкой, ждём сообщения агента о ней
 
     public ServerScheduleViewModel(ServerViewModel server) => _server = server;
 
@@ -45,6 +47,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     [ObservableProperty] private string _intervalText = "1";
     [ObservableProperty] private string _keepText = "7";
     [ObservableProperty] private bool _onlyWhenPlayed = true;
+    [ObservableProperty] private bool _announce = true;
     [ObservableProperty] private string _intervalError = "";
     [ObservableProperty] private string _keepError = "";
 
@@ -58,8 +61,9 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     public bool HasBackups => Backups.Count > 0;
 
     /// <summary>Сменился профиль (или его правят в настройках): другой профиль — другие настройки и другая папка копий.</summary>
-    public void OnProfileSwitched(string? profileId, string? dataDir)
+    public void OnProfileSwitched(string? profileId, string? dataDir, string profileName)
     {
+        _profileName = profileName; // имя идёт в имена копий; его правка настройки и список не перечитывает
         if (profileId == _profileId && string.Equals(dataDir, _dataDir, StringComparison.OrdinalIgnoreCase)) return;
         _profileId = profileId;
         _dataDir = dataDir;
@@ -75,6 +79,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
             IntervalText = settings.BackupIntervalHours.ToString("0.##", CultureInfo.CurrentCulture);
             KeepText = settings.BackupKeep.ToString();
             OnlyWhenPlayed = settings.BackupOnlyWhenPlayed;
+            Announce = settings.BackupAnnounce;
             IntervalError = KeepError = "";
         }
         finally
@@ -99,10 +104,15 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         // агент сообщил о новой копии — список устарел
         if (status?.LastBackupAt is { } last && last != _lastSeenBackup)
         {
-            // первая отметка после смены профиля — не новость; дальше — копия готова, «сервер делает копию…» пора убрать
-            if (_lastSeenBackup is not null) StatusText = "";
             _lastSeenBackup = last;
             if (_active) RefreshList();
+            // копию просили кнопкой — вместо «сервер делает копию…» показываем итог
+            if (_awaitingBackup && _dataDir is not null)
+            {
+                _awaitingBackup = false;
+                var made = Store(_dataDir).List().FirstOrDefault(b => b.IsOwn);
+                StatusText = made is null ? "" : Loc.T("sched.done", made.Name, Sizes.Format(made.Size));
+            }
         }
         UpdateTexts();
         BackupNowCommand.NotifyCanExecuteChanged();
@@ -114,6 +124,10 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     partial void OnIntervalTextChanged(string value) => SaveSettings();
     partial void OnKeepTextChanged(string value) => SaveSettings();
     partial void OnOnlyWhenPlayedChanged(bool value) => SaveSettings();
+    partial void OnAnnounceChanged(bool value) => SaveSettings();
+
+    /// <summary>Папка копий профиля; «свои» копии — с именем профиля в названии файла.</summary>
+    private BackupStore Store(string dataDir) => new(dataDir, BackupStore.Slug(_profileName));
 
     /// <summary>Правка сразу уходит в файл настроек (если числа разобрались) — агент подхватит её в течение нескольких секунд.</summary>
     private void SaveSettings()
@@ -134,6 +148,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
                 BackupIntervalHours = hours,
                 BackupKeep = keep,
                 BackupOnlyWhenPlayed = OnlyWhenPlayed,
+                BackupAnnounce = Announce,
             }.Save(_profileId);
             StatusText = "";
         }
@@ -169,7 +184,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         {
             try
             {
-                foreach (var file in new BackupStore(_dataDir).List())
+                foreach (var file in Store(_dataDir).List())
                 {
                     Backups.Add(new BackupRowViewModel(file));
                     total += file.Size;
@@ -202,7 +217,8 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
             if (_server.State == ServerState.Running)
             {
                 // сервер сам сохранит мир и положит копию в Backups; список обновится, когда агент сообщит о ней
-                await _server.RunCommandAsync("/genbackup");
+                _awaitingBackup = true;
+                await _server.BackupAsync();
                 StatusText = Loc.T("sched.requested");
             }
             else
@@ -211,12 +227,12 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
                 var settings = _profileId is null ? new ServerAutomation() : ServerAutomation.Load(_profileId);
                 var copy = await Task.Run(() =>
                 {
-                    var store = new BackupStore(dataDir);
+                    var store = Store(dataDir);
                     var made = store.CopySave(save, DateTime.Now);
                     if (settings.BackupEnabled) store.Prune(settings.BackupKeep);
                     return made;
                 });
-                StatusText = Loc.T("sched.done", copy.Name);
+                StatusText = Loc.T("sched.done", copy.Name, Sizes.Format(copy.Size));
                 RefreshList();
             }
         }

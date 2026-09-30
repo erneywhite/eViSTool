@@ -102,9 +102,9 @@ public sealed partial class ServerViewModel : ObservableObject
         Schedule.SetActive(value == ServerTab.Schedule);
     }
 
-    /// <summary>Отправить серверу команду не из поля ввода (например, «/genbackup» с вкладки расписания).</summary>
-    public Task RunCommandAsync(string text) =>
-        _client is { } client ? client.CommandAsync(text) : throw new InvalidOperationException(Loc.T("sched.notRunning"));
+    /// <summary>Попросить агента сделать копию мира на работающем сервере.</summary>
+    public Task BackupAsync() =>
+        _client is { } client ? client.BackupAsync() : throw new InvalidOperationException(Loc.T("sched.notRunning"));
 
     partial void OnStateChanged(ServerState value) => Refresh();
     partial void OnAgentRunningChanged(bool value) => Refresh();
@@ -174,7 +174,7 @@ public sealed partial class ServerViewModel : ObservableObject
         Config.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model.DataDir : null, _main.ActiveProfile?.Name ?? "",
             _main.ActiveProfile?.Model.GameDir);
         Schedule.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model.Id : null,
-            IsServerProfile ? _main.ActiveProfile?.Model.DataDir : null);
+            IsServerProfile ? _main.ActiveProfile?.Model.DataDir : null, _main.ActiveProfile?.Name ?? "");
         if (!IsServerProfile) return;
 
         _session = new CancellationTokenSource();

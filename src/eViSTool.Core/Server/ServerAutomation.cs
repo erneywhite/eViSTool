@@ -20,6 +20,9 @@ public sealed record ServerAutomation
     /// <summary>Пропускать копию, если с прошлой никто не заходил: мир не менялся, копия была бы той же самой.</summary>
     public bool BackupOnlyWhenPlayed { get; init; } = true;
 
+    /// <summary>Сообщать игрокам в чат, когда копия готова (имя, размер, время).</summary>
+    public bool BackupAnnounce { get; init; } = true;
+
     /// <summary>Интервал в допустимых пределах (не чаще раза в 5 минут).</summary>
     [JsonIgnore]
     public TimeSpan BackupInterval => TimeSpan.FromHours(Math.Clamp(BackupIntervalHours, 5.0 / 60, 24 * 30));

@@ -7,21 +7,40 @@ namespace eViSTool.Core.Server;
 /// <summary>Резервная копия мира в папке Backups.</summary>
 public sealed record BackupFile(string Path, string Name, DateTime Time, long Size)
 {
-    /// <summary>Имя с отметкой времени «мир-2026-09-30_17-51-32.vcdbs» — такую копию сделал сервер или eViSTool.</summary>
+    /// <summary>В имени есть отметка времени «…-2026-09-30_17-51-32.vcdbs» — время копии берётся из неё.</summary>
     public bool IsStamped { get; init; }
+
+    /// <summary>
+    /// Копия этого профиля, сделанная eViSTool («&lt;профиль&gt;-&lt;время&gt;.vcdbs»): только такие удаляет ротация.
+    /// Копии с другим именем (от другого профиля, прежние «default-…», положенные руками) не трогаются.
+    /// </summary>
+    public bool IsOwn { get; init; }
 }
 
 /// <summary>
-/// Папка Backups серверного профиля. Копии называются как у самого сервера (команда /genbackup):
-/// «&lt;имя сохранения&gt;-ГГГГ-ММ-ДД_ЧЧ-ММ-СС.vcdbs». Ротация трогает только такие файлы — всё, что положили руками
-/// под другим именем, остаётся.
+/// Папка Backups серверного профиля. Копии называются «&lt;профиль&gt;-ГГГГ-ММ-ДД_ЧЧ-ММ-СС.vcdbs»: по имени видно, чей это мир,
+/// даже если файл унесли в другую папку. Без имени профиля (prefix = null) «своей» считается любая копия с отметкой времени.
 /// </summary>
-public sealed partial class BackupStore(string dataDir)
+public sealed partial class BackupStore(string dataDir, string? prefix = null)
 {
     private const string Extension = ".vcdbs";
     private const string StampFormat = "yyyy-MM-dd_HH-mm-ss";
 
     public string Dir { get; } = Path.Combine(dataDir, "Backups");
+
+    /// <summary>
+    /// Имя профиля для имени файла: команда сервера /genbackup не принимает пробелы, а в имени файла нельзя ещё ряд знаков —
+    /// всё такое становится «_». Пустое имя — «world».
+    /// </summary>
+    public static string Slug(string? profileName)
+    {
+        var slug = string.Concat((profileName ?? "").Trim().Select(c => char.IsWhiteSpace(c) || System.IO.Path.GetInvalidFileNameChars().Contains(c) ? '_' : c))
+            .Trim('_', '.');
+        return slug.Length == 0 ? "world" : slug;
+    }
+
+    /// <summary>Имя файла для копии, сделанной сейчас.</summary>
+    public string NameFor(DateTime now) => $"{prefix ?? "world"}-{now.ToString(StampFormat, CultureInfo.InvariantCulture)}{Extension}";
 
     /// <summary>Копии, новые сверху.</summary>
     public IReadOnlyList<BackupFile> List()
@@ -29,21 +48,21 @@ public sealed partial class BackupStore(string dataDir)
         if (!Directory.Exists(Dir)) return [];
         return new DirectoryInfo(Dir).EnumerateFiles("*" + Extension)
             .Select(f => TryStamp(f.Name, out var time)
-                ? new BackupFile(f.FullName, f.Name, time, f.Length) { IsStamped = true }
+                ? new BackupFile(f.FullName, f.Name, time, f.Length) { IsStamped = true, IsOwn = IsOwnName(f.Name) }
                 : new BackupFile(f.FullName, f.Name, f.LastWriteTime, f.Length))
             .OrderByDescending(b => b.Time)
             .ToList();
     }
 
     /// <summary>
-    /// Оставить keep последних копий с отметкой времени, остальные удалить (насовсем — это и есть ротация).
+    /// Оставить keep последних своих копий, остальные удалить (насовсем — это и есть ротация).
     /// keep ≤ 0 — ничего не удалять. Возвращает удалённые.
     /// </summary>
     public IReadOnlyList<BackupFile> Prune(int keep)
     {
         if (keep <= 0) return [];
         var removed = new List<BackupFile>();
-        foreach (var old in List().Where(b => b.IsStamped).Skip(keep))
+        foreach (var old in List().Where(b => b.IsOwn).Skip(keep))
         {
             try
             {
@@ -70,11 +89,18 @@ public sealed partial class BackupStore(string dataDir)
         if (wal.Exists && wal.Length > 0) throw new InvalidOperationException(Loc.T("backup.dirtySave"));
 
         Directory.CreateDirectory(Dir);
-        var name = $"{Path.GetFileNameWithoutExtension(saveFile)}-{now.ToString(StampFormat, CultureInfo.InvariantCulture)}{Extension}";
+        var name = NameFor(now);
         var target = Path.Combine(Dir, name);
         File.Copy(saveFile, target, overwrite: false);
-        return new BackupFile(target, name, now, new FileInfo(target).Length) { IsStamped = true };
+        return new BackupFile(target, name, now, new FileInfo(target).Length) { IsStamped = true, IsOwn = true };
     }
+
+    /// <summary>Файл копии по имени (null — такого нет).</summary>
+    public BackupFile? Find(string name) => List().FirstOrDefault(b => string.Equals(b.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    private bool IsOwnName(string name) =>
+        prefix is null || (name.StartsWith(prefix + "-", StringComparison.OrdinalIgnoreCase)
+                           && name.Length == prefix.Length + 1 + StampFormat.Length + Extension.Length);
 
     private static bool TryStamp(string name, out DateTime time)
     {
