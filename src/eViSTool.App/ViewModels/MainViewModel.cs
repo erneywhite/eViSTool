@@ -174,6 +174,31 @@ public sealed partial class MainViewModel : ObservableObject
         Save();
     }
 
+    /// <summary>Клон серверного профиля со своей папкой данных («тот же мир» или «новый мир»).</summary>
+    [RelayCommand]
+    private async Task CloneProfile(ProfileViewModel? profile)
+    {
+        if (profile is not { Kind: ProfileKind.Server }) return;
+        var running = await IsServerRunningAsync(profile.Model);
+        var dlg = new CloneProfileWindow(profile.Model, running) { Owner = System.Windows.Application.Current.MainWindow };
+        if (dlg.ShowDialog() == true && dlg.Result is { } clone) AddProfile(clone);
+    }
+
+    /// <summary>Работает ли сервер профиля под нашим агентом (копировать мир работающего сервера нельзя).</summary>
+    private static async Task<bool> IsServerRunningAsync(GameProfile profile)
+    {
+        using var client = Core.Server.AgentClient.TryConnect(profile.Id);
+        if (client is null) return false;
+        try
+        {
+            return (await client.StatusAsync()).State != Core.Server.ServerState.Stopped;
+        }
+        catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or TaskCanceledException or InvalidOperationException)
+        {
+            return false; // агент не отвечает — сервера под ним нет
+        }
+    }
+
     [RelayCommand]
     private void RemoveProfile(ProfileViewModel? profile)
     {

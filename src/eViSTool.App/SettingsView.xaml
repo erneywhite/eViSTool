@@ -78,6 +78,14 @@
                                 </StackPanel>
                             </Button>
                         </UniformGrid>
+                        <Button Command="{Binding CloneProfileCommand}" CommandParameter="{Binding EditedProfile}" HorizontalAlignment="Stretch"
+                                Margin="0,0,0,8" IsEnabled="{Binding EditedProfile.IsServer}" ToolTip="{local:Tr settings.cloneTip}"
+                                ToolTipService.ShowOnDisabled="True">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource Icon.Copy}" Style="{StaticResource Forest.Icon}" Width="13" Height="13" Margin="0,0,8,0" />
+                                <TextBlock Text="{local:Tr settings.clone}" />
+                            </StackPanel>
+                        </Button>
                         <Button Content="{local:Tr settings.removeProfile}" Command="{Binding RemoveProfileCommand}" CommandParameter="{Binding EditedProfile}"
                                 Style="{StaticResource Forest.DangerButton}" HorizontalAlignment="Stretch" />
                     </StackPanel>

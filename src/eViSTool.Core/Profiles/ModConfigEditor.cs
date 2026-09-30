@@ -94,7 +94,7 @@ public static class ModConfigEditor
     /// <summary>Резервная копия предыдущего состояния рядом (*.evistool.bak) и атомарная запись.</summary>
     internal static void Save(string path, JObject root)
     {
-        File.Copy(path, path + ".evistool.bak", overwrite: true);
+        if (File.Exists(path)) File.Copy(path, path + ".evistool.bak", overwrite: true);
         var tmp = path + ".evistool.tmp";
         File.WriteAllText(tmp, root.ToString(Formatting.Indented), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         File.Move(tmp, path, overwrite: true);
