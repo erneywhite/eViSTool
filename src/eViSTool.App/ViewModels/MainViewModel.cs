@@ -155,6 +155,32 @@ public sealed partial class MainViewModel : ObservableObject
         Save(); // перенос настроек старого формата сразу на диск
         Mods.OnProfileSwitched(); // список модов виден сразу, без сети
         _ = About.CheckQuietlyAsync(); // новая версия программы — подсказка в боковой панели
+
+        // Удалённый доступ работает, пока открыто это окно (или пока работает сервер): держим агентов таких профилей
+        // запущенными. Закрыли окно и сервер не работает — агент через пару минут выйдет, в системе ничего не остаётся.
+        _keepRemote = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        _keepRemote.Tick += (_, _) => _ = KeepRemoteAgentsAsync();
+        _keepRemote.Start();
+        _ = KeepRemoteAgentsAsync();
+    }
+
+    private readonly System.Windows.Threading.DispatcherTimer _keepRemote;
+
+    private async Task KeepRemoteAgentsAsync()
+    {
+        foreach (var profile in Profiles.Where(p => p.Kind == ProfileKind.Server).Select(p => p.Model).ToList())
+        {
+            if (!Core.Server.Remote.RemoteAccess.Load(profile.Id).Enabled) continue;
+            try
+            {
+                using var client = await Core.Server.AgentLauncher.EnsureRunningAsync(profile, startServer: false);
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or TimeoutException
+                                           or System.Net.Http.HttpRequestException or System.ComponentModel.Win32Exception)
+            {
+                // папки игры нет и т. п. — вкладка «Удалённый доступ» покажет, что агент не запущен
+            }
+        }
     }
 
     [RelayCommand]

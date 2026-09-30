@@ -1,0 +1,123 @@
+<UserControl x:Class="eViSTool.App.ServerRemoteView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:eViSTool.App">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:TextToVisibilityConverter x:Key="TextToVis" />
+
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,2,0,0" />
+        </Style>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="Row" TargetType="Border">
+            <Setter Property="BorderBrush" Value="{StaticResource Forest.Line}" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
+            <Setter Property="Padding" Value="0,14,0,0" />
+            <Setter Property="Margin" Value="0,14,0,0" />
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
+        <StackPanel Margin="0,0,14,0">
+            <Border Style="{StaticResource Forest.Card}" Padding="20,16,20,18">
+                <StackPanel>
+                    <TextBlock Text="{local:Tr remote.title}" Style="{StaticResource CardTitle}" />
+                    <TextBlock Text="{local:Tr remote.hint}" Style="{StaticResource Hint}" />
+
+                    <Border Style="{StaticResource Row}">
+                        <DockPanel>
+                            <CheckBox DockPanel.Dock="Right" Style="{StaticResource Forest.Switch}" IsChecked="{Binding Enabled}" VerticalAlignment="Center"
+                                      AutomationProperties.AutomationId="RemoteEnabled" AutomationProperties.Name="{local:Tr remote.enabled}" />
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{local:Tr remote.enabled}" Style="{StaticResource Label}" />
+                                <TextBlock Text="{Binding StatusText}" FontSize="12" Margin="0,4,0,0" AutomationProperties.AutomationId="RemoteStatus">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsListening}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource Forest.Good}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <StackPanel Visibility="{Binding Enabled, Converter={StaticResource BoolToVis}}">
+                        <!-- адрес, по которому до этой машины достучатся -->
+                        <Border Style="{StaticResource Row}">
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Right" Width="260">
+                                    <ComboBox IsEditable="True" ItemsSource="{Binding Addresses}" Text="{Binding Host, UpdateSourceTrigger=PropertyChanged}"
+                                              AutomationProperties.AutomationId="RemoteHost" AutomationProperties.Name="{local:Tr remote.host}" />
+                                    <TextBlock Style="{StaticResource Hint}" Margin="2,6,0,0">
+                                        <Run Text="{local:Tr remote.port}" /><Run Text=" " /><Run Text="{Binding Port, Mode=OneWay}" FontWeight="SemiBold" />
+                                    </TextBlock>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock Text="{local:Tr remote.host}" Style="{StaticResource Label}" />
+                                    <TextBlock Text="{local:Tr remote.hostHint}" Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <!-- код подключения: закрыт точками, пока не попросят показать -->
+                        <Border Style="{StaticResource Row}">
+                            <StackPanel>
+                                <TextBlock Text="{local:Tr remote.code}" Style="{StaticResource Label}" />
+                                <TextBlock Text="{local:Tr remote.codeHint}" Style="{StaticResource Hint}" />
+                                <DockPanel Margin="0,10,0,0">
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="8,0,0,0">
+                                        <Button Content="{Binding RevealText}" Command="{Binding ToggleRevealCommand}" Margin="0,0,8,0"
+                                                AutomationProperties.AutomationId="RemoteReveal" />
+                                        <Button Style="{StaticResource Forest.PrimaryButton}" Command="{Binding CopyCodeCommand}"
+                                                AutomationProperties.AutomationId="RemoteCopy">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Path Data="{StaticResource Icon.Copy}" Style="{StaticResource Forest.Icon}" Width="13" Height="13" Margin="0,0,8,0" />
+                                                <TextBlock Text="{local:Tr remote.copy}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                    <TextBox Text="{Binding CodeText, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas" FontSize="12"
+                                             VerticalContentAlignment="Center" AutomationProperties.AutomationId="RemoteCode" />
+                                </DockPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button Content="{local:Tr remote.newKey}" Command="{Binding RegenerateKeyCommand}" Margin="0,0,8,0"
+                                            ToolTip="{local:Tr remote.newKeyTip}" />
+                                    <Button Content="{local:Tr remote.firewall}" Command="{Binding OpenFirewallCommand}" ToolTip="{local:Tr remote.firewallTip}" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding Message}" FontSize="12" Foreground="{StaticResource Forest.Accent}" TextWrapping="Wrap" Margin="0,10,0,0"
+                                           Visibility="{Binding Message, Converter={StaticResource TextToVis}}" AutomationProperties.AutomationId="RemoteMessage" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- безопасность: коротко и по делу -->
+            <Border Style="{StaticResource Forest.Warning}" Margin="0,14,0,0">
+                <DockPanel>
+                    <Path DockPanel.Dock="Left" Data="{StaticResource Icon.Warning}" Style="{StaticResource Forest.Icon}" Stroke="{StaticResource Forest.Warn}"
+                          VerticalAlignment="Top" Margin="0,2,12,0" />
+                    <TextBlock Text="{local:Tr remote.warning}" Foreground="{StaticResource Forest.Warn}" TextWrapping="Wrap" FontSize="12" />
+                </DockPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

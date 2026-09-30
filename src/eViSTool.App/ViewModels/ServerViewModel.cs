@@ -13,7 +13,7 @@ using eViSTool.Core.Server;
 namespace eViSTool.App.ViewModels;
 
 /// <summary>Виды раздела «Сервер».</summary>
-public enum ServerTab { Console, Config, Schedule }
+public enum ServerTab { Console, Config, Schedule, Remote }
 
 /// <summary>
 /// Вкладка «Сервер». Сервером владеет агент (отдельный процесс) — окно только показывает и командует,
@@ -38,6 +38,7 @@ public sealed partial class ServerViewModel : ObservableObject
 
     /// <summary>Расписание: резервные копии (и рестарты) — третий вид раздела.</summary>
     public ServerScheduleViewModel Schedule { get; }
+    public ServerRemoteViewModel Remote { get; } = new();
 
     /// <summary>Какой вид раздела открыт. Консоль продолжает получать строки при любом.</summary>
     [ObservableProperty] private ServerTab _tab;
@@ -45,6 +46,7 @@ public sealed partial class ServerViewModel : ObservableObject
     public bool IsConsoleTab => Tab == ServerTab.Console;
     public bool IsConfigTab => Tab == ServerTab.Config;
     public bool IsScheduleTab => Tab == ServerTab.Schedule;
+    public bool IsRemoteTab => Tab == ServerTab.Remote;
 
     // состояние сервера профиля выяснено (первый проход слежения после смены профиля завершён)
     private bool _stateKnown;
@@ -98,6 +100,7 @@ public sealed partial class ServerViewModel : ObservableObject
         OnPropertyChanged(nameof(IsConsoleTab));
         OnPropertyChanged(nameof(IsConfigTab));
         OnPropertyChanged(nameof(IsScheduleTab));
+        OnPropertyChanged(nameof(IsRemoteTab));
         Config.SetActive(value == ServerTab.Config);
         Schedule.SetActive(value == ServerTab.Schedule);
     }
@@ -148,6 +151,7 @@ public sealed partial class ServerViewModel : ObservableObject
         Refresh();
         Config.OnLanguageChanged();
         Schedule.OnLanguageChanged();
+        Remote.OnLanguageChanged();
     }
 
     /// <summary>Сменился профиль: отключиться от старого агента, подключиться к агенту нового (если он работает).</summary>
@@ -175,6 +179,7 @@ public sealed partial class ServerViewModel : ObservableObject
             _main.ActiveProfile?.Model.GameDir);
         Schedule.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model.Id : null,
             IsServerProfile ? _main.ActiveProfile?.Model.DataDir : null, _main.ActiveProfile?.Name ?? "");
+        Remote.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model : null);
         if (!IsServerProfile) return;
 
         _session = new CancellationTokenSource();
@@ -242,6 +247,7 @@ public sealed partial class ServerViewModel : ObservableObject
         PidText = s.ServerPid is { } pid && s.State != ServerState.Stopped ? pid.ToString() : "—";
         ShowPlayers(s.Players, running: s.State == ServerState.Running);
         Schedule.ShowStatus(s);
+        Remote.ShowStatus(s);
         StateNote = s.RestartScheduledAt is { } at ? Loc.T("server.restartIn", Math.Max(0, (int)(at - DateTime.Now).TotalSeconds))
             : s.State == ServerState.Stopped && s.LastExitCode is { } code ? Loc.T("server.lastExit", code)
             : s.NextRestartAt is { } planned ? Loc.T("server.restartPlanned", planned.ToString("HH:mm"))
@@ -254,6 +260,7 @@ public sealed partial class ServerViewModel : ObservableObject
         StateNote = "";
         ShowPlayers([], running: false);
         Schedule?.ShowStatus(null);
+        Remote?.ShowStatus(null);
     }
 
     // ---------- игроки на сервере ----------
