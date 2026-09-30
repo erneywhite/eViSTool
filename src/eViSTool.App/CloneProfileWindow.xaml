@@ -34,13 +34,13 @@
 
         <StackPanel x:Name="Form">
             <TextBlock Text="{local:Tr clone.name}" Style="{StaticResource Label}" />
-            <TextBox x:Name="NameBox" Margin="0,6,0,0" MaxLength="60" TextChanged="NameBox_TextChanged" />
+            <TextBox x:Name="NameBox" Margin="0,6,0,0" MaxLength="60" TextChanged="NameBox_TextChanged" AutomationProperties.AutomationId="CloneName" />
 
             <TextBlock Text="{local:Tr clone.target}" Style="{StaticResource Label}" />
             <TextBlock Text="{local:Tr clone.targetHint}" Style="{StaticResource Hint}" Margin="0,2,0,6" />
             <DockPanel>
                 <Button DockPanel.Dock="Right" Content="{local:Tr common.browse}" Click="Browse_Click" Margin="8,0,0,0" />
-                <TextBox x:Name="TargetBox" VerticalContentAlignment="Center" TextChanged="TargetBox_TextChanged" />
+                <TextBox x:Name="TargetBox" VerticalContentAlignment="Center" TextChanged="TargetBox_TextChanged" AutomationProperties.AutomationId="CloneTarget" />
             </DockPanel>
 
             <!-- несколько serverconfig*.json в одной папке — выбрать мир -->
