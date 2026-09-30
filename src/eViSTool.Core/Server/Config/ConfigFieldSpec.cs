@@ -22,8 +22,22 @@ public sealed record ConfigFieldSpec
 
     public IReadOnlyList<ConfigChoice> Choices { get; init; } = [];
 
-    /// <summary>Пустой ввод → null в JSON.</summary>
+    /// <summary>
+    /// Пустой ввод → null в JSON. Схема подстраивает признак под файл (см. <see cref="ServerConfigSchema.FieldsFor"/>):
+    /// пустой ввод возвращает ту «пустоту», что лежала в файле, — если поле не помечено <see cref="EmptyIsNull"/> или <see cref="NeverNull"/>.
+    /// </summary>
     public bool Nullable { get; init; }
+
+    /// <summary>
+    /// «Пусто» здесь — только null: пустой ввод (и из одних пробелов) даёт null, даже если в файле лежит "" или [].
+    /// Так у адреса сервера: «все адреса» — это именно null.
+    /// </summary>
+    public bool EmptyIsNull { get; init; }
+
+    /// <summary>
+    /// null в этом поле роняет сервер: пустой ввод даёт "" (для списка — []), даже если в файле лежит null.
+    /// </summary>
+    public bool NeverNull { get; init; }
 
     /// <summary>Choice хранится числом.</summary>
     public bool NumericChoice { get; init; }

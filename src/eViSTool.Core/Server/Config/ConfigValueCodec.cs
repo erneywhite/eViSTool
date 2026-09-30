@@ -39,16 +39,26 @@ public static class ConfigValueCodec
     /// То же, но с исходным значением поля: пока текст не тронут, возвращается исходный токен как был —
     /// даже если обычный разбор дал бы другое (null вместо "", элемент списка с пробелами) или ошибку.
     /// ReadOnly всегда возвращает исходное.
+    /// Исключение — «пустота», которую поле хранить не должно (<see cref="ConfigFieldSpec.EmptyIsNull"/>,
+    /// <see cref="ConfigFieldSpec.NeverNull"/>): пустой ввод разбирается всегда, иначе "" в адресе сервера или null
+    /// в приветствии было бы нечем исправить.
     /// </summary>
     public static bool TryParse(string? text, ConfigFieldSpec spec, JToken? original, out JToken? token, out string? errorKey, out object?[] errorArgs)
     {
-        if (spec.Kind != Kind.ReadOnly && Lf(text ?? "") != Lf(ToText(original, spec)))
+        if (spec.Kind != Kind.ReadOnly && (Lf(text ?? "") != Lf(ToText(original, spec)) || IsWrongEmptiness(text, spec, original)))
             return TryParse(text, spec, out token, out errorKey, out errorArgs);
 
         token = original?.DeepClone() ?? JValue.CreateNull();
         errorKey = null;
         errorArgs = NoArgs;
         return true;
+    }
+
+    /// <summary>Поле пусто, а в файле лежит не та «пустота», что положена этому полю.</summary>
+    private static bool IsWrongEmptiness(string? text, ConfigFieldSpec spec, JToken? original)
+    {
+        if (!string.IsNullOrWhiteSpace(text) || original is null) return false;
+        return original.Type == JTokenType.Null ? spec.NeverNull : spec.EmptyIsNull;
     }
 
     /// <summary>Скаляр как записан: строка — как есть, bool — «true»/«false», числа — с точкой; объект или массив — сжатым JSON.</summary>
@@ -72,7 +82,8 @@ public static class ConfigValueCodec
             {
                 // поле ввода WPF вставляет «\r\n», сервер сам пишет «\n»; у пути пробелы по краям — всегда опечатка
                 var value = spec.Kind switch { Kind.Multiline => Lf(text), Kind.Path => text.Trim(), _ => text };
-                if (value.Length == 0 && spec.Nullable) return Ok(JValue.CreateNull());
+                if (spec.EmptyIsNull && string.IsNullOrWhiteSpace(value)) return Ok(JValue.CreateNull());
+                if (value.Length == 0 && spec.Nullable && !spec.NeverNull) return Ok(JValue.CreateNull());
                 return spec.Required && string.IsNullOrWhiteSpace(value) ? Error("cfgerr.required") : Ok(new JValue(value));
             }
 
@@ -81,7 +92,7 @@ public static class ConfigValueCodec
                 var list = new JArray();
                 foreach (var line in text.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0))
                     list.Add(line);
-                return list.Count == 0 && spec.Nullable ? Ok(JValue.CreateNull()) : Ok(list);
+                return list.Count == 0 && (spec.EmptyIsNull || (spec.Nullable && !spec.NeverNull)) ? Ok(JValue.CreateNull()) : Ok(list);
             }
 
             case Kind.Json:
