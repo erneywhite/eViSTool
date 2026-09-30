@@ -148,9 +148,14 @@ public static class AgentLauncher
         {
             try
             {
-                await existing.StatusAsync(ct).ConfigureAwait(false);
-                if (startServer) await existing.StartAsync(ct).ConfigureAwait(false);
-                return existing;
+                var status = await existing.StatusAsync(ct).ConfigureAwait(false);
+                if (!(AgentProtocol.IsOutdated(status) && status.State == ServerState.Stopped && status.RestartScheduledAt is null))
+                {
+                    if (startServer) await existing.StartAsync(ct).ConfigureAwait(false);
+                    return existing;
+                }
+                // eViSTool обновили, а агент прежний; сервер стоит — меняем агента на новый (сервер при этом не трогаем)
+                await ReplaceAsync(existing, ct).ConfigureAwait(false);
             }
             catch (HttpRequestException)
             {
@@ -195,5 +200,45 @@ public static class AgentLauncher
             await Task.Delay(150, ct).ConfigureAwait(false);
         }
         throw new TimeoutException(Loc.T("srv.agentTimeout"));
+    }
+
+    /// <summary>
+    /// Перед обновлением программы: остановить агентов, у которых сервер не работает, — иначе они продолжили бы жить
+    /// со старым файлом и не знали бы новых функций. Агентов с работающим сервером не трогаем: сервер важнее,
+    /// такой агент заменится после остановки сервера.
+    /// </summary>
+    public static async Task StopIdleAgentsAsync(IEnumerable<GameProfile> profiles, CancellationToken ct = default)
+    {
+        foreach (var profile in profiles.Where(p => p.Kind == ProfileKind.Server && !p.IsRemote))
+        {
+            if (AgentClient.TryConnect(profile.Id) is not { } client) continue;
+            try
+            {
+                var status = await client.StatusAsync(ct).ConfigureAwait(false);
+                if (status.State == ServerState.Stopped && status.RestartScheduledAt is null)
+                {
+                    await ReplaceAsync(client, ct).ConfigureAwait(false);
+                    continue;
+                }
+            }
+            catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException) { }
+            client.Dispose();
+        }
+    }
+
+    /// <summary>Попросить агента выйти и дождаться, пока он действительно завершится.</summary>
+    public static async Task ReplaceAsync(AgentClient existing, CancellationToken ct = default)
+    {
+        var pid = existing.Endpoint.Pid;
+        try { await existing.ShutdownAsync(ct).ConfigureAwait(false); }
+        catch (HttpRequestException) { /* уже выходит */ }
+        existing.Dispose();
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            using var wait = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            await p.WaitForExitAsync(wait.Token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or OperationCanceledException) { }
     }
 }

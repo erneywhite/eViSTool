@@ -151,6 +151,7 @@ public sealed partial class MainViewModel : ObservableObject
         Mods = new ModsViewModel(this, db);
         Catalog = new CatalogViewModel(this, db);
         Server = new ServerViewModel(this);
+        About.Profiles = () => _settings.Profiles;
         Server.OnProfileSwitched();
         Save(); // перенос настроек старого формата сразу на диск
         Mods.OnProfileSwitched(); // список модов виден сразу, без сети

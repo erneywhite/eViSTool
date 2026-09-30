@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core;
 using eViSTool.Core.AppUpdate;
 using eViSTool.Core.Localization;
+using eViSTool.Core.Profiles;
 using eViSTool.Core.Versioning;
 
 namespace eViSTool.App.ViewModels;
@@ -17,6 +18,9 @@ public sealed partial class AboutViewModel : ObservableObject
     public const string KofiUrl = "https://ko-fi.com/erneywhite";
 
     private readonly AppUpdater _updater = new();
+
+    /// <summary>Профили — чтобы перед перезапуском после обновления остановить агентов без работающего сервера.</summary>
+    public Func<IEnumerable<GameProfile>>? Profiles { get; set; }
 
     public string AppVersion { get; } =
         typeof(AboutViewModel).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
@@ -102,6 +106,8 @@ public sealed partial class AboutViewModel : ObservableObject
 
             AvailableUpdate = null;
             UpdateStatus = Loc.T("about.updateInstalled", release.Version);
+            // агенты без работающего сервера — на выход: новое окно поднимет агентов уже новой версии
+            if (Profiles is { } profiles) await Core.Server.AgentLauncher.StopIdleAgentsAsync([.. profiles()]);
             var owner = Application.Current.MainWindow!;
             if (MessageBox.Show(owner, Loc.T("about.updateRestartAsk", release.Version), "eViSTool",
                     MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)

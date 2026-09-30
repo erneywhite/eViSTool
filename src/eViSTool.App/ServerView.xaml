@@ -180,6 +180,8 @@
             <!-- ===== ошибка последнего действия ===== -->
             <TextBlock DockPanel.Dock="Top" Text="{Binding ErrorText}" Foreground="{StaticResource Forest.Danger}" TextWrapping="Wrap" Margin="0,12,0,0"
                        Visibility="{Binding ErrorText, Converter={StaticResource TextToVis}}" />
+            <TextBlock DockPanel.Dock="Top" Text="{Binding AgentNote}" Foreground="{StaticResource Forest.Warn}" TextWrapping="Wrap" Margin="0,12,0,0"
+                       Visibility="{Binding AgentNote, Converter={StaticResource TextToVis}}" AutomationProperties.AutomationId="AgentNote" />
 
             <!-- остаток места: консоль или редактор конфигурации -->
             <Grid>

@@ -136,8 +136,9 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or IOException or TaskCanceledException
                                        or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
         {
-            // удалённый сервер недоступен — попробуем, когда появится связь (ShowStatus)
-            if (generation == _generation && !data.IsRemote) StatusText = Loc.T("sched.failed", ex.Message);
+            // удалённый сервер недоступен — попробуем, когда появится связь (ShowStatus); а вот о старом агенте — скажем
+            if (generation == _generation && (!data.IsRemote || ex.Message.StartsWith("404")))
+                StatusText = data.IsRemote ? RemoteSecret.Describe(ex) : Loc.T("sched.failed", ex.Message);
         }
         UpdateTexts();
     }
@@ -319,7 +320,8 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException or InvalidOperationException
                                        or TaskCanceledException or Newtonsoft.Json.JsonException)
         {
-            if (generation == _generation && !data.IsRemote) StatusText = ex.Message;
+            if (generation == _generation && (!data.IsRemote || ex.Message.StartsWith("404")))
+                StatusText = data.IsRemote ? RemoteSecret.Describe(ex) : ex.Message;
             return;
         }
         if (generation != _generation) return;
