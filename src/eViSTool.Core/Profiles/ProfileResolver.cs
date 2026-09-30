@@ -8,7 +8,7 @@ namespace eViSTool.Core.Profiles;
 /// <summary>Читает из файлов игры, где у профиля лежат моды и какие из них выключены.</summary>
 public static class ProfileResolver
 {
-    // У обычной сборки файл называется clientsettings.json, у некоторых сборок — с префиксом (myclientsettings.json).
+    // У обычной сборки файл называется clientsettings.json, у некоторых сборок — с префиксом перед этим именем.
     private const string ClientSettingsPattern = "*clientsettings.json";
     public const string ServerConfigName = "serverconfig.json";
 

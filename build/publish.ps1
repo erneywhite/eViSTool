@@ -31,7 +31,7 @@ if ($LASTEXITCODE) { throw "publish eViSTool.Agent: $LASTEXITCODE" }
 # в релиз — только сами программы; папку data программа создаст рядом при первом запуске
 Get-ChildItem $out -File | Where-Object { $_.Name -notin 'eViSTool.exe', 'eViSTool.Agent.exe' } | Remove-Item -Force
 Get-ChildItem $out -Directory | Remove-Item -Recurse -Force
-foreach ($doc in 'LICENSE', 'README.md') {
+foreach ($doc in 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'README.md', 'README.ru.md') {
     if (Test-Path (Join-Path $root $doc)) { Copy-Item (Join-Path $root $doc) $out }
 }
 
