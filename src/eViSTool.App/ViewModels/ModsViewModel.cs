@@ -96,7 +96,10 @@ public sealed partial class ModsViewModel : ObservableObject
         if (value is null) return;
         _cardLoad?.Cancel();
         _cardLoad = new CancellationTokenSource();
+        // тот же мод после операции — остаёмся на той же вкладке карточки
+        var keepTab = Card is { IsVersionsTab: true } old && old.Row.ModId == value.ModId;
         Card = new ModCardViewModel(value, this, Profile?.GameVersion, _main.ActiveProfile?.Name ?? "");
+        if (keepTab) Card.IsVersionsTab = true;
         _ = Card.LoadAsync(_db, _cardLoad.Token);
     }
 
@@ -429,13 +432,17 @@ public sealed partial class ModsViewModel : ObservableObject
 
     /// <summary>Скачать релиз и поставить его. Ошибки — в problems.</summary>
     private async Task<bool> DownloadAndInstallAsync(ResolvedProfile profile, string modId, string name, ModDbRelease release,
-        List<string> installed, List<string> problems)
+        List<string> installed, List<string> problems, Action<double>? onProgress = null, CancellationToken ct = default)
     {
         string? file = null;
         try
         {
-            var progress = new Progress<double>(x => StatusText = Loc.T("dl.progress", name, release.ModVersion, x.ToString("P0")));
-            file = await _updater.DownloadReleaseAsync(release, modId, progress);
+            var progress = new Progress<double>(x =>
+            {
+                StatusText = Loc.T("dl.progress", name, release.ModVersion, x.ToString("P0"));
+                onProgress?.Invoke(x);
+            });
+            file = await _updater.DownloadReleaseAsync(release, modId, progress, ct);
             return InstallZip(profile, file, interactive: false, installed, problems);
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or TaskCanceledException)
@@ -470,65 +477,167 @@ public sealed partial class ModsViewModel : ObservableObject
     // ---------- обновление ----------
 
     [RelayCommand]
-    private async Task UpdateOneAsync(ModRowViewModel? row)
+    private void UpdateOne(ModRowViewModel? row)
     {
-        if (row is not { CanUpdate: true } || Profile is not { } profile || IsBusy) return;
-        if (!ConfirmIfRunning(profile)) return;
-
-        var installed = new List<string>();
-        var problems = new List<string>();
-        IsBusy = true;
-        try
-        {
-            await DownloadAndInstallAsync(profile, row.ModId, row.Name, row.Result.LatestCompatible!, installed, problems);
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-        Report(Loc.T("report.updated"), installed, problems);
+        if (row is not { CanUpdate: true }) return;
+        Enqueue([QueueItemFor(row, row.Result.LatestCompatible!)]);
     }
 
     [RelayCommand]
-    private async Task UpdateAllAsync()
+    private void UpdateAll()
     {
-        if (Profile is not { } profile || IsBusy) return;
+        if (IsBusy && !IsQueueRunning) return;
         var todo = Rows.Where(r => r.CanUpdate).ToList();
         if (todo.Count == 0) return;
 
         var list = string.Join("\n", todo.Select(r => $"• {r.Name}: {r.Installed} → {r.Latest}"));
         if (!Confirm(Loc.T("mods.updateAllConfirm", todo.Count, list))) return;
-        if (!ConfirmIfRunning(profile)) return;
+        Enqueue(todo.Select(r => QueueItemFor(r, r.Result.LatestCompatible!)));
+    }
 
-        var installed = new List<string>();
-        var problems = new List<string>();
+    private static UpdateQueueItem QueueItemFor(ModRowViewModel row, ModDbRelease release) =>
+        new(row.ModId, row.Name, row.Installed, release.ModVersion ?? "?", release, null);
+
+    // ---------- очередь установки ----------
+
+    /// <summary>Очередь: обновления, откаты, выбранные версии. Ставятся по одному, можно добавлять на ходу.</summary>
+    public ObservableCollection<UpdateQueueItem> Queue { get; } = [];
+    [ObservableProperty] private bool _isQueueRunning;
+    private CancellationTokenSource? _queueCts;
+
+    public bool HasQueue => Queue.Count > 0;
+    public string QueueTitle => Loc.T(IsQueueRunning ? "queue.titleRunning" : "queue.titleDone",
+        Queue.Count(i => i.State is QueueState.Done or QueueState.Failed or QueueState.Cancelled), Queue.Count);
+    public double QueueProgress => Queue.Count == 0 ? 0
+        : (Queue.Count(i => i.State is QueueState.Done or QueueState.Failed or QueueState.Cancelled)
+           + Queue.Where(i => i.IsWorking).Sum(i => i.Progress)) / Queue.Count;
+    public bool HasQueueRetry => !IsQueueRunning && Queue.Any(i => i.State is QueueState.Failed or QueueState.Cancelled);
+
+    /// <summary>Кнопки «Обновить» доступны и пока идёт очередь — пункт просто встанет в конец.</summary>
+    public bool CanQueue => !IsBusy || IsQueueRunning;
+
+    partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(CanQueue));
+
+    partial void OnIsQueueRunningChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanQueue));
+        NotifyQueue();
+    }
+
+    private void NotifyQueue()
+    {
+        OnPropertyChanged(nameof(HasQueue));
+        OnPropertyChanged(nameof(QueueTitle));
+        OnPropertyChanged(nameof(QueueProgress));
+        OnPropertyChanged(nameof(HasQueueRetry));
+    }
+
+    /// <summary>Поставить в очередь; уже ждущий или ставящийся мод второй раз не добавляется.</summary>
+    public void Enqueue(IEnumerable<UpdateQueueItem> items)
+    {
+        if (IsBusy && !IsQueueRunning) return; // идёт другая операция (импорт модпака и т.п.)
+        if (!IsQueueRunning)
+        {
+            // прошлый прогон закончен — его итоги убираем
+            foreach (var old in Queue.Where(i => i.State is QueueState.Done).ToList()) Queue.Remove(old);
+        }
+        foreach (var item in items)
+        {
+            var same = Queue.FirstOrDefault(i => string.Equals(i.ModId, item.ModId, StringComparison.OrdinalIgnoreCase));
+            if (same is { State: QueueState.Waiting or QueueState.Working }) continue;
+            if (same is not null) Queue.Remove(same);
+            Queue.Add(item);
+        }
+        NotifyQueue();
+        if (!IsQueueRunning) _ = RunQueueAsync();
+    }
+
+    private async Task RunQueueAsync()
+    {
+        if (Profile is not { } profile) return;
+        if (!ConfirmIfRunning(profile))
+        {
+            foreach (var i in Queue.Where(i => i.State == QueueState.Waiting)) i.State = QueueState.Cancelled;
+            NotifyQueue();
+            return;
+        }
+
+        _queueCts = new CancellationTokenSource();
+        var ct = _queueCts.Token;
         IsBusy = true;
+        IsQueueRunning = true;
+        var installed = new List<string>();
         try
         {
-            // по одному: понятный прогресс и никаких гонок за папку модов
-            foreach (var row in todo)
-                await DownloadAndInstallAsync(profile, row.ModId, row.Name, row.Result.LatestCompatible!, installed, problems);
+            while (!ct.IsCancellationRequested && Queue.FirstOrDefault(i => i.State == QueueState.Waiting) is { } item)
+            {
+                item.State = QueueState.Working;
+                item.Progress = 0;
+                NotifyQueue();
+                var problems = new List<string>();
+                bool ok;
+                if (item.Path is not null)
+                    ok = InstallZip(profile, item.Path, interactive: false, installed, problems);
+                else
+                    ok = await DownloadAndInstallAsync(profile, item.ModId, item.Name, item.Release!, installed, problems,
+                        x => { item.Progress = x; OnPropertyChanged(nameof(QueueProgress)); }, ct);
+
+                item.State = ok ? QueueState.Done : ct.IsCancellationRequested ? QueueState.Cancelled : QueueState.Failed;
+                item.Message = ok ? "" : ct.IsCancellationRequested ? "" : problems.FirstOrDefault() ?? "";
+                if (ok) ReloadLocal(); // таблица и карточка сразу показывают новую версию
+                NotifyQueue();
+            }
+            foreach (var i in Queue.Where(i => i.State == QueueState.Waiting)) i.State = QueueState.Cancelled;
         }
         finally
         {
+            IsQueueRunning = false;
             IsBusy = false;
+            _queueCts.Dispose();
+            _queueCts = null;
         }
-        Report(Loc.T("report.updated"), installed, problems);
+
+        ReloadLocal();
+        _ = FetchNewModsAsync();
+        var done = Queue.Count(i => i.State == QueueState.Done);
+        var failed = Queue.Count(i => i.State == QueueState.Failed);
+        StatusText = Loc.T("queue.finished", done, failed);
+    }
+
+    [RelayCommand]
+    private void StopQueue() => _queueCts?.Cancel();
+
+    [RelayCommand]
+    private void RetryQueue()
+    {
+        if (IsQueueRunning) return;
+        foreach (var i in Queue.Where(i => i.State is QueueState.Failed or QueueState.Cancelled))
+        {
+            i.Message = "";
+            i.State = QueueState.Waiting;
+        }
+        NotifyQueue();
+        _ = RunQueueAsync();
+    }
+
+    [RelayCommand]
+    private void CloseQueue()
+    {
+        if (IsQueueRunning) return;
+        Queue.Clear();
+        NotifyQueue();
     }
 
     // ---------- откат / другая версия ----------
 
-    [RelayCommand]
-    private async Task RollbackAsync(ModRowViewModel? row)
+    /// <summary>Версии для установки: сохранённые копии и релизы модбазы под версию игры.</summary>
+    public async Task<List<VersionOption>> LoadVersionOptionsAsync(ModRowViewModel row, CancellationToken ct = default)
     {
-        if (row?.Local.Info is not { } info || Profile is not { } profile || IsBusy) return;
-
+        if (row.Local.Info is not { } info || Profile is not { } profile) return [];
         IReadOnlyList<ModDbRelease> releases = [];
-        IsBusy = true;
         try
         {
-            StatusText = Loc.T("mods.findingVersions", row.Name);
-            var remote = row.Result.Remote ?? await _db.GetModAsync(info.ModId);
+            var remote = row.Result.Remote ?? await _db.GetModAsync(info.ModId, ct);
             if (remote is not null && profile.GameVersion is { } game)
                 releases = UpdateChecker.CompatibleReleases(remote.Releases, game);
         }
@@ -536,36 +645,27 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             // без сети — только сохранённые копии
         }
-        finally
-        {
-            IsBusy = false;
-            StatusText = "";
-        }
+        return RollbackWindow.BuildOptions(ModBackupStore.ForProfile(profile.Profile), info.ModId, info.Version, releases);
+    }
 
-        var store = ModBackupStore.ForProfile(profile.Profile);
-        var dlg = new RollbackWindow(Loc.T("rollback.heading", row.Name, row.Installed),
-            RollbackWindow.BuildOptions(store, info.ModId, info.Version, releases))
+    /// <summary>Поставить выбранную версию (через очередь).</summary>
+    public void InstallVersion(ModRowViewModel row, VersionOption option) =>
+        Enqueue([new UpdateQueueItem(row.ModId, row.Name, row.Installed, option.Version, option.Release, option.Path)]);
+
+    [RelayCommand]
+    private async Task RollbackAsync(ModRowViewModel? row)
+    {
+        if (row?.Local.Info is null || Profile is null || (IsBusy && !IsQueueRunning)) return;
+
+        StatusText = Loc.T("mods.findingVersions", row.Name);
+        var options = await LoadVersionOptionsAsync(row);
+        StatusText = "";
+
+        var dlg = new RollbackWindow(Loc.T("rollback.heading", row.Name, row.Installed), options)
         {
             Owner = Application.Current.MainWindow,
         };
-        if (dlg.ShowDialog() != true || dlg.Selected is not { } choice) return;
-        if (!ConfirmIfRunning(profile)) return;
-
-        var installed = new List<string>();
-        var problems = new List<string>();
-        IsBusy = true;
-        try
-        {
-            if (choice.Path is not null)
-                InstallZip(profile, choice.Path, interactive: false, installed, problems);
-            else if (choice.Release is not null)
-                await DownloadAndInstallAsync(profile, info.ModId, row.Name, choice.Release, installed, problems);
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-        Report(Loc.T("report.installed"), installed, problems);
+        if (dlg.ShowDialog() == true && dlg.Selected is { } choice) InstallVersion(row, choice);
     }
 
     // ---------- зависимости ----------

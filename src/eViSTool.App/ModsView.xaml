@@ -10,6 +10,7 @@
         <local:PixelsToGridLengthConverter x:Key="PxToGrid" />
         <local:EnumEqualsConverter x:Key="EnumEq" />
         <local:TextToVisibilityConverter x:Key="TextToVis" />
+        <local:InvertBoolToVisibilityConverter x:Key="InvertVis" />
 
         <!-- цвет состояния: точка и текст (DataContext — строка мода) -->
         <Style x:Key="ToneDot" TargetType="Ellipse">
@@ -127,7 +128,7 @@
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource Forest.PrimaryButton}" Command="{Binding UpdateAllCommand}" Margin="8,0,0,0"
-                        IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}"
+                        IsEnabled="{Binding CanQueue}"
                         Visibility="{Binding UpdateCount, Converter={StaticResource CountToVis}}"
                         ToolTip="{local:Tr mods.updateAllTip}">
                     <StackPanel Orientation="Horizontal">
@@ -177,6 +178,48 @@
                     <TextBlock Text="{local:Tr mods.depTitle}" Foreground="{StaticResource Forest.Warn}" FontSize="13" />
                     <TextBlock Text="{Binding DependencyText}" Foreground="{StaticResource Forest.Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0" />
                 </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- ===== очередь установки ===== -->
+        <Border DockPanel.Dock="Top" Style="{StaticResource Forest.Card}" Margin="0,14,0,0" Padding="14,12"
+                Visibility="{Binding HasQueue, Converter={StaticResource BoolToVis}}">
+            <DockPanel>
+                <DockPanel DockPanel.Dock="Top">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Button Content="{local:Tr queue.stop}" Command="{Binding StopQueueCommand}" Padding="12,4" MinHeight="0" FontSize="12"
+                                Style="{StaticResource Forest.DangerButton}"
+                                Visibility="{Binding IsQueueRunning, Converter={StaticResource BoolToVis}}" />
+                        <Button Content="{local:Tr queue.retry}" Command="{Binding RetryQueueCommand}" Padding="12,4" MinHeight="0" FontSize="12"
+                                Visibility="{Binding HasQueueRetry, Converter={StaticResource BoolToVis}}" />
+                        <Button Content="{local:Tr queue.close}" Command="{Binding CloseQueueCommand}" Padding="12,4" MinHeight="0" FontSize="12"
+                                Margin="8,0,0,0" Visibility="{Binding IsQueueRunning, Converter={StaticResource InvertVis}}" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding QueueTitle}" Foreground="{StaticResource Forest.Text}" FontSize="13" FontWeight="SemiBold"
+                               VerticalAlignment="Center" />
+                </DockPanel>
+                <ProgressBar DockPanel.Dock="Top" Style="{StaticResource Forest.Progress}" Value="{Binding QueueProgress, Mode=OneWay}" Margin="0,10,0,6" />
+                <ScrollViewer MaxHeight="150" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Queue}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel Margin="0,4">
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Width="130" Margin="12,0,0,0">
+                                        <Ellipse Style="{StaticResource ToneDot}" />
+                                        <TextBlock Text="{Binding StateText}" Style="{StaticResource ToneText}" />
+                                    </StackPanel>
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Versions}" FontFamily="Consolas" FontSize="12"
+                                               Foreground="{StaticResource Forest.Muted}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontSize="12" Foreground="{StaticResource Forest.Text}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Message}" FontSize="11" Foreground="{StaticResource Forest.Danger}" TextWrapping="Wrap"
+                                                   Visibility="{Binding Message, Converter={StaticResource TextToVis}}" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
             </DockPanel>
         </Border>
 
@@ -412,6 +455,18 @@
                                 <TextBlock Text="{Binding Name}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" TextWrapping="Wrap" />
                                 <TextBlock Text="{Binding ByLine}" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="0,2,0,0" TextWrapping="Wrap" />
 
+                                <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,0,0,1" Margin="0,14,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="CardTab" Content="{local:Tr mcard.tabOverview}"
+                                                     IsChecked="{Binding IsVersionsTab, Converter={StaticResource Invert}}" />
+                                        <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="CardTab" Content="{local:Tr mcard.tabVersions}"
+                                                     IsChecked="{Binding IsVersionsTab}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- ===== вкладка «Обзор» ===== -->
+                                <StackPanel Visibility="{Binding IsVersionsTab, Converter={StaticResource InvertVis}}">
+
                                 <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Foreground="{StaticResource Forest.Text}" FontSize="13" Margin="0,14,0,0"
                                            Visibility="{Binding Summary, Converter={StaticResource TextToVis}}" />
 
@@ -465,7 +520,7 @@
                                 <!-- действия -->
                                 <Button Style="{StaticResource Forest.PrimaryButton}" Margin="0,14,0,0" HorizontalAlignment="Stretch"
                                         Command="{Binding Owner.UpdateOneCommand}" CommandParameter="{Binding Row}"
-                                        IsEnabled="{Binding Owner.IsBusy, Converter={StaticResource Invert}}"
+                                        IsEnabled="{Binding Owner.CanQueue}"
                                         Visibility="{Binding Row.CanUpdate, Converter={StaticResource BoolToVis}}">
                                     <StackPanel Orientation="Horizontal">
                                         <Path Data="{StaticResource Icon.Download}" Style="{StaticResource Forest.Icon}" Width="14" Height="14" Margin="0,0,8,0" />
@@ -485,7 +540,7 @@
                                 </Grid>
                                 <Button Content="{local:Tr mcard.chooseVersion}" Margin="0,8,0,0" HorizontalAlignment="Stretch"
                                         Command="{Binding Owner.RollbackCommand}" CommandParameter="{Binding Row}"
-                                        IsEnabled="{Binding Owner.IsBusy, Converter={StaticResource Invert}}" />
+                                        IsEnabled="{Binding Owner.CanQueue}" />
 
                                 <WrapPanel Margin="0,14,0,0">
                                     <Button Style="{StaticResource Forest.LinkButton}" Content="{local:Tr mcard.modDb}" Margin="0,0,14,4"
@@ -528,6 +583,41 @@
                                 <StackPanel Visibility="{Binding FullText, Converter={StaticResource TextToVis}}" Margin="0,10,0,0">
                                     <TextBlock Text="{local:Tr mcard.about}" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" FontSize="13" />
                                     <TextBlock Text="{Binding FullText}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="0,6,0,0" />
+                                </StackPanel>
+                                </StackPanel>
+
+                                <!-- ===== вкладка «Версии» ===== -->
+                                <StackPanel Visibility="{Binding IsVersionsTab, Converter={StaticResource BoolToVis}}" Margin="0,12,0,0">
+                                    <TextBlock Text="{Binding VersionsStatus}" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap"
+                                               Margin="0,0,0,8" />
+                                    <ItemsControl ItemsSource="{Binding Versions}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,0,0,1" Padding="0,9">
+                                                    <DockPanel>
+                                                        <Button DockPanel.Dock="Right" Content="{local:Tr mcard.installThis}" Padding="12,4" MinHeight="0" FontSize="12"
+                                                                VerticalAlignment="Center"
+                                                                Command="{Binding DataContext.InstallVersionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                CommandParameter="{Binding}"
+                                                                IsEnabled="{Binding DataContext.Owner.CanQueue, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                Visibility="{Binding IsInstalled, Converter={StaticResource InvertVis}}" />
+                                                        <Border DockPanel.Dock="Right" CornerRadius="4" Padding="8,2" VerticalAlignment="Center"
+                                                                Background="{StaticResource Forest.Selected}"
+                                                                Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVis}}">
+                                                            <TextBlock Text="{local:Tr mcard.installedBadge}" FontSize="11" Foreground="{StaticResource Forest.Good}" />
+                                                        </Border>
+                                                        <StackPanel VerticalAlignment="Center">
+                                                            <TextBlock>
+                                                                <Run Text="{Binding Version, Mode=OneWay}" FontFamily="Consolas" FontSize="13" Foreground="{StaticResource Forest.Text}" />
+                                                                <Run Text="{Binding PreText, Mode=OneWay}" FontSize="11" Foreground="{StaticResource Forest.Warn}" />
+                                                            </TextBlock>
+                                                            <TextBlock Text="{Binding Meta}" FontSize="11" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2,8,0" />
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </StackPanel>
                             </StackPanel>
                         </StackPanel>

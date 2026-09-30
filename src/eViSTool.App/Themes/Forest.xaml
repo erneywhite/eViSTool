@@ -311,6 +311,52 @@
         </Setter>
     </Style>
 
+    <!-- вкладка внутри карточки (RadioButton): выбранная — песочный текст и подчёркивание -->
+    <Style x:Key="Forest.TabHeader" TargetType="RadioButton">
+        <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Margin" Value="0,0,18,0" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Bd" Background="Transparent" BorderBrush="Transparent" BorderThickness="0,0,0,2" Padding="0,0,0,7">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Forest.Accent}" />
+                            <Setter Property="Foreground" Value="{StaticResource Forest.Accent}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- тонкая полоска прогресса -->
+    <Style x:Key="Forest.Progress" TargetType="ProgressBar">
+        <Setter Property="Height" Value="4" />
+        <Setter Property="Minimum" Value="0" />
+        <Setter Property="Maximum" Value="1" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Border CornerRadius="2" Background="{StaticResource Forest.Raised}" ClipToBounds="True">
+                        <Grid>
+                            <Border x:Name="PART_Track" />
+                            <Border x:Name="PART_Indicator" HorizontalAlignment="Left" CornerRadius="2" Background="{StaticResource Forest.Accent}" />
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- большое число-счётчик над таблицей (кликабельное: включает фильтр) -->
     <Style x:Key="Forest.StatButton" TargetType="Button">
         <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />

@@ -27,6 +27,12 @@ public sealed partial class ModCardViewModel : ObservableObject
     [ObservableProperty] private IReadOnlyList<string> _screenshots = [];
     [ObservableProperty] private string _compatibility;
 
+    /// <summary>Вкладка «Версии» (иначе «Обзор»). Список версий грузится при первом открытии.</summary>
+    [ObservableProperty] private bool _isVersionsTab;
+    [ObservableProperty] private IReadOnlyList<VersionRowViewModel> _versions = [];
+    [ObservableProperty] private string _versionsStatus = "";
+    private bool _versionsLoaded;
+
     public ModCardViewModel(ModRowViewModel row, ModsViewModel owner, ModVersion? game, string profileName)
     {
         Row = row;
@@ -103,6 +109,27 @@ public sealed partial class ModCardViewModel : ObservableObject
         };
     }
 
+    async partial void OnIsVersionsTabChanged(bool value)
+    {
+        if (!value || _versionsLoaded) return;
+        _versionsLoaded = true;
+        VersionsStatus = Loc.T("mcard.versionsLoading");
+        var options = await Owner.LoadVersionOptionsAsync(Row);
+        Versions = options.Select(o => new VersionRowViewModel(o, Row.Installed)).ToList();
+        VersionsStatus = Versions.Count == 0 ? Loc.T("mcard.versionsNone") : Loc.T("mcard.versionsHint");
+    }
+
+    [RelayCommand]
+    private void InstallVersion(VersionRowViewModel? v)
+    {
+        if (v is null) return;
+        if (!Confirm(Loc.T("mcard.installVersionConfirm", Name, v.Version, Row.Installed))) return;
+        Owner.InstallVersion(Row, v.Option);
+    }
+
+    private static bool Confirm(string text) =>
+        MessageBox.Show(Application.Current.MainWindow, text, "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+
     [RelayCommand]
     private void OpenScreenshot(string? url)
     {
@@ -110,4 +137,21 @@ public sealed partial class ModCardViewModel : ObservableObject
         var index = Math.Max(0, Screenshots.ToList().IndexOf(url));
         new ScreenshotWindow(Screenshots, index, Loc.T("shots.title", Name)) { Owner = Application.Current.MainWindow }.ShowDialog();
     }
+}
+
+/// <summary>Строка вкладки «Версии»: версия, откуда (модбаза или сохранённая копия), дата, под какие версии игры.</summary>
+public sealed class VersionRowViewModel(VersionOption option, string installed)
+{
+    public VersionOption Option { get; } = option;
+    public string Version => Option.Version;
+    public bool IsInstalled { get; } = option.Version == installed;
+    public bool IsPrerelease { get; } = ModVersion.ParseOrNull(option.Version)?.IsPrerelease == true;
+    public string PreText => IsPrerelease ? Loc.T("mcard.pre") : "";
+
+    public string Meta { get; } = string.Join(" · ", new[]
+    {
+        option.Path is not null ? Loc.T("rollback.savedCopy") : Loc.T("mcard.fromModDb"),
+        option.Date,
+        option.Release is { } r && r.GameVersions.Any() ? "VS " + string.Join(", ", r.GameVersions.TakeLast(3)) : null,
+    }.Where(x => !string.IsNullOrEmpty(x)));
 }
