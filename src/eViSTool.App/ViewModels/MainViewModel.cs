@@ -229,6 +229,23 @@ public sealed partial class MainViewModel : ObservableObject
     private void AddServerProfile()
     {
         if (AskNewProfile(ProfileKind.Server, Loc.T("profile.newServer", Profiles.Count + 1)) is not { DataDir: { } dataDir } dlg) return;
+
+        // данные сервера уже есть: взять папку как есть или скопировать её в профиль (как клон: мир, конфиги, данные модов и игроков)
+        if (dlg.Existing == NewProfileWindow.ExistingMode.UseInPlace && dlg.ExistingDir is { } inPlace)
+        {
+            AddProfile(new GameProfile { Name = dlg.ProfileName, Kind = ProfileKind.Server, GameDir = KnownGameDir(), DataDir = inPlace });
+            return;
+        }
+        if (dlg.Existing == NewProfileWindow.ExistingMode.Import && dlg.ExistingDir is { } from)
+        {
+            var source = new GameProfile { Name = Path.GetFileName(from.TrimEnd('\\', '/')), Kind = ProfileKind.Server, GameDir = KnownGameDir(), DataDir = from };
+            // сервер из этой папки игры работает — копия мира может получиться битой, окно не даст начать
+            var running = GameProcess.FindServerPids(source).Count > 0;
+            var clone = new CloneProfileWindow(source, running, dlg.ProfileName) { Owner = System.Windows.Application.Current.MainWindow };
+            if (clone.ShowDialog() == true && clone.Result is { } imported) AddProfile(imported);
+            return;
+        }
+
         try
         {
             // своя папка данных внутри VintagestoryData\ServerProfiles, названная как профиль: мир, конфиг и бэкапы — свои,

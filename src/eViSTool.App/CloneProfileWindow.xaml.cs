@@ -28,7 +28,8 @@ public partial class CloneProfileWindow : Window
     /// <summary>Готовый профиль (папка уже скопирована).</summary>
     public GameProfile? Result { get; private set; }
 
-    public CloneProfileWindow(GameProfile source, bool serverRunning)
+    /// <param name="importName">Не null — это импорт существующих данных сервера в новый профиль с этим названием.</param>
+    public CloneProfileWindow(GameProfile source, bool serverRunning, string? importName = null)
     {
         // план — это обход всей папки данных: считаем не на каждую букву, а после короткой паузы
         _delay = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
@@ -38,7 +39,8 @@ public partial class CloneProfileWindow : Window
         _serverRunning = serverRunning;
         _configs = ProfileCloner.FindConfigs(source.DataDir ?? "");
 
-        Heading.Text = Loc.T("clone.heading", source.Name);
+        Heading.Text = importName is null ? Loc.T("clone.heading", source.Name) : Loc.T("clone.headingImport", source.DataDir);
+        if (importName is not null) Title = Loc.T("newprofile.titleServer");
         RunningBox.Visibility = serverRunning ? Visibility.Visible : Visibility.Collapsed;
         SharedModsHint.Text = Loc.T("clone.modsSharedHint", ProfileResolver.Resolve(source).InstallDir ?? "—");
 
@@ -50,7 +52,7 @@ public partial class CloneProfileWindow : Window
             ConfigBox.SelectedIndex = 0;
         }
 
-        NameBox.Text = Loc.T("clone.copySuffix", source.Name);
+        NameBox.Text = importName ?? Loc.T("clone.copySuffix", source.Name);
         WorldNameBox.Text = NameBox.Text;
         Loaded += async (_, _) =>
         {

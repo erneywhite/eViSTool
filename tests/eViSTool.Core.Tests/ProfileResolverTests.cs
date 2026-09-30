@@ -79,6 +79,18 @@ public sealed class ProfileResolverTests : IDisposable
     }
 
     [Fact]
+    public void ServerDataFolder_IsRecognized()
+    {
+        Assert.False(ProfileResolver.LooksLikeServerData(_data)); // пустая
+        File.WriteAllText(Path.Combine(_data, "serverconfig-ccop.json"), "{}");
+        Assert.True(ProfileResolver.LooksLikeServerData(_data));
+        // у клиента serverconfig.json бывает от одиночной игры — но рядом его настройки
+        File.WriteAllText(Path.Combine(_data, "clientsettings.json"), "{}");
+        Assert.False(ProfileResolver.LooksLikeServerData(_data));
+        Assert.False(ProfileResolver.LooksLikeServerData(Path.Combine(_root, "нет такой")));
+    }
+
+    [Fact]
     public void MissingConfigStillGivesDefaultModsDir()
     {
         var r = ProfileResolver.Resolve(new GameProfile { Kind = ProfileKind.Server, GameDir = _game, DataDir = _data });

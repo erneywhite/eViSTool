@@ -31,7 +31,7 @@ public sealed class AppSettings
     public void EnsureProfiles()
     {
         if (Profiles.Count == 0)
-            Profiles.Add(ProfileResolver.DefaultClient(GameDir));
+            Profiles.Add(ProfileResolver.DefaultProfile(GameDir));
         GameDir = null;
         if (Profiles.All(p => p.Id != ActiveProfileId))
             ActiveProfileId = Profiles[0].Id;

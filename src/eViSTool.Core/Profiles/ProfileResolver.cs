@@ -120,6 +120,30 @@ public static class ProfileResolver
         return File.Exists(Path.Combine(dir, "VSSurvivalMod.dll"));
     }
 
+    /// <summary>
+    /// Похоже ли на папку данных выделенного сервера: есть serverconfig*.json, а настроек клиента нет
+    /// (у клиента serverconfig.json тоже бывает — от одиночной игры, — но рядом всегда лежат его настройки).
+    /// </summary>
+    public static bool LooksLikeServerData(string? dataDir) =>
+        !string.IsNullOrWhiteSpace(dataDir) && Directory.Exists(dataDir)
+        && Directory.EnumerateFiles(dataDir, "serverconfig*.json").Any()
+        && !Directory.EnumerateFiles(dataDir, ClientSettingsPattern).Any();
+
+    /// <summary>
+    /// Профиль для первого запуска: клиентский на стандартной папке данных, а на машине, где стоит только сервер
+    /// (нет Vintagestory.exe или в стандартной папке лежат данные сервера без настроек клиента), — серверный на ней же.
+    /// </summary>
+    public static GameProfile DefaultProfile(string? gameDir = null)
+    {
+        gameDir ??= GameInstall.FindGameDir();
+        var serverOnly = LooksLikeServerData(GameInstall.DefaultDataDir)
+                         || (!string.IsNullOrWhiteSpace(gameDir) && !File.Exists(Path.Combine(gameDir, "Vintagestory.exe"))
+                             && File.Exists(Path.Combine(gameDir, "VintagestoryServer.exe")));
+        return serverOnly
+            ? new GameProfile { Name = Loc.T("profile.defaultServerName"), Kind = ProfileKind.Server, GameDir = gameDir, DataDir = GameInstall.DefaultDataDir }
+            : DefaultClient(gameDir);
+    }
+
     /// <summary>Профиль клиента по умолчанию — для первого запуска.</summary>
     public static GameProfile DefaultClient(string? gameDir = null) => new()
     {
