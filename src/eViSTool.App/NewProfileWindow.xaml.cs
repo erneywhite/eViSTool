@@ -21,7 +21,10 @@ public partial class NewProfileWindow : Window
     public string? DataDir { get; private set; }
 
     /// <summary>Что делать с уже существующими данными сервера.</summary>
-    public enum ExistingMode { None, Import, UseInPlace }
+    public enum ExistingMode { None, Import, UseInPlace, Remote }
+
+    /// <summary>Для Remote: код подключения к серверу на другом компьютере.</summary>
+    public Core.Server.Remote.ConnectionCode? RemoteCode { get; private set; }
 
     public ExistingMode Existing { get; private set; }
 
@@ -35,6 +38,7 @@ public partial class NewProfileWindow : Window
         Title = Heading.Text = Loc.T(kind == ProfileKind.Server ? "newprofile.titleServer" : "newprofile.titleClient");
         FolderPanel.Visibility = kind == ProfileKind.Server ? Visibility.Visible : Visibility.Collapsed;
         ExistingPanel.Visibility = FolderPanel.Visibility;
+        RemotePanel.Visibility = FolderPanel.Visibility;
         // сервер уже работал со стандартной папкой (так бывает на машине, где стоит только сервер) — подставляем её
         if (kind == ProfileKind.Server)
             ExistingBox.Text = ProfileResolver.LooksLikeServerData(GameInstall.DefaultDataDir) ? GameInstall.DefaultDataDir : "";
@@ -69,6 +73,19 @@ public partial class NewProfileWindow : Window
     {
         var dlg = new Microsoft.Win32.OpenFolderDialog { Title = Loc.T("newprofile.existingPick"), InitialDirectory = ExistingBox.Text.Trim() };
         if (dlg.ShowDialog(this) == true) ExistingBox.Text = dlg.FolderName;
+    }
+
+    private void Connect_Click(object sender, RoutedEventArgs e)
+    {
+        var name = NameBox.Text.Trim();
+        if (name.Length == 0) { NameBox.Focus(); return; }
+        var dlg = new ConnectCodeWindow(Loc.T("newprofile.connectOk")) { Owner = this };
+        if (dlg.ShowDialog() != true || dlg.Code is not { } code) return;
+        ProfileName = name;
+        Existing = ExistingMode.Remote;
+        RemoteCode = code;
+        DataDir = "";
+        DialogResult = true;
     }
 
     private void Import_Click(object sender, RoutedEventArgs e) => FinishExisting(ExistingMode.Import);

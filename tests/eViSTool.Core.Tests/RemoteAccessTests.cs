@@ -70,4 +70,25 @@ public sealed class RemoteAccessTests : IDisposable
             Assert.False(System.Net.IPAddress.IsLoopback(ip));
         }
     }
+
+    [Fact]
+    public void RemoteProfile_StoresCodeEncrypted()
+    {
+        var code = new ConnectionCode("192.168.31.31", 48213, RemoteAccess.NewKey(), new string('b', 64));
+        var stored = RemoteSecret.Protect(code);
+
+        Assert.DoesNotContain(code.Key, stored);
+        Assert.DoesNotContain("192.168", stored);
+        Assert.Equal(code, RemoteSecret.Unprotect(stored));
+        Assert.Null(RemoteSecret.Unprotect("не base64"));
+        Assert.Null(RemoteSecret.Unprotect(Convert.ToBase64String("чужое"u8.ToArray())));
+
+        var profile = new eViSTool.Core.Profiles.GameProfile { Name = "VM", Kind = eViSTool.Core.Profiles.ProfileKind.Server, RemoteCode = stored };
+        Assert.True(profile.IsRemote);
+        var resolved = eViSTool.Core.Profiles.ProfileResolver.Resolve(profile);
+        Assert.Empty(resolved.ModDirs); // своих папок нет — моды у агента на той машине
+        Assert.Single(resolved.Warnings);
+        // код в настройках — зашифрованный, не открытым текстом
+        Assert.DoesNotContain(code.Key, Newtonsoft.Json.JsonConvert.SerializeObject(profile));
+    }
 }

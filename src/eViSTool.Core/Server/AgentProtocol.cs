@@ -46,6 +46,9 @@ public sealed record AgentStatus
     public int AgentPid { get; init; }
     public string AgentVersion { get; init; } = "";
 
+    /// <summary>Версия игры сервера (по его exe) — удалённому профилю её больше неоткуда взять.</summary>
+    public string? GameVersion { get; init; }
+
     /// <summary>Последняя резервная копия мира и когда агент сделает следующую (null — расписание выключено).</summary>
     public DateTime? LastBackupAt { get; init; }
     public DateTime? NextBackupAt { get; init; }

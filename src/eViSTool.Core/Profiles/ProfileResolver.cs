@@ -14,6 +14,10 @@ public static class ProfileResolver
 
     public static ResolvedProfile Resolve(GameProfile profile)
     {
+        // удалённый сервер: своих папок нет, моды и версия — у агента на той машине
+        if (profile.IsRemote)
+            return new ResolvedProfile { Profile = profile, Warnings = [Loc.T("profile.remoteModsLater")] };
+
         var warnings = new List<string>();
         var version = string.IsNullOrWhiteSpace(profile.GameDir) ? null : GameInstall.DetectVersion(profile.GameDir);
         if (version is null)

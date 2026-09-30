@@ -93,6 +93,7 @@
                              IsChecked="{Binding Tab, Converter={StaticResource EnumEq}, ConverterParameter=Console}"
                              AutomationProperties.AutomationId="SrvTabConsole" />
                 <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15"
+                             Visibility="{Binding IsRemoteProfile, Converter={StaticResource InvertVis}}"
                              IsChecked="{Binding Tab, Converter={StaticResource EnumEq}, ConverterParameter=Config}"
                              AutomationProperties.Name="{local:Tr srvcfg.modeConfig}" AutomationProperties.AutomationId="SrvTabConfig">
                     <StackPanel Orientation="Horizontal">
@@ -104,9 +105,11 @@
                     </StackPanel>
                 </RadioButton>
                 <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr sched.tab}"
+                             Visibility="{Binding IsRemoteProfile, Converter={StaticResource InvertVis}}"
                              IsChecked="{Binding Tab, Converter={StaticResource EnumEq}, ConverterParameter=Schedule}"
                              AutomationProperties.AutomationId="SrvTabSchedule" />
                 <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr remote.tab}"
+                             Visibility="{Binding IsRemoteProfile, Converter={StaticResource InvertVis}}"
                              IsChecked="{Binding Tab, Converter={StaticResource EnumEq}, ConverterParameter=Remote}"
                              AutomationProperties.AutomationId="SrvTabRemote" />
             </StackPanel>

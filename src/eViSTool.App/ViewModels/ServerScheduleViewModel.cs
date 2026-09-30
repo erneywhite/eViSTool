@@ -271,9 +271,10 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     }
 
     // копию можно сделать на работающем сервере (её делает сам сервер) или на полностью остановленном (копируем файл)
-    private bool CanBackupNow => !IsBusy && _dataDir is not null
+    // на работающем сервере копию делает сам сервер — папка на этом компьютере не нужна (так и для удалённого сервера)
+    private bool CanBackupNow => !IsBusy
                                  && (_server.State == ServerState.Running && _server.AgentRunning
-                                     || _server.State == ServerState.Stopped && !_server.HasForeign);
+                                     || _dataDir is not null && _server.State == ServerState.Stopped && !_server.HasForeign);
 
     partial void OnIsBusyChanged(bool value)
     {
@@ -284,7 +285,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanBackupNow))]
     private async Task BackupNow()
     {
-        if (_dataDir is not { } dataDir) return;
+        var dataDir = _dataDir;
         IsBusy = true;
         try
         {
@@ -295,7 +296,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
                 await _server.BackupAsync();
                 StatusText = Loc.T("sched.requested");
             }
-            else
+            else if (dataDir is not null)
             {
                 var save = SaveFile(dataDir) ?? throw new InvalidOperationException(Loc.T("sched.noConfig"));
                 var settings = _profileId is null ? new ServerAutomation() : ServerAutomation.Load(_profileId);

@@ -34,8 +34,24 @@ public sealed partial class ProfileViewModel : ObservableObject
     /// <summary>Тип задаётся при создании профиля и дальше не меняется.</summary>
     public bool IsServer => Kind == ProfileKind.Server;
 
-    public string KindText => Loc.T(Kind == ProfileKind.Server ? "profile.kindServer" : "profile.kindClient");
-    public string GameVersionText => Resolved.GameVersion?.ToString() ?? Loc.T("common.notFound");
+    public string KindText => Loc.T(Model.IsRemote ? "profile.kindRemote" : Kind == ProfileKind.Server ? "profile.kindServer" : "profile.kindClient");
+
+    public bool IsRemote => Model.IsRemote;
+
+    /// <summary>Куда ведёт код подключения удалённого профиля (сам код не показываем).</summary>
+    public string RemoteTarget => Core.Server.Remote.RemoteSecret.Unprotect(Model.RemoteCode) is { } c ? $"{c.Host}:{c.Port}" : Loc.T("remote.errDecrypt");
+
+    /// <summary>Заменить код подключения (сменили ключ на сервере, переехал адрес).</summary>
+    [RelayCommand]
+    private void ReplaceCode()
+    {
+        var dlg = new ConnectCodeWindow(Loc.T("settings.remoteReplaceOk")) { Owner = System.Windows.Application.Current.MainWindow };
+        if (dlg.ShowDialog() != true || dlg.Code is not { } code) return;
+        Model.RemoteCode = Core.Server.Remote.RemoteSecret.Protect(code);
+        OnPropertyChanged(nameof(RemoteTarget));
+        _changed(this);
+    }
+    public string GameVersionText => Model.IsRemote ? Loc.T("profile.remoteVersion") : Resolved.GameVersion?.ToString() ?? Loc.T("common.notFound");
     public string ConfigText => Resolved.ConfigPath ?? Loc.T("common.notFoundM");
     public string ModDirsText => Resolved.ModDirs.Count == 0 ? "—" : string.Join(Environment.NewLine, Resolved.ModDirs);
     public string WarningsText => string.Join(Environment.NewLine, Resolved.Warnings);
