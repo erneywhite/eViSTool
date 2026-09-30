@@ -12,6 +12,9 @@ using eViSTool.Core.Server;
 
 namespace eViSTool.App.ViewModels;
 
+/// <summary>Виды раздела «Сервер».</summary>
+public enum ServerTab { Console, Config, Schedule }
+
 /// <summary>
 /// Вкладка «Сервер». Сервером владеет агент (отдельный процесс) — окно только показывает и командует,
 /// поэтому его можно закрыть в любой момент.
@@ -33,8 +36,15 @@ public sealed partial class ServerViewModel : ObservableObject
     /// <summary>Редактор serverconfig.json — второй вид раздела, рядом с консолью.</summary>
     public ServerConfigViewModel Config { get; } = new();
 
-    /// <summary>Открыта «Конфигурация» (иначе — «Консоль»). Консоль при этом продолжает получать строки.</summary>
-    [ObservableProperty] private bool _isConfigTab;
+    /// <summary>Расписание: резервные копии (и рестарты) — третий вид раздела.</summary>
+    public ServerScheduleViewModel Schedule { get; }
+
+    /// <summary>Какой вид раздела открыт. Консоль продолжает получать строки при любом.</summary>
+    [ObservableProperty] private ServerTab _tab;
+
+    public bool IsConsoleTab => Tab == ServerTab.Console;
+    public bool IsConfigTab => Tab == ServerTab.Config;
+    public bool IsScheduleTab => Tab == ServerTab.Schedule;
 
     // состояние сервера профиля выяснено (первый проход слежения после смены профиля завершён)
     private bool _stateKnown;
@@ -77,9 +87,24 @@ public sealed partial class ServerViewModel : ObservableObject
     /// <summary>Автопрокрутка: пока пользователь внизу — едем за новыми строками. true — прокрутить в любом случае (первая порция).</summary>
     public event Action<bool>? LinesAppended;
 
-    public ServerViewModel(MainViewModel main) => _main = main;
+    public ServerViewModel(MainViewModel main)
+    {
+        _main = main;
+        Schedule = new ServerScheduleViewModel(this);
+    }
 
-    partial void OnIsConfigTabChanged(bool value) => Config.SetActive(value);
+    partial void OnTabChanged(ServerTab value)
+    {
+        OnPropertyChanged(nameof(IsConsoleTab));
+        OnPropertyChanged(nameof(IsConfigTab));
+        OnPropertyChanged(nameof(IsScheduleTab));
+        Config.SetActive(value == ServerTab.Config);
+        Schedule.SetActive(value == ServerTab.Schedule);
+    }
+
+    /// <summary>Отправить серверу команду не из поля ввода (например, «/genbackup» с вкладки расписания).</summary>
+    public Task RunCommandAsync(string text) =>
+        _client is { } client ? client.CommandAsync(text) : throw new InvalidOperationException(Loc.T("sched.notRunning"));
 
     partial void OnStateChanged(ServerState value) => Refresh();
     partial void OnAgentRunningChanged(bool value) => Refresh();
@@ -122,6 +147,7 @@ public sealed partial class ServerViewModel : ObservableObject
         OnPropertyChanged(nameof(ForeignText));
         Refresh();
         Config.OnLanguageChanged();
+        Schedule.OnLanguageChanged();
     }
 
     /// <summary>Сменился профиль: отключиться от старого агента, подключиться к агенту нового (если он работает).</summary>
@@ -147,6 +173,8 @@ public sealed partial class ServerViewModel : ObservableObject
         // сюда попадаем и при правке имени профиля: редактор сам разберётся, сменился ли файл
         Config.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model.DataDir : null, _main.ActiveProfile?.Name ?? "",
             _main.ActiveProfile?.Model.GameDir);
+        Schedule.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model.Id : null,
+            IsServerProfile ? _main.ActiveProfile?.Model.DataDir : null);
         if (!IsServerProfile) return;
 
         _session = new CancellationTokenSource();
@@ -213,6 +241,7 @@ public sealed partial class ServerViewModel : ObservableObject
         MemoryText = s.MemoryMb is { } mb && s.State != ServerState.Stopped ? Loc.T("server.memoryMb", mb.ToString("N0")) : "—";
         PidText = s.ServerPid is { } pid && s.State != ServerState.Stopped ? pid.ToString() : "—";
         ShowPlayers(s.Players, running: s.State == ServerState.Running);
+        Schedule.ShowStatus(s);
         StateNote = s.RestartScheduledAt is { } at ? Loc.T("server.restartIn", Math.Max(0, (int)(at - DateTime.Now).TotalSeconds))
             : s.State == ServerState.Stopped && s.LastExitCode is { } code ? Loc.T("server.lastExit", code)
             : "";
@@ -223,6 +252,7 @@ public sealed partial class ServerViewModel : ObservableObject
         UptimeText = MemoryText = PidText = "—";
         StateNote = "";
         ShowPlayers([], running: false);
+        Schedule?.ShowStatus(null);
     }
 
     // ---------- игроки на сервере ----------

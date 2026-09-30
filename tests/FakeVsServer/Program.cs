@@ -6,12 +6,18 @@ using System.Runtime.InteropServices;
 //   /crash           — «падение» (код 1)
 //   /hang            — дальше игнорирует /stop (для проверки Ctrl+C и kill)
 //   /spam N          — N строк в stderr (проверка, что stderr читается и сервер не виснет)
+//   /genbackup       — копия мира в Backups, как у настоящего: «default-ГГГГ-ММ-ДД_ЧЧ-ММ-СС.vcdbs» и «Backup complete!»
+//   /fakejoin N имя, /fakeleave N — строки входа и выхода игрока
 //   прочее           — «Handling Console Command …»
 // Аргументы: --dataPath <путь> (обязателен, как у нас), --slowstart <мс>
 
 var slowStart = 200;
+var dataPath = ".";
 for (var i = 0; i < args.Length - 1; i++)
+{
     if (args[i] == "--slowstart") slowStart = int.Parse(args[i + 1]);
+    if (args[i] == "--dataPath") dataPath = args[i + 1];
+}
 
 var hang = false;
 var stopping = new ManualResetEventSlim();
@@ -47,6 +53,14 @@ var reader = new Thread(() =>
         else if (line == "/crash") Environment.Exit(1);
         else if (line == "/hang") { hang = true; Log("Notification", "Now ignoring /stop"); }
         else if (line.StartsWith("/spam ")) { for (var n = 0; n < int.Parse(line[6..]); n++) Console.Error.WriteLine($"stderr line {n} " + new string('x', 200)); }
+        else if (line == "/genbackup")
+        {
+            Log("Notification", "Handling Console Command /genbackup ");
+            Log("Notification", "Ok, generating backup, this might take a while");
+            var dir = Directory.CreateDirectory(Path.Combine(dataPath, "Backups")).FullName;
+            File.WriteAllText(Path.Combine(dir, $"default-{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.vcdbs"), "world");
+            Log("Notification", "Backup complete!");
+        }
         // вход и выход игрока — теми же строками, что печатает настоящий сервер
         else if (line.StartsWith("/fakejoin "))
         {

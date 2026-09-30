@@ -57,6 +57,27 @@ host.StateChanged += state =>
     if (state is ServerState.Stopped or ServerState.Starting) players.Reset();
 };
 
+// резервные копии по расписанию: копию делает сам сервер (/genbackup), агент решает когда и убирает старые
+var automation = ServerAutomation.Load(opts.ProfileId, opts.AgentsDir);
+var automationFile = ServerAutomation.FileFor(opts.ProfileId, opts.AgentsDir);
+var automationStamp = File.Exists(automationFile) ? File.GetLastWriteTimeUtc(automationFile) : default;
+var backups = new BackupStore(opts.DataPath);
+var scheduler = new BackupScheduler();
+scheduler.Seed(backups.List().FirstOrDefault(b => b.IsStamped)?.Time);
+host.Console.LineAdded += line =>
+{
+    // сервер закончил копию (по расписанию или по команде из консоли): отсчёт — от неё, лишние копии — долой
+    if (line.Kind != ConsoleLineKind.Output || !line.Text.EndsWith("Backup complete!", StringComparison.Ordinal)) return;
+    scheduler.MarkDone(line.Time, players.Players.Count);
+    var settings = automation;
+    if (!settings.BackupEnabled || settings.BackupKeep <= 0) return;
+    _ = Task.Run(() =>
+    {
+        var removed = backups.Prune(settings.BackupKeep);
+        if (removed.Count > 0) host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.pruned", removed.Count, settings.BackupKeep));
+    });
+};
+
 var builder = WebApplication.CreateSlimBuilder();
 builder.Logging.ClearProviders();
 builder.WebHost.UseKestrel(k => k.Listen(System.Net.IPAddress.Loopback, 0)); // свободный порт выберет система
@@ -88,6 +109,8 @@ AgentStatus Status() => new()
     AgentPid = Environment.ProcessId,
     AgentVersion = version,
     Players = players.Players,
+    LastBackupAt = scheduler.LastBackupAt,
+    NextBackupAt = scheduler.NextAt(automation, host.State, host.StartedAt),
 };
 
 IResult Json(object value) => Results.Text(JsonConvert.SerializeObject(value), "application/json");
@@ -156,6 +179,29 @@ try
     while (!shutdown.IsCancellationRequested)
     {
         await Task.Delay(TimeSpan.FromSeconds(5), shutdown.Token).ContinueWith(_ => { });
+
+        // настройки расписания поменяли в окне — подхватываем
+        var stamp = File.Exists(automationFile) ? File.GetLastWriteTimeUtc(automationFile) : default;
+        if (stamp != automationStamp)
+        {
+            automationStamp = stamp;
+            automation = ServerAutomation.Load(opts.ProfileId, opts.AgentsDir);
+        }
+
+        scheduler.NotePlayers(players.Players.Count);
+        if (scheduler.IsDue(automation, DateTime.Now, host.State, host.StartedAt))
+        {
+            scheduler.MarkDone(DateTime.Now, players.Players.Count); // чтобы следующий тик не запустил копию повторно
+            try
+            {
+                host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.scheduled"));
+                await host.SendCommandAsync("/genbackup");
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException)
+            {
+                host.Console.Add(ConsoleLineKind.System, ex.Message);
+            }
+        }
         var idle = host.State == ServerState.Stopped && host.RestartScheduledAt is null
                    && DateTime.Now - lastActivity > opts.IdleExit;
         if (idle) break;

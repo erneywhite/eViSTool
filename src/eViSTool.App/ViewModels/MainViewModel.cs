@@ -296,8 +296,9 @@ public sealed partial class MainViewModel : ObservableObject
             }
         }
 
-        // ключ и адрес агента этого профиля больше не нужны
-        foreach (var file in new[] { Core.Server.AgentProtocol.StateFile(model.Id), Core.Server.AgentProtocol.KeyFile(model.Id) })
+        // ключ, адрес агента и расписание этого профиля больше не нужны
+        foreach (var file in new[] { Core.Server.AgentProtocol.StateFile(model.Id), Core.Server.AgentProtocol.KeyFile(model.Id),
+                     Core.Server.ServerAutomation.FileFor(model.Id) })
         {
             try { File.Delete(file); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }

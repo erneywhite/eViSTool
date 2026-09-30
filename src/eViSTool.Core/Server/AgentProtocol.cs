@@ -46,6 +46,10 @@ public sealed record AgentStatus
     public int AgentPid { get; init; }
     public string AgentVersion { get; init; } = "";
 
+    /// <summary>Последняя резервная копия мира и когда агент сделает следующую (null — расписание выключено).</summary>
+    public DateTime? LastBackupAt { get; init; }
+    public DateTime? NextBackupAt { get; init; }
+
     /// <summary>Кто сейчас на сервере (по времени входа).</summary>
     public IReadOnlyList<OnlinePlayer> Players { get; init; } = [];
 }
