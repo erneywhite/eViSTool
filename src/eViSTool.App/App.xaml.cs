@@ -18,7 +18,31 @@ public partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += (_, a) => WriteCrashLog(a.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, a) => { WriteCrashLog(a.Exception); a.SetObserved(); };
         Core.AppPaths.MigrateLegacy(); // до первого чтения настроек
+        Core.AppUpdate.AppUpdater.CleanupOld(AppContext.BaseDirectory); // хвосты прошлого обновления
         base.OnStartup(e);
+    }
+
+    private static string? _restartExe;
+
+    /// <summary>
+    /// Закрыть окно обычным путём (с вопросами про несохранённое) и после выхода запустить новую версию.
+    /// Если закрытие отменили — перезапуска не будет.
+    /// </summary>
+    public static void RestartAfterClose(string exe)
+    {
+        _restartExe = exe;
+        Current.MainWindow?.Close();
+        if (Current.MainWindow is { IsVisible: true }) _restartExe = null;
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        if (_restartExe is { } exe && File.Exists(exe))
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe) { UseShellExecute = true }); }
+            catch (System.ComponentModel.Win32Exception ex) { WriteCrashLog(ex); }
+        }
+        base.OnExit(e);
     }
 
     private void OnDispatcherError(object sender, DispatcherUnhandledExceptionEventArgs e)

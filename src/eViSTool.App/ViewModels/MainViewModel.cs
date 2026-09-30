@@ -154,7 +154,11 @@ public sealed partial class MainViewModel : ObservableObject
         Server.OnProfileSwitched();
         Save(); // перенос настроек старого формата сразу на диск
         Mods.OnProfileSwitched(); // список модов виден сразу, без сети
+        _ = About.CheckQuietlyAsync(); // новая версия программы — подсказка в боковой панели
     }
+
+    [RelayCommand]
+    private void ShowAbout() => SelectedTab = 4;
 
     partial void OnActiveProfileChanged(ProfileViewModel? value)
     {

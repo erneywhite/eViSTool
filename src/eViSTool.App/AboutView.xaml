@@ -4,6 +4,7 @@
              xmlns:local="clr-namespace:eViSTool.App">
     <UserControl.Resources>
         <local:TextToVisibilityConverter x:Key="TextToVis" />
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <Style x:Key="CardTitle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="15" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -66,7 +67,20 @@
                                 </StackPanel>
                             </Button>
                             <TextBlock Text="{Binding UpdateStatus}" Style="{StaticResource Muted}" TextAlignment="Right" Margin="0,8,0,0" MaxWidth="260"
-                                       HorizontalAlignment="Right" Visibility="{Binding UpdateStatus, Converter={StaticResource TextToVis}}" />
+                                       TextWrapping="Wrap" HorizontalAlignment="Right" Visibility="{Binding UpdateStatus, Converter={StaticResource TextToVis}}"
+                                       AutomationProperties.AutomationId="UpdateStatus" />
+                            <!-- найдена новая версия: поставить и что в ней нового -->
+                            <StackPanel HorizontalAlignment="Right" Margin="0,10,0,0" Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVis}}">
+                                <Button Style="{StaticResource Forest.PrimaryButton}" Command="{Binding InstallUpdateCommand}" HorizontalAlignment="Right"
+                                        AutomationProperties.AutomationId="InstallUpdate">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Path Data="{StaticResource Icon.Download}" Style="{StaticResource Forest.Icon}" Width="14" Height="14" Margin="0,0,8,0" />
+                                        <TextBlock Text="{Binding UpdateButtonText}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource Forest.LinkButton}" Content="{local:Tr about.updateNotes}" Command="{Binding OpenReleaseNotesCommand}"
+                                        HorizontalAlignment="Right" Margin="0,8,0,0" />
+                            </StackPanel>
                         </StackPanel>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="eViSTool" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" />
