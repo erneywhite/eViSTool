@@ -1,6 +1,7 @@
 using System.Reflection;
 using eViSTool.Core;
 using eViSTool.Core.Server;
+using eViSTool.Core.Server.Remote;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -134,12 +135,23 @@ host.Console.LineAdded += line =>
     });
 };
 
+var shutdown = new CancellationTokenSource();
+var lastActivity = DateTime.Now;
+
+// удалённый доступ: второй вход — из сети, по TLS и со своим ключом; включается и выключается файлом настроек
+WebApplication? remoteApp = null;
+string? remoteError = null;
+var remote = new RemoteSettings();
+var remoteFile = RemoteAccess.FileFor(opts.ProfileId, opts.AgentsDir);
+DateTime? remoteStamp = null;
+var failures = new Dictionary<string, (int Count, DateTime BlockedUntil)>();
+
 var builder = WebApplication.CreateSlimBuilder();
 builder.Logging.ClearProviders();
 builder.WebHost.UseKestrel(k => k.Listen(System.Net.IPAddress.Loopback, 0)); // свободный порт выберет система
 var app = builder.Build();
 
-// ключ — на каждом запросе
+// ключ — на каждом запросе; запросы окна с этой машины держат агента живым (окно открыто — агент нужен)
 app.Use(async (ctx, next) =>
 {
     if (!ctx.Request.Headers.TryGetValue(AgentProtocol.KeyHeader, out var got) || got != key)
@@ -147,11 +159,9 @@ app.Use(async (ctx, next) =>
         ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
         return;
     }
+    lastActivity = DateTime.Now;
     await next();
 });
-
-var shutdown = new CancellationTokenSource();
-var lastActivity = DateTime.Now;
 
 AgentStatus Status() => new()
 {
@@ -168,6 +178,8 @@ AgentStatus Status() => new()
     LastBackupAt = scheduler.LastBackupAt,
     NextBackupAt = scheduler.NextAt(automation, host.State, host.StartedAt),
     NextRestartAt = RestartScheduler.NextAt(automation, host.State, host.StartedAt),
+    RemotePort = remoteApp is not null ? remote.Port : null,
+    RemoteError = remoteError,
 };
 
 IResult Json(object value) => Results.Text(JsonConvert.SerializeObject(value), "application/json");
@@ -186,20 +198,23 @@ async Task<IResult> Run(Func<Task> action)
     }
 }
 
-app.MapGet("/status", () => Json(Status()));
+// Точки API — одни и те же для окна на этой машине и для удалённого клиента (кроме выключения агента).
+void MapApi(WebApplication web, bool isRemote)
+{
+web.MapGet("/status", () => Json(Status()));
 
-app.MapGet("/console", async (long since, int? wait, HttpContext ctx) =>
+web.MapGet("/console", async (long since, int? wait, HttpContext ctx) =>
 {
     var lines = await host.Console.WaitSinceAsync(since, TimeSpan.FromSeconds(Math.Clamp(wait ?? 0, 0, 30)), ct: ctx.RequestAborted);
     return Json(lines);
 });
 
-app.MapPost("/start", () => Run(host.StartAsync));
+web.MapPost("/start", () => Run(host.StartAsync));
 // остановка может идти минуты (большой мир сохраняется) — отвечаем сразу, окно следит за статусом
-app.MapPost("/stop", () => Run(() => { _ = host.StopAsync(); return Task.CompletedTask; }));
-app.MapPost("/restart", () => Run(() => { _ = host.RestartAsync(); return Task.CompletedTask; }));
-app.MapPost("/kill", () => Run(() => { host.Kill(); return Task.CompletedTask; }));
-app.MapPost("/command", async (HttpContext ctx) =>
+web.MapPost("/stop", () => Run(() => { _ = host.StopAsync(); return Task.CompletedTask; }));
+web.MapPost("/restart", () => Run(() => { _ = host.RestartAsync(); return Task.CompletedTask; }));
+web.MapPost("/kill", () => Run(() => { host.Kill(); return Task.CompletedTask; }));
+web.MapPost("/command", async (HttpContext ctx) =>
 {
     using var reader = new StreamReader(ctx.Request.Body);
     var req = JsonConvert.DeserializeObject<CommandRequest>(await reader.ReadToEndAsync());
@@ -207,12 +222,81 @@ app.MapPost("/command", async (HttpContext ctx) =>
     return await Run(() => host.SendCommandAsync(req.Text.Trim()));
 });
 // копия мира сейчас (кнопка в окне); на остановленном сервере копию делает само окно
-app.MapPost("/backup", () => Run(RequestBackup));
-app.MapPost("/shutdown", () =>
+web.MapPost("/backup", () => Run(RequestBackup));
+if (isRemote) return;
+web.MapPost("/shutdown", () =>
 {
     shutdown.Cancel(); // сервер остановим при выходе (finally ниже)
     return Json(Status());
 });
+}
+
+MapApi(app, isRemote: false);
+
+// Удалённый вход: поднять, пересоздать или погасить по файлу настроек (окно пишет его, агент подхватывает сам).
+async Task ApplyRemoteAsync()
+{
+    var stamp = File.Exists(remoteFile) ? File.GetLastWriteTimeUtc(remoteFile) : default;
+    if (stamp == remoteStamp) return;
+    remoteStamp = stamp;
+    remote = RemoteAccess.Load(opts.ProfileId, opts.AgentsDir);
+
+    if (remoteApp is not null)
+    {
+        await remoteApp.StopAsync();
+        await remoteApp.DisposeAsync();
+        remoteApp = null;
+    }
+    remoteError = null;
+    if (!remote.Enabled || remote.Port <= 0 || remote.Key.Length < 32) return;
+
+    try
+    {
+        var cert = RemoteAccess.EnsureCertificate(opts.ProfileId, opts.AgentsDir);
+        var remoteKey = System.Text.Encoding.UTF8.GetBytes(remote.Key);
+        var rb = WebApplication.CreateSlimBuilder();
+        rb.Logging.ClearProviders();
+        rb.WebHost.UseKestrelHttpsConfiguration();
+        rb.WebHost.UseKestrel(k => k.Listen(System.Net.IPAddress.Any, remote.Port, o => o.UseHttps(cert)));
+        var web = rb.Build();
+        web.Use(async (ctx, next) =>
+        {
+            // неверный ключ несколько раз подряд — адрес ждёт минуту: подбирать ключ бессмысленно, но и шуметь незачем
+            var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "?";
+            lock (failures)
+            {
+                if (failures.TryGetValue(ip, out var f) && f.BlockedUntil > DateTime.Now)
+                {
+                    ctx.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                    return;
+                }
+            }
+            var got = ctx.Request.Headers.TryGetValue(AgentProtocol.KeyHeader, out var header) ? System.Text.Encoding.UTF8.GetBytes(header.ToString()) : [];
+            if (!System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(got, remoteKey))
+            {
+                lock (failures)
+                {
+                    var f = failures.GetValueOrDefault(ip);
+                    failures[ip] = f.Count + 1 >= 5 ? (0, DateTime.Now.AddMinutes(1)) : (f.Count + 1, default);
+                }
+                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+            lock (failures) failures.Remove(ip);
+            await next();
+        });
+        MapApi(web, isRemote: true);
+        await web.StartAsync();
+        remoteApp = web;
+        host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("remote.listening", remote.Port));
+    }
+    catch (Exception ex) when (ex is IOException or InvalidOperationException or System.Security.Cryptography.CryptographicException
+                                   or System.Net.Sockets.SocketException)
+    {
+        remoteError = ex.Message;
+        host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("remote.failed", remote.Port, ex.Message));
+    }
+}
 
 await app.StartAsync();
 var port = new Uri(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First()).Port;
@@ -221,6 +305,8 @@ var stateFile = AgentProtocol.StateFile(opts.ProfileId, opts.AgentsDir);
 Directory.CreateDirectory(Path.GetDirectoryName(stateFile)!);
 File.WriteAllText(stateFile, JsonConvert.SerializeObject(new AgentEndpoint(Environment.ProcessId, port, DateTime.Now, version)));
 Console.WriteLine($"eViSTool.Agent {version}: profile {opts.ProfileId}, http://127.0.0.1:{port}");
+
+await ApplyRemoteAsync();
 
 if (opts.StartServer)
 {
@@ -297,6 +383,7 @@ try
             }
         }
 
+        await ApplyRemoteAsync();
         scheduler.NotePlayers(players.Players.Count);
         if (scheduler.IsDue(automation, DateTime.Now, host.State, host.StartedAt))
         {
@@ -318,6 +405,7 @@ try
 finally
 {
     if (host.State != ServerState.Stopped) await host.StopAsync();
+    if (remoteApp is not null) await remoteApp.StopAsync();
     await app.StopAsync();
     try { File.Delete(stateFile); } catch (IOException) { }
 }

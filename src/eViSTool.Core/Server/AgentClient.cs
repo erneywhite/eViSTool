@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;
+using eViSTool.Core.Server.Remote;
 using Newtonsoft.Json;
 
 namespace eViSTool.Core.Server;
@@ -13,16 +14,27 @@ public sealed class AgentClient : IDisposable
 
     public AgentEndpoint Endpoint { get; }
 
-    public AgentClient(AgentEndpoint endpoint, string key)
+    public AgentClient(AgentEndpoint endpoint, string key) : this(endpoint, new Uri($"http://127.0.0.1:{endpoint.Port}/"), key, null) { }
+
+    private AgentClient(AgentEndpoint endpoint, Uri baseAddress, string key, string? fingerprint)
     {
         Endpoint = endpoint;
-        _http = new HttpClient
+        var handler = new HttpClientHandler();
+        // удалённый агент — только тот, чей сертификат указан в коде подключения: подменить его по дороге не выйдет
+        if (fingerprint is not null)
+            handler.ServerCertificateCustomValidationCallback = (_, cert, _, _) =>
+                cert is not null && string.Equals(RemoteAccess.Fingerprint(cert), fingerprint, StringComparison.OrdinalIgnoreCase);
+        _http = new HttpClient(handler)
         {
-            BaseAddress = new Uri($"http://127.0.0.1:{endpoint.Port}/"),
+            BaseAddress = baseAddress,
             Timeout = TimeSpan.FromSeconds(40), // долгий опрос консоли — до 30 с
         };
         _http.DefaultRequestHeaders.Add(AgentProtocol.KeyHeader, key);
     }
+
+    /// <summary>Агент на другой машине — по коду подключения (HTTPS, сертификат сверяется с отпечатком из кода).</summary>
+    public static AgentClient ForRemote(ConnectionCode code) =>
+        new(new AgentEndpoint(0, code.Port, default, ""), new UriBuilder(Uri.UriSchemeHttps, code.Host, code.Port).Uri, code.Key, code.Fingerprint);
 
     /// <summary>Подключиться к уже работающему агенту профиля (null — агента нет).</summary>
     public static AgentClient? TryConnect(string profileId, string? agentsDir = null)

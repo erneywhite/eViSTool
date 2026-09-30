@@ -714,6 +714,8 @@
   "queue.titleRunning": "Installing mods · {0} of {1}",
   "queue.waiting": "Waiting",
   "queue.working": "Installing…",
+  "remote.failed": "▸ Remote access did not start on port {0}: {1}",
+  "remote.listening": "▸ Remote access: accepting connections on port {0}",
   "report.attention": "Attention",
   "report.changedCount": "{0}: changes — {1}",
   "report.dependencies": "Dependencies",

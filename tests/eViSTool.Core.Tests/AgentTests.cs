@@ -158,4 +158,49 @@ public sealed class AgentTests : IAsyncLifetime
         _client.Dispose();
         _client = null;
     }
+
+    [Fact]
+    public async Task RemoteAccess_OverTls_WithPinnedCertificateAndOwnKey()
+    {
+        // включили удалённый доступ до запуска агента — он поднимет сетевой вход сам
+        var remote = eViSTool.Core.Server.Remote.RemoteAccess.Enable(_profile.Id, AgentsDir);
+        string fingerprint;
+        using (var cert = eViSTool.Core.Server.Remote.RemoteAccess.EnsureCertificate(_profile.Id, AgentsDir))
+            fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
+        _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: true, AgentExe, AgentsDir);
+        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
+
+        // по коду подключения: HTTPS, сертификат сверяется с отпечатком
+        var code = new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint);
+        using (var client = AgentClient.ForRemote(code))
+        {
+            await Until(async () => (await client.StatusAsync()).State == ServerState.Running);
+            await client.CommandAsync("/time");
+            await Until(async () => (await client.ConsoleAsync(0, 0)).Any(l => l.Text.Contains("Handling Console Command /time")));
+            // выключить агента по сети нельзя — эта точка только для окна на той же машине
+            await Assert.ThrowsAnyAsync<InvalidOperationException>(() => client.ShutdownAsync());
+        }
+
+        // чужой агент (другой отпечаток) — соединение не устанавливается вовсе
+        using (var impostor = AgentClient.ForRemote(code with { Fingerprint = new string('0', 64) }))
+            await Assert.ThrowsAsync<HttpRequestException>(() => impostor.StatusAsync());
+
+        // ключ окна не подходит для удалённого входа, и наоборот
+        using (var wrong = AgentClient.ForRemote(code with { Key = eViSTool.Core.Server.Remote.RemoteAccess.NewKey() }))
+        {
+            for (var i = 0; i < 5; i++)
+                Assert.Contains("401", (await Assert.ThrowsAsync<InvalidOperationException>(() => wrong.StatusAsync())).Message);
+            // после пяти неверных попыток адрес ждёт — даже с верным ключом
+            using var right = AgentClient.ForRemote(code);
+            Assert.Contains("429", (await Assert.ThrowsAsync<InvalidOperationException>(() => right.StatusAsync())).Message);
+        }
+        using (var local = new AgentClient(_client.Endpoint, remote.Key))
+            await Assert.ThrowsAsync<InvalidOperationException>(() => local.StatusAsync());
+
+        // выключили в настройках — агент сам закрывает сетевой вход
+        eViSTool.Core.Server.Remote.RemoteAccess.Disable(_profile.Id, AgentsDir);
+        await Until(async () => (await _client.StatusAsync()).RemotePort is null, 15000);
+        using (var late = AgentClient.ForRemote(code))
+            await Assert.ThrowsAsync<HttpRequestException>(() => late.StatusAsync());
+    }
 }

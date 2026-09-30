@@ -53,6 +53,12 @@ public sealed record AgentStatus
     /// <summary>Ближайший перезапуск по расписанию (null — расписание выключено или сервер не работает).</summary>
     public DateTime? NextRestartAt { get; init; }
 
+    /// <summary>Удалённый доступ: агент принимает подключения из сети на этом порту (null — выключен или не удалось открыть порт).</summary>
+    public int? RemotePort { get; init; }
+
+    /// <summary>Почему удалённый доступ не заработал (порт занят и т. п.).</summary>
+    public string? RemoteError { get; init; }
+
     /// <summary>Кто сейчас на сервере (по времени входа).</summary>
     public IReadOnlyList<OnlinePlayer> Players { get; init; } = [];
 }
