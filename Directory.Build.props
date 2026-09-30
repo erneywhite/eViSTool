@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
-    <Version>0.1.0</Version>
+    <!-- версия релиза: скрипт build/publish.ps1 берёт её отсюда -->
+    <Version>0.1.0-alpha.1</Version>
     <Authors>Erney White</Authors>
     <Company>Erney White</Company>
     <Product>eViSTool</Product>

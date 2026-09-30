@@ -12,10 +12,12 @@
   <ItemGroup>
     <ProjectReference Include="..\eViSTool.Core\eViSTool.Core.csproj" />
     <!-- агент собирается вместе с окном и кладётся рядом: общая папка data -->
-    <ProjectReference Include="..\eViSTool.Agent\eViSTool.Agent.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\eViSTool.Agent\eViSTool.Agent.csproj" ReferenceOutputAssembly="false"
+                      Condition="'$(_IsPublishing)' != 'true'" />
   </ItemGroup>
 
-  <Target Name="CopyAgentNextToApp" AfterTargets="Build">
+  <!-- при публикации агент собирается отдельно (самодостаточным) — см. build/publish.ps1 -->
+  <Target Name="CopyAgentNextToApp" AfterTargets="Build" Condition="'$(_IsPublishing)' != 'true'">
     <PropertyGroup>
       <AgentOut>..\eViSTool.Agent\bin\$(Configuration)\net10.0\</AgentOut>
     </PropertyGroup>

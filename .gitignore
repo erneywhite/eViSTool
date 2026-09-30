@@ -482,3 +482,6 @@ $RECYCLE.BIN/
 *.swp
 eViSTool-forest-*.zip
 .claude/
+
+# сборки для релиза (build/publish.ps1)
+dist/
