@@ -4,7 +4,7 @@ namespace eViSTool.Core.Server.Config;
 
 /// <summary>
 /// Роль из serverconfig.json — обёртка над её JSON-объектом: правка свойства сразу пишет в документ.
-/// Полей, которых обёртка не знает (DefaultSpawn, RuntimePrivileges, добавленные модами), она не касается.
+/// Полей, которых обёртка не знает (DefaultSpawn, добавленные модами), она не касается; RuntimePrivileges только читает.
 /// Нет поля в JSON — читается значение по умолчанию (0, "", false); запись значения, которое и так читается,
 /// ничего не меняет — документ не становится «грязным» оттого, что поле ввода вернуло то же самое.
 /// </summary>
@@ -42,8 +42,15 @@ public sealed class RoleEntry
     }
 
     /// <summary>Привилегии как в файле — в том же порядке, вместе с незнакомыми программе.</summary>
-    public IReadOnlyList<string> Privileges =>
-        Json[PrivilegesName] is JArray list ? [.. list.Where(t => t.Type == JTokenType.String).Select(t => (string)t!)] : [];
+    public IReadOnlyList<string> Privileges => Strings(PrivilegesName);
+
+    /// <summary>
+    /// Привилегии, которые роли выдали моды во время работы сервера. Список ведёт сам сервер — только для показа.
+    /// </summary>
+    public IReadOnlyList<string> RuntimePrivileges => Strings("RuntimePrivileges");
+
+    /// <summary>Выдана ли привилегия (регистр важен, как и в игре).</summary>
+    public bool HasPrivilege(string code) => Privileges.Contains(code);
 
     /// <summary>Выдать (в конец списка, если ещё нет) или отобрать привилегию. Остальные и их порядок не трогаются.</summary>
     public void SetPrivilege(string code, bool granted)
@@ -64,6 +71,9 @@ public sealed class RoleEntry
 
     /// <summary>Роль из тех, что сервер создаёт сам.</summary>
     public bool IsStandard => ServerConfigSchema.StandardRoleCodes.Contains(Code, StringComparer.OrdinalIgnoreCase);
+
+    private IReadOnlyList<string> Strings(string name) =>
+        Json[name] is JArray list ? [.. list.Where(t => t.Type == JTokenType.String).Select(t => (string)t!)] : [];
 
     private string Text(string name) => Json[name] is JValue { Value: string s } ? s : "";
 
