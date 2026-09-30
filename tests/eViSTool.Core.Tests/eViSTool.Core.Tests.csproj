@@ -19,6 +19,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- образцы serverconfig.json (без личного): тесты берут их из папки сборки и работают с копией -->
+    <None Update="TestData\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\eViSTool.Core\eViSTool.Core.csproj" />
     <!-- поддельный сервер VS для тестов ServerHost: только собрать, ссылаться не нужно -->
     <ProjectReference Include="..\FakeVsServer\FakeVsServer.csproj" ReferenceOutputAssembly="false" />
