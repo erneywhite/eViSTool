@@ -8,6 +8,17 @@ public static class AgentProtocol
 
     public static string DefaultAgentsDir => Path.Combine(AppPaths.Root, "agents");
 
+    /// <summary>Версия этой сборки eViSTool: окно и агент выпускаются вместе и должны совпадать.</summary>
+    public static string AppVersion { get; } =
+        typeof(AgentProtocol).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion.Split('+')[0] ?? "?";
+
+    /// <summary>
+    /// Агент прежней версии: eViSTool обновили, а он работает со старым файлом (обновление его не трогает, чтобы не
+    /// уронить сервер). Новых функций он не знает.
+    /// </summary>
+    public static bool IsOutdated(AgentStatus status) => status.AgentVersion.Length > 0 && status.AgentVersion != AppVersion;
+
     /// <summary>Файл с адресом работающего агента профиля.</summary>
     public static string StateFile(string profileId, string? dir = null) => Path.Combine(dir ?? DefaultAgentsDir, $"{profileId}.json");
 

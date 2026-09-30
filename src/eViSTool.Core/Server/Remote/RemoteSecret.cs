@@ -36,6 +36,7 @@ public static class RemoteSecret
     {
         InvalidOperationException { Message: var m } when m.StartsWith("401") => Loc.T("remote.errKey"),
         InvalidOperationException { Message: var m } when m.StartsWith("429") => Loc.T("remote.errTooMany"),
+        InvalidOperationException { Message: var m } when m.StartsWith("404") => Loc.T("remote.errOldAgent"),
         HttpRequestException { InnerException: System.Security.Authentication.AuthenticationException } => Loc.T("remote.errCertificate"),
         HttpRequestException or TaskCanceledException => Loc.T("remote.errNoConnection", ex.Message),
         _ => ex.Message,

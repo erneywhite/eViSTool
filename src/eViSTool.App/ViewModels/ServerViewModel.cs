@@ -85,6 +85,9 @@ public sealed partial class ServerViewModel : ObservableObject
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _errorText = "";
 
+    /// <summary>Агент старее программы: удалённый — «обнови там», свой при работающем сервере — «обновится после остановки».</summary>
+    [ObservableProperty] private string _agentNote = "";
+
     /// <summary>Сервер из папки игры профиля, запущенный не нашим агентом (например, ViSST).</summary>
     [ObservableProperty] private int? _foreignPid;
 
@@ -176,6 +179,7 @@ public sealed partial class ServerViewModel : ObservableObject
         State = ServerState.Stopped;
         ForeignPid = null;
         ErrorText = "";
+        AgentNote = "";
         ClearStats();
         OnPropertyChanged(nameof(HeaderSubtitle));
         OnPropertyChanged(nameof(DataDir));
@@ -222,7 +226,18 @@ public sealed partial class ServerViewModel : ObservableObject
             {
                 try
                 {
-                    Apply(await _client.StatusAsync(ct));
+                    var status = await _client.StatusAsync(ct);
+                    Apply(status);
+                    // eViSTool обновили, а агент прежний: сервер стоит — меняем агента (нужен для удалённого доступа — сразу
+                    // запускаем новый; нет — новый появится при следующем запуске сервера)
+                    if (AgentProtocol.IsOutdated(status) && status.State == ServerState.Stopped && status.RestartScheduledAt is null && !IsBusy)
+                    {
+                        var old = _client;
+                        Detach();
+                        await AgentLauncher.ReplaceAsync(old, ct);
+                        if (Core.Server.Remote.RemoteAccess.Load(profile.Id).Enabled)
+                            using (await AgentLauncher.EnsureRunningAsync(profile, startServer: false, ct: ct)) { }
+                    }
                 }
                 catch (HttpRequestException)
                 {
@@ -298,6 +313,9 @@ public sealed partial class ServerViewModel : ObservableObject
         AgentRunning = true;
         State = s.State;
         _serverPid = s.ServerPid;
+        AgentNote = !AgentProtocol.IsOutdated(s) ? ""
+            : IsRemoteProfile ? Loc.T("server.agentOutdatedRemote", s.AgentVersion, AgentProtocol.AppVersion)
+            : Loc.T("server.agentOutdatedLocal", s.AgentVersion);
         if (IsRemoteProfile && s.GameVersion != _remoteGameVersion)
         {
             _remoteGameVersion = s.GameVersion;
