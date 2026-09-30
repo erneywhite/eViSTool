@@ -1139,6 +1139,7 @@
   "update.badHash": "The downloaded file does not match the checksum of the release — it was damaged or replaced on the way. Nothing was installed.",
   "update.httpFailed": "GitHub answered with code {0}.",
   "update.noHash": "The release has no checksum — the download cannot be verified, so it will not be installed.",
+  "update.rateLimited": "GitHub limited the number of checks from your address for now (60 per hour). Try again in a few minutes.",
   "ws.allowCoordinateHud": "Coordinate overlay",
   "ws.allowCoordinateHud.hint": "Players may show the coordinates overlay.",
   "ws.allowFallingBlocks": "Allow falling blocks",

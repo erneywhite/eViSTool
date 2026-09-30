@@ -40,4 +40,7 @@ foreach ($doc in 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'README.md', 'README.ru.md
 }
 
 Compress-Archive -Path (Join-Path $out '*') -DestinationPath $zip
-Get-ChildItem $out, $zip | Select-Object Name, @{ n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
+# контрольная сумма рядом с архивом: по ней программа проверяет скачанное, когда API GitHub недоступен (лимит запросов)
+$hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+[IO.File]::WriteAllText("$zip.sha256", "$hash  $(Split-Path $zip -Leaf)`n")
+Get-ChildItem $out, $zip, "$zip.sha256" | Select-Object Name, @{ n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize

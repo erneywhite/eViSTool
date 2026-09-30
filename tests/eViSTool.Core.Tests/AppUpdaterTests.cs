@@ -139,4 +139,65 @@ public sealed class AppUpdaterTests : IDisposable
         Assert.False(File.Exists(path)); // подменённый файл не остаётся
         await Assert.ThrowsAsync<InvalidOperationException>(() => updater.DownloadAsync(Release(null), downloads));
     }
+
+    private const string Feed = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <feed xmlns="http://www.w3.org/2005/Atom">
+      <entry>
+        <id>tag:github.com,2008:Repository/1/v0.1.0-alpha.9</id>
+        <link rel="alternate" type="text/html" href="https://github.com/erneywhite/eViSTool/releases/tag/v0.1.0-alpha.9"/>
+        <title>eViSTool 0.1.0-alpha.9</title>
+      </entry>
+      <entry>
+        <link rel="alternate" type="text/html" href="https://github.com/erneywhite/eViSTool/releases/tag/v0.2.0"/>
+      </entry>
+      <entry>
+        <link rel="alternate" type="text/html" href="https://github.com/erneywhite/eViSTool/releases/tag/не-версия"/>
+      </entry>
+    </feed>
+    """;
+
+    [Fact]
+    public void ParseFeed_GivesReleasesWithDirectLinks()
+    {
+        var list = AppUpdater.ParseFeed(Feed);
+        Assert.Equal(["v0.1.0-alpha.9", "v0.2.0"], list.Select(r => r.Tag));
+        var alpha = list[0];
+        Assert.True(alpha.Prerelease);
+        Assert.False(list[1].Prerelease);
+        Assert.Equal("eViSTool-0.1.0-alpha.9-win-x64.zip", alpha.AssetName);
+        Assert.Equal("https://github.com/erneywhite/eViSTool/releases/download/v0.1.0-alpha.9/eViSTool-0.1.0-alpha.9-win-x64.zip", alpha.AssetUrl);
+        Assert.Equal(alpha.AssetUrl + ".sha256", alpha.ChecksumUrl);
+        Assert.Null(alpha.Sha256);
+    }
+
+    private sealed class RoutedHandler(Func<string, HttpResponseMessage> route) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            Task.FromResult(route(request.RequestUri!.ToString()));
+    }
+
+    [Fact]
+    public async Task ApiRateLimited_FallsBackToFeed_AndChecksumFile()
+    {
+        var body = "archive bytes"u8.ToArray();
+        var sum = Convert.ToHexStringLower(SHA256.HashData(body));
+        var badSum = false;
+        var updater = new AppUpdater(new HttpClient(new RoutedHandler(url =>
+            url.StartsWith("https://api.github.com") ? new HttpResponseMessage(HttpStatusCode.Forbidden)
+            : url.EndsWith("releases.atom") ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(Feed) }
+            : url.EndsWith(".sha256") ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent((badSum ? new string('0', 64) : sum) + "  file.zip\n") }
+            : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(body) })));
+
+        // лимит API исчерпан — релизы из ленты: самый новый — стабильный 0.2.0
+        var found = await updater.FindUpdateAsync(V("0.1.0-alpha.8"));
+        Assert.Equal("v0.2.0", found!.Tag);
+
+        // контрольная сумма — из файла рядом с архивом
+        var downloads = Path.Combine(_root, "dl-feed");
+        var path = await updater.DownloadAsync(found, downloads);
+        Assert.Equal(body, await File.ReadAllBytesAsync(path));
+        badSum = true;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => updater.DownloadAsync(found, downloads));
+    }
 }
