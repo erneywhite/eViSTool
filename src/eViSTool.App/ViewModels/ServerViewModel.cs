@@ -186,15 +186,14 @@ public sealed partial class ServerViewModel : ObservableObject
         IsServerProfile = _main.ActiveProfile?.Kind == ProfileKind.Server;
         IsRemoteProfile = _main.ActiveProfile?.Model.IsRemote == true;
         _remoteGameVersion = null;
-        // у удалённого профиля пока только консоль и управление; конфиг, расписание и доступ — на компьютере с сервером
-        if (IsRemoteProfile) Tab = ServerTab.Console;
+        // у удалённого профиля пока нет конфигурации и удалённого доступа (их настраивают на компьютере с сервером)
+        if (IsRemoteProfile && Tab is ServerTab.Config or ServerTab.Remote) Tab = ServerTab.Console;
         var local = IsServerProfile && !IsRemoteProfile;
         Refresh();
         // сюда попадаем и при правке имени профиля: редактор сам разберётся, сменился ли файл
         Config.OnProfileSwitched(local ? _main.ActiveProfile?.Model.DataDir : null, _main.ActiveProfile?.Name ?? "",
             _main.ActiveProfile?.Model.GameDir);
-        Schedule.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model.Id : null,
-            local ? _main.ActiveProfile?.Model.DataDir : null, _main.ActiveProfile?.Name ?? "");
+        Schedule.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model : null, () => _client);
         Remote.OnProfileSwitched(local ? _main.ActiveProfile?.Model : null);
         if (!IsServerProfile) return;
 

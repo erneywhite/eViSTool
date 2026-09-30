@@ -82,17 +82,35 @@ public sealed class AgentClient : IDisposable
     /// <summary>Сделать копию мира сейчас (сервер должен работать).</summary>
     public Task<AgentStatus> BackupAsync(CancellationToken ct = default) => Post("backup", null, ct);
 
+    // ---- расписание и резервные копии (для удалённого сервера: окно не видит его файлов)
+
+    public Task<ServerAutomation> GetAutomationAsync(CancellationToken ct = default) => Get<ServerAutomation>("automation", ct);
+
+    public async Task SaveAutomationAsync(ServerAutomation settings, CancellationToken ct = default)
+    {
+        using var content = new StringContent(JsonConvert.SerializeObject(settings), Encoding.UTF8, "application/json");
+        using var resp = await _http.PutAsync("automation", content, ct).ConfigureAwait(false);
+        await Read<AgentStatus>(resp, ct).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<BackupEntry>> BackupsAsync(CancellationToken ct = default) => await Get<List<BackupEntry>>("backups", ct).ConfigureAwait(false);
+    public Task<BackupEntry> CopyWorldAsync(CancellationToken ct = default) => Post<BackupEntry>("backups/copy", null, ct);
+    public Task<RestoreResult> RestoreAsync(string name, CancellationToken ct = default) => Post<RestoreResult>("backups/restore", new BackupNameRequest(name), ct);
+    public Task DeleteBackupAsync(string name, CancellationToken ct = default) => Post<AgentStatus>("backups/delete", new BackupNameRequest(name), ct);
+
     private async Task<T> Get<T>(string path, CancellationToken ct)
     {
         using var resp = await _http.GetAsync(path, ct).ConfigureAwait(false);
         return await Read<T>(resp, ct).ConfigureAwait(false);
     }
 
-    private async Task<AgentStatus> Post(string path, object? body, CancellationToken ct)
+    private Task<AgentStatus> Post(string path, object? body, CancellationToken ct) => Post<AgentStatus>(path, body, ct);
+
+    private async Task<T> Post<T>(string path, object? body, CancellationToken ct)
     {
         using var content = new StringContent(body is null ? "" : JsonConvert.SerializeObject(body), Encoding.UTF8, "application/json");
         using var resp = await _http.PostAsync(path, content, ct).ConfigureAwait(false);
-        return await Read<AgentStatus>(resp, ct).ConfigureAwait(false);
+        return await Read<T>(resp, ct).ConfigureAwait(false);
     }
 
     private static async Task<T> Read<T>(HttpResponseMessage resp, CancellationToken ct)

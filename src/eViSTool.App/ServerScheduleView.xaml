@@ -186,7 +186,8 @@
                 <StackPanel>
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
-                            <Button Command="{Binding OpenFolderCommand}" Padding="10,8" Margin="0,0,8,0" ToolTip="{local:Tr sched.openFolder}">
+                            <Button Command="{Binding OpenFolderCommand}" Padding="10,8" Margin="0,0,8,0" ToolTip="{local:Tr sched.openFolder}"
+                                    Visibility="{Binding IsLocal, Converter={StaticResource BoolToVis}}">
                                 <Path Data="{StaticResource Icon.Folder}" Style="{StaticResource Forest.Icon}" Width="16" Height="16" />
                             </Button>
                             <Button Style="{StaticResource Forest.PrimaryButton}" Command="{Binding BackupNowCommand}" ToolTip="{local:Tr sched.nowTip}"
@@ -224,6 +225,7 @@
                                                     Command="{Binding DataContext.RestoreCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                     CommandParameter="{Binding}" />
                                             <Button Style="{StaticResource Forest.LinkButton}" Content="{local:Tr sched.show}" Margin="0,0,14,0"
+                                                    Visibility="{Binding IsLocal, Converter={StaticResource BoolToVis}}"
                                                     Command="{Binding DataContext.ShowInFolderCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                     CommandParameter="{Binding}" />
                                             <Button Style="{StaticResource Forest.LinkButton}" Content="{local:Tr sched.delete}" Foreground="{StaticResource Forest.Danger}"

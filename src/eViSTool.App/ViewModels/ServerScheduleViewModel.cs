@@ -8,35 +8,41 @@ using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Server;
-using eViSTool.Core.Server.Config;
-using Newtonsoft.Json.Linq;
+using eViSTool.Core.Server.Remote;
 
 namespace eViSTool.App.ViewModels;
 
 /// <summary>Строка списка резервных копий.</summary>
-public sealed class BackupRowViewModel(BackupFile file)
+public sealed class BackupRowViewModel(BackupEntry entry)
 {
-    public BackupFile File { get; } = file;
-    public string Name => File.Name;
-    public string TimeText { get; } = file.Time.ToString("dd.MM.yyyy HH:mm");
-    public string SizeText { get; } = Sizes.Format(file.Size);
+    public BackupEntry Entry { get; } = entry;
+    public string Name => Entry.Name;
+    public string TimeText { get; } = entry.Time.ToString("dd.MM.yyyy HH:mm");
+    public string SizeText { get; } = Sizes.Format(entry.Size);
 
     /// <summary>Не «своя» копия (другой профиль, прежнее имя «default-…», положена руками): ротация её не трогает.</summary>
-    public bool IsManual => !File.IsOwn;
+    public bool IsManual => !Entry.IsOwn;
+
+    /// <summary>Файл на этой машине — можно показать в Проводнике.</summary>
+    public bool IsLocal => Entry.LocalPath is not null;
 }
 
 /// <summary>
 /// Вкладка «Расписание» раздела «Сервер»: резервные копии мира — по расписанию (их делает агент, окно можно закрыть)
-/// и по кнопке. Настройки пишутся в файл рядом с ключом агента сразу при правке; агент сам их перечитывает.
+/// и по кнопке, перезапуски. Работает одинаково для сервера на этой машине (файлы) и на другой (агент по сети) —
+/// через <see cref="IServerData"/>. Настройки уходят агенту сразу при правке; он их подхватывает сам.
 /// </summary>
 public sealed partial class ServerScheduleViewModel : ObservableObject
 {
     private readonly ServerViewModel _server;
-    private string? _profileId;
-    private string? _dataDir;
-    private string _profileName = "";
+    private IServerData? _data;
+    private string? _profileKey;       // профиль и папка (или «удалённый»): сменились — всё читаем заново
+    private string? _dataDir;          // только для сервера на этой машине: «Открыть папку»
+    private ServerAutomation _saved = new();
+    private bool _loaded;              // настройки прочитаны (у удалённого — когда появилась связь)
     private bool _loading;
     private bool _active;
+    private int _generation;
     private DateTime? _lastSeenBackup;
     private DateTime? _nextBackupAt;
     private bool _awaitingBackup; // копию запросили кнопкой, ждём сообщения агента о ней
@@ -71,24 +77,77 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     [ObservableProperty] private string _totalText = "";
     [ObservableProperty] private bool _isBusy;
 
+    /// <summary>Сервер на этой машине: есть папка копий, которую можно открыть.</summary>
+    [ObservableProperty] private bool _isLocal;
+
     public ObservableCollection<BackupRowViewModel> Backups { get; } = [];
     public bool HasBackups => Backups.Count > 0;
 
-    /// <summary>Сменился профиль (или его правят в настройках): другой профиль — другие настройки и другая папка копий.</summary>
-    public void OnProfileSwitched(string? profileId, string? dataDir, string profileName)
+    /// <summary>
+    /// Сменился профиль (или его правят в настройках). Для сервера на этой машине — файлы его папки,
+    /// для удалённого — агент по сети (клиент берётся у раздела «Сервер»: связь может появиться и пропасть).
+    /// </summary>
+    public void OnProfileSwitched(GameProfile? profile, Func<AgentClient?> remoteClient)
     {
-        _profileName = profileName; // имя идёт в имена копий; его правка настройки и список не перечитывает
-        if (profileId == _profileId && string.Equals(dataDir, _dataDir, StringComparison.OrdinalIgnoreCase)) return;
-        _profileId = profileId;
-        _dataDir = dataDir;
+        var key = profile is null ? null : profile.IsRemote ? "remote:" + profile.Id : profile.Id + "|" + profile.DataDir;
+        if (key == _profileKey)
+        {
+            // только имя профиля: оно идёт в имена копий — источник данных пересоздаём, настройки не перечитываем
+            if (profile is { IsRemote: false, DataDir: { } dir }) _data = Local(profile, dir);
+            return;
+        }
+        _profileKey = key;
+        _generation++;
+        _dataDir = profile is { IsRemote: false } ? profile.DataDir : null;
+        _data = profile is null ? null
+            : profile.IsRemote ? new RemoteServerData(remoteClient)
+            : profile.DataDir is { } data ? Local(profile, data) : null;
+        IsLocal = _data is LocalServerData;
         _lastSeenBackup = null;
         _nextBackupAt = null;
+        _loaded = false;
         StatusText = "";
+        Backups.Clear();
+        OnPropertyChanged(nameof(HasBackups));
+        TotalText = "";
+        Apply(new ServerAutomation());
+        // источник данных сменился — доступность кнопок считаем заново (до этого её посчитали без профиля)
+        BackupNowCommand.NotifyCanExecuteChanged();
+        RestoreCommand.NotifyCanExecuteChanged();
+        _ = LoadAsync(_generation);
+    }
 
+    private static LocalServerData Local(GameProfile profile, string dataDir) =>
+        new(new ServerFiles(profile.Id, dataDir, BackupStore.Slug(profile.Name)));
+
+    /// <summary>Прочитать настройки расписания и список копий (у удалённого сервера — когда есть связь).</summary>
+    private async Task LoadAsync(int generation)
+    {
+        if (_data is not { } data) return;
+        try
+        {
+            var settings = await data.LoadAutomationAsync();
+            if (generation != _generation) return;
+            _saved = settings;
+            Apply(settings);
+            _loaded = true;
+            if (_active) await RefreshListAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or IOException or TaskCanceledException
+                                       or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
+        {
+            // удалённый сервер недоступен — попробуем, когда появится связь (ShowStatus)
+            if (generation == _generation && !data.IsRemote) StatusText = Loc.T("sched.failed", ex.Message);
+        }
+        UpdateTexts();
+    }
+
+    /// <summary>Настройки — в поля вкладки (без записи обратно).</summary>
+    private void Apply(ServerAutomation settings)
+    {
         _loading = true;
         try
         {
-            var settings = profileId is null ? new ServerAutomation() : ServerAutomation.Load(profileId);
             BackupEnabled = settings.BackupEnabled;
             IntervalText = settings.BackupIntervalHours.ToString("0.##", CultureInfo.CurrentCulture);
             KeepText = settings.BackupKeep.ToString();
@@ -106,34 +165,29 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         {
             _loading = false;
         }
-        if (_active) RefreshList();
-        UpdateTexts();
     }
 
-    /// <summary>Вкладку открыли — список копий читается с диска.</summary>
+    /// <summary>Вкладку открыли — список копий читается заново.</summary>
     public void SetActive(bool active)
     {
         _active = active;
-        if (active) RefreshList();
+        if (active) _ = RefreshListAsync();
     }
 
-    /// <summary>Свежий статус агента (null — агента нет, сервер остановлен).</summary>
+    /// <summary>Свежий статус агента (null — агента нет или нет связи).</summary>
     public void ShowStatus(AgentStatus? status)
     {
+        // удалённый сервер: связь появилась — настройки ещё не прочитаны, читаем
+        if (status is not null && !_loaded && _data is { IsRemote: true }) _ = LoadAsync(_generation);
+
         _nextBackupAt = status?.NextBackupAt;
         _nextRestartAt = status?.NextRestartAt;
         // агент сообщил о новой копии — список устарел
         if (status?.LastBackupAt is { } last && last != _lastSeenBackup)
         {
             _lastSeenBackup = last;
-            if (_active) RefreshList();
-            // копию просили кнопкой — вместо «сервер делает копию…» показываем итог
-            if (_awaitingBackup && _dataDir is not null)
-            {
-                _awaitingBackup = false;
-                var made = Store(_dataDir).List().FirstOrDefault(b => b.IsOwn);
-                StatusText = made is null ? "" : Loc.T("sched.done", made.Name, Sizes.Format(made.Size));
-            }
+            if (_active || _awaitingBackup) _ = RefreshListAsync(reportNewest: _awaitingBackup);
+            _awaitingBackup = false;
         }
         UpdateTexts();
         BackupNowCommand.NotifyCanExecuteChanged();
@@ -160,24 +214,21 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         SaveSettings();
     }
 
-    /// <summary>Папка копий профиля; «свои» копии — с именем профиля в названии файла.</summary>
-    private BackupStore Store(string dataDir) => new(dataDir, BackupStore.Slug(_profileName));
-
-    /// <summary>Правка сразу уходит в файл настроек (если числа разобрались) — агент подхватит её в течение нескольких секунд.</summary>
+    /// <summary>Правка сразу уходит агенту (если числа разобрались) — он подхватит её в течение нескольких секунд.</summary>
     private void SaveSettings()
     {
-        if (_loading || _profileId is null) return;
+        // пока настройки не прочитаны, не пишем: иначе значения по умолчанию затёрли бы настоящие
+        if (_loading || !_loaded || _data is not { } data) return;
 
         var intervalOk = TryNumber(IntervalText, out var hours) && hours is >= 5.0 / 60 and <= 720;
         var keepOk = int.TryParse(KeepText.Trim(), out var keep) && keep is >= 0 and <= 1000;
         IntervalError = intervalOk ? "" : Loc.T("sched.intervalError");
         KeepError = keepOk ? "" : Loc.T("sched.keepError");
 
-        // перезапуски: проверяем только поля выбранного режима; скрытые поля остаются в файле как были
-        var saved = ServerAutomation.Load(_profileId);
-        var restartHours = saved.RestartIntervalHours;
-        var times = saved.RestartTimes;
-        var warns = saved.RestartWarnMinutes;
+        // перезапуски: проверяем только поля выбранного режима; скрытые поля остаются как были
+        var restartHours = _saved.RestartIntervalHours;
+        var times = _saved.RestartTimes;
+        var warns = _saved.RestartWarnMinutes;
         RestartError = "";
         if (RestartMode == RestartMode.Interval)
         {
@@ -198,28 +249,35 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         }
         if (!intervalOk || !keepOk || RestartError.Length > 0) return;
 
+        _saved = _saved with
+        {
+            BackupEnabled = BackupEnabled,
+            BackupIntervalHours = hours,
+            BackupKeep = keep,
+            BackupOnlyWhenPlayed = OnlyWhenPlayed,
+            BackupAnnounce = Announce,
+            RestartMode = RestartMode,
+            RestartIntervalHours = restartHours,
+            RestartTimes = times,
+            RestartWarnMinutes = warns,
+            RestartBackup = RestartBackup,
+        };
+        _ = SaveAsync(data, _saved);
+        UpdateTexts();
+    }
+
+    private async Task SaveAsync(IServerData data, ServerAutomation settings)
+    {
         try
         {
-            new ServerAutomation
-            {
-                BackupEnabled = BackupEnabled,
-                BackupIntervalHours = hours,
-                BackupKeep = keep,
-                BackupOnlyWhenPlayed = OnlyWhenPlayed,
-                BackupAnnounce = Announce,
-                RestartMode = RestartMode,
-                RestartIntervalHours = restartHours,
-                RestartTimes = times,
-                RestartWarnMinutes = warns,
-                RestartBackup = RestartBackup,
-            }.Save(_profileId);
-            StatusText = "";
+            await data.SaveAutomationAsync(settings);
+            if (StatusText.StartsWith(Loc.T("sched.saveFailed", ""), StringComparison.Ordinal)) StatusText = "";
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException or InvalidOperationException
+                                       or TaskCanceledException)
         {
-            StatusText = Loc.T("sched.saveFailed", ex.Message);
+            StatusText = Loc.T("sched.saveFailed", data.IsRemote ? RemoteSecret.Describe(ex) : ex.Message);
         }
-        UpdateTexts();
     }
 
     // «05:00, 17:30» или «10 5 1» → части
@@ -232,7 +290,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
 
     private void UpdateTexts()
     {
-        var newest = Backups.FirstOrDefault()?.File.Time;
+        var newest = Backups.FirstOrDefault()?.Entry.Time;
         LastBackupText = newest is { } t ? Loc.T("sched.last", When(t)) : Loc.T("sched.lastNone");
         NextBackupText = !BackupEnabled ? Loc.T("sched.nextOff")
             : _nextBackupAt is { } next ? Loc.T("sched.next", When(next))
@@ -246,35 +304,40 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         time.Date == DateTime.Today ? Loc.T("sched.today", time.ToString("HH:mm")) : time.ToString("dd.MM.yyyy HH:mm");
 
     [RelayCommand]
-    private void RefreshList()
+    private Task RefreshList() => RefreshListAsync();
+
+    /// <param name="reportNewest">Копию просили кнопкой — вместо «сервер делает копию…» показать итог.</param>
+    private async Task RefreshListAsync(bool reportNewest = false)
     {
-        Backups.Clear();
-        long total = 0;
-        if (_dataDir is not null)
+        if (_data is not { } data) return;
+        var generation = _generation;
+        IReadOnlyList<BackupEntry> list;
+        try
         {
-            try
-            {
-                foreach (var file in Store(_dataDir).List())
-                {
-                    Backups.Add(new BackupRowViewModel(file));
-                    total += file.Size;
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                StatusText = ex.Message;
-            }
+            list = await data.ListBackupsAsync();
         }
-        TotalText = Backups.Count == 0 ? "" : Loc.T("sched.total", Backups.Count, Sizes.Format(total));
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException or InvalidOperationException
+                                       or TaskCanceledException or Newtonsoft.Json.JsonException)
+        {
+            if (generation == _generation && !data.IsRemote) StatusText = ex.Message;
+            return;
+        }
+        if (generation != _generation) return;
+
+        Backups.Clear();
+        foreach (var entry in list) Backups.Add(new BackupRowViewModel(entry));
+        TotalText = Backups.Count == 0 ? "" : Loc.T("sched.total", Backups.Count, Sizes.Format(list.Sum(b => b.Size)));
         OnPropertyChanged(nameof(HasBackups));
+        if (reportNewest && list.FirstOrDefault(b => b.IsOwn) is { } made) StatusText = Loc.T("sched.done", made.Name, Sizes.Format(made.Size));
         UpdateTexts();
     }
 
-    // копию можно сделать на работающем сервере (её делает сам сервер) или на полностью остановленном (копируем файл)
-    // на работающем сервере копию делает сам сервер — папка на этом компьютере не нужна (так и для удалённого сервера)
-    private bool CanBackupNow => !IsBusy
+    // На работающем сервере копию делает сам сервер (/genbackup), на полностью остановленном — копируется файл мира
+    // (у удалённого сервера — его агентом). Чужой сервер из той же папки — только своими средствами.
+    private bool CanBackupNow => !IsBusy && _data is not null
+                                 && (!_server.IsRemoteProfile || _server.AgentRunning)
                                  && (_server.State == ServerState.Running && _server.AgentRunning
-                                     || _dataDir is not null && _server.State == ServerState.Stopped && !_server.HasForeign);
+                                     || _server.State == ServerState.Stopped && !_server.HasForeign);
 
     partial void OnIsBusyChanged(bool value)
     {
@@ -285,7 +348,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanBackupNow))]
     private async Task BackupNow()
     {
-        var dataDir = _dataDir;
+        if (_data is not { } data) return;
         IsBusy = true;
         try
         {
@@ -296,25 +359,17 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
                 await _server.BackupAsync();
                 StatusText = Loc.T("sched.requested");
             }
-            else if (dataDir is not null)
+            else
             {
-                var save = SaveFile(dataDir) ?? throw new InvalidOperationException(Loc.T("sched.noConfig"));
-                var settings = _profileId is null ? new ServerAutomation() : ServerAutomation.Load(_profileId);
-                var copy = await Task.Run(() =>
-                {
-                    var store = Store(dataDir);
-                    var made = store.CopySave(save, DateTime.Now);
-                    if (settings.BackupEnabled) store.Prune(settings.BackupKeep);
-                    return made;
-                });
+                var copy = await data.CopyWorldAsync();
                 StatusText = Loc.T("sched.done", copy.Name, Sizes.Format(copy.Size));
-                RefreshList();
+                await RefreshListAsync();
             }
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException
-                                       or HttpRequestException or Newtonsoft.Json.JsonException)
+                                       or HttpRequestException or TaskCanceledException or Newtonsoft.Json.JsonException)
         {
-            StatusText = Loc.T("sched.failed", ex.Message);
+            StatusText = Loc.T("sched.failed", data.IsRemote ? RemoteSecret.Describe(ex) : ex.Message);
         }
         finally
         {
@@ -322,27 +377,18 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         }
     }
 
-    /// <summary>Файл мира профиля — из его serverconfig.json (null — конфига или пути в нём нет).</summary>
-    private static string? SaveFile(string dataDir)
-    {
-        var config = Path.Combine(dataDir, ProfileResolver.ServerConfigName);
-        if (!File.Exists(config)) return null;
-        if (ServerConfigDocument.Load(config).Get("WorldConfig.SaveFileLocation") is not JValue { Value: string path } || path.Trim().Length == 0)
-            return null;
-        return Path.IsPathRooted(path) ? path : Path.Combine(dataDir, path);
-    }
-
     // восстановление подменяет файл мира — только при полностью остановленном сервере
     private bool CanRestore(BackupRowViewModel? row) =>
-        row is not null && !IsBusy && _dataDir is not null && _server.State == ServerState.Stopped && !_server.HasForeign;
+        row is not null && !IsBusy && _data is not null && _server.State == ServerState.Stopped && !_server.HasForeign
+        && (!_server.IsRemoteProfile || _server.AgentRunning);
 
     /// <summary>Вернуть мир из копии. Текущий мир перед этим сохраняется рядом с копиями — восстановление можно откатить.</summary>
     [RelayCommand(CanExecute = nameof(CanRestore))]
     private async Task Restore(BackupRowViewModel? row)
     {
-        if (row is null || _dataDir is not { } dataDir) return;
+        if (row is null || _data is not { } data) return;
         var text = Loc.T("sched.restoreAsk", row.Name, row.TimeText, row.SizeText)
-                   + (row.File.IsOwn ? "" : "\n\n" + Loc.T("sched.restoreForeign"));
+                   + (row.Entry.IsOwn ? "" : "\n\n" + Loc.T("sched.restoreForeign"));
         if (MessageBox.Show(Application.Current.MainWindow!, text, "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No)
             != MessageBoxResult.Yes)
             return;
@@ -350,26 +396,26 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            var save = SaveFile(dataDir) ?? throw new InvalidOperationException(Loc.T("sched.noConfig"));
-            var safety = await Task.Run(() => Store(dataDir).Restore(row.File, save, DateTime.Now));
-            StatusText = safety is null ? Loc.T("sched.restored", row.Name) : Loc.T("sched.restoredKept", row.Name, safety.Name);
+            var result = await data.RestoreAsync(row.Name);
+            StatusText = result.SafetyName is null ? Loc.T("sched.restored", row.Name) : Loc.T("sched.restoredKept", row.Name, result.SafetyName);
         }
-        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or HttpRequestException
+                                       or TaskCanceledException or Newtonsoft.Json.JsonException)
         {
-            StatusText = Loc.T("sched.failed", ex.Message);
+            StatusText = Loc.T("sched.failed", data.IsRemote ? RemoteSecret.Describe(ex) : ex.Message);
         }
         finally
         {
             IsBusy = false;
         }
-        RefreshList();
+        await RefreshListAsync();
     }
 
     [RelayCommand]
     private void OpenFolder()
     {
-        if (_dataDir is null) return;
-        var dir = new BackupStore(_dataDir).Dir;
+        if (_data is not LocalServerData local) return;
+        var dir = local.Files.BackupsDir;
         Directory.CreateDirectory(dir);
         Shell.OpenFolder(dir);
     }
@@ -377,24 +423,26 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     [RelayCommand]
     private static void ShowInFolder(BackupRowViewModel? row)
     {
-        if (row is not null && File.Exists(row.File.Path)) Shell.ShowInFolder(row.File.Path);
+        if (row?.Entry.LocalPath is { } path && File.Exists(path)) Shell.ShowInFolder(path);
     }
 
     [RelayCommand]
-    private void Delete(BackupRowViewModel? row)
+    private async Task Delete(BackupRowViewModel? row)
     {
-        if (row is null) return;
-        if (MessageBox.Show(Application.Current.MainWindow!, Loc.T("sched.deleteAsk", row.Name), "eViSTool",
+        if (row is null || _data is not { } data) return;
+        var ask = Loc.T(data.IsRemote ? "sched.deleteAskRemote" : "sched.deleteAsk", row.Name);
+        if (MessageBox.Show(Application.Current.MainWindow!, ask, "eViSTool",
                 MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
             return;
         try
         {
-            Shell.MoveToRecycleBin(row.File.Path);
+            await data.DeleteBackupAsync(row.Name);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or HttpRequestException
+                                       or TaskCanceledException)
         {
-            StatusText = Loc.T("sched.failed", ex.Message);
+            StatusText = Loc.T("sched.failed", data.IsRemote ? RemoteSecret.Describe(ex) : ex.Message);
         }
-        RefreshList();
+        await RefreshListAsync();
     }
 }

@@ -64,6 +64,7 @@ var automation = ServerAutomation.Load(opts.ProfileId, opts.AgentsDir);
 var automationFile = ServerAutomation.FileFor(opts.ProfileId, opts.AgentsDir);
 var automationStamp = File.Exists(automationFile) ? File.GetLastWriteTimeUtc(automationFile) : default;
 var backups = new BackupStore(opts.DataPath, opts.BackupName);
+var files = new ServerFiles(opts.ProfileId, opts.DataPath, opts.BackupName, opts.AgentsDir); // для окна на другой машине
 var scheduler = new BackupScheduler();
 scheduler.Seed(backups.List().FirstOrDefault(b => b.IsOwn)?.Time);
 string? pendingBackup = null; // имя копии, которую сервер делает по нашей просьбе
@@ -203,6 +204,32 @@ async Task<IResult> Run(Func<Task> action)
     }
 }
 
+// ответ или «409» с понятным текстом: копии, восстановление, настройки
+IResult Guard(Func<object> action)
+{
+    lastActivity = DateTime.Now;
+    try
+    {
+        return Json(action());
+    }
+    catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or JsonException)
+    {
+        return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
+    }
+}
+
+// файл мира трогаем только у полностью остановленного сервера
+IResult WhenStopped(Func<object> action) =>
+    host.State != ServerState.Stopped
+        ? Results.Problem(eViSTool.Core.Localization.Loc.T("sched.needStopped"), statusCode: StatusCodes.Status409Conflict)
+        : Guard(action);
+
+async Task<string?> ReadName(HttpContext ctx)
+{
+    using var reader = new StreamReader(ctx.Request.Body);
+    return JsonConvert.DeserializeObject<BackupNameRequest>(await reader.ReadToEndAsync())?.Name;
+}
+
 // Точки API — одни и те же для окна на этой машине и для удалённого клиента (кроме выключения агента).
 void MapApi(WebApplication web, bool isRemote)
 {
@@ -228,6 +255,21 @@ web.MapPost("/command", async (HttpContext ctx) =>
 });
 // копия мира сейчас (кнопка в окне); на остановленном сервере копию делает само окно
 web.MapPost("/backup", () => Run(RequestBackup));
+
+// расписание и резервные копии — нужны окну на другой машине (своё окно работает с файлами напрямую)
+web.MapGet("/automation", () => Json(files.LoadAutomation()));
+web.MapPut("/automation", async (HttpContext ctx) =>
+{
+    using var reader = new StreamReader(ctx.Request.Body);
+    var settings = JsonConvert.DeserializeObject<ServerAutomation>(await reader.ReadToEndAsync());
+    return settings is null ? Results.BadRequest() : Guard(() => { files.SaveAutomation(settings); return Status(); });
+});
+web.MapGet("/backups", () => Guard(files.ListBackups));
+web.MapPost("/backups/copy", () => WhenStopped(() => files.CopyWorld(DateTime.Now)));
+web.MapPost("/backups/restore", async (HttpContext ctx) =>
+    await ReadName(ctx) is { Length: > 0 } name ? WhenStopped(() => files.Restore(name, DateTime.Now)) : Results.BadRequest());
+web.MapPost("/backups/delete", async (HttpContext ctx) =>
+    await ReadName(ctx) is { Length: > 0 } name ? Guard(() => { files.DeleteBackup(name); return Status(); }) : Results.BadRequest());
 if (isRemote) return;
 web.MapPost("/shutdown", () =>
 {
