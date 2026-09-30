@@ -21,13 +21,34 @@ public partial class ServerView : UserControl
         };
     }
 
-    // автопрокрутка, только если пользователь и так внизу (читает старое — не дёргаем)
+    // Автопрокрутка как в терминале: консоль «прилипает» к низу, пока пользователь сам не отмотал вверх.
+    // Докручиваем после отрисовки — до неё высота списка ещё старая (особенно с переносом длинных строк).
+    private bool _stick = true;
+    private ScrollViewer? _scroll;
+
+    private ScrollViewer? Scroll
+    {
+        get
+        {
+            if (_scroll is null && FindScroll(ConsoleList) is { } sv)
+            {
+                _scroll = sv;
+                // изменилась не высота содержимого, а позиция — значит, крутил пользователь
+                sv.ScrollChanged += (_, e) =>
+                {
+                    if (e.ExtentHeightChange == 0 && e.ViewportHeightChange == 0)
+                        _stick = sv.VerticalOffset >= sv.ScrollableHeight - 1;
+                };
+            }
+            return _scroll;
+        }
+    }
+
     private void OnLinesAppended(bool force)
     {
-        var scroll = FindScroll(ConsoleList);
-        var atBottom = force || scroll is null || scroll.VerticalOffset >= scroll.ScrollableHeight - 2;
-        if (atBottom && ConsoleList.Items.Count > 0)
-            ConsoleList.ScrollIntoView(ConsoleList.Items[^1]);
+        if (force) _stick = true;
+        if (!_stick || Scroll is not { } scroll) return;
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, () => scroll.ScrollToEnd());
     }
 
     private static ScrollViewer? FindScroll(DependencyObject root)

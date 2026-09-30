@@ -34,7 +34,24 @@ public sealed partial class ServerViewModel : ObservableObject
     [ObservableProperty] private ServerState _state = ServerState.Stopped;
     [ObservableProperty] private bool _agentRunning;
     [ObservableProperty] private string _stateText = "";
-    [ObservableProperty] private string _detailsText = "";
+
+    // плитки над консолью
+    [ObservableProperty] private RowTone _stateTone = RowTone.Muted;
+    [ObservableProperty] private string _uptimeText = "—";
+    [ObservableProperty] private string _memoryText = "—";
+    [ObservableProperty] private string _pidText = "—";
+    /// <summary>Под плиткой состояния: перезапуск через N с / код выхода.</summary>
+    [ObservableProperty] private string _stateNote = "";
+
+    /// <summary>Подзаголовок: профиль и версия игры; путь к данным — в подсказке.</summary>
+    public string HeaderSubtitle => _main.ActiveProfile is { } p ? Loc.T("server.subtitle", p.Name, p.GameVersionText) : "";
+    public string DataDir => _main.ActiveProfile?.Model.DataDir ?? "";
+
+    [RelayCommand]
+    private void OpenServerMods() => _main.SelectedTab = 0;
+
+    [RelayCommand]
+    private void OpenSettings() => _main.SelectedTab = 3;
     [ObservableProperty] private string _commandText = "";
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _errorText = "";
@@ -68,12 +85,12 @@ public sealed partial class ServerViewModel : ObservableObject
         OnPropertyChanged(nameof(CanStart));
         OnPropertyChanged(nameof(CanStop));
         OnPropertyChanged(nameof(CanCommand));
-        StateText = !IsServerProfile ? "" : (AgentRunning ? State : ServerState.Stopped) switch
+        (StateText, StateTone) = !IsServerProfile ? ("", RowTone.Muted) : (AgentRunning ? State : ServerState.Stopped) switch
         {
-            ServerState.Starting => "◌ " + Loc.T("server.stateStarting"),
-            ServerState.Running => "● " + Loc.T("server.stateRunning"),
-            ServerState.Stopping => "◌ " + Loc.T("server.stateStopping"),
-            _ => "○ " + Loc.T("server.stateStopped"),
+            ServerState.Starting => (Loc.T("server.stateStarting"), RowTone.Update),
+            ServerState.Running => (Loc.T("server.stateRunning"), RowTone.Good),
+            ServerState.Stopping => (Loc.T("server.stateStopping"), RowTone.Warn),
+            _ => (Loc.T("server.stateStopped"), RowTone.Muted),
         };
     }
 
@@ -87,7 +104,9 @@ public sealed partial class ServerViewModel : ObservableObject
         State = ServerState.Stopped;
         ForeignPid = null;
         ErrorText = "";
-        DetailsText = "";
+        ClearStats();
+        OnPropertyChanged(nameof(HeaderSubtitle));
+        OnPropertyChanged(nameof(DataDir));
         Lines.Clear();
         _lastSeq = 0;
         _agentPid = 0;
@@ -152,13 +171,18 @@ public sealed partial class ServerViewModel : ObservableObject
             }
         }
 
-        var parts = new List<string>();
-        if (s.StartedAt is { } started) parts.Add(Loc.T("server.uptime", FormatUptime(DateTime.Now - started)));
-        if (s.MemoryMb is { } mb) parts.Add(Loc.T("server.memory", mb));
-        if (s.ServerPid is { } pid) parts.Add($"PID {pid}");
-        if (s.RestartScheduledAt is { } at) parts.Add(Loc.T("server.restartIn", Math.Max(0, (int)(at - DateTime.Now).TotalSeconds)));
-        if (s.State == ServerState.Stopped && s.LastExitCode is { } code) parts.Add(Loc.T("server.lastExit", code));
-        DetailsText = string.Join("   ·   ", parts);
+        UptimeText = s.StartedAt is { } started && s.State != ServerState.Stopped ? FormatUptime(DateTime.Now - started) : "—";
+        MemoryText = s.MemoryMb is { } mb && s.State != ServerState.Stopped ? Loc.T("server.memoryMb", mb.ToString("N0")) : "—";
+        PidText = s.ServerPid is { } pid && s.State != ServerState.Stopped ? pid.ToString() : "—";
+        StateNote = s.RestartScheduledAt is { } at ? Loc.T("server.restartIn", Math.Max(0, (int)(at - DateTime.Now).TotalSeconds))
+            : s.State == ServerState.Stopped && s.LastExitCode is { } code ? Loc.T("server.lastExit", code)
+            : "";
+    }
+
+    private void ClearStats()
+    {
+        UptimeText = MemoryText = PidText = "—";
+        StateNote = "";
     }
 
     private static string FormatUptime(TimeSpan t) =>
@@ -178,7 +202,7 @@ public sealed partial class ServerViewModel : ObservableObject
         AgentRunning = false;
         State = ServerState.Stopped;
         _serverPid = null;
-        DetailsText = "";
+        ClearStats();
     }
 
     /// <summary>Поток консоли: долгий опрос агента — строка появилась, сразу пришла.</summary>
@@ -320,11 +344,12 @@ public sealed partial class ServerViewModel : ObservableObject
 /// <summary>Строка консоли с цветом по уровню.</summary>
 public sealed class ConsoleLineViewModel(ConsoleLine line)
 {
-    private static readonly Brush ErrorBrush = Frozen(0xF0, 0x60, 0x60);
-    private static readonly Brush WarningBrush = Frozen(0xE8, 0xA8, 0x40);
-    private static readonly Brush InputBrush = Frozen(0x6C, 0xB4, 0xFF);
-    private static readonly Brush SystemBrush = Frozen(0xC0, 0x8C, 0xFF);
-    private static readonly Brush ChatBrush = Frozen(0x80, 0xD0, 0x90);
+    // лесная палитра: ошибки — розоватые, предупреждения — янтарь, ввод — песок, сообщения eViSTool — дымчато-голубые, чат — зелёный
+    private static readonly Brush ErrorBrush = Frozen(0xE8, 0x9B, 0x96);
+    private static readonly Brush WarningBrush = Frozen(0xED, 0xBF, 0x82);
+    private static readonly Brush InputBrush = Frozen(0xD4, 0xBD, 0x83);
+    private static readonly Brush SystemBrush = Frozen(0x9F, 0xB7, 0xC9);
+    private static readonly Brush ChatBrush = Frozen(0xB0, 0xC8, 0x98);
 
     public string Text { get; } = line.Kind == ConsoleLineKind.Input ? "> " + line.Text : line.Text;
 
