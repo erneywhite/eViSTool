@@ -52,7 +52,7 @@
         <Border DockPanel.Dock="Top" BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,0,0,1" Margin="0,14,0,14" />
 
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel MaxWidth="900" HorizontalAlignment="Left" Margin="0,0,14,0">
+            <StackPanel Margin="0,0,14,0">
                 <!-- ===== программа и обновления ===== -->
                 <Border Style="{StaticResource AboutCard}" Padding="20">
                     <DockPanel>

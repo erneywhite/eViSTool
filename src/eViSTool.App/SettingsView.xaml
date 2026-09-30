@@ -113,7 +113,7 @@
 
             <!-- ===== правая часть ===== -->
             <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
-                <StackPanel MaxWidth="900" HorizontalAlignment="Stretch" Margin="0,0,14,0">
+                <StackPanel Margin="0,0,14,0">
                     <!-- выбранный профиль -->
                     <Border Style="{StaticResource SettingsCard}" DataContext="{Binding EditedProfile}">
                         <StackPanel>
