@@ -151,6 +151,55 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
         return safety;
     }
 
+    /// <summary>
+    /// Дождаться копии, которую делает сервер (/genbackup): файл с этим именем (или, без имени, — любой новый, которого
+    /// не было в <paramref name="before"/>) появился, сервер его дописал и отпустил. Не по строке «Backup complete!»:
+    /// её сервер пишет на своём языке («Резервное копирование завершено!»). null — не дождались.
+    /// </summary>
+    public async Task<BackupFile?> WaitForAsync(string? name, IReadOnlySet<string> before, TimeSpan timeout,
+        CancellationToken ct = default, TimeSpan? poll = null)
+    {
+        var until = DateTime.UtcNow + timeout;
+        long lastSize = -1;
+        while (DateTime.UtcNow < until)
+        {
+            var file = name is not null ? Find(name) : List().FirstOrDefault(b => !before.Contains(b.Name));
+            // дописан — размер перестал меняться и файл никто не держит открытым
+            if (file is not null && file.Size == lastSize && file.Size > 0 && !IsOpenElsewhere(file.Path)) return file;
+            lastSize = file?.Size ?? -1;
+            await Task.Delay(poll ?? TimeSpan.FromMilliseconds(500), ct).ConfigureAwait(false);
+        }
+        return null;
+    }
+
+    private static bool IsOpenElsewhere(string path)
+    {
+        try
+        {
+            using var _ = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
+            return false;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Сервер взялся за копию: «Handling Console Command /genbackup [имя]». Эту строку сервер пишет по-английски
+    /// при любом языке; имя — если его задали.
+    /// </summary>
+    public static bool IsBackupCommand(string line, out string? name)
+    {
+        const string marker = "Handling Console Command /genbackup";
+        name = null;
+        var at = line.IndexOf(marker, StringComparison.Ordinal);
+        if (at < 0) return false;
+        var rest = line[(at + marker.Length)..].Trim();
+        if (rest.Length > 0) name = rest;
+        return true;
+    }
+
     /// <summary>Часть имени страховочной копии, сделанной перед восстановлением.</summary>
     public const string BeforeRestore = "before-restore";
 

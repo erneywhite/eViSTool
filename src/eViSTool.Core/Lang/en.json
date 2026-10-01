@@ -31,6 +31,7 @@
   "backup.empty": "The backup «{0}» is empty — nothing to restore from.",
   "backup.modData": "▸ Mod data next to the world (Saves, ModData) packed: {0}",
   "backup.noSave": "World file not found: {0}",
+  "backup.notFound": "▸ The backup {0} did not appear in the Backups folder — the server may have failed to make it. See the lines above.",
   "backup.pruned": "▸ Old backups removed: {0} (keeping the last {1})",
   "backup.scheduled": "▸ Scheduled backup…",
   "card.author": "by {0}",

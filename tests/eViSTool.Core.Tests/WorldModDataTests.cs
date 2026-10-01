@@ -131,3 +131,60 @@ public sealed class WorldModDataTests : IDisposable
         Assert.Equal("world B", Read("Saves/default.vcdbs"));
     }
 }
+
+/// <summary>Агент узнаёт о копии сервера по строке-команде и по готовому файлу — не по фразе на языке сервера.</summary>
+public sealed class BackupWatchTests : IDisposable
+{
+    private readonly string _data = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "evistool-bkwatch-" + Guid.NewGuid().ToString("N"))).FullName;
+
+    public void Dispose() => Directory.Delete(_data, recursive: true);
+
+    [Theory]
+    [InlineData("2.10.2026 02:26:19 [Server Notification] Handling Console Command /genbackup Server_DUO-2026-10-02_02-26-19.vcdbs", "Server_DUO-2026-10-02_02-26-19.vcdbs")]
+    [InlineData("2.10.2026 02:26:19 [Server Notification] Handling Console Command /genbackup", null)]
+    public void RecognizesBackupCommand(string line, string? name)
+    {
+        Assert.True(BackupStore.IsBackupCommand(line, out var parsed));
+        Assert.Equal(name, parsed);
+    }
+
+    [Theory]
+    [InlineData("2.10.2026 02:26:20 [Server Notification] Резервное копирование завершено!")]
+    [InlineData("2.10.2026 02:26:20 [Server Notification] Handling Console Command /help")]
+    public void IgnoresOtherLines(string line) => Assert.False(BackupStore.IsBackupCommand(line, out _));
+
+    [Fact]
+    public async Task WaitsUntilTheServerLetsTheFileGo()
+    {
+        var store = new BackupStore(_data, "Survival");
+        var path = Path.Combine(store.Dir, "Survival-2026-10-02_02-26-19.vcdbs");
+        Directory.CreateDirectory(store.Dir);
+
+        var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read); // сервер ещё пишет
+        stream.Write("world"u8);
+        stream.Flush();
+        var wait = store.WaitForAsync("Survival-2026-10-02_02-26-19.vcdbs", new HashSet<string>(), TimeSpan.FromSeconds(10),
+            poll: TimeSpan.FromMilliseconds(50));
+        await Task.Delay(400);
+        Assert.False(wait.IsCompleted); // файл ещё открыт сервером — не считаем копию готовой
+        stream.Dispose();
+
+        var file = await wait;
+        Assert.Equal("Survival-2026-10-02_02-26-19.vcdbs", file?.Name);
+    }
+
+    [Fact]
+    public async Task UnnamedCommand_TakesTheNewFile_AndGivesUpOnTimeout()
+    {
+        var store = new BackupStore(_data, "Survival");
+        Directory.CreateDirectory(store.Dir);
+        File.WriteAllText(Path.Combine(store.Dir, "old-2026-10-01_10-00-00.vcdbs"), "old");
+        var before = store.List().Select(b => b.Name).ToHashSet();
+
+        Assert.Null(await store.WaitForAsync(null, before, TimeSpan.FromMilliseconds(300), poll: TimeSpan.FromMilliseconds(50)));
+
+        File.WriteAllText(Path.Combine(store.Dir, "default-2026-10-02_02-30-00.vcdbs"), "new");
+        var file = await store.WaitForAsync(null, before, TimeSpan.FromSeconds(5), poll: TimeSpan.FromMilliseconds(50));
+        Assert.Equal("default-2026-10-02_02-30-00.vcdbs", file?.Name);
+    }
+}
