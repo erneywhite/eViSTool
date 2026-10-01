@@ -42,6 +42,7 @@ It is portable: unzip it anywhere and run. Nothing is installed into the system 
 - [Updates, data and uninstalling](#updates-data-and-uninstalling)
 - [Troubleshooting](#troubleshooting)
 - [Building from source](#building-from-source)
+- [Code signing policy](#code-signing-policy)
 
 ## Getting started
 
@@ -54,7 +55,7 @@ It is portable: unzip it anywhere and run. Nothing is installed into the system 
 The game client needs the same runtime, so it is already there if you play Vintage Story.
 On a machine with only a dedicated server, Windows offers to download the runtime on the first start.
 
-> **"Windows protected your PC"?** eViSTool is not code-signed (a certificate costs money every year),
+> **"Windows protected your PC"?** eViSTool is not code-signed yet (it is being set up, see [Code signing policy](#code-signing-policy)),
 > so SmartScreen may warn about an unknown publisher on the first start. Click **More info → Run anyway**.
 > The source code is open, and every release comes with a SHA-256 checksum.
 
@@ -267,6 +268,32 @@ pwsh build/publish.ps1   # release build and zip in dist/
 
 Projects: `eViSTool.Core` — mods, ModDB, profiles, configs, backups, remote access; `eViSTool.Agent` — background agent that owns
 the server process; `eViSTool.App` — WPF interface; `tests/eViSTool.Core.Tests` — tests.
+
+## Code signing policy
+
+Windows releases of eViSTool are to be signed with a free code signing certificate:
+free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+Signing is being set up — releases up to and including 0.1.0 are not signed yet.
+
+Only binaries built by [GitHub Actions](https://github.com/erneywhite/eViSTool/actions/workflows/build.yml) from the source code
+in this repository are signed — never files built on a personal computer.
+
+**Team roles**
+
+- Committers and reviewers: [Erney White](https://github.com/erneywhite)
+- Approvers (release signing): [Erney White](https://github.com/erneywhite)
+
+**Privacy**
+
+eViSTool does not collect or send any personal data or usage statistics. It connects to other systems only for its features:
+
+- **GitHub** (`api.github.com`, `github.com`) — to check for and download eViSTool updates;
+- **Vintage Story ModDB** (`mods.vintagestory.at`) — for the mod catalog, update checks and to download the mods you choose;
+- **your own server computer** — only if you turn on remote management, and only with the connection code you created.
+
+Settings, logs and saved mod versions stay on your computer in the `data` folder. eViSTool changes system settings only when
+you ask it to: **Allow in Windows Firewall** adds an inbound rule for the remote access port after a Windows administrator prompt.
+To uninstall, delete the program folder (see [Updates, data and uninstalling](#updates-data-and-uninstalling)).
 
 ## Support
 
