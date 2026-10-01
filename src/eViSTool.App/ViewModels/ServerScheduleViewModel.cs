@@ -18,7 +18,11 @@ public sealed class BackupRowViewModel(BackupEntry entry)
     public BackupEntry Entry { get; } = entry;
     public string Name => Entry.Name;
     public string TimeText { get; } = entry.Time.ToString("dd.MM.yyyy HH:mm");
-    public string SizeText { get; } = Sizes.Format(entry.Size);
+    public string SizeText { get; } = Sizes.Format(entry.Size + entry.ModDataSize);
+
+    /// <summary>Рядом с копией мира — архив данных модов (Saves без миров, ModData).</summary>
+    public bool HasModData => Entry.ModDataSize > 0;
+    public string ModDataTip { get; } = Loc.T("sched.modDataTip", Sizes.Format(entry.ModDataSize));
 
     /// <summary>Не «своя» копия (другой профиль, прежнее имя «default-…», положена руками): ротация её не трогает.</summary>
     public bool IsManual => !Entry.IsOwn;
@@ -369,7 +373,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
 
         Backups.Clear();
         foreach (var entry in list) Backups.Add(new BackupRowViewModel(entry));
-        TotalText = Backups.Count == 0 ? "" : Loc.T("sched.total", Backups.Count, Sizes.Format(list.Sum(b => b.Size)));
+        TotalText = Backups.Count == 0 ? "" : Loc.T("sched.total", Backups.Count, Sizes.Format(list.Sum(b => b.Size + b.ModDataSize)));
         OnPropertyChanged(nameof(HasBackups));
         if (reportNewest && list.FirstOrDefault(b => b.IsOwn) is { } made) StatusText = Loc.T("sched.done", made.Name, Sizes.Format(made.Size));
         UpdateTexts();
@@ -440,7 +444,8 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         try
         {
             var result = await data.RestoreAsync(row.Name);
-            StatusText = result.SafetyName is null ? Loc.T("sched.restored", row.Name) : Loc.T("sched.restoredKept", row.Name, result.SafetyName);
+            StatusText = (result.SafetyName is null ? Loc.T("sched.restored", row.Name) : Loc.T("sched.restoredKept", row.Name, result.SafetyName))
+                         + " " + Loc.T(result.ModDataRestored ? "sched.restoredModData" : "sched.restoredNoModData");
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or HttpRequestException
                                        or TaskCanceledException or Newtonsoft.Json.JsonException)

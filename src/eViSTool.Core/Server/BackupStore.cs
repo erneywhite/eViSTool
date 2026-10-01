@@ -15,6 +15,9 @@ public sealed record BackupFile(string Path, string Name, DateTime Time, long Si
     /// Копии с другим именем (от другого профиля, прежние «default-…», положенные руками) не трогаются.
     /// </summary>
     public bool IsOwn { get; init; }
+
+    /// <summary>Размер архива с данными модов рядом с копией («….mods.zip»); 0 — архива нет (копия старая или модам нечего хранить).</summary>
+    public long ModDataSize { get; init; }
 }
 
 /// <summary>
@@ -48,8 +51,8 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
         if (!Directory.Exists(Dir)) return [];
         return new DirectoryInfo(Dir).EnumerateFiles("*" + Extension)
             .Select(f => TryStamp(f.Name, out var time)
-                ? new BackupFile(f.FullName, f.Name, time, f.Length) { IsStamped = true, IsOwn = IsOwnName(f.Name) }
-                : new BackupFile(f.FullName, f.Name, f.LastWriteTime, f.Length))
+                ? new BackupFile(f.FullName, f.Name, time, f.Length) { IsStamped = true, IsOwn = IsOwnName(f.Name), ModDataSize = ModDataSizeOf(f.FullName) }
+                : new BackupFile(f.FullName, f.Name, f.LastWriteTime, f.Length) { ModDataSize = ModDataSizeOf(f.FullName) })
             .OrderByDescending(b => b.Time)
             .ToList();
     }
@@ -67,6 +70,7 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
             try
             {
                 File.Delete(old.Path);
+                File.Delete(WorldModData.ArchiveFor(old.Path)); // данные модов этой копии — вместе с ней
                 removed.Add(old);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -92,14 +96,27 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
         var name = NameFor(now);
         var target = Path.Combine(Dir, name);
         File.Copy(saveFile, target, overwrite: false);
-        return new BackupFile(target, name, now, new FileInfo(target).Length) { IsStamped = true, IsOwn = true };
+        var made = new BackupFile(target, name, now, new FileInfo(target).Length) { IsStamped = true, IsOwn = true };
+        return made with { ModDataSize = PackModData(made) };
     }
+
+    /// <summary>
+    /// Упаковать данные модов рядом с копией мира (Saves без файлов миров и ModData — см. <see cref="WorldModData"/>).
+    /// Возвращает размер архива, 0 — модам нечего хранить.
+    /// </summary>
+    public long PackModData(BackupFile backup) =>
+        WorldModData.Pack(dataDir, WorldModData.ArchiveFor(backup.Path)) is { } archive ? new FileInfo(archive).Length : 0;
+
+    private static long ModDataSizeOf(string backupPath) =>
+        new FileInfo(WorldModData.ArchiveFor(backupPath)) is { Exists: true } f ? f.Length : 0;
 
     /// <summary>
     /// Восстановить мир из копии — только при ОСТАНОВЛЕННОМ сервере. Текущий мир сначала сохраняется в Backups как
     /// «&lt;профиль&gt;-before-restore-&lt;время&gt;.vcdbs» (вместе с журналом SQLite, если он остался) — восстановление можно откатить;
     /// ротация такой файл не удаляет. Затем копия встаёт на место файла мира, а остатки журнала убираются:
     /// они от прежнего мира и испортили бы восстановленный.
+    /// Данные модов (Saves без миров, ModData) возвращаются из архива копии, если он есть, — текущие перед этим
+    /// упаковываются рядом со страховочной копией. У старой копии без архива данные модов остаются как есть.
     /// Возвращает страховочную копию (null — файла мира не было).
     /// </summary>
     public BackupFile? Restore(BackupFile backup, string saveFile, DateTime now)
@@ -109,10 +126,14 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
         if (source.Length == 0) throw new InvalidOperationException(Loc.T("backup.empty", backup.Name));
 
         BackupFile? safety = null;
+        var safetyName = $"{prefix ?? "world"}-{BeforeRestore}-{now.ToString(StampFormat, CultureInfo.InvariantCulture)}{Extension}";
+        var modArchive = WorldModData.ArchiveFor(backup.Path);
+        if (File.Exists(modArchive))
+            WorldModData.Pack(dataDir, WorldModData.ArchiveFor(Path.Combine(Dir, safetyName))); // текущие данные модов — в сторону
         if (File.Exists(saveFile))
         {
             Directory.CreateDirectory(Dir);
-            var name = $"{prefix ?? "world"}-{BeforeRestore}-{now.ToString(StampFormat, CultureInfo.InvariantCulture)}{Extension}";
+            var name = safetyName;
             var target = Path.Combine(Dir, name);
             File.Copy(saveFile, target, overwrite: false);
             foreach (var tail in JournalTails)
@@ -126,6 +147,7 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
         File.Copy(backup.Path, tmp, overwrite: true);
         File.Move(tmp, saveFile, overwrite: true);
         foreach (var tail in JournalTails) File.Delete(saveFile + tail);
+        if (File.Exists(modArchive)) WorldModData.Restore(dataDir, modArchive);
         return safety;
     }
 

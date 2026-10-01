@@ -118,6 +118,9 @@ host.Console.LineAdded += line =>
             {
                 var size = eViSTool.Core.Localization.SizeText.Format(file.Size);
                 host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.created", file.Name, size));
+                // мир сохранил сервер; данные модов рядом с миром (Saves/XLeveling, ModData) упаковываем сами — сразу после
+                if (backups.PackModData(file) is > 0 and var modSize)
+                    host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.modData", eViSTool.Core.Localization.SizeText.Format(modSize)));
                 // игрокам — в чат: что копия есть, как называется и сколько весит
                 if (settings.BackupAnnounce && host.State == ServerState.Running)
                     await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.T("backup.announce", file.Name, size, file.Time.ToString("dd.MM.yyyy HH:mm")));
