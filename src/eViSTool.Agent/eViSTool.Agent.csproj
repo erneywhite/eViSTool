@@ -14,4 +14,12 @@
     <ProjectReference Include="..\eViSTool.Core\eViSTool.Core.csproj" />
   </ItemGroup>
 
+  <!-- релизный агент обрезается (PublishTrimmed в build/publish.ps1): из .NET и ASP.NET остаётся только используемое.
+       Свой код и Newtonsoft.Json сохраняются целиком — JSON читается через рефлексию по нашим типам. -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="eViSTool.Agent" />
+    <TrimmerRootAssembly Include="eViSTool.Core" />
+    <TrimmerRootAssembly Include="Newtonsoft.Json" />
+  </ItemGroup>
+
 </Project>

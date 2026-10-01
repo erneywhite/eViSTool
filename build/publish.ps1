@@ -6,6 +6,7 @@
 # Окно (eViSTool.exe) — один файл без рантайма внутри: ему нужен .NET 10 Desktop Runtime, тот же, что и клиенту
 # игры, поэтому у игроков он уже стоит. Агент (eViSTool.Agent.exe) — один файл с рантаймом внутри: ему нужен ещё
 # и ASP.NET Core, которого у игроков обычно нет, а агент должен запускаться и на голой машине с сервером.
+# Рантайм в агенте обрезан до того, что он использует (PublishTrimmed) — иначе exe весил бы ~50 МБ.
 param([string]$Version)
 
 $ErrorActionPreference = 'Stop'
@@ -29,7 +30,8 @@ dotnet publish (Join-Path $root 'src/eViSTool.App') @common --self-contained fal
 if ($LASTEXITCODE) { throw "publish eViSTool.App: $LASTEXITCODE" }
 
 dotnet publish (Join-Path $root 'src/eViSTool.Agent') @common --self-contained true `
-    '-p:EnableCompressionInSingleFile=true' '-p:IncludeNativeLibrariesForSelfExtract=true' -o $out
+    '-p:EnableCompressionInSingleFile=true' '-p:IncludeNativeLibrariesForSelfExtract=true' `
+    '-p:PublishTrimmed=true' '-p:TrimMode=full' -o $out  # обрезка: ~17 МБ вместо ~50; что сохраняется целиком — в eViSTool.Agent.csproj
 if ($LASTEXITCODE) { throw "publish eViSTool.Agent: $LASTEXITCODE" }
 
 # в релиз — только сами программы; папку data программа создаст рядом при первом запуске
