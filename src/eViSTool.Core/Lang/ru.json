@@ -47,6 +47,7 @@
   "card.screenshotTip": "Открыть скриншот (листать стрелками)",
   "card.sideBoth": "клиент и сервер",
   "card.sideClient": "только клиент",
+  "card.sideOnModDb": "(на модбазе: {0})",
   "card.sideServer": "только сервер",
   "card.stats": "⬇ {0} скачиваний   ♥ {1}   обновлён {2}",
   "card.update": "Обновить {0} → {1}",

@@ -47,6 +47,7 @@
   "card.screenshotTip": "Open screenshot (arrows to browse)",
   "card.sideBoth": "client and server",
   "card.sideClient": "client only",
+  "card.sideOnModDb": "(on ModDB: {0})",
   "card.sideServer": "server only",
   "card.stats": "⬇ {0} downloads   ♥ {1}   updated {2}",
   "card.update": "Update {0} → {1}",
