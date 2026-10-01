@@ -71,7 +71,13 @@ public sealed partial class ModCardViewModel : ObservableObject
         Logo = string.IsNullOrWhiteSpace(mod.LogoFile) ? null : mod.LogoFile;
         if (!string.IsNullOrWhiteSpace(mod.Author)) Author = mod.Author;
         Tag = mod.Tags.FirstOrDefault(t => !string.IsNullOrWhiteSpace(t)) ?? "";
-        if (mod.Side is { Length: > 0 } side) Side = SideText(side);
+        // сторона — как её видит игра (modinfo.json установленного файла); модбаза — только справка, если пишет другое
+        if (mod.Side is { Length: > 0 } side)
+        {
+            if (Row.Local.Info is null) Side = SideText(side);
+            else if (ModSides.Parse(side) != ModSides.Parse(Row.Local.Info.Side))
+                Side = SideText(Row.Local.Info.Side) + " " + Loc.T("card.sideOnModDb", SideText(side));
+        }
         Screenshots = mod.Screenshots.Select(s => s.MainFile).Where(u => !string.IsNullOrWhiteSpace(u)).ToList()!;
     }
 
