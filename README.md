@@ -27,8 +27,8 @@ A server on another computer is managed the same way, with a single connection c
 
 It is portable: unzip it anywhere and run. Nothing is installed into the system — no services, no autostart.
 
-> **Status: alpha.** Everything described below works and is in daily use, but expect rough edges.
-> Bug reports and ideas are very welcome in [Issues](https://github.com/erneywhite/eViSTool/issues).
+> **Early version (0.x).** Everything described below works and is in daily use. Found a bug or have an idea?
+> Tell about it in [Issues](https://github.com/erneywhite/eViSTool/issues) — it really helps.
 
 ## Contents
 
