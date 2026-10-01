@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/erneywhite/eViSTool/releases"><img src="https://img.shields.io/github/v/release/erneywhite/eViSTool?include_prereleases&label=release" alt="Latest release"></a>
+  <a href="https://github.com/erneywhite/eViSTool/releases"><img src="https://img.shields.io/github/v/release/erneywhite/eViSTool?label=release" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/erneywhite/eViSTool" alt="License: GPL-3.0"></a>
   <a href="https://ko-fi.com/erneywhite"><img src="https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
 </p>
