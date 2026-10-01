@@ -75,6 +75,13 @@ public sealed class AgentTests : IAsyncLifetime
         await _client.CommandAsync("/ping");
         Assert.Contains(await waiting, l => l.Seq > last);
 
+        // команды для подсказок — из ответа сервера на /help; запоминаются для профиля
+        await _client.CommandAsync("/help");
+        await Until(async () => (await _client.StatusAsync()).CommandCount == 3);
+        var tp = (await _client.CommandsAsync()).Single(c => c.Name == "tp");
+        Assert.Equal("/tp <source> <target>", tp.Usage);
+        await Until(() => Task.FromResult(File.Exists(ServerCommands.FileFor(_profile.Id, AgentsDir))));
+
         await _client.StopAsync();
         await Until(async () => (await _client.StatusAsync()).State == ServerState.Stopped);
         Assert.Equal(0, (await _client.StatusAsync()).LastExitCode);

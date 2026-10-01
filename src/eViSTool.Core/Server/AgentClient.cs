@@ -119,6 +119,9 @@ public sealed class AgentClient : IDisposable
     // ---- моды сервера (для окна на другой машине)
 
     public Task<RemoteModList> ModsAsync(CancellationToken ct = default) => Get<RemoteModList>("mods", ct);
+
+    /// <summary>Команды сервера из его /help — для подсказок в консоли.</summary>
+    public Task<List<ServerCommand>> CommandsAsync(CancellationToken ct = default) => Get<List<ServerCommand>>("commands", ct);
     public Task SetModEnabledAsync(string path, bool enabled, CancellationToken ct = default) =>
         Post<AgentStatus>("mods/toggle", new ModToggleRequest(path, enabled), ct);
     public Task DeleteModAsync(string path, CancellationToken ct = default) => Post<AgentStatus>("mods/delete", new ModPathRequest(path), ct);

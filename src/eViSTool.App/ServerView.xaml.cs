@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using eViSTool.App.ViewModels;
+using eViSTool.Core.Server;
 
 namespace eViSTool.App;
 
@@ -16,9 +17,17 @@ public partial class ServerView : UserControl
         InitializeComponent();
         DataContextChanged += (_, _) =>
         {
-            if (_vm is not null) _vm.LinesAppended -= OnLinesAppended;
+            if (_vm is not null)
+            {
+                _vm.LinesAppended -= OnLinesAppended;
+                _vm.CommandInserted -= OnCommandInserted;
+            }
             _vm = DataContext as ServerViewModel;
-            if (_vm is not null) _vm.LinesAppended += OnLinesAppended;
+            if (_vm is not null)
+            {
+                _vm.LinesAppended += OnLinesAppended;
+                _vm.CommandInserted += OnCommandInserted;
+            }
         };
 
         // окно закрывают с несохранёнными правками конфигурации — спросить (правки появляются только после
@@ -83,6 +92,32 @@ public partial class ServerView : UserControl
         if (_vm is null) return;
         switch (e.Key)
         {
+            // Tab дописывает команду и не уводит фокус из поля
+            case Key.Tab:
+                _vm.CompleteCommand();
+                CommandBox.CaretIndex = CommandBox.Text.Length;
+                e.Handled = true;
+                break;
+            case Key.Escape when _vm.ShowSuggestions:
+                _vm.HideSuggestions();
+                e.Handled = true;
+                break;
+            // открыты подсказки — стрелки ходят по ним, Enter берёт выбранную; иначе стрелки — история
+            case Key.Up when _vm.ShowSuggestions:
+                _vm.MoveSuggestion(-1);
+                SuggestionList.ScrollIntoView(_vm.SelectedSuggestion);
+                e.Handled = true;
+                break;
+            case Key.Down when _vm.ShowSuggestions:
+                _vm.MoveSuggestion(+1);
+                SuggestionList.ScrollIntoView(_vm.SelectedSuggestion);
+                e.Handled = true;
+                break;
+            case Key.Enter when _vm.ShowSuggestions && _vm.SelectedSuggestion is { } chosen:
+                _vm.InsertCommand(chosen);
+                CommandBox.CaretIndex = CommandBox.Text.Length;
+                e.Handled = true;
+                break;
             case Key.Enter:
                 if (_vm.SendCommandCommand.CanExecute(null)) _vm.SendCommandCommand.Execute(null);
                 e.Handled = true;
@@ -98,6 +133,28 @@ public partial class ServerView : UserControl
                 e.Handled = true;
                 break;
         }
+    }
+
+    // клик по подсказке — команда в поле, фокус остаётся в поле ввода
+    private void SuggestionList_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (_vm is null || (e.OriginalSource as FrameworkElement)?.DataContext is not ServerCommand command) return;
+        _vm.InsertCommand(command);
+        FocusCommandBox();
+    }
+
+    // ушли из поля (не в список подсказок) — список прячется
+    private void CommandBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (!SuggestionList.IsKeyboardFocusWithin) _vm?.HideSuggestions();
+    }
+
+    private void OnCommandInserted(object? sender, EventArgs e) => FocusCommandBox();
+
+    private void FocusCommandBox()
+    {
+        CommandBox.Focus();
+        CommandBox.CaretIndex = CommandBox.Text.Length;
     }
 
     private void CopyLines_Click(object sender, RoutedEventArgs e)
