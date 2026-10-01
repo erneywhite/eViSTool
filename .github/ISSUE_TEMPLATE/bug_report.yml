@@ -1,0 +1,60 @@
+name: Bug report
+description: Something does not work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! English or Russian — both are fine. / Можно писать по-русски.
+        Before posting, have a look at [Troubleshooting](https://github.com/erneywhite/eViSTool#troubleshooting) — maybe the answer is already there.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected and what happened instead.
+      placeholder: "I pressed Update all, the queue stopped at the third mod with the error …"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: If you can repeat it — how.
+      placeholder: |
+        1. Open My mods
+        2. …
+  - type: input
+    id: version
+    attributes:
+      label: eViSTool version
+      description: Shown in About.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: game
+    attributes:
+      label: Vintage Story version
+      placeholder: "1.22.7"
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Profile type
+      options:
+        - Client
+        - Server
+        - Remote server
+        - Not related to a profile
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: If eViSTool hit an error, it is written to `data\logs\error-<date>.log` next to `eViSTool.exe`. Drag the file here or paste the end of it.
+      render: text
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: If they help — drag them here.
