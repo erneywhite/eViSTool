@@ -22,73 +22,237 @@
 ![My mods](docs/screenshots/mods.png)
 
 eViSTool keeps your Vintage Story mods up to date, lets you browse and install mods from the ModDB,
-and runs your dedicated server — console, players, backups and scheduled restarts — from one window.
-It is portable: unzip it anywhere and run, nothing is installed into the system.
+and runs your dedicated server — console, players, configuration, backups and scheduled restarts — from one window.
+A server on another computer is managed the same way, with a single connection code.
+
+It is portable: unzip it anywhere and run. Nothing is installed into the system — no services, no autostart.
 
 > **Status: alpha.** Everything described below works and is in daily use, but expect rough edges.
 > Bug reports and ideas are very welcome in [Issues](https://github.com/erneywhite/eViSTool/issues).
 
-## Features
+## Contents
 
-### Mods
-- See every installed mod with its version, side and status; check all of them for updates in one click.
-- Update one mod or everything at once; pin a mod to its version or skip a specific release.
-- Roll back to a previous version — replaced mod files are kept for that.
-- Enable and disable mods exactly like the game's own mod manager does.
-- Spot problems early: missing dependencies, duplicates, versions for another game branch.
-- Share your setup as a modpack and import someone else's.
+- [Getting started](#getting-started)
+- [Profiles](#profiles)
+- [My mods](#my-mods)
+- [Mod catalog](#mod-catalog)
+- [Dedicated server](#dedicated-server)
+- [Remote management](#remote-management)
+- [Updates, data and uninstalling](#updates-data-and-uninstalling)
+- [Troubleshooting](#troubleshooting)
+- [Building from source](#building-from-source)
 
-### Mod catalog
-- The whole ModDB inside the app: search, tags, side, game version filters, sorting by trending, downloads and more.
-- Screenshots, description and every release of a mod; install the right version with one button.
+## Getting started
+
+1. Download `eViSTool-<version>-win-x64.zip` from [Releases](https://github.com/erneywhite/eViSTool/releases).
+2. Unzip it into any folder you like (not into the game folder) and run `eViSTool.exe`.
+3. eViSTool finds the game and your mods by itself and opens **My mods**.
+   If the game is installed somewhere unusual, set its folder in **Settings**.
+
+**Requirements:** Windows 10 or 11 (x64) and the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
+The game client needs the same runtime, so it is already there if you play Vintage Story.
+On a machine with only a dedicated server, Windows offers to download the runtime on the first start.
+
+> **"Windows protected your PC"?** eViSTool is not code-signed (a certificate costs money every year),
+> so SmartScreen may warn about an unknown publisher on the first start. Click **More info → Run anyway**.
+> The source code is open, and every release comes with a SHA-256 checksum.
+
+The interface is in English or Russian. It follows the system language, and you can switch it in **Settings**.
+
+## Profiles
+
+A **profile** is one game setup: which game it uses and which data folder (settings, mods, worlds).
+The active profile is chosen at the top of the window, and every page works with it.
+
+- **Client profile** — the game you play. **Play** starts the game with this profile:
+  its own mods, settings and worlds. The main profile for your usual game is created automatically.
+- **Server profile** — a dedicated server: the folder with `VintagestoryServer.exe` and the server data folder (`--dataPath`).
+- **Remote server** — a server on another computer, managed over the network (see [Remote management](#remote-management)).
+
+Profiles are created in **Settings** with **+ Client** and **+ Server**, or copied from an existing one with **Clone…**.
+
+![New client profile](docs/screenshots/profile.png)
+
+**A new client profile** is handy for a second mod set — for one particular server, for testing, for a modpack.
+It gets its own data folder, and you choose:
+
+- **Mods:** *shared* with the source profile (update once — both get it; a mod can still be switched off in just one of them),
+  *own copy* (from then on the sets live separately) or *own mods from scratch* (an empty folder).
+- **Game settings:** *same as in the source profile* — graphics, controls, server list, account login and mod settings are copied,
+  so you don't have to log in again — or *clean*, as on the very first start of the game.
+- **Worlds:** copy the single-player worlds and maps, or start without them.
+
+**A new server profile** starts with an empty data folder — the server fills it on its first start.
+If you already have a server (the standard `VintagestoryData` or your own `--dataPath`), use **Already have server data?**:
+
+- **Copy into a new profile** — configs, world, mod settings and player data are copied, the original folder stays untouched;
+- **Use as it is** — the profile works right in that folder.
+
+A server profile is cloned with the same world or with a fresh one. Removing a profile asks whether to also move
+its data folder to the Recycle Bin — nothing is deleted without asking.
+
+## My mods
+
+Everything installed in the active profile: name, version, side and status. The counters on top and the chips above the table
+filter the list — updates, problems, pinned, disabled. Click a mod to open its card on the right: description and screenshots
+from the ModDB, compatibility, file, and all actions for it.
+
+**Check** asks the ModDB about every installed mod (it can also run on start — see **Settings**). The status shows the result:
+
+| Status | Meaning |
+|---|---|
+| Up to date | You have the latest version for your game version. |
+| Update available | A newer version for your game version is on the ModDB. |
+| No version for game | The ModDB has no release of this mod for your game version. |
+| Not on ModDB | The mod is not on the ModDB (installed by hand) — nothing to compare with. |
+| Not checked | The list was read from disk, but the ModDB was not asked yet. |
+
+**Updating.** **Update** on a mod, or **Update all**. Installs go through a queue at the bottom of the window:
+you can keep working, add more, stop the queue and retry failed items.
+Replaced versions are kept (the last three per mod), so any update can be undone.
+
+**Choose version / roll back** installs any release for your game version from the ModDB, or a saved copy of
+a version you had before. **Pin** keeps a mod on its current version (no updates are offered);
+**Skip version** hides one particular release and offers the next one.
+
+**Enable and disable** with the switch. eViSTool writes the same setting the game's own mod manager does,
+so the game sees it exactly the same way. Do it with the game closed: the game rewrites its settings on exit.
+
+**Dependencies.** If an enabled mod needs another mod that is missing, outdated or disabled, a banner appears above the table.
+**Fix** downloads what is missing from the ModDB and enables what is disabled.
+
+**Adding mods by hand.** **Add**, or just drag zip files onto the list. If it is the same version, an older one or a mod
+that is already installed, eViSTool asks before replacing. **Delete** moves the file to the Recycle Bin.
+
+**Modpacks.** **Modpack → Create modpack…** saves your set as one `.evpack` file: either a list of ModDB mods
+(small, the mods are downloaded on import) or with the mod files inside, optionally with mod settings (`ModConfig`).
+**Import modpack…** shows what will be installed, updated or disabled before changing anything.
+
+The list refreshes by itself when mods change outside the window — in another eViSTool window or by copying files by hand.
+
+## Mod catalog
 
 ![Mod catalog](docs/screenshots/catalog.png)
 
-### Profiles
-- Several game setups side by side: client and server profiles, each with its own data folder.
-- **Play** starts the game with the selected client profile — its own mods, settings and worlds.
-- New client profiles and clones: share mods with the main game or keep a separate set, copy settings or start clean.
-- Server profiles are cloned with the same world or a fresh one.
+The whole ModDB inside the app: search by name, description, author or modid; filter by tag, side and game version;
+sort by trending, downloads, follows or recent updates. By default only mods with a release for your game version are shown
+(★ marks the version of the active profile).
 
-### Dedicated server
-- Start, stop, restart and a live console. The server is owned by a small background agent,
-  so it keeps running if you close the window, and the watchdog restarts it after a crash.
-- Players online, uptime and memory at a glance.
-- `serverconfig.json` editor with proper fields: general settings, world settings, roles and privileges with checkboxes,
-  and everything else — unknown keys are preserved as they are.
+A mod's card has its screenshots, description and every release. **Install** takes the right version for your game
+and offers to install missing dependencies. Installed mods are marked in the list.
+The catalog is cached for 6 hours; **Refresh catalog** downloads a fresh one.
+
+## Dedicated server
+
+Pick a server profile and open **Server**.
 
 ![Server console](docs/screenshots/server.png)
 
-- **Backups** on a schedule, with rotation, a chat announcement and one-click restore
-  (the current world is saved aside first, so a restore can be undone).
-- **Scheduled restarts** every N hours or at set times of day, with chat warnings
-  10 and 5 minutes before and then every minute, and a fresh backup right before the restart.
-- **Remote management** of a server on another computer with a one-string connection code
-  (encrypted, nothing to set up): console, start and stop, configuration, schedule, backups and the server's mods.
-  Changes made in one window show up in the other by themselves.
+**Start, Stop, Restart** and a live **Console** with command history (↑/↓). **Stop** saves the world;
+**Kill** ends the process at once and is only for a server that hangs.
+On top: state, uptime, memory and who is online since when.
 
-| Configuration | Schedule |
-|---|---|
-| ![Configuration](docs/screenshots/config.png) | ![Schedule](docs/screenshots/schedule.png) |
+**The agent.** The server is owned by a small background program, `eViSTool.Agent.exe`, next to `eViSTool.exe`.
+Close the window — the server keeps running; open it again — you are back in the same console.
+If the server crashes, the agent starts it again. The agent exits by itself once the server is stopped and the window is closed:
+nothing stays in the background, and nothing starts with Windows.
 
-### Coming next
-- Syncing the mods of a client profile with a server: missing mods, version differences, extras.
+**Configuration** edits `serverconfig.json` with proper fields: general settings, world settings, roles and privileges
+with checkboxes, and everything else as a list — unknown keys are kept as they are. The server rewrites this file when it stops,
+so changes can be saved only while it is stopped. A copy of the previous file stays next to it (`.evistool.bak`).
 
-## Installation
+![Configuration](docs/screenshots/config.png)
 
-1. Download `eViSTool-<version>-win-x64.zip` from [Releases](https://github.com/erneywhite/eViSTool/releases).
-2. Unzip it into any folder and run `eViSTool.exe`.
-3. eViSTool finds the game and your mods by itself. If it doesn't, point it to the game folder in **Settings**.
+**Schedule.** Both parts are run by the agent, so they work with the window closed:
 
-**Requirements:** Windows 10 or 11 (x64) and the .NET 10 Desktop Runtime — the game client needs the same runtime,
-so it is already there if you play Vintage Story. On a machine with only a dedicated server,
-Windows offers to download the runtime on the first start.
+- **World backups** every N hours. The server itself makes the copy into the `Backups` folder of the profile;
+  old copies are rotated (keep the last N), optionally only if someone played, with an announcement in chat.
+  **Restore** puts a backup in place of the world (with the server stopped). The current world is saved aside first,
+  so a restore can be undone.
+- **Scheduled restarts** every N hours of uptime or at set times of day, with chat warnings
+  (10 and 5 minutes before, then every minute) and, if you like, a fresh backup right before the restart.
 
-**Updates:** eViSTool checks GitHub releases on start and updates itself from **About** — a running server is not interrupted.
+![Schedule](docs/screenshots/schedule.png)
 
-**Your data** (settings, backups of replaced mods, logs) lives in the `data` folder next to `eViSTool.exe`.
-To remove eViSTool, delete its folder. eViSTool changes only mod folders, game and server settings files
-(with a `.evistool.bak` copy of the previous state) and the folders of profiles it created.
+**Server mods** opens **My mods** for the server profile — the same table, catalog and updates as for the game.
+
+## Remote management
+
+Manage a server on another computer — a home PC, a spare laptop, a rented machine — as if it were here:
+console, start and stop, configuration, schedule, backups and the server's mods. One string, the **connection code**,
+carries everything needed: address, port, key and the server's certificate. There is nothing to configure by hand.
+
+![Remote access](docs/screenshots/remote.png)
+
+**On the server computer:**
+
+1. Run eViSTool there and pick the server profile.
+2. Open **Server → Remote access** and turn on **Allow remote management**. A random port is chosen once and then kept.
+3. In **Address of this computer**, pick how the other computer will reach it: within your home network — the local address
+   (like `192.168.1.20`); from outside — your external IP or domain.
+4. Press **Allow in Windows Firewall** (Windows asks for administrator rights), then **Copy** the code.
+
+**On your computer:** **Settings → + Server → Server on another computer? → Connect by code…**, paste the code,
+press **Check connection** and create the profile. Pick it at the top of the window — **Server** and **My mods**
+now work with the remote server.
+
+![Mods of a remote server](docs/screenshots/remote-mods.png)
+
+Good to know:
+
+- The server computer needs eViSTool open, or its server running: remote access lives as long as the agent does.
+  There is no service and no autostart.
+- Changes show up in both windows by themselves. A mod disabled from your PC appears disabled on the server computer
+  within seconds, and the other way round. The same goes for the schedule and the configuration.
+- Mods are installed on the server over the connection: from a zip, from the catalog, as updates.
+  Modpacks are imported on the server computer itself.
+- Keep eViSTool updated on both computers. An agent of an older version is replaced by itself while the server is stopped;
+  until then a note says so.
+
+**Security.** The connection is encrypted (TLS), and eViSTool checks that it talks to exactly the server from the code —
+another computer at the same address is not accepted. Without the key nobody can connect; after five wrong keys
+connections are refused for a minute. The code is hidden on screen and copied without showing; on your computer it is stored
+encrypted for your Windows account. If the code got into the wrong hands, **New key** makes the old code useless.
+
+**Over the internet** you also need to forward the port on your router to the server computer.
+A VPN (Tailscale, ZeroTier, WireGuard and the like) is simpler and safer: use the VPN address of the server computer,
+and nothing is exposed to the internet.
+
+## Updates, data and uninstalling
+
+**Updates.** On start eViSTool checks GitHub for a new release. **About → Update to …** downloads it, verifies the checksum
+and replaces the program. A running server is not interrupted.
+
+**Your data** — settings, saved versions of mods, downloads and logs — lives in the `data` folder next to `eViSTool.exe`.
+Move the program folder, and everything moves with it. (If eViSTool cannot write there, for example in `Program Files`,
+it uses `%LOCALAPPDATA%\eViSTool` instead.)
+
+**What eViSTool changes:** only mod folders, the game and server settings files (keeping a `.evistool.bak` copy of the previous state),
+backups in the `Backups` folder of server profiles, and the data folders of profiles it created.
+Deleted mods, backups and profile folders go to the Recycle Bin.
+
+**To uninstall,** stop your servers, close eViSTool and delete its folder.
+
+## Troubleshooting
+
+**The game or its version is not found.** Settings → the profile → **Game folder**: the folder with `Vintagestory.exe`
+(or `VintagestoryServer.exe` for a server).
+
+**A mod is "Not on ModDB".** It was installed by hand, or its `modid` differs from the one on the ModDB. It works as usual,
+there is just nothing to compare it with — update it by hand.
+
+**Enabling or disabling a mod does not stick.** The game was running and rewrote its settings on exit. Close the game and switch it again.
+
+**"A server from this game folder is already running, but not under eViSTool".** It was started elsewhere, for example by another tool.
+**Stop gently** sends it Ctrl+C so it saves the world; then start it from eViSTool.
+
+**Remote: no connection.** Check, in this order: eViSTool is open on the server computer (or its server is running) and remote access is on;
+the address in the code fits where you are (a local address works only within the same network); the port is allowed in the firewall
+(**Allow in Windows Firewall**); over the internet — the port is forwarded on the router.
+**"The key does not match"** — the key was changed on the server, get a new code. **"The server did not present the certificate"** —
+a different computer answers at that address.
+
+Anything else — [open an issue](https://github.com/erneywhite/eViSTool/issues) and attach the log from `data\logs` if there is one.
 
 ## Building from source
 
@@ -100,7 +264,7 @@ dotnet test
 pwsh build/publish.ps1   # release build and zip in dist/
 ```
 
-Projects: `eViSTool.Core` — mods, ModDB, profiles, configs, backups; `eViSTool.Agent` — background agent that owns
+Projects: `eViSTool.Core` — mods, ModDB, profiles, configs, backups, remote access; `eViSTool.Agent` — background agent that owns
 the server process; `eViSTool.App` — WPF interface; `tests/eViSTool.Core.Tests` — tests.
 
 ## Support
