@@ -51,7 +51,15 @@ public sealed partial class ProfileViewModel : ObservableObject
         OnPropertyChanged(nameof(RemoteTarget));
         _changed(this);
     }
-    public string GameVersionText => Model.IsRemote ? Loc.T("profile.remoteVersion") : Resolved.GameVersion?.ToString() ?? Loc.T("common.notFound");
+    public string GameVersionText => Model.IsRemote ? RemoteGameVersion ?? Loc.T("profile.remoteVersion")
+        : Resolved.GameVersion?.ToString() ?? Loc.T("common.notFound");
+
+    /// <summary>Версия игры удалённого сервера — из статуса его агента (пока связи не было — неизвестна).</summary>
+    public string? RemoteGameVersion
+    {
+        get;
+        set { if (field == value) return; field = value; OnPropertyChanged(nameof(GameVersionText)); }
+    }
     public string ConfigText => Resolved.ConfigPath ?? Loc.T("common.notFoundM");
     public string ModDirsText => Resolved.ModDirs.Count == 0 ? "—" : string.Join(Environment.NewLine, Resolved.ModDirs);
     public string WarningsText => string.Join(Environment.NewLine, Resolved.Warnings);

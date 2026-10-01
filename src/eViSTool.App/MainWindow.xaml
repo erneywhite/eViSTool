@@ -48,7 +48,7 @@
                         </Border>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Vintage Story" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" />
-                            <TextBlock FontSize="11" Foreground="{StaticResource Forest.Muted}">
+                            <TextBlock FontSize="11" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap">
                                 <Run Text="{local:Tr shell.profileVersion}" /><Run Text=" · " /><Run Text="{Binding ActiveProfile.GameVersionText, Mode=OneWay}" />
                             </TextBlock>
                         </StackPanel>
