@@ -264,25 +264,36 @@ public sealed partial class CatalogViewModel : ObservableObject
         var installed = _main.Mods.InstalledVersions;
         var keep = Selected?.Item.ModId;
         var branchLabel = ProfileBranch is { } pb ? $"{pb}.x" : null;
+        _rebuilding = keep is not null;
         Results = found.Select(i => new CatalogItemViewModel(i, installed,
             _profileCompat is null || branchLabel is null ? null : _profileCompat.Contains(i.AssetId), branchLabel))
             .Where(r => (SelectedInstallFilter?.Value ?? 0) switch { 1 => r.IsInstalled, 2 => !r.IsInstalled, _ => true })
             .ToList();
+        _rebuilding = false;
         if (keep is not null)
         {
             var again = Results.FirstOrDefault(r => r.Item.ModId == keep);
 #pragma warning disable MVVMTK0034 // намеренно мимо свойства: его обработчик перезагрузил бы карточку
             if (again is not null) SetProperty(ref _selected, again, nameof(Selected)); // без перезагрузки карточки
 #pragma warning restore MVVMTK0034
-            else Selected = null;
+            else
+            {
+                Selected = null;
+                Details = null; // мод выпал из списка (фильтр «Не установленные» и т.п.) — карточку закрываем явно
+            }
         }
 
         var at = _catalog.LoadedAt?.ToLocalTime().ToString("dd.MM HH:mm") ?? "—";
         StatusText = Loc.T("catalog.found", Results.Count, _catalog.Items.Count, at);
     }
 
+    // новый список результатов на миг сбрасывает выбор в нём — карточку при этом не закрываем:
+    // тот же мод выбирается снова ниже, и карточка остаётся (иначе после установки она пропадала насовсем)
+    private bool _rebuilding;
+
     partial void OnSelectedChanged(CatalogItemViewModel? value)
     {
+        if (value is null && _rebuilding) return;
         _detailsCts?.Cancel();
         if (value is null)
         {
