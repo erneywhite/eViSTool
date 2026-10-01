@@ -27,7 +27,9 @@ public sealed class AgentClient : IDisposable
         _http = new HttpClient(handler)
         {
             BaseAddress = baseAddress,
-            Timeout = TimeSpan.FromSeconds(40), // долгий опрос консоли — до 30 с
+            // таймаут — у каждого запроса свой (Timed): обычный ответ ждём 40 с (долгий опрос консоли — до 30 с),
+            // а загрузка архива мода по медленной сети может идти минуты
+            Timeout = Timeout.InfiniteTimeSpan,
         };
         _http.DefaultRequestHeaders.Add(AgentProtocol.KeyHeader, key);
     }
@@ -89,7 +91,8 @@ public sealed class AgentClient : IDisposable
     public async Task SaveAutomationAsync(ServerAutomation settings, CancellationToken ct = default)
     {
         using var content = new StringContent(JsonConvert.SerializeObject(settings), Encoding.UTF8, "application/json");
-        using var resp = await _http.PutAsync("automation", content, ct).ConfigureAwait(false);
+        using var cts = Timed(ct);
+        using var resp = await _http.PutAsync("automation", content, cts.Token).ConfigureAwait(false);
         await Read<AgentStatus>(resp, ct).ConfigureAwait(false);
     }
 
@@ -105,16 +108,46 @@ public sealed class AgentClient : IDisposable
     public async Task<ConfigSaveResult> SaveConfigAsync(ConfigSaveRequest request, CancellationToken ct = default)
     {
         using var content = new StringContent(JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json");
-        using var resp = await _http.PutAsync("config", content, ct).ConfigureAwait(false);
+        using var cts = Timed(ct);
+        using var resp = await _http.PutAsync("config", content, cts.Token).ConfigureAwait(false);
         return await Read<ConfigSaveResult>(resp, ct).ConfigureAwait(false);
     }
 
     /// <summary>Конфига ещё нет — агент попросит сервер записать конфиг по умолчанию.</summary>
     public Task<RemoteConfigFile> GenerateConfigAsync(CancellationToken ct = default) => Post<RemoteConfigFile>("config/generate", null, ct);
 
+    // ---- моды сервера (для окна на другой машине)
+
+    public Task<RemoteModList> ModsAsync(CancellationToken ct = default) => Get<RemoteModList>("mods", ct);
+    public Task SetModEnabledAsync(string path, bool enabled, CancellationToken ct = default) =>
+        Post<AgentStatus>("mods/toggle", new ModToggleRequest(path, enabled), ct);
+    public Task DeleteModAsync(string path, CancellationToken ct = default) => Post<AgentStatus>("mods/delete", new ModPathRequest(path), ct);
+
+    /// <summary>Отправить архив мода агенту — он поставит его в папку модов сервера (как установка на этой машине).</summary>
+    public async Task<ModInstallResult> InstallModAsync(string zipPath, CancellationToken ct = default)
+    {
+        await using var file = File.OpenRead(zipPath);
+        using var content = new StreamContent(file);
+        content.Headers.Add(ModFileHeader, Uri.EscapeDataString(Path.GetFileName(zipPath)));
+        using var cts = Timed(ct, TimeSpan.FromMinutes(15));
+        using var resp = await _http.PostAsync("mods/install", content, cts.Token).ConfigureAwait(false);
+        return await Read<ModInstallResult>(resp, cts.Token).ConfigureAwait(false);
+    }
+
+    /// <summary>Имя файла присланного архива (имя важно: мод ляжет в папку под ним).</summary>
+    public const string ModFileHeader = "X-eViSTool-File";
+
+    private static CancellationTokenSource Timed(CancellationToken ct, TimeSpan? timeout = null)
+    {
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(timeout ?? TimeSpan.FromSeconds(40));
+        return cts;
+    }
+
     private async Task<T> Get<T>(string path, CancellationToken ct)
     {
-        using var resp = await _http.GetAsync(path, ct).ConfigureAwait(false);
+        using var cts = Timed(ct);
+        using var resp = await _http.GetAsync(path, cts.Token).ConfigureAwait(false);
         return await Read<T>(resp, ct).ConfigureAwait(false);
     }
 
@@ -123,7 +156,8 @@ public sealed class AgentClient : IDisposable
     private async Task<T> Post<T>(string path, object? body, CancellationToken ct)
     {
         using var content = new StringContent(body is null ? "" : JsonConvert.SerializeObject(body), Encoding.UTF8, "application/json");
-        using var resp = await _http.PostAsync(path, content, ct).ConfigureAwait(false);
+        using var cts = Timed(ct);
+        using var resp = await _http.PostAsync(path, content, cts.Token).ConfigureAwait(false);
         return await Read<T>(resp, ct).ConfigureAwait(false);
     }
 

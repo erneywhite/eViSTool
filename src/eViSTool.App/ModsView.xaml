@@ -111,6 +111,7 @@
                       Command="{Binding PlacementTarget.DataContext.OpenPageCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                       CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
             <MenuItem Header="{local:Tr menu.showFile}"
+                      Visibility="{Binding PlacementTarget.DataContext.IsLocalProfile, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVis}}"
                       Command="{Binding PlacementTarget.DataContext.ShowFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                       CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
         </ContextMenu>
@@ -254,7 +255,8 @@
                             </StackPanel>
                         </Button>
                         <Button Margin="8,0,0,0" Click="PackMenu_Click" ToolTip="{local:Tr pack.menuTip}"
-                                IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}">
+                                IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}"
+                                Visibility="{Binding IsLocalProfile, Converter={StaticResource BoolToVis}}">
                             <Button.ContextMenu>
                                 <ContextMenu>
                                     <MenuItem Header="{local:Tr pack.export}" Command="{Binding ExportPackCommand}" />
@@ -266,7 +268,8 @@
                                 <TextBlock Text="{local:Tr pack.menu}" />
                             </StackPanel>
                         </Button>
-                        <Button Margin="8,0,0,0" Command="{Binding OpenModsFolderCommand}" ToolTip="{local:Tr mods.openFolder}" Padding="10,8">
+                        <Button Margin="8,0,0,0" Command="{Binding OpenModsFolderCommand}" ToolTip="{local:Tr mods.openFolder}" Padding="10,8"
+                                Visibility="{Binding IsLocalProfile, Converter={StaticResource BoolToVis}}">
                             <Path Data="{StaticResource Icon.Folder}" Style="{StaticResource Forest.Icon}" Width="16" Height="16" />
                         </Button>
                     </StackPanel>
@@ -556,6 +559,7 @@
                                     <Button Style="{StaticResource Forest.LinkButton}" Content="{local:Tr mcard.inCatalog}" Margin="0,0,14,4"
                                             Command="{Binding Owner.ShowInCatalogCommand}" CommandParameter="{Binding Row}" />
                                     <Button Style="{StaticResource Forest.LinkButton}" Content="{local:Tr mcard.showFile}" Margin="0,0,14,4"
+                                            Visibility="{Binding Owner.IsLocalProfile, Converter={StaticResource BoolToVis}}"
                                             Command="{Binding Owner.ShowFileCommand}" CommandParameter="{Binding Row}" />
                                     <Button Style="{StaticResource Forest.LinkButton}" Content="{local:Tr menu.delete}" Margin="0,0,14,4"
                                             Foreground="{StaticResource Forest.Danger}"

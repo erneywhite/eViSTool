@@ -301,4 +301,84 @@ public sealed class AgentTests : IAsyncLifetime
         await Until(async () => (await client.StatusAsync()).State == ServerState.Running);
         await Assert.ThrowsAsync<InvalidOperationException>(() => client.SaveConfigAsync(new ConfigSaveRequest("{}", forced.File.Stamp, Force: true)));
     }
+
+    private static string MakeModZip(string dir, string fileName, string modId, string version)
+    {
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, fileName);
+        using var zip = System.IO.Compression.ZipFile.Open(path, System.IO.Compression.ZipArchiveMode.Create);
+        using var w = new StreamWriter(zip.CreateEntry("modinfo.json").Open());
+        w.Write($$"""{ "modid": "{{modId}}", "name": "{{modId}}", "version": "{{version}}", "dependencies": { "game": "" } }""");
+        return path;
+    }
+
+    [Fact]
+    public async Task RemoteMods_List_Toggle_Install_Delete()
+    {
+        var mods = Path.Combine(_profile.DataDir!, "Mods");
+        File.WriteAllText(Path.Combine(_profile.DataDir!, "serverconfig.json"),
+            "{ \"ModPaths\": [\"Mods\", " + Newtonsoft.Json.JsonConvert.ToString(mods) + "], \"WorldConfig\": { \"DisabledMods\": [] } }");
+        var carry = MakeModZip(mods, "carryon_1.0.0.zip", "CarryOn", "1.0.0");
+        MakeModZip(mods, "other_2.0.0.zip", "other", "2.0.0");
+
+        var remote = eViSTool.Core.Server.Remote.RemoteAccess.Enable(_profile.Id, AgentsDir);
+        string fingerprint;
+        using (var cert = eViSTool.Core.Server.Remote.RemoteAccess.EnsureCertificate(_profile.Id, AgentsDir))
+            fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
+        _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
+        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
+        using var client = AgentClient.ForRemote(new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint));
+        var backups = Path.Combine(Path.GetDirectoryName(AgentExe)!, "data", "ModBackups", _profile.Id);
+        try
+        {
+            // список: оба мода, папки и modinfo доезжают до окна целиком
+            var list = await client.ModsAsync();
+            Assert.Equal(2, list.Mods.Count);
+            Assert.Equal(mods, list.InstallDir);
+            var info = list.Mods.Single(m => m.Info?.ModId == "carryon").Info!;
+            Assert.Equal("CarryOn", info.OriginalModId);
+            Assert.True(info.Dependencies.ContainsKey("game"));
+            Assert.NotNull(list.ChangedAt);
+
+            // выключить — как игра: modid@версия не нужен, пишется OriginalModId в WorldConfig.DisabledMods
+            await client.SetModEnabledAsync(carry, enabled: false);
+            list = await client.ModsAsync();
+            Assert.Contains("CarryOn", list.DisabledMods);
+            var stamp = (await client.StatusAsync()).ModsChangedAt;
+
+            // новая версия архивом по сети: старая уходит в хранилище, выключенный мод остаётся выключенным
+            await Task.Delay(20);
+            var incoming = MakeModZip(Path.Combine(_tmp, "upload"), "carryon_1.1.0.zip", "CarryOn", "1.1.0");
+            var installed = await client.InstallModAsync(incoming);
+            Assert.Equal(("CarryOn", "1.1.0", "1.0.0"), (installed.Name, installed.Version, installed.OldVersion));
+            Assert.False(File.Exists(carry));
+            Assert.True(File.Exists(Path.Combine(mods, "carryon_1.1.0.zip")));
+            Assert.Single(Directory.GetFiles(Path.Combine(backups, "carryon")));
+            list = await client.ModsAsync();
+            Assert.Contains("CarryOn", list.DisabledMods);
+            Assert.NotEqual(stamp, (await client.StatusAsync()).ModsChangedAt);
+
+            // не мод — отказ с понятной причиной, ничего не поставлено
+            var junk = Path.Combine(_tmp, "upload", "junk.zip");
+            File.WriteAllText(junk, "not a zip");
+            await Assert.ThrowsAsync<InvalidOperationException>(() => client.InstallModAsync(junk));
+            Assert.False(File.Exists(Path.Combine(mods, "junk.zip")));
+
+            // чужой путь (не из списка модов) не удаляется и не выключается
+            var outside = Path.Combine(_tmp, "upload", "carryon_1.1.0.zip");
+            await Assert.ThrowsAsync<InvalidOperationException>(() => client.DeleteModAsync(outside));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => client.SetModEnabledAsync(outside, false));
+            Assert.True(File.Exists(outside));
+
+            // удаление последней копии — в корзину, и из списка выключенных тоже
+            await client.DeleteModAsync(Path.Combine(mods, "carryon_1.1.0.zip"));
+            list = await client.ModsAsync();
+            Assert.Single(list.Mods);
+            Assert.DoesNotContain("CarryOn", list.DisabledMods);
+        }
+        finally
+        {
+            try { Directory.Delete(backups, recursive: true); } catch (IOException) { }
+        }
+    }
 }

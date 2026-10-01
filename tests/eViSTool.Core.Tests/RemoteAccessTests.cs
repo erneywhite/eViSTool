@@ -87,7 +87,7 @@ public sealed class RemoteAccessTests : IDisposable
         Assert.True(profile.IsRemote);
         var resolved = eViSTool.Core.Profiles.ProfileResolver.Resolve(profile);
         Assert.Empty(resolved.ModDirs); // своих папок нет — моды у агента на той машине
-        Assert.Single(resolved.Warnings);
+        Assert.Empty(resolved.Warnings); // и не пугаем предупреждениями: список модов окно возьмёт у агента
         // код в настройках — зашифрованный, не открытым текстом
         Assert.DoesNotContain(code.Key, Newtonsoft.Json.JsonConvert.SerializeObject(profile));
     }

@@ -34,7 +34,7 @@ public partial class ModsView : UserControl
     private void Grid_Drop(object sender, DragEventArgs e)
     {
         if (e.Data.GetData(DataFormats.FileDrop) is string[] files)
-            Vm?.AddFiles(files);
+            _ = Vm?.AddFilesAsync(files);
     }
 
     private void Splitter_DragCompleted(object sender, DragCompletedEventArgs e) => Vm?.SaveLayout();

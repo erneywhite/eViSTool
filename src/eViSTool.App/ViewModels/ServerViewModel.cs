@@ -26,6 +26,12 @@ public sealed partial class ServerViewModel : ObservableObject
 
     private readonly MainViewModel _main;
     private AgentClient? _client;
+
+    /// <summary>Связь с агентом удалённого сервера (null — профиль свой или связи нет): через неё вкладка модов работает с его модами.</summary>
+    public AgentClient? RemoteClient => IsRemoteProfile ? _client : null;
+
+    /// <summary>Сервер запущен или запускается (по последнему статусу агента).</summary>
+    public bool IsServerUp => AgentRunning && State != ServerState.Stopped;
     private CancellationTokenSource? _session;
     private long _lastSeq;
     private int _agentPid;
@@ -313,7 +319,11 @@ public sealed partial class ServerViewModel : ObservableObject
         AgentRunning = true;
         State = s.State;
         _serverPid = s.ServerPid;
-        if (IsRemoteProfile) Config.ShowRemoteStatus(s);
+        if (IsRemoteProfile)
+        {
+            Config.ShowRemoteStatus(s);
+            _main.Mods.OnRemoteStatus(s);
+        }
         AgentNote = !AgentProtocol.IsOutdated(s) ? ""
             : IsRemoteProfile ? Loc.T("server.agentOutdatedRemote", s.AgentVersion, AgentProtocol.AppVersion)
             : Loc.T("server.agentOutdatedLocal", s.AgentVersion);

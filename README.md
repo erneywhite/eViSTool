@@ -63,13 +63,15 @@ It is portable: unzip it anywhere and run, nothing is installed into the system.
   (the current world is saved aside first, so a restore can be undone).
 - **Scheduled restarts** every N hours or at set times of day, with chat warnings
   10 and 5 minutes before and then every minute, and a fresh backup right before the restart.
+- **Remote management** of a server on another computer with a one-string connection code
+  (encrypted, nothing to set up): console, start and stop, configuration, schedule, backups and the server's mods.
+  Changes made in one window show up in the other by themselves.
 
 | Configuration | Schedule |
 |---|---|
 | ![Configuration](docs/screenshots/config.png) | ![Schedule](docs/screenshots/schedule.png) |
 
 ### Coming next
-- Remote management of a server on another machine with a one-string connection code (encrypted, no setup).
 - Syncing the mods of a client profile with a server: missing mods, version differences, extras.
 
 ## Installation

@@ -14,6 +14,8 @@ using eViSTool.Core.Versioning;
 using Microsoft.Win32;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Packs;
+using eViSTool.Core.Server;
+using System.Windows.Threading;
 
 namespace eViSTool.App.ViewModels;
 
@@ -134,6 +136,24 @@ public sealed partial class ModsViewModel : ObservableObject
                 || r.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)
                 || r.ModId.Contains(Search, StringComparison.OrdinalIgnoreCase));
         ApplySort();
+        _diskWatch.Tick += (_, _) =>
+        {
+            if (IsRemote || IsBusy || Profile is not { } profile) return;
+            if (ServerMods.StampOf(profile) == _diskStamp) return;
+            ReloadLocal();
+            StatusText = Loc.T("mods.changedOutside");
+        };
+    }
+
+    /// <summary>Вкладка «Мои моды» открыта — следим за папками модов (закрыта — не тратим на это время).</summary>
+    public void SetActive(bool active)
+    {
+        if (active && !_diskWatch.IsEnabled)
+        {
+            if (!IsRemote && Profile is { } profile && ServerMods.StampOf(profile) != _diskStamp) ReloadLocal();
+            _diskWatch.Start();
+        }
+        else if (!active) _diskWatch.Stop();
     }
 
     partial void OnFilterChanged(ModFilter value) => RefreshView();
@@ -156,7 +176,23 @@ public sealed partial class ModsViewModel : ObservableObject
         }
     }
 
-    private ResolvedProfile? Profile => _main.ActiveProfile?.Resolved;
+    /// <summary>Моды берутся с диска этой машины или — у удалённого сервера — у его агента по сети.</summary>
+    private ResolvedProfile? Profile => IsRemote ? _remoteResolved : _main.ActiveProfile?.Resolved;
+
+    // ---- удалённый сервер: список модов и папки — со слов агента, пути — на той машине
+    private bool IsRemote => _main.ActiveProfile?.Model.IsRemote == true;
+    private ResolvedProfile? _remoteResolved;
+    private DateTime? _remoteStamp;
+    private bool _remoteLoading;
+
+    /// <summary>Профиль на этой машине: папку модов можно открыть, модпаки — собрать и поставить.</summary>
+    public bool IsLocalProfile => !IsRemote;
+
+    private AgentClient RemoteAgent => _main.Server.RemoteClient ?? throw new InvalidOperationException(Loc.T("mods.remoteOffline"));
+
+    // ---- своя машина: моды могли поменять в другом окне (удалённом или втором локальном) — перечитываем сами
+    private readonly DispatcherTimer _diskWatch = new() { Interval = TimeSpan.FromSeconds(2) };
+    private DateTime? _diskStamp;
 
     /// <summary>Подзаголовок страницы: «Мой мир · клиент / Vintage Story 1.22.7».</summary>
     public string HeaderSubtitle => _main.ActiveProfile is { } p
@@ -166,16 +202,28 @@ public sealed partial class ModsViewModel : ObservableObject
     /// <summary>Строка под кнопками: какие папки и какая игра.</summary>
     public string ProfileInfo => Profile is { } r
         ? Loc.T("mods.profileInfo", r.GameVersion?.ToString() ?? Loc.T("common.notFound"), string.Join("; ", r.ModDirs))
+        : IsRemote ? Loc.T("mods.remoteWaiting")
         : Loc.T("mods.noProfile");
 
     /// <summary>Сменился профиль или его настройки — перечитываем моды с диска, ответ модбазы про другой набор сбрасываем.</summary>
     public void OnProfileSwitched()
     {
         _remote = new(StringComparer.OrdinalIgnoreCase);
+        _remoteResolved = null;
+        _remoteStamp = null;
+        _locals = [];
+        OnPropertyChanged(nameof(IsLocalProfile));
         OnPropertyChanged(nameof(ProfileInfo));
         OnPropertyChanged(nameof(HeaderSubtitle));
         Selected = null;
         Card = null;
+        if (IsRemote)
+        {
+            // список придёт с первым ответом агента (OnRemoteStatus)
+            Rebuild();
+            StatusText = Loc.T("mods.remoteWaiting");
+            return;
+        }
         ReloadLocal();
         StatusText = Loc.T("mods.readFromDisk");
         if (_main.AutoCheckUpdates && Profile?.GameVersion is not null && CheckCommand.CanExecute(null))
@@ -185,6 +233,11 @@ public sealed partial class ModsViewModel : ObservableObject
     /// <summary>Перечитать папки модов (без сети) и перестроить таблицу с уже известными статусами.</summary>
     public void ReloadLocal()
     {
+        if (IsRemote)
+        {
+            _ = ReloadAsync();
+            return;
+        }
         if (_main.ActiveProfile is not { } profile) return;
         profile.Refresh(notify: false); // игра могла поменять свои настройки
         try
@@ -196,8 +249,83 @@ public sealed partial class ModsViewModel : ObservableObject
             _locals = [];
             StatusText = Loc.T("mods.readFailed", ex.Message);
         }
+        _diskStamp = ServerMods.StampOf(profile.Resolved);
         Rebuild();
         LocalModsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Перечитать моды и дождаться: у своей машины — с диска, у удалённого сервера — у агента.</summary>
+    private async Task ReloadAsync()
+    {
+        if (!IsRemote)
+        {
+            ReloadLocal();
+            return;
+        }
+        if (_main.Server.RemoteClient is not { } agent) return; // нет связи — список обновится, когда она появится
+        var profile = _main.ActiveProfile!.Model;
+        _remoteLoading = true;
+        try
+        {
+            var list = await agent.ModsAsync();
+            if (_main.ActiveProfile?.Model != profile) return; // пока ждали ответ, переключили профиль
+            var first = _remoteResolved is null;
+            _remoteResolved = new ResolvedProfile
+            {
+                Profile = profile,
+                GameVersion = ModVersion.ParseOrNull(list.GameVersion),
+                ModDirs = list.ModDirs,
+                InstallDir = list.InstallDir,
+                DisabledMods = list.DisabledMods,
+            };
+            var disabled = new HashSet<string>(list.DisabledMods);
+            _locals = [.. list.Mods.Select(m => new LocalMod(m.Path, m.Info, m.Error))
+                .Select(l => l with { IsDisabled = ModUpdateService.IsDisabled(l, disabled) })];
+            _remoteStamp = list.ChangedAt;
+            if (first)
+            {
+                OnPropertyChanged(nameof(ProfileInfo));
+                OnPropertyChanged(nameof(HeaderSubtitle));
+                if (StatusText == Loc.T("mods.remoteWaiting")) StatusText = Loc.T("mods.readFromServer");
+            }
+            Rebuild();
+            LocalModsChanged?.Invoke(this, EventArgs.Empty);
+            if (first && _main.AutoCheckUpdates && _remoteResolved.GameVersion is not null && CheckCommand.CanExecute(null))
+                CheckCommand.Execute(null);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
+        {
+            StatusText = Loc.T("mods.readFailed", ex.Message);
+        }
+        finally
+        {
+            _remoteLoading = false;
+        }
+    }
+
+    /// <summary>Новый статус агента удалённого сервера: моды там поменялись (здесь или в другом окне) — перечитываем.</summary>
+    public void OnRemoteStatus(AgentStatus status)
+    {
+        // своё действие ещё не закончилось — его изменение не «чужое», список перечитает оно само
+        if (!IsRemote || _remoteLoading || IsBusy || ToggleEnabledCommand.IsRunning || DeleteCommand.IsRunning) return;
+        if (_remoteResolved is null) _ = ReloadAsync();
+        else if (status.ModsChangedAt != _remoteStamp) _ = ReloadChangedAsync();
+    }
+
+    private async Task ReloadChangedAsync()
+    {
+        await ReloadAsync();
+        StatusText = Loc.T("mods.changedOutside");
+    }
+
+    /// <summary>Сервер этого профиля запущен (свой — по процессу, удалённый — со слов агента).</summary>
+    private bool IsRunning(ResolvedProfile profile) =>
+        IsRemote ? _main.Server.IsServerUp : GameProcess.IsRunning(profile.Profile);
+
+    private async Task SetEnabledAsync(ResolvedProfile profile, LocalMod mod, bool enabled)
+    {
+        if (IsRemote) await RemoteAgent.SetModEnabledAsync(mod.Path, enabled);
+        else ModConfigEditor.SetEnabled(profile, mod.Info!, enabled);
     }
 
     private void Rebuild()
@@ -241,7 +369,7 @@ public sealed partial class ModsViewModel : ObservableObject
 
         try
         {
-            ReloadLocal();
+            await ReloadAsync();
             if (Profile?.GameVersion is not { } game)
             {
                 StatusText = Loc.T("mods.noGameVersion");
@@ -265,11 +393,11 @@ public sealed partial class ModsViewModel : ObservableObject
     // ---------- включение / выключение ----------
 
     [RelayCommand]
-    private void ToggleEnabled(ModRowViewModel? row)
+    private async Task ToggleEnabledAsync(ModRowViewModel? row)
     {
-        if (row?.Local.Info is not { } info || Profile is not { } profile) return;
+        if (row?.Local.Info is null || Profile is not { } profile) return;
 
-        if (GameProcess.IsRunning(profile.Profile))
+        if (IsRunning(profile))
         {
             // клиент при выходе перезаписывает свои настройки, сервер применит только после перезапуска
             var server = profile.Profile.Kind == ProfileKind.Server;
@@ -285,41 +413,47 @@ public sealed partial class ModsViewModel : ObservableObject
 
         try
         {
-            ModConfigEditor.SetEnabled(profile, info, enabled: !row.IsEnabled);
+            await SetEnabledAsync(profile, row.Local, enabled: !row.IsEnabled);
             StatusText = Loc.T(row.IsEnabled ? "mods.disabledOk" : "mods.enabledOk", row.Name);
         }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException
+                                       or HttpRequestException or TaskCanceledException)
         {
             Error(Loc.T("mods.toggleFailed", ex.Message));
         }
-        ReloadLocal();
+        await ReloadAsync();
     }
 
     // ---------- удаление ----------
 
     [RelayCommand]
-    private void Delete(ModRowViewModel? row)
+    private async Task DeleteAsync(ModRowViewModel? row)
     {
         if (row is null || Profile is not { } profile) return;
 
-        var running = GameProcess.IsRunning(profile.Profile)
+        var running = IsRunning(profile)
             ? "\n\n" + Loc.T("mods.deleteRunning") : "";
         if (!Confirm(Loc.T("mods.deleteConfirm", row.Name, row.Installed) + running))
             return;
 
         try
         {
-            Shell.MoveToRecycleBin(row.Local.Path);
-            // если других копий мода не осталось — чистим его и из списка выключенных
-            if (row.Local.Info is { } info && _locals.Count(l => l.Info?.ModId == info.ModId) == 1)
-                ModConfigEditor.Forget(profile, info);
+            if (IsRemote) await RemoteAgent.DeleteModAsync(row.Local.Path); // на сервере — в его корзину
+            else
+            {
+                Shell.MoveToRecycleBin(row.Local.Path);
+                // если других копий мода не осталось — чистим его и из списка выключенных
+                if (row.Local.Info is { } info && _locals.Count(l => l.Info?.ModId == info.ModId) == 1)
+                    ModConfigEditor.Forget(profile, info);
+            }
             StatusText = Loc.T("mods.deletedOk", row.Name);
         }
-        catch (Exception ex) when (ex is IOException or OperationCanceledException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or OperationCanceledException or UnauthorizedAccessException
+                                       or HttpRequestException or InvalidOperationException)
         {
             Error(Loc.T("mods.deleteFailed", row.Name, ex.Message));
         }
-        ReloadLocal();
+        await ReloadAsync();
     }
 
     // ---------- добавление из архива ----------
@@ -333,13 +467,13 @@ public sealed partial class ModsViewModel : ObservableObject
             Filter = Loc.T("mods.zipFilter") + " (*.zip)|*.zip",
             Multiselect = true,
         };
-        if (dlg.ShowDialog() == true) AddFiles(dlg.FileNames);
+        if (dlg.ShowDialog() == true) _ = AddFilesAsync(dlg.FileNames);
     }
 
     /// <summary>Установка набора zip (кнопка или перетаскивание).</summary>
-    public void AddFiles(IEnumerable<string> files)
+    public async Task AddFilesAsync(IEnumerable<string> files)
     {
-        if (Profile is not { } profile) return;
+        if (Profile is not { } profile || IsBusy) return;
 
         var list = files.ToList();
         if (list.FirstOrDefault(f => f.EndsWith(PackManifest.Extension, StringComparison.OrdinalIgnoreCase)) is { } pack)
@@ -354,16 +488,22 @@ public sealed partial class ModsViewModel : ObservableObject
             return;
         }
 
-        if (GameProcess.IsRunning(profile.Profile)
-            && !Confirm(Loc.T("mods.runningContinue")))
-            return;
+        if (!ConfirmIfRunning(profile)) return;
 
         var installed = new List<string>();
         var problems = new List<string>();
-        foreach (var zip in zips)
-            InstallZip(profile, zip, interactive: true, installed, problems);
+        IsBusy = true;
+        try
+        {
+            foreach (var zip in zips)
+                await InstallZipAsync(profile, zip, interactive: true, installed, problems);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
 
-        ReloadLocal();
+        await ReloadAsync();
         if (installed.Count > 0) StatusText = Loc.T("report.installed") + ": " + string.Join("; ", installed);
 
         if (problems.Count > 0)
@@ -378,11 +518,12 @@ public sealed partial class ModsViewModel : ObservableObject
     /// Ставит один zip в профиль: старая версия — в хранилище, выключенный мод остаётся выключенным.
     /// interactive — спрашивать про ту же версию и даунгрейд (при обновлении/откате не спрашиваем: решение уже принято).
     /// </summary>
-    private bool InstallZip(ResolvedProfile profile, string zip, bool interactive, List<string> installed, List<string> problems)
+    private async Task<bool> InstallZipAsync(ResolvedProfile profile, string zip, bool interactive, List<string> installed, List<string> problems)
     {
         try
         {
-            var plan = ModInstaller.Plan(zip, profile, ModUpdateService.ScanLocal(profile));
+            // удалённому серверу план нужен только для вопросов: ставить будет его агент, по тем же правилам
+            var plan = ModInstaller.Plan(zip, profile, IsRemote ? _locals : ModUpdateService.ScanLocal(profile));
             var info = plan.Incoming.Info!;
             var old = plan.Replaces.FirstOrDefault()?.Info?.Version;
 
@@ -390,6 +531,14 @@ public sealed partial class ModsViewModel : ObservableObject
                 return false;
             if (interactive && plan.IsDowngrade && !Confirm(Loc.T("mods.downgradeConfirm", info.Name, old, info.Version)))
                 return false;
+
+            if (IsRemote)
+            {
+                StatusText = Loc.T("mods.uploading", info.Name, info.Version);
+                var result = await RemoteAgent.InstallModAsync(zip);
+                installed.Add(result.OldVersion is not null ? $"{result.Name}: {result.OldVersion} → {result.Version}" : $"{result.Name} {result.Version}");
+                return true;
+            }
 
             var disabledSet = new HashSet<string>(profile.DisabledMods);
             var wasDisabled = plan.Replaces.Any(r => ModUpdateService.IsDisabled(r, disabledSet));
@@ -400,16 +549,17 @@ public sealed partial class ModsViewModel : ObservableObject
             installed.Add(plan.IsReplace ? $"{info.Name}: {old} → {info.Version}" : $"{info.Name} {info.Version}");
             return true;
         }
-        catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException
+                                       or HttpRequestException or TaskCanceledException)
         {
             problems.Add($"{Path.GetFileName(zip)}: {ex.Message}");
             return false;
         }
     }
 
-    private void Report(string title, List<string> installed, List<string> problems)
+    private async Task ReportAsync(string title, List<string> installed, List<string> problems)
     {
-        ReloadLocal();
+        await ReloadAsync();
         _ = FetchNewModsAsync();
         // зависимости — по итоговому состоянию, а не на момент установки каждого мода
         if (installed.Count > 0)
@@ -426,8 +576,8 @@ public sealed partial class ModsViewModel : ObservableObject
         MessageBox.Show(Application.Current.MainWindow, text, "eViSTool", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
-    private static bool ConfirmIfRunning(ResolvedProfile profile) =>
-        !GameProcess.IsRunning(profile.Profile)
+    private bool ConfirmIfRunning(ResolvedProfile profile) =>
+        !IsRunning(profile)
         || Confirm(Loc.T("mods.runningContinue"));
 
     /// <summary>Скачать релиз и поставить его. Ошибки — в problems.</summary>
@@ -443,7 +593,7 @@ public sealed partial class ModsViewModel : ObservableObject
                 onProgress?.Invoke(x);
             });
             file = await _updater.DownloadReleaseAsync(release, modId, progress, ct);
-            return InstallZip(profile, file, interactive: false, installed, problems);
+            return await InstallZipAsync(profile, file, interactive: false, installed, problems);
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or TaskCanceledException)
         {
@@ -577,14 +727,14 @@ public sealed partial class ModsViewModel : ObservableObject
                 var problems = new List<string>();
                 bool ok;
                 if (item.Path is not null)
-                    ok = InstallZip(profile, item.Path, interactive: false, installed, problems);
+                    ok = await InstallZipAsync(profile, item.Path, interactive: false, installed, problems);
                 else
                     ok = await DownloadAndInstallAsync(profile, item.ModId, item.Name, item.Release!, installed, problems,
                         x => { item.Progress = x; OnPropertyChanged(nameof(QueueProgress)); }, ct);
 
                 item.State = ok ? QueueState.Done : ct.IsCancellationRequested ? QueueState.Cancelled : QueueState.Failed;
                 item.Message = ok ? "" : ct.IsCancellationRequested ? "" : problems.FirstOrDefault() ?? "";
-                if (ok) ReloadLocal(); // таблица и карточка сразу показывают новую версию
+                if (ok) await ReloadAsync(); // таблица и карточка сразу показывают новую версию
                 NotifyQueue();
             }
             foreach (var i in Queue.Where(i => i.State == QueueState.Waiting)) i.State = QueueState.Cancelled;
@@ -597,7 +747,7 @@ public sealed partial class ModsViewModel : ObservableObject
             _queueCts = null;
         }
 
-        ReloadLocal();
+        await ReloadAsync();
         _ = FetchNewModsAsync();
         var done = Queue.Count(i => i.State == QueueState.Done);
         var failed = Queue.Count(i => i.State == QueueState.Failed);
@@ -645,7 +795,8 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             // без сети — только сохранённые копии
         }
-        return RollbackWindow.BuildOptions(ModBackupStore.ForProfile(profile.Profile), info.ModId, info.Version, releases);
+        // прежние копии удалённого сервера лежат на той машине — отсюда предлагаем только релизы модбазы
+        return RollbackWindow.BuildOptions(IsRemote ? null : ModBackupStore.ForProfile(profile.Profile), info.ModId, info.Version, releases);
     }
 
     /// <summary>Поставить выбранную версию (через очередь).</summary>
@@ -695,7 +846,7 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             IsBusy = false;
         }
-        Report(Loc.T("report.dependencies"), installed, problems);
+        await ReportAsync(Loc.T("report.dependencies"), installed, problems);
     }
 
     /// <summary>
@@ -709,7 +860,7 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             for (var round = 0; round < 5; round++)
             {
-                ReloadLocal();
+                await ReloadAsync();
                 var issues = DependencyIssues.Where(i => tried.Add(i.ModId)).ToList();
                 if (issues.Count == 0 || Profile is not { } profile) break;
 
@@ -718,7 +869,7 @@ public sealed partial class ModsViewModel : ObservableObject
                     if (issue.IsDisabled)
                     {
                         var mod = _locals.First(l => string.Equals(l.Info?.ModId, issue.ModId, StringComparison.OrdinalIgnoreCase));
-                        ModConfigEditor.SetEnabled(profile, mod.Info!, enabled: true);
+                        await SetEnabledAsync(profile, mod, enabled: true);
                         installed.Add(Loc.T("mods.enabledShort", mod.Info!.Name));
                         continue;
                     }
@@ -734,7 +885,8 @@ public sealed partial class ModsViewModel : ObservableObject
                 }
             }
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or InvalidOperationException)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or InvalidOperationException
+                                       or UnauthorizedAccessException)
         {
             problems.Add(ex.Message);
         }
@@ -763,11 +915,11 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             if (!await DownloadAndInstallAsync(profile, modId, name, release, installed, problems))
             {
-                Report(Loc.T("report.install"), installed, problems);
+                await ReportAsync(Loc.T("report.install"), installed, problems);
                 return false;
             }
 
-            ReloadLocal();
+            await ReloadAsync();
             if (DependencyIssues.Count > 0 && profile.GameVersion is { } game)
             {
                 var list = string.Join("\n", DependencyIssues.Select(i => "• " + i.Describe()));
@@ -779,7 +931,7 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             IsBusy = false;
         }
-        Report(Loc.T("report.installed"), installed, problems);
+        await ReportAsync(Loc.T("report.installed"), installed, problems);
         return true;
     }
 
@@ -788,7 +940,7 @@ public sealed partial class ModsViewModel : ObservableObject
     [RelayCommand]
     private async Task ExportPackAsync()
     {
-        if (Profile is not { } profile || IsBusy) return;
+        if (Profile is not { } profile || IsBusy || IsRemote) return;
         var enabled = _locals.Count(l => l.Info is not null && !l.IsDisabled);
         var disabled = _locals.Count(l => l.Info is not null && l.IsDisabled);
         if (enabled + disabled == 0)
@@ -851,6 +1003,11 @@ public sealed partial class ModsViewModel : ObservableObject
     public async Task ImportPackFileAsync(string path)
     {
         if (Profile is not { } profile || IsBusy) return;
+        if (IsRemote)
+        {
+            Error(Loc.T("mods.remotePacksLater"));
+            return;
+        }
 
         PackFile pack;
         try
@@ -886,7 +1043,7 @@ public sealed partial class ModsViewModel : ObservableObject
             {
                 IsBusy = false;
             }
-            Report(Loc.T("report.imported", pack.Manifest.Name), result.Done.ToList(), result.Problems.ToList());
+            await ReportAsync(Loc.T("report.imported", pack.Manifest.Name), result.Done.ToList(), result.Problems.ToList());
         }
     }
 
@@ -959,15 +1116,15 @@ public sealed partial class ModsViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private static void ShowFile(ModRowViewModel? row)
+    private void ShowFile(ModRowViewModel? row)
     {
-        if (row is not null && Path.Exists(row.FilePath)) Shell.ShowInFolder(row.FilePath);
+        if (!IsRemote && row is not null && Path.Exists(row.FilePath)) Shell.ShowInFolder(row.FilePath);
     }
 
     [RelayCommand]
     private void OpenModsFolder()
     {
-        if (Profile?.InstallDir is { } dir && Directory.Exists(dir)) Shell.OpenFolder(dir);
+        if (!IsRemote && Profile?.InstallDir is { } dir && Directory.Exists(dir)) Shell.OpenFolder(dir);
     }
 
     private static bool Confirm(string text) =>
