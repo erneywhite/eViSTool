@@ -330,6 +330,7 @@ public sealed partial class ServerViewModel : ObservableObject
         if (IsRemoteProfile && s.GameVersion != _remoteGameVersion)
         {
             _remoteGameVersion = s.GameVersion;
+            if (_main.ActiveProfile is { } active) active.RemoteGameVersion = s.GameVersion;
             OnPropertyChanged(nameof(HeaderSubtitle));
         }
 
@@ -554,7 +555,8 @@ public sealed class ConsoleLineViewModel(ConsoleLine line)
     private static readonly Brush SystemBrush = Frozen(0x9F, 0xB7, 0xC9);
     private static readonly Brush ChatBrush = Frozen(0xB0, 0xC8, 0x98);
 
-    public string Text { get; } = line.Kind == ConsoleLineKind.Input ? "> " + line.Text : line.Text;
+    // ответы сервера бывают с разметкой игры (/help) — показываем обычным текстом
+    public string Text { get; } = line.Kind == ConsoleLineKind.Input ? "> " + line.Text : ConsoleMarkup.ToPlain(line.Text);
 
     /// <summary>null — обычный цвет текста темы.</summary>
     public Brush? Foreground { get; } = line.Kind switch
