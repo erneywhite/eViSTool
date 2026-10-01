@@ -69,6 +69,7 @@ var mods = new ServerMods(opts.ProfileId, Path.GetDirectoryName(Path.GetFullPath
 var scheduler = new BackupScheduler();
 scheduler.Seed(backups.List().FirstOrDefault(b => b.IsOwn)?.Time);
 string? pendingBackup = null; // имя копии, которую сервер делает по нашей просьбе
+var pendingSince = DateTime.MinValue; // когда попросили: сервер мог и не взяться — тогда отметка не должна висеть вечно
 var restarts = new RestartScheduler(); // перезапуски по расписанию с предупреждениями в чат
 DateTime? restartAfterBackup = null; // перезапуск ждёт копию мира — до этого срока
 
@@ -79,6 +80,7 @@ async Task RequestBackup()
     var now = DateTime.Now;
     var name = backups.NameFor(now);
     pendingBackup = name;
+    pendingSince = now;
     scheduler.MarkDone(now, players.Players.Count); // чтобы следующий тик расписания не запустил копию повторно
     await host.SendCommandAsync("/genbackup " + name);
 }
@@ -100,21 +102,25 @@ async Task RestartBySchedule()
 
 host.Console.LineAdded += line =>
 {
-    // сервер закончил копию (по расписанию, по кнопке или по команде из консоли)
-    if (line.Kind != ConsoleLineKind.Output || !line.Text.EndsWith("Backup complete!", StringComparison.Ordinal)) return;
-    scheduler.MarkDone(line.Time, players.Players.Count);
-    var name = pendingBackup;
-    pendingBackup = null;
-    var beforeRestart = restartAfterBackup is not null; // этой копии ждал перезапуск по расписанию
-    restartAfterBackup = null;
-    var settings = automation;
+    // сервер взялся за копию (по расписанию, по кнопке или по команде из консоли). Конец копии узнаём по файлу,
+    // а не по строке «Backup complete!»: её сервер пишет на своём языке, и на русском сервере она не находилась
+    if (line.Kind != ConsoleLineKind.Output || !BackupStore.IsBackupCommand(line.Text, out var requested)) return;
+    var before = backups.List().Select(b => b.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
     _ = Task.Run(async () =>
     {
+        var file = await backups.WaitForAsync(requested, before, BackupWaitOf());
+        if (requested is not null && requested == pendingBackup) pendingBackup = null;
+        if (file is null)
+        {
+            host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.notFound", requested ?? "?"));
+            return;
+        }
+        scheduler.MarkDone(DateTime.Now, players.Players.Count);
+        var beforeRestart = restartAfterBackup is not null; // этой копии ждал перезапуск по расписанию
+        restartAfterBackup = null;
+        var settings = automation;
         try
         {
-            // копию просили из консоли без имени — это самый свежий файл в папке
-            var file = (name is null ? null : backups.Find(name)) ?? backups.List().FirstOrDefault();
-            if (file is not null)
             {
                 var size = eViSTool.Core.Localization.SizeText.Format(file.Size);
                 host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.created", file.Name, size));
@@ -140,6 +146,9 @@ host.Console.LineAdded += line =>
         if (beforeRestart && host.State == ServerState.Running) await RestartBySchedule();
     });
 };
+
+// большой мир сервер копирует минутами — ждём файл с запасом
+static TimeSpan BackupWaitOf() => TimeSpan.FromMinutes(30);
 
 var shutdown = new CancellationTokenSource();
 var lastActivity = DateTime.Now;
@@ -479,11 +488,12 @@ try
                 }
                 else
                 {
-                    // сначала копия мира; перезапуск — когда сервер её закончит (строка «Backup complete!» выше)
+                    // сначала копия мира; перезапуск — когда сервер её закончит (файл копии готов — см. выше)
                     restartAfterBackup = DateTime.Now + ServerAutomation.RestartBackupWait;
                     host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.backupFirst"));
                     await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.T("restart.announceBackup"));
-                    if (pendingBackup is null) await RequestBackup(); // копия уже идёт — ждём её
+                    // копия уже идёт — ждём её; отметка старше получаса — сервер за копию так и не взялся, просим заново
+                    if (pendingBackup is null || DateTime.Now - pendingSince > BackupWaitOf()) await RequestBackup();
                 }
             }
             catch (Exception ex) when (ex is InvalidOperationException or IOException)

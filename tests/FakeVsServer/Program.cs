@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 //   /crash           — «падение» (код 1)
 //   /hang            — дальше игнорирует /stop (для проверки Ctrl+C и kill)
 //   /spam N          — N строк в stderr (проверка, что stderr читается и сервер не виснет)
-//   /genbackup       — копия мира в Backups, как у настоящего: «default-ГГГГ-ММ-ДД_ЧЧ-ММ-СС.vcdbs» и «Backup complete!»
+//   /genbackup       — копия мира в Backups, как у настоящего: «default-ГГГГ-ММ-ДД_ЧЧ-ММ-СС.vcdbs»; конец — по-русски
 //   /fakejoin N имя, /fakeleave N — строки входа и выхода игрока
 //   прочее           — «Handling Console Command …»
 // Аргументы: --dataPath <путь> (обязателен, как у нас), --slowstart <мс>
@@ -61,7 +61,8 @@ var reader = new Thread(() =>
             Log("Notification", "Ok, generating backup, this might take a while");
             var dir = Directory.CreateDirectory(Path.Combine(dataPath, "Backups")).FullName;
             File.WriteAllText(Path.Combine(dir, name), "world");
-            Log("Notification", "Backup complete!");
+            // как у сервера с ServerLanguage=ru: строка о конце копии — на языке сервера, агент не должен на неё полагаться
+            Log("Notification", "Резервное копирование завершено!");
         }
         // вход и выход игрока — теми же строками, что печатает настоящий сервер
         else if (line.StartsWith("/fakejoin "))
