@@ -1,5 +1,6 @@
 using eViSTool.Core.Mods;
 using eViSTool.Core.Localization;
+using eViSTool.Core.Profiles;
 
 namespace eViSTool.App.ViewModels;
 
@@ -9,7 +10,7 @@ public enum RowTone { Good, Update, Warn, Danger, Muted }
 /// <summary>Строка таблицы модов.</summary>
 public sealed class ModRowViewModel
 {
-    public ModRowViewModel(ModCheckResult r, IReadOnlyList<DependencyIssue> issues, bool pinned)
+    public ModRowViewModel(ModCheckResult r, IReadOnlyList<DependencyIssue> issues, bool pinned, ProfileKind profileKind)
     {
         Result = r;
         Local = r.Local;
@@ -60,7 +61,24 @@ public sealed class ModRowViewModel
         }.Concat(DependencyIssues.Select(i => i.Describe())).Where(s => !string.IsNullOrEmpty(s)));
 
         Changelog = r.Status == ModStatus.UpdateAvailable ? Html.ToPlainText(r.LatestCompatible?.Changelog, 1500) : null;
+
+        // сторона — из modinfo.json, как её видит игра; у «обеих сторон» (таких большинство) пометки нет
+        var side = r.Local.Info is { } info ? ModSides.Parse(info.Side) : ModSide.Both;
+        IsUnneeded = ModSides.IsUnneeded(side, profileKind);
+        SideNote = side switch
+        {
+            ModSide.Client => Loc.T("mods.sideClient") + (IsUnneeded ? " · " + Loc.T("mods.unneededOnServer") : ""),
+            // у игрока серверный мод работает в одиночной игре (её мир крутит встроенный сервер)
+            ModSide.Server => Loc.T("mods.sideServer") + (profileKind == ProfileKind.Client ? " · " + Loc.T("mods.forSingleplayer") : ""),
+            _ => "",
+        };
     }
+
+    /// <summary>« · только клиент» / « · только сервер» после modid; у мода для обеих сторон — пусто.</summary>
+    public string SideNote { get; }
+
+    /// <summary>Профилю мод не нужен (клиентский мод на выделенном сервере) — подсказка, не проблема.</summary>
+    public bool IsUnneeded { get; }
 
     public ModCheckResult Result { get; }
     public LocalMod Local { get; }

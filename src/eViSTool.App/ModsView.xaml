@@ -298,28 +298,39 @@
                 <!-- чипы-фильтры и сортировка -->
                 <DockPanel DockPanel.Dock="Top" Margin="0,12,0,10">
                     <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding SortModes}" SelectedIndex="{Binding SortIndex}" MinWidth="170" FontSize="12" />
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <RadioButton Style="{StaticResource Forest.Chip}" GroupName="ModFilter"
+                    <!-- узкая таблица (открыта карточка) — чипы переносятся на вторую строку, а не уходят под сортировку -->
+                    <WrapPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
+                        <WrapPanel.Resources>
+                            <Style TargetType="RadioButton" BasedOn="{StaticResource Forest.Chip}">
+                                <Setter Property="Margin" Value="0,2,6,2" />
+                            </Style>
+                        </WrapPanel.Resources>
+                        <RadioButton GroupName="ModFilter"
                                      IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=All}">
                             <TextBlock><Run Text="{local:Tr mods.chipAll}" /><Run Text="  " /><Run Text="{Binding ModCount, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" /></TextBlock>
                         </RadioButton>
-                        <RadioButton Style="{StaticResource Forest.Chip}" GroupName="ModFilter"
+                        <RadioButton GroupName="ModFilter"
                                      IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=Updates}">
                             <TextBlock><Run Text="{local:Tr mods.chipUpdates}" /><Run Text="  " /><Run Text="{Binding UpdatesAvailable, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" /></TextBlock>
                         </RadioButton>
-                        <RadioButton Style="{StaticResource Forest.Chip}" GroupName="ModFilter"
+                        <RadioButton GroupName="ModFilter"
                                      IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=Problems}">
                             <TextBlock><Run Text="{local:Tr mods.chipProblems}" /><Run Text="  " /><Run Text="{Binding ProblemCount, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" /></TextBlock>
                         </RadioButton>
-                        <RadioButton Style="{StaticResource Forest.Chip}" GroupName="ModFilter"
+                        <RadioButton GroupName="ModFilter"
                                      IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=Pinned}">
                             <TextBlock><Run Text="{local:Tr mods.chipPinned}" /><Run Text="  " /><Run Text="{Binding PinnedCount, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" /></TextBlock>
                         </RadioButton>
-                        <RadioButton Style="{StaticResource Forest.Chip}" GroupName="ModFilter"
+                        <RadioButton GroupName="ModFilter"
                                      IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=Disabled}">
                             <TextBlock><Run Text="{local:Tr mods.chipDisabled}" /><Run Text="  " /><Run Text="{Binding DisabledCount, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" /></TextBlock>
                         </RadioButton>
-                    </StackPanel>
+                        <RadioButton GroupName="ModFilter" ToolTip="{local:Tr mods.chipUnneededTip}"
+                                     Visibility="{Binding HasUnneeded, Converter={StaticResource BoolToVis}}"
+                                     IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=Unneeded}">
+                            <TextBlock><Run Text="{local:Tr mods.chipUnneeded}" /><Run Text="  " /><Run Text="{Binding UnneededCount, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" /></TextBlock>
+                        </RadioButton>
+                    </WrapPanel>
                 </DockPanel>
 
                 <!-- таблица -->
@@ -374,7 +385,19 @@
                                             <StackPanel VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"
                                                            Foreground="{StaticResource Forest.Text}" ToolTip="{Binding FileName}" />
-                                                <TextBlock Text="{Binding ModId}" FontSize="11" Foreground="{StaticResource Forest.Muted}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock FontSize="11" Foreground="{StaticResource Forest.Muted}" TextTrimming="CharacterEllipsis">
+                                                    <Run Text="{Binding ModId, Mode=OneWay}" /><Run Text="{Binding SideNote, Mode=OneWay}">
+                                                        <Run.Style>
+                                                            <Style TargetType="Run">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsUnneeded}" Value="True">
+                                                                        <Setter Property="Foreground" Value="{StaticResource Forest.Warn}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Run.Style>
+                                                    </Run>
+                                                </TextBlock>
                                             </StackPanel>
                                         </DockPanel>
                                     </DataTemplate>

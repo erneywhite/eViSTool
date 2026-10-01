@@ -20,7 +20,7 @@ using System.Windows.Threading;
 namespace eViSTool.App.ViewModels;
 
 /// <summary>Чипы над таблицей модов.</summary>
-public enum ModFilter { All, Updates, Problems, Pinned, Disabled }
+public enum ModFilter { All, Updates, Problems, Pinned, Disabled, Unneeded }
 
 public sealed partial class ModsViewModel : ObservableObject
 {
@@ -53,6 +53,11 @@ public sealed partial class ModsViewModel : ObservableObject
     [ObservableProperty] private int _problemCount;
     [ObservableProperty] private int _pinnedCount;
     [ObservableProperty] private int _disabledCount;
+
+    /// <summary>Клиентские моды в серверном профиле — фильтр виден, только когда они есть.</summary>
+    [ObservableProperty] private int _unneededCount;
+    public bool HasUnneeded => UnneededCount > 0;
+    partial void OnUnneededCountChanged(int value) => OnPropertyChanged(nameof(HasUnneeded));
 
     /// <summary>Идёт скачивание/установка — кнопки операций недоступны.</summary>
     [ObservableProperty] private bool _isBusy;
@@ -130,6 +135,7 @@ public sealed partial class ModsViewModel : ObservableObject
                 ModFilter.Problems => r.IsProblem,
                 ModFilter.Pinned => r.IsPinned,
                 ModFilter.Disabled => !r.IsEnabled,
+                ModFilter.Unneeded => r.IsUnneeded,
                 _ => true,
             }
             && (Search.Length == 0
@@ -342,14 +348,17 @@ public sealed partial class ModsViewModel : ObservableObject
         // после операции таблица строится заново — выбор остаётся на том же моде
         var keep = Card?.Row;
         var pins = _main.ActiveProfile?.Model.PinnedMods ?? new Dictionary<string, string>();
+        var kind = _main.ActiveProfile?.Model.Kind ?? ProfileKind.Client;
         Rows.Clear();
         foreach (var r in results)
-            Rows.Add(new ModRowViewModel(r, DependencyIssues, r.Local.Info?.ModId is { } id && pins.ContainsKey(id)));
+            Rows.Add(new ModRowViewModel(r, DependencyIssues, r.Local.Info?.ModId is { } id && pins.ContainsKey(id), kind));
 
         UpdatesAvailable = Rows.Count(r => r.Kind == ModStatus.UpdateAvailable);
         ProblemCount = Rows.Count(r => r.IsProblem);
         PinnedCount = Rows.Count(r => r.IsPinned);
         DisabledCount = Rows.Count(r => !r.IsEnabled);
+        UnneededCount = Rows.Count(r => r.IsUnneeded);
+        if (UnneededCount == 0 && Filter == ModFilter.Unneeded) Filter = ModFilter.All; // таких модов не осталось — показываем всё
         OnPropertyChanged(nameof(ShownText));
 
         if (keep is not null)
