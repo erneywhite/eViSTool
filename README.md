@@ -171,6 +171,8 @@ so changes can be saved only while it is stopped. A copy of the previous file st
   old copies are rotated (keep the last N), optionally only if someone played, with an announcement in chat.
   **Restore** puts a backup in place of the world (with the server stopped). The current world is saved aside first,
   so a restore can be undone.
+  Data that mods keep next to the world rather than in it (for example `Saves/XLeveling` with skill progress,
+  and the `ModData` folder) is packed with every backup and restored together with the world.
 - **Scheduled restarts** every N hours of uptime or at set times of day, with chat warnings
   (10 and 5 minutes before, then every minute) and, if you like, a fresh backup right before the restart.
 

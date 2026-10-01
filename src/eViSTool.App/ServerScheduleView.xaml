@@ -243,6 +243,10 @@
                                                     ToolTip="{local:Tr sched.manualTip}" Visibility="{Binding IsManual, Converter={StaticResource BoolToVis}}">
                                                 <TextBlock Text="{local:Tr sched.manual}" FontSize="10" Foreground="{StaticResource Forest.Muted}" />
                                             </Border>
+                                            <Border CornerRadius="4" Padding="6,1" Margin="10,0,0,0" Background="{StaticResource Forest.Raised}"
+                                                    ToolTip="{Binding ModDataTip}" Visibility="{Binding HasModData, Converter={StaticResource BoolToVis}}">
+                                                <TextBlock Text="{local:Tr sched.modData}" FontSize="10" Foreground="{StaticResource Forest.Muted}" />
+                                            </Border>
                                         </StackPanel>
                                     </DockPanel>
                                 </Border>

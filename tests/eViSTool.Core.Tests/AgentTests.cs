@@ -113,6 +113,9 @@ public sealed class AgentTests : IAsyncLifetime
         foreach (var day in new[] { "01", "02", "03" }) File.WriteAllText(Path.Combine(dir, $"Тест_мир-2026-09-{day}_10-00-00.vcdbs"), "old");
         File.WriteAllText(Path.Combine(dir, "default-2026-08-01_10-00-00.vcdbs"), "legacy");
         File.WriteAllText(Path.Combine(dir, "before-update.vcdbs"), "manual");
+        // мод хранит прогресс рядом с миром — он должен попасть в копию вместе с миром
+        Directory.CreateDirectory(Path.Combine(_profile.DataDir!, "Saves", "XLeveling"));
+        File.WriteAllText(Path.Combine(_profile.DataDir!, "Saves", "XLeveling", "Erney.json"), "skills");
 
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: true, AgentExe, AgentsDir);
         await Until(async () => (await _client.StatusAsync()).State == ServerState.Running);
@@ -131,6 +134,7 @@ public sealed class AgentTests : IAsyncLifetime
         Assert.Contains("default-2026-08-01_10-00-00.vcdbs", names); // чужие и ручные копии ротация не трогает
         Assert.Contains("before-update.vcdbs", names);
         Assert.True((await _client.StatusAsync()).LastBackupAt > DateTime.Now.AddMinutes(-1));
+        await Until(() => Task.FromResult(store.List().Single(b => b.Name == fresh).ModDataSize > 0));
 
         // о готовой копии — строка в консоли и объявление игрокам в чат
         await Until(async () => (await _client.ConsoleAsync(0, 0)).Any(l => l.Text.Contains("/announce") && l.Text.Contains(fresh)));

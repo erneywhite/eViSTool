@@ -10,13 +10,20 @@ namespace eViSTool.Core.Server;
 /// <summary>Резервная копия в списке — без пути: у удалённого сервера путь указывает на чужую машину.</summary>
 public sealed record BackupEntry(string Name, DateTime Time, long Size, bool IsOwn)
 {
+    /// <summary>Размер архива с данными модов рядом с копией; 0 — его нет.</summary>
+    public long ModDataSize { get; init; }
+
     /// <summary>Путь к файлу — только для сервера на этой машине (для «Показать в папке»).</summary>
     [JsonIgnore]
     public string? LocalPath { get; init; }
 }
 
 /// <summary>Итог восстановления: куда отложен прежний мир (null — его не было).</summary>
-public sealed record RestoreResult(string? SafetyName);
+public sealed record RestoreResult(string? SafetyName)
+{
+    /// <summary>У копии был архив данных модов — они тоже вернулись (иначе остались текущие).</summary>
+    public bool ModDataRestored { get; init; }
+}
 
 /// <summary>
 /// Данные сервера, которые нужны вкладке «Расписание»: настройки расписания и резервные копии. Две реализации —
@@ -54,7 +61,7 @@ public sealed class ServerFiles(string profileId, string dataDir, string? backup
     public void SaveAutomation(ServerAutomation settings) => settings.Save(profileId, agentsDir);
 
     public IReadOnlyList<BackupEntry> ListBackups() =>
-        [.. Store.List().Select(b => new BackupEntry(b.Name, b.Time, b.Size, b.IsOwn) { LocalPath = b.Path })];
+        [.. Store.List().Select(b => new BackupEntry(b.Name, b.Time, b.Size, b.IsOwn) { LocalPath = b.Path, ModDataSize = b.ModDataSize })];
 
     public BackupEntry CopyWorld(DateTime now)
     {
@@ -63,7 +70,7 @@ public sealed class ServerFiles(string profileId, string dataDir, string? backup
         var made = store.CopySave(save, now);
         var settings = LoadAutomation();
         if (settings.BackupEnabled && settings.BackupKeep > 0) store.Prune(settings.BackupKeep);
-        return new BackupEntry(made.Name, made.Time, made.Size, made.IsOwn) { LocalPath = made.Path };
+        return new BackupEntry(made.Name, made.Time, made.Size, made.IsOwn) { LocalPath = made.Path, ModDataSize = made.ModDataSize };
     }
 
     public RestoreResult Restore(string name, DateTime now)
@@ -72,13 +79,14 @@ public sealed class ServerFiles(string profileId, string dataDir, string? backup
         // имя — только из списка копий: путь «..\..\что-то» сюда не пройдёт
         var backup = store.Find(name) ?? throw new FileNotFoundException(Loc.T("sched.noBackup", name));
         var save = SaveFileOf(dataDir) ?? throw new InvalidOperationException(Loc.T("sched.noConfig"));
-        return new RestoreResult(store.Restore(backup, save, now)?.Name);
+        return new RestoreResult(store.Restore(backup, save, now)?.Name) { ModDataRestored = backup.ModDataSize > 0 };
     }
 
     public void DeleteBackup(string name)
     {
         var backup = Store.Find(name) ?? throw new FileNotFoundException(Loc.T("sched.noBackup", name));
         RecycleBin.Send(backup.Path);
+        if (backup.ModDataSize > 0) RecycleBin.Send(WorldModData.ArchiveFor(backup.Path)); // данные модов — вместе с копией
     }
 
     // ---- serverconfig.json — для окна на другой машине
