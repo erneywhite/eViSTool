@@ -1,0 +1,47 @@
+# Сборка и тесты на каждый пуш и pull request; заодно — релизный zip тем же build/publish.ps1
+# и тесты агента на обрезанном релизном exe (артефакт запуска хранится две недели).
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build
+        run: dotnet build -c Debug
+
+      - name: Test
+        run: dotnet test tests/eViSTool.Core.Tests --no-build -c Debug --logger "console;verbosity=normal"
+
+      - name: Release build
+        shell: pwsh
+        run: ./build/publish.ps1
+
+      - name: Test the release agent
+        shell: pwsh
+        run: |
+          $agent = Get-ChildItem dist -Recurse -Filter eViSTool.Agent.exe | Select-Object -First 1
+          $env:EVISTOOL_TEST_AGENT = $agent.FullName
+          dotnet test tests/eViSTool.Core.Tests --no-build -c Debug --filter "FullyQualifiedName~AgentTests"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eViSTool-win-x64
+          path: dist/*.zip*
+          retention-days: 14
