@@ -65,6 +65,7 @@ var automationFile = ServerAutomation.FileFor(opts.ProfileId, opts.AgentsDir);
 var automationStamp = File.Exists(automationFile) ? File.GetLastWriteTimeUtc(automationFile) : default;
 var backups = new BackupStore(opts.DataPath, opts.BackupName);
 var files = new ServerFiles(opts.ProfileId, opts.DataPath, opts.BackupName, opts.AgentsDir); // для окна на другой машине
+var mods = new ServerMods(opts.ProfileId, Path.GetDirectoryName(Path.GetFullPath(opts.ExePath)) ?? "", opts.DataPath);
 var scheduler = new BackupScheduler();
 scheduler.Seed(backups.List().FirstOrDefault(b => b.IsOwn)?.Time);
 string? pendingBackup = null; // имя копии, которую сервер делает по нашей просьбе
@@ -150,7 +151,11 @@ var failures = new Dictionary<string, (int Count, DateTime BlockedUntil)>();
 
 var builder = WebApplication.CreateSlimBuilder();
 builder.Logging.ClearProviders();
-builder.WebHost.UseKestrel(k => k.Listen(System.Net.IPAddress.Loopback, 0)); // свободный порт выберет система
+builder.WebHost.UseKestrel(k =>
+{
+    k.Limits.MaxRequestBodySize = 1L << 30; // архив мода бывает и сотни мегабайт
+    k.Listen(System.Net.IPAddress.Loopback, 0); // свободный порт выберет система
+});
 var app = builder.Build();
 
 // ключ — на каждом запросе. При включённом удалённом доступе запросы окна с этой машины держат агента живым:
@@ -187,6 +192,7 @@ AgentStatus Status() => new()
     RemotePort = remoteApp is not null ? remote.Port : null,
     AutomationChangedAt = File.Exists(automationFile) ? File.GetLastWriteTimeUtc(automationFile) : null,
     ConfigChangedAt = File.Exists(files.ConfigPath) ? File.GetLastWriteTimeUtc(files.ConfigPath) : null,
+    ModsChangedAt = mods.ChangedAt(),
     RemoteError = remoteError,
 };
 
@@ -214,7 +220,8 @@ IResult Guard(Func<object> action)
     {
         return Json(action());
     }
-    catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or JsonException)
+    catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or JsonException
+                                   or InvalidDataException)
     {
         return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
     }
@@ -270,6 +277,40 @@ web.MapGet("/backups", () => Guard(files.ListBackups));
 web.MapPost("/backups/copy", () => WhenStopped(() => files.CopyWorld(DateTime.Now)));
 web.MapPost("/backups/restore", async (HttpContext ctx) =>
     await ReadName(ctx) is { Length: > 0 } name ? WhenStopped(() => files.Restore(name, DateTime.Now)) : Results.BadRequest());
+// моды сервера — для окна на другой машине: список, включение/выключение, удаление, установка присланного архива
+web.MapGet("/mods", () => Guard(mods.List));
+web.MapPost("/mods/toggle", async (HttpContext ctx) =>
+{
+    using var reader = new StreamReader(ctx.Request.Body);
+    var request = JsonConvert.DeserializeObject<ModToggleRequest>(await reader.ReadToEndAsync());
+    return request is null ? Results.BadRequest() : Guard(() => { mods.SetEnabled(request.Path, request.Enabled); return Status(); });
+});
+web.MapPost("/mods/delete", async (HttpContext ctx) =>
+{
+    using var reader = new StreamReader(ctx.Request.Body);
+    var request = JsonConvert.DeserializeObject<ModPathRequest>(await reader.ReadToEndAsync());
+    return request is null ? Results.BadRequest() : Guard(() => { mods.Delete(request.Path); return Status(); });
+});
+web.MapPost("/mods/install", async (HttpContext ctx) =>
+{
+    // имя файла — только имя, без пути: мод ляжет в папку модов под ним
+    var name = Path.GetFileName(Uri.UnescapeDataString(ctx.Request.Headers[AgentClient.ModFileHeader].ToString()));
+    if (!name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || name.Length <= 4) return Results.BadRequest();
+    var dir = Path.Combine(Path.GetTempPath(), "evistool-upload-" + Guid.NewGuid().ToString("N"));
+    try
+    {
+        Directory.CreateDirectory(dir);
+        var zip = Path.Combine(dir, name);
+        await using (var file = File.Create(zip))
+            await ctx.Request.Body.CopyToAsync(file, ctx.RequestAborted);
+        return Guard(() => mods.Install(zip));
+    }
+    finally
+    {
+        try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
+    }
+});
+
 // serverconfig.json — для окна на другой машине; писать можно только в остановленный сервер (иначе он перезапишет файл)
 web.MapGet("/config", () => Guard(files.ReadConfig));
 web.MapPut("/config", async (HttpContext ctx) =>
@@ -334,7 +375,11 @@ async Task ApplyRemoteAsync()
         var rb = WebApplication.CreateSlimBuilder();
         rb.Logging.ClearProviders();
         rb.WebHost.UseKestrelHttpsConfiguration();
-        rb.WebHost.UseKestrel(k => k.Listen(System.Net.IPAddress.Any, remote.Port, o => o.UseHttps(cert)));
+        rb.WebHost.UseKestrel(k =>
+        {
+            k.Limits.MaxRequestBodySize = 1L << 30; // архив мода бывает и сотни мегабайт
+            k.Listen(System.Net.IPAddress.Any, remote.Port, o => o.UseHttps(cert));
+        });
         var web = rb.Build();
         web.Use(async (ctx, next) =>
         {

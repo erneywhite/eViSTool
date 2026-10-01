@@ -64,6 +64,9 @@ public sealed record AgentStatus
     public DateTime? LastBackupAt { get; init; }
     public DateTime? NextBackupAt { get; init; }
 
+    /// <summary>Когда последний раз менялись моды сервера (папки модов или включение/выключение): удалённое окно перечитывает список.</summary>
+    public DateTime? ModsChangedAt { get; init; }
+
     /// <summary>Когда последний раз менялся serverconfig.json (null — его нет): удалённое окно перечитывает конфиг.</summary>
     public DateTime? ConfigChangedAt { get; init; }
 

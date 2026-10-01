@@ -36,6 +36,7 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnSelectedTabChanged(int value)
     {
         OnPropertyChanged(nameof(PageTitle));
+        Mods.SetActive(value == 0);
         if (value == 1) _ = Catalog.EnsureLoadedAsync(); // каталог грузим только когда он нужен
     }
     public ObservableCollection<ProfileViewModel> Profiles { get; } = [];
@@ -155,6 +156,7 @@ public sealed partial class MainViewModel : ObservableObject
         Server.OnProfileSwitched();
         Save(); // перенос настроек старого формата сразу на диск
         Mods.OnProfileSwitched(); // список модов виден сразу, без сети
+        Mods.SetActive(SelectedTab == 0); // и сам обновляется, если моды поменяли в другом окне
         _ = About.CheckQuietlyAsync(); // новая версия программы — подсказка в боковой панели
 
         // Удалённый доступ работает, пока открыто это окно (или пока работает сервер): держим агентов таких профилей
