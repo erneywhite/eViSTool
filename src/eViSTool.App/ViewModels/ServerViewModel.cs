@@ -88,6 +88,98 @@ public sealed partial class ServerViewModel : ObservableObject
     [RelayCommand]
     private void OpenSettings() => _main.SelectedTab = 3;
     [ObservableProperty] private string _commandText = "";
+
+    // ---- подсказки команд: список — из ответа сервера на /help (агент его запоминает), Tab дописывает
+
+    /// <summary>Команды сервера, которые знает агент.</summary>
+    public IReadOnlyList<ServerCommand> Commands { get; private set; } = [];
+    private int _commandCount = -1;
+
+    [ObservableProperty] private IReadOnlyList<ServerCommand> _suggestions = [];
+    [ObservableProperty] private bool _showSuggestions;
+    [ObservableProperty] private ServerCommand? _selectedSuggestion;
+
+    /// <summary>Под полем: «/tp &lt;source&gt; &lt;target&gt; — Teleport…» для набираемой команды.</summary>
+    [ObservableProperty] private string _argsHint = "";
+    private bool _quietText; // текст пришёл из истории (↑/↓) — подсказки не всплывают
+
+    partial void OnCommandTextChanged(string value)
+    {
+        if (_quietText) return;
+        UpdateSuggestions(value);
+    }
+
+    private void UpdateSuggestions(string value)
+    {
+        Suggestions = ServerCommands.Suggest(Commands, value);
+        // подсказывать нечего, кроме уже набранного целиком — список не нужен, хватит подсказки аргументов
+        ShowSuggestions = Suggestions.Count > 0
+                          && !(Suggestions.Count == 1 && string.Equals("/" + Suggestions[0].Name, value, StringComparison.OrdinalIgnoreCase));
+        SelectedSuggestion = null;
+        ArgsHint = ServerCommands.Typed(Commands, value) is { } typed && !ShowSuggestions
+            ? $"{typed.Usage}   —   {typed.Description}"
+            : value.StartsWith('/') && Commands.Count == 0 ? Loc.T("cmds.unknownHint") : "";
+    }
+
+    /// <summary>Tab: выбранная подсказка или общее начало подходящих команд. false — дописывать нечего.</summary>
+    public bool CompleteCommand()
+    {
+        var completed = SelectedSuggestion is { } chosen ? "/" + chosen.Name + " " : ServerCommands.Complete(Suggestions, CommandText);
+        if (completed is null || completed == CommandText) return false;
+        CommandText = completed;
+        return true;
+    }
+
+    /// <summary>↑/↓ при открытых подсказках — по списку подсказок (иначе — история).</summary>
+    public void MoveSuggestion(int direction)
+    {
+        if (Suggestions.Count == 0) return;
+        var i = SelectedSuggestion is null ? (direction > 0 ? -1 : Suggestions.Count) : Suggestions.ToList().IndexOf(SelectedSuggestion);
+        SelectedSuggestion = Suggestions[Math.Clamp(i + direction, 0, Suggestions.Count - 1)];
+    }
+
+    public void HideSuggestions() => ShowSuggestions = false;
+
+    /// <summary>Команда из окна «Команды» или клик по подсказке — в поле ввода, дальше набирать аргументы.</summary>
+    public void InsertCommand(ServerCommand command) => CommandText = "/" + command.Name + " ";
+
+    /// <summary>Попросить у сервера список команд: его ответ на /help агент разберёт и запомнит.</summary>
+    public void RequestCommandList()
+    {
+        if (_client is { } client && CanCommand) _ = client.CommandAsync("/help");
+    }
+
+    private async Task LoadCommandsAsync(AgentClient client)
+    {
+        try
+        {
+            var list = await client.CommandsAsync();
+            if (client != _client) return; // пока ждали, связь сменилась
+            Commands = list;
+            OnPropertyChanged(nameof(Commands));
+            if (!_quietText) UpdateSuggestions(CommandText);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
+        {
+            _commandCount = -1; // старый агент без списка команд или связь оборвалась — попробуем со следующим статусом
+        }
+    }
+
+    /// <summary>Кнопка «Команды»: все команды сервера с поиском; выбранная — в поле ввода.</summary>
+    [RelayCommand]
+    private void ShowCommands()
+    {
+        if (Commands.Count == 0) RequestCommandList(); // список ещё не знаем — сразу спросим у сервера
+        var dlg = new ServerCommandsWindow(this) { Owner = Application.Current.MainWindow };
+        if (dlg.ShowDialog() == true && dlg.Chosen is { } chosen)
+        {
+            InsertCommand(chosen);
+            CommandInserted?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>Команда вставлена из окна — вид переводит фокус в поле ввода.</summary>
+    public event EventHandler? CommandInserted;
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _errorText = "";
 
@@ -192,6 +284,10 @@ public sealed partial class ServerViewModel : ObservableObject
         Lines.Clear();
         _lastSeq = 0;
         _agentPid = 0;
+        Commands = [];
+        _commandCount = -1;
+        OnPropertyChanged(nameof(Commands));
+        UpdateSuggestions(CommandText);
 
         IsServerProfile = _main.ActiveProfile?.Kind == ProfileKind.Server;
         IsRemoteProfile = _main.ActiveProfile?.Model.IsRemote == true;
@@ -316,6 +412,11 @@ public sealed partial class ServerViewModel : ObservableObject
 
     private void Apply(AgentStatus s)
     {
+        if (s.CommandCount != _commandCount && _client is { } commandsFrom)
+        {
+            _commandCount = s.CommandCount;
+            _ = LoadCommandsAsync(commandsFrom);
+        }
         AgentRunning = true;
         State = s.State;
         _serverPid = s.ServerPid;
@@ -485,6 +586,7 @@ public sealed partial class ServerViewModel : ObservableObject
         _history.Add(text);
         _historyPos = -1;
         CommandText = "";
+        ShowSuggestions = false;
         await _client.CommandAsync(text);
     });
 
@@ -497,7 +599,11 @@ public sealed partial class ServerViewModel : ObservableObject
             : _historyPos + direction;
         if (_historyPos >= _history.Count) _historyPos = -1;
         if (_historyPos < -1) _historyPos = 0;
+        _quietText = true;
         CommandText = _historyPos < 0 ? "" : _history[Math.Max(0, _historyPos)];
+        _quietText = false;
+        ShowSuggestions = false;
+        ArgsHint = ServerCommands.Typed(Commands, CommandText) is { } typed ? $"{typed.Usage}   —   {typed.Description}" : "";
     }
 
     // ---------- чужой сервер ----------

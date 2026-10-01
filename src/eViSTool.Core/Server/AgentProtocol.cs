@@ -67,6 +67,9 @@ public sealed record AgentStatus
     /// <summary>Когда последний раз менялись моды сервера (папки модов или включение/выключение): удалённое окно перечитывает список.</summary>
     public DateTime? ModsChangedAt { get; init; }
 
+    /// <summary>Сколько команд сервера известно (из его /help) — поменялось, значит окну пора перечитать список для подсказок.</summary>
+    public int CommandCount { get; init; }
+
     /// <summary>Когда последний раз менялся serverconfig.json (null — его нет): удалённое окно перечитывает конфиг.</summary>
     public DateTime? ConfigChangedAt { get; init; }
 

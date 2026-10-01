@@ -150,7 +150,9 @@ Pick a server profile and open **Server**.
 
 ![Server console](docs/screenshots/server.png)
 
-**Start, Stop, Restart** and a live **Console** with command history (↑/↓). **Stop** saves the world;
+**Start, Stop, Restart** and a live **Console** with command history (↑/↓) and command hints: start typing `/` and the server's
+commands pop up with their arguments, **Tab** completes. **Commands** lists them all with search. The list comes from the server
+itself (its `/help`), so commands added by mods are there too. **Stop** saves the world;
 **Kill** ends the process at once and is only for a server that hangs.
 On top: state, uptime, memory and who is online since when.
 

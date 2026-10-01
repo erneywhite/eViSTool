@@ -205,6 +205,8 @@
                 <DockPanel>
                     <DockPanel DockPanel.Dock="Top" Margin="16,10,10,8">
                         <Button DockPanel.Dock="Right" Content="{local:Tr server.clear}" Command="{Binding ClearConsoleCommand}" Padding="12,4" MinHeight="0" FontSize="12" />
+                        <Button DockPanel.Dock="Right" Content="{local:Tr cmds.button}" Command="{Binding ShowCommandsCommand}" Padding="12,4" MinHeight="0" FontSize="12"
+                                Margin="0,0,8,0" ToolTip="{local:Tr cmds.buttonTip}" AutomationProperties.AutomationId="SrvCommands" />
                         <!-- копия мира сейчас — та же команда, что на вкладке «Расписание» -->
                         <Button DockPanel.Dock="Right" Command="{Binding Schedule.BackupNowCommand}" Padding="12,4" MinHeight="0" FontSize="12" Margin="0,0,8,0"
                                 ToolTip="{local:Tr sched.nowTip}" ToolTipService.ShowOnDisabled="True" AutomationProperties.AutomationId="SrvBackupNow">
@@ -218,15 +220,49 @@
                                    Margin="16,0,16,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Schedule.StatusText}" />
                     </DockPanel>
 
-                    <!-- ввод команды: Enter — отправить, ↑/↓ — история -->
+                    <!-- ввод команды: Enter — отправить, ↑/↓ — история (или подсказки, если они открыты), Tab — дописать команду -->
                     <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Padding="10">
                         <DockPanel>
+                            <!-- что ждёт набранная команда: «/tp <source> <target> — Teleport…» -->
+                            <TextBlock DockPanel.Dock="Bottom" Text="{Binding ArgsHint}" FontFamily="Cascadia Mono, Consolas" FontSize="11"
+                                       Foreground="{StaticResource Forest.Muted}" Margin="29,6,0,0" TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding ArgsHint}" Visibility="{Binding ArgsHint, Converter={StaticResource TextToVis}}"
+                                       AutomationProperties.AutomationId="SrvArgsHint" />
                             <Button DockPanel.Dock="Right" Content="{local:Tr server.send}" Command="{Binding SendCommandCommand}" IsEnabled="{Binding CanCommand}"
                                     Style="{StaticResource Forest.PrimaryButton}" Margin="8,0,0,0" />
                             <Grid>
                                 <TextBox x:Name="CommandBox" Text="{Binding CommandText, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas"
                                          IsEnabled="{Binding CanCommand}" PreviewKeyDown="CommandBox_PreviewKeyDown" VerticalContentAlignment="Center"
-                                         Padding="28,7,10,7" ToolTip="{local:Tr server.commandTip}" />
+                                         LostKeyboardFocus="CommandBox_LostKeyboardFocus"
+                                         Padding="28,7,10,7" ToolTip="{local:Tr server.commandTip}" AutomationProperties.AutomationId="SrvCommandBox" />
+                                <!-- подсказки команд — над полем: оно внизу окна -->
+                                <Popup IsOpen="{Binding ShowSuggestions}" PlacementTarget="{Binding ElementName=CommandBox}" Placement="Top"
+                                       AllowsTransparency="True" StaysOpen="True" Focusable="False" VerticalOffset="-4">
+                                    <Border Background="{StaticResource Forest.Surface}" BorderBrush="{StaticResource Forest.Line}" BorderThickness="1"
+                                            CornerRadius="6" Padding="4" MinWidth="{Binding ActualWidth, ElementName=CommandBox}" MaxWidth="900">
+                                        <ListBox x:Name="SuggestionList" ItemsSource="{Binding Suggestions}" SelectedItem="{Binding SelectedSuggestion}"
+                                                 Background="Transparent" BorderThickness="0" Focusable="False"
+                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" PreviewMouseLeftButtonUp="SuggestionList_Click"
+                                                 AutomationProperties.AutomationId="SrvSuggestions">
+                                            <ListBox.ItemContainerStyle>
+                                                <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                                                    <Setter Property="Focusable" Value="False" />
+                                                    <Setter Property="Padding" Value="8,3" />
+                                                </Style>
+                                            </ListBox.ItemContainerStyle>
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <DockPanel>
+                                                        <TextBlock DockPanel.Dock="Left" Text="{Binding Usage}" FontFamily="Cascadia Mono, Consolas" FontSize="12"
+                                                                   Foreground="{StaticResource Forest.Text}" />
+                                                        <TextBlock Text="{Binding Description}" FontSize="11" Foreground="{StaticResource Forest.Muted}"
+                                                                   Margin="14,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                    </DockPanel>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </Border>
+                                </Popup>
                                 <TextBlock Text="›" FontSize="16" Foreground="{StaticResource Forest.Accent}" Margin="12,0,0,1" VerticalAlignment="Center"
                                            IsHitTestVisible="False" />
                                 <TextBlock Text="{local:Tr server.commandPlaceholder}" Foreground="{StaticResource Forest.Muted}" Margin="29,0,0,0"

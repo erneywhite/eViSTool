@@ -53,6 +53,16 @@ var reader = new Thread(() =>
         else if (line == "/crash") Environment.Exit(1);
         else if (line == "/hang") { hang = true; Log("Notification", "Now ignoring /stop"); }
         else if (line.StartsWith("/spam ")) { for (var n = 0; n < int.Parse(line[6..]); n++) Console.Error.WriteLine($"stderr line {n} " + new string('x', 200)); }
+        // список команд — как у настоящего: строки в разметке игры, без префикса времени
+        else if (line == "/help")
+        {
+            Log("Notification", "Handling Console Command /help");
+            Log("Notification", "Available commands:");
+            Console.WriteLine("");
+            Console.WriteLine("<code>/time </code> :  Get or set world time or time speed");
+            Console.WriteLine("<code>/tp <i>&lt;source&gt;</i> <i>&lt;target&gt;</i> </code> :  Teleport a player or entity to a location");
+            Console.WriteLine("<code>/genbackup <i>[filename]</i> </code> :  Creates a copy of the current save game in the Backups folder");
+        }
         else if (line == "/genbackup" || line.StartsWith("/genbackup "))
         {
             // имя задано — файл называется ровно так (настоящий сервер расширение не дописывает)

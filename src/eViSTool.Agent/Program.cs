@@ -65,6 +65,10 @@ var automationFile = ServerAutomation.FileFor(opts.ProfileId, opts.AgentsDir);
 var automationStamp = File.Exists(automationFile) ? File.GetLastWriteTimeUtc(automationFile) : default;
 var backups = new BackupStore(opts.DataPath, opts.BackupName);
 var files = new ServerFiles(opts.ProfileId, opts.DataPath, opts.BackupName, opts.AgentsDir); // для окна на другой машине
+// команды сервера — из его ответа на /help (с командами модов); помним между запусками, чтобы подсказки были сразу
+var commandsFile = ServerCommands.FileFor(opts.ProfileId, opts.AgentsDir);
+var commands = ServerCommands.Load(commandsFile).ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
+var commandsDirty = false;
 var mods = new ServerMods(opts.ProfileId, Path.GetDirectoryName(Path.GetFullPath(opts.ExePath)) ?? "", opts.DataPath);
 var scheduler = new BackupScheduler();
 scheduler.Seed(backups.List().FirstOrDefault(b => b.IsOwn)?.Time);
@@ -99,6 +103,18 @@ async Task RestartBySchedule()
     }
     _ = host.RestartAsync();
 }
+
+host.Console.LineAdded += line =>
+{
+    // ответ на /help — список команд для подсказок в консоли окна
+    if (line.Kind == ConsoleLineKind.Output && ServerCommands.TryParseHelpLine(line.Text, out var command))
+        lock (commands)
+            if (!commands.TryGetValue(command.Name, out var known) || known != command)
+            {
+                commands[command.Name] = command;
+                commandsDirty = true;
+            }
+};
 
 host.Console.LineAdded += line =>
 {
@@ -205,6 +221,7 @@ AgentStatus Status() => new()
     AutomationChangedAt = File.Exists(automationFile) ? File.GetLastWriteTimeUtc(automationFile) : null,
     ConfigChangedAt = File.Exists(files.ConfigPath) ? File.GetLastWriteTimeUtc(files.ConfigPath) : null,
     ModsChangedAt = mods.ChangedAt(),
+    CommandCount = commands.Count,
     RemoteError = remoteError,
 };
 
@@ -291,6 +308,7 @@ web.MapPost("/backups/restore", async (HttpContext ctx) =>
     await ReadName(ctx) is { Length: > 0 } name ? WhenStopped(() => files.Restore(name, DateTime.Now)) : Results.BadRequest());
 // моды сервера — для окна на другой машине: список, включение/выключение, удаление, установка присланного архива
 web.MapGet("/mods", () => Guard(mods.List));
+web.MapGet("/commands", () => { lock (commands) return Json(commands.Values.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ToList()); });
 web.MapPost("/mods/toggle", async (HttpContext ctx) =>
 {
     using var reader = new StreamReader(ctx.Request.Body);
@@ -520,6 +538,15 @@ try
 
         await ApplyRemoteAsync();
         scheduler.NotePlayers(players.Players.Count);
+        if (commandsDirty)
+        {
+            lock (commands)
+            {
+                commandsDirty = false;
+                try { ServerCommands.Save(commandsFile, commands.Values); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { commandsDirty = true; } // в следующий раз
+            }
+        }
         if (scheduler.IsDue(automation, DateTime.Now, host.State, host.StartedAt))
         {
             try
