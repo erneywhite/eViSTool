@@ -1,0 +1,20 @@
+name: Idea
+description: Suggest something new or an improvement
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: English or Russian — both are fine. / Можно писать по-русски.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: The task or the annoyance — what you do now and what gets in the way.
+      placeholder: "Every time a new game version comes out I have to …"
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could eViSTool help?
+      description: Your idea of how it could work. Rough is fine.
