@@ -1,3 +1,4 @@
+using eViSTool.Core.Profiles;
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Threading;
@@ -302,6 +303,14 @@ public sealed partial class CatalogViewModel : ObservableObject
             MessageBox.Show(Application.Current.MainWindow, Loc.T("catalog.noModId"), "eViSTool");
             return;
         }
+        // клиентский мод выделенному серверу ни к чему (не загружает): спросить. Серверный у игрока нужен одиночной игре
+        var kind = _main.ActiveProfile?.Model.Kind ?? ProfileKind.Client;
+        var side = ModSides.Parse(details.Mod?.Side ?? details.RawSide);
+        if (ModSides.IsUnneeded(side, kind)
+            && MessageBox.Show(Application.Current.MainWindow,
+                   Loc.T("catalog.clientOnlyAsk", details.Name),
+                   "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
         await _main.Mods.InstallFromCatalogAsync(id, details.Name, release);
     }
 }
@@ -353,6 +362,9 @@ public sealed partial class ModDetailsViewModel : ObservableObject
     public string? Logo { get; }
     public string Stats { get; }
     public string Side { get; }
+
+    /// <summary>Сторона, как её пишет модбаза («both» / «client» / «server»).</summary>
+    public string? RawSide => _item.Side;
     public string TagsText { get; }
     public string PageUrl { get; }
     public string Initials { get; }
