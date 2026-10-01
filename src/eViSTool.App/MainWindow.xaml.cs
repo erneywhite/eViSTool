@@ -12,6 +12,13 @@ public partial class MainWindow : Window
 
     private MainViewModel Vm => (MainViewModel)DataContext;
 
+    // профили добавляют и переименовывают на ходу, а выпадашка мерит себя по пунктам с прошлого раза:
+    // новый пункт оказывался за нижним краем, длинное имя — обрезанным. Перед открытием пункты строятся заново.
+    private void ProfileCombo_DropDownOpened(object? sender, EventArgs e)
+    {
+        if (sender is System.Windows.Controls.ComboBox combo) combo.Items.Refresh();
+    }
+
     // тёмный заголовок окна в цвет боковой колонки (Windows 11; на Windows 10 — просто тёмный)
     private void Window_SourceInitialized(object? sender, EventArgs e)
     {

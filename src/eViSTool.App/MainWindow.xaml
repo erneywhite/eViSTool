@@ -122,7 +122,8 @@
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="{local:Tr shell.activeProfile}" VerticalAlignment="Center" Margin="0,0,10,0"
                                    Foreground="{StaticResource Forest.Muted}" FontSize="12" />
-                        <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding ActiveProfile}" MinWidth="240">
+                        <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding ActiveProfile}" MinWidth="240"
+                                  DropDownOpened="ProfileCombo_DropDownOpened">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
                                     <TextBlock>
