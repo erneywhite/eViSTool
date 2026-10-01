@@ -55,7 +55,7 @@ It is portable: unzip it anywhere and run. Nothing is installed into the system 
 The game client needs the same runtime, so it is already there if you play Vintage Story.
 On a machine with only a dedicated server, Windows offers to download the runtime on the first start.
 
-> **"Windows protected your PC"?** eViSTool is not code-signed yet (it is being set up, see [Code signing policy](#code-signing-policy)),
+> **"Windows protected your PC"?** eViSTool is not code-signed yet (see [Code signing policy](#code-signing-policy)),
 > so SmartScreen may warn about an unknown publisher on the first start. Click **More info → Run anyway**.
 > The source code is open, and every release comes with a SHA-256 checksum.
 
@@ -271,9 +271,9 @@ the server process; `eViSTool.App` — WPF interface; `tests/eViSTool.Core.Tests
 
 ## Code signing policy
 
-Windows releases of eViSTool are to be signed with a free code signing certificate:
-free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
-Signing is being set up — releases up to and including 0.1.0 are not signed yet.
+eViSTool releases are not code-signed yet. The plan is free code signing for open-source projects —
+provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org) —
+once the project is known well enough to qualify for their program.
 
 Only binaries built by [GitHub Actions](https://github.com/erneywhite/eViSTool/actions/workflows/build.yml) from the source code
 in this repository are signed — never files built on a personal computer.
