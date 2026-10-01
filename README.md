@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/erneywhite/eViSTool/actions/workflows/build.yml"><img src="https://github.com/erneywhite/eViSTool/actions/workflows/build.yml/badge.svg" alt="Build"></a>
   <a href="https://github.com/erneywhite/eViSTool/releases/latest"><img src="https://img.shields.io/badge/download-latest%20release-2ea44f" alt="Download the latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License: GPL-3.0"></a>
   <a href="https://ko-fi.com/erneywhite"><img src="https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
