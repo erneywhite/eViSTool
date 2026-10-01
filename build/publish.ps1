@@ -31,7 +31,7 @@ if ($LASTEXITCODE) { throw "publish eViSTool.App: $LASTEXITCODE" }
 
 dotnet publish (Join-Path $root 'src/eViSTool.Agent') @common --self-contained true `
     '-p:EnableCompressionInSingleFile=true' '-p:IncludeNativeLibrariesForSelfExtract=true' `
-    '-p:PublishTrimmed=true' '-p:TrimMode=full' -o $out  # обрезка: ~17 МБ вместо ~50; что сохраняется целиком — в eViSTool.Agent.csproj
+    '-p:PublishTrimmed=true' '-p:TrimMode=full' '-p:EnableTrimAnalyzer=false' -o $out  # обрезка: ~17 МБ вместо ~50; что сохраняется целиком — в eViSTool.Agent.csproj
 if ($LASTEXITCODE) { throw "publish eViSTool.Agent: $LASTEXITCODE" }
 
 # в релиз — только сами программы; папку data программа создаст рядом при первом запуске

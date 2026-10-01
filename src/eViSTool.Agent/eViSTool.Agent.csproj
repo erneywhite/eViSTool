@@ -16,6 +16,11 @@
 
   <!-- релизный агент обрезается (PublishTrimmed в build/publish.ps1): из .NET и ASP.NET остаётся только используемое.
        Свой код и Newtonsoft.Json сохраняются целиком — JSON читается через рефлексию по нашим типам. -->
+  <PropertyGroup>
+    <!-- предупреждения обрезки — про Newtonsoft по нашим типам; они сохранены целиком (ниже), а CI проверяет
+         обрезанный агент тестами (EVISTOOL_TEST_AGENT) — поломку покажут тесты, а не предупреждение -->
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+  </PropertyGroup>
   <ItemGroup>
     <TrimmerRootAssembly Include="eViSTool.Agent" />
     <TrimmerRootAssembly Include="eViSTool.Core" />
