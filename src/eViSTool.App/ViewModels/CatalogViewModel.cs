@@ -100,6 +100,9 @@ public sealed partial class CatalogViewModel : ObservableObject
             new(Loc.T("catalog.installYes"), 1),
             new(Loc.T("catalog.installNo"), 2),
         ];
+        // фильтры из настроек ставим в поля напрямую, минуя свойства: их обработчики перезапускали бы поиск
+        // на каждом присваивании; окно узнаёт о значениях из OnPropertyChanged
+#pragma warning disable MVVMTK0034
         _selectedInstallFilter = InstallFilters.First(f => f.Value == install);
         OnPropertyChanged(nameof(SelectedInstallFilter));
 
@@ -107,6 +110,7 @@ public sealed partial class CatalogViewModel : ObservableObject
         _selectedSort = Sorts.First(s => s.Value == sort);
         _selectedBranch = Branches.FirstOrDefault(b => b.Value == branch) ?? Branches[0];
         _selectedTag = Tags.FirstOrDefault(t => t.Value == tag) ?? Tags[0];
+#pragma warning restore MVVMTK0034
         OnPropertyChanged(nameof(SelectedSide));
         OnPropertyChanged(nameof(SelectedSort));
         OnPropertyChanged(nameof(SelectedBranch));
@@ -266,7 +270,9 @@ public sealed partial class CatalogViewModel : ObservableObject
         if (keep is not null)
         {
             var again = Results.FirstOrDefault(r => r.Item.ModId == keep);
+#pragma warning disable MVVMTK0034 // намеренно мимо свойства: его обработчик перезагрузил бы карточку
             if (again is not null) SetProperty(ref _selected, again, nameof(Selected)); // без перезагрузки карточки
+#pragma warning restore MVVMTK0034
             else Selected = null;
         }
 

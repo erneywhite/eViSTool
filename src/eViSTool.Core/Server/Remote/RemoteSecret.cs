@@ -13,13 +13,16 @@ public static class RemoteSecret
 {
     private static readonly byte[] Entropy = "eViSTool remote connection code"u8.ToArray();
 
-    public static string Protect(ConnectionCode code) =>
-        Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(code.ToString()), Entropy, DataProtectionScope.CurrentUser));
+    public static string Protect(ConnectionCode code)
+    {
+        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("DPAPI"); // eViSTool — только под Windows
+        return Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(code.ToString()), Entropy, DataProtectionScope.CurrentUser));
+    }
 
     /// <summary>null — не расшифровать (другой пользователь или компьютер) или внутри не код.</summary>
     public static ConnectionCode? Unprotect(string? stored)
     {
-        if (string.IsNullOrWhiteSpace(stored)) return null;
+        if (string.IsNullOrWhiteSpace(stored) || !OperatingSystem.IsWindows()) return null;
         try
         {
             var text = Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(stored), Entropy, DataProtectionScope.CurrentUser));
