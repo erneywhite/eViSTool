@@ -127,7 +127,7 @@ public sealed class BackupTests : IDisposable
         Assert.Equal("current world", File.ReadAllText(safety.Path));
         Assert.Equal("journal of the current world", File.ReadAllText(safety.Path + "-wal"));
         Assert.False(store.Find(safety.Name)!.IsOwn);
-        Assert.Empty(store.Prune(1).Where(b => b.Name == safety.Name));
+        Assert.DoesNotContain(store.Prune(1), b => b.Name == safety.Name);
         Assert.True(File.Exists(backup.Path)); // сама копия остаётся
 
         // откат восстановления — тем же способом
