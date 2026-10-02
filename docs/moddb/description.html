@@ -1,0 +1,57 @@
+<p><img src="https://raw.githubusercontent.com/erneywhite/eViSTool/main/docs/screenshots/mods.png" alt="My mods" width="100%" /></p>
+
+<p>I play Vintage Story with a lot of mods and run a small server for friends, and I got tired of checking every mod for updates by hand, copying zips around and connecting to the server just to restart it. So I made <strong>eViSTool</strong>. It's one window where you can keep your mods up to date, grab new ones from the ModDB and look after your dedicated server.</p>
+<p>It's free, open source and portable: unzip it anywhere and run it. Nothing gets installed, nothing runs in the background when you don't need it.</p>
+
+<h2>Your mods</h2>
+<p>Hit <strong>Check</strong> and you'll see which mods have updates. Update one or all of them in one go. If an update breaks something, roll back to the version you had before &mdash; eViSTool keeps the old files around for exactly that. You can pin a mod to its current version or skip one particular release you don't want.</p>
+<p>It also warns you about the usual headaches before they bite: a missing or outdated dependency (one button fixes it), a duplicate mod, a version made for another game branch. And if you keep a separate mod set for a server, it tells you which mods are client-only and don't belong there.</p>
+<p>Want to share your setup with a friend? Save it as a modpack and send them one file.</p>
+
+<h2>The whole ModDB inside the app</h2>
+<p>Search, filter by tag, side and game version, sort by what's trending. Every mod shows its screenshots, description and all releases, and installs with one click &mdash; dependencies included.</p>
+
+<h2>Profiles</h2>
+<p>Keep several setups side by side: your main game, a separate mod set for a particular server, a test profile. Each has its own mods, settings and worlds, and the <strong>Play</strong> button starts the game with the one you picked.</p>
+
+<p><img src="https://raw.githubusercontent.com/erneywhite/eViSTool/main/docs/screenshots/server.png" alt="Server console" width="100%" /></p>
+
+<h2>Your dedicated server</h2>
+<p>Start, stop and restart it, watch the live console and type commands with hints &mdash; start typing <code>/</code> and eViSTool suggests the server's commands, including the ones added by mods, and Tab completes them.</p>
+<p>The server keeps running when you close the window, and if it crashes it comes back up on its own.</p>
+<p>Backups run on a schedule, old ones get cleaned up, and restoring one is a single click &mdash; together with the data some mods keep next to the world, like XLeveling's skill progress. Scheduled restarts warn players in chat beforehand and take a fresh backup right before restarting, just in case.</p>
+<p>There's also a proper editor for <code>serverconfig.json</code>: world settings, roles and privileges with checkboxes instead of hand-editing JSON.</p>
+
+<h2>Your server on another PC</h2>
+<p>If the server lives on a different computer (a spare PC, a VM, a rented box), turn on remote access there and you'll get a connection code. Paste it into eViSTool on your own PC, and you can manage that server just like a local one: console, config, backups, schedule, and its mods. The connection is encrypted, and there's nothing to set up beyond the code.</p>
+
+<h2>Getting started</h2>
+<ol>
+<li>Download the zip below (or from <a href="https://github.com/erneywhite/eViSTool/releases">GitHub</a>), unzip it anywhere and run <code>eViSTool.exe</code>.</li>
+<li>It finds the game and your mods by itself.</li>
+</ol>
+<p>You'll need Windows 10 or 11 and the .NET 10 Desktop Runtime. The game uses the same runtime, so if you play Vintage Story you already have it.</p>
+<p>The app isn't code-signed yet, so Windows may show <em>"Windows protected your PC"</em> the first time. Click <em>More info &rarr; Run anyway</em>. The source code is open if you'd like to look inside.</p>
+<p>eViSTool updates itself from GitHub and doesn't collect anything about you. It only talks to GitHub (updates), the ModDB (catalog and downloads), and your own server if you turn on remote access.</p>
+
+<h2>Links</h2>
+<ul>
+<li>Full guide and troubleshooting: <a href="https://github.com/erneywhite/eViSTool#readme">README on GitHub</a></li>
+<li>Found a bug or have an idea? <a href="https://github.com/erneywhite/eViSTool/issues">Tell me on GitHub</a></li>
+<li>If it saves you time and you'd like to say thanks: <a href="https://ko-fi.com/erneywhite">Ko-fi</a></li>
+</ul>
+<p>Thanks to Tekunogosu for <a href="https://github.com/Tekunogosu/Rustique">Rustique</a> (MIT) &mdash; the ModDB and version handling is based on it &mdash; and to THumbert for <a href="https://mods.vintagestory.at/show/mod/17652">ViSST</a>, which inspired the server side. eViSTool is licensed under GPL-3.0.</p>
+
+<hr />
+
+<h2>По-русски</h2>
+<p>Я играю в Vintage Story с кучей модов и держу небольшой сервер для друзей. Надоело проверять обновления каждого мода руками, таскать zip-файлы туда-сюда и лезть на сервер ради перезапуска, поэтому я сделал <strong>eViSTool</strong>. Это одно окно, где можно обновлять моды, ставить новые с модбазы и присматривать за своим выделенным сервером.</p>
+<p>Программа бесплатная, с открытым кодом и портативная: распаковал в любую папку и запустил. Интерфейс полностью на русском.</p>
+<ul>
+<li><strong>Моды:</strong> одна кнопка проверяет обновления, можно обновить всё разом, а если что-то сломалось &mdash; откатиться на прежнюю версию. Программа заранее подскажет про нехватку зависимостей (чинится одной кнопкой), дубликаты и версии не для твоей игры. Своим набором можно поделиться модпаком.</li>
+<li><strong>Каталог модбазы</strong> прямо в программе: поиск, фильтры, скриншоты, установка в один клик.</li>
+<li><strong>Профили:</strong> несколько сборок игры рядом, у каждой свои моды, настройки и миры. Кнопка «Играть» запускает нужную.</li>
+<li><strong>Сервер:</strong> консоль с подсказками команд, копии мира по расписанию (вместе с данными модов, например прогрессом XLeveling), перезапуски с предупреждением игроков в чате, удобный редактор конфига.</li>
+<li><strong>Сервер на другом компьютере:</strong> включаешь там удалённый доступ, вставляешь код у себя и управляешь им как своим. Соединение зашифровано.</li>
+</ul>
+<p>Скачай zip, распакуй и запусти <code>eViSTool.exe</code>. Подробная инструкция &mdash; в <a href="https://github.com/erneywhite/eViSTool/blob/main/README.ru.md">README на русском</a>.</p>
