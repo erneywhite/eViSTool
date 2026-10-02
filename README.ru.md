@@ -11,6 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/erneywhite/eViSTool/actions/workflows/build.yml"><img src="https://github.com/erneywhite/eViSTool/actions/workflows/build.yml/badge.svg" alt="Сборка"></a>
+  <a href="https://mods.vintagestory.at/evistool"><img src="https://img.shields.io/badge/ModDB-eViSTool-8a6d3b" alt="Страница на модбазе Vintage Story"></a>
   <a href="https://github.com/erneywhite/eViSTool/releases/latest"><img src="https://img.shields.io/badge/download-latest%20release-2ea44f" alt="Скачать последний релиз"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="Лицензия: GPL-3.0"></a>
   <a href="https://ko-fi.com/erneywhite"><img src="https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
@@ -48,7 +49,7 @@ eViSTool держит моды Vintage Story в актуальном состо�
 
 ## Начало работы
 
-1. Скачай `eViSTool-<версия>-win-x64.zip` в [Releases](https://github.com/erneywhite/eViSTool/releases).
+1. Скачай `eViSTool-<версия>-win-x64.zip` [со страницы на модбазе](https://mods.vintagestory.at/evistool) или в [Releases](https://github.com/erneywhite/eViSTool/releases) — файл один и тот же.
 2. Распакуй в любую удобную папку (не в папку игры) и запусти `eViSTool.exe`.
 3. Игру и моды eViSTool найдёт сам и откроет **«Мои моды»**.
    Если игра стоит в необычном месте — укажи её папку в **«Настройках»**.
