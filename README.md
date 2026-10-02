@@ -11,6 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/erneywhite/eViSTool/actions/workflows/build.yml"><img src="https://github.com/erneywhite/eViSTool/actions/workflows/build.yml/badge.svg" alt="Build"></a>
+  <a href="https://mods.vintagestory.at/evistool"><img src="https://img.shields.io/badge/ModDB-eViSTool-8a6d3b" alt="On the Vintage Story ModDB"></a>
   <a href="https://github.com/erneywhite/eViSTool/releases/latest"><img src="https://img.shields.io/badge/download-latest%20release-2ea44f" alt="Download the latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License: GPL-3.0"></a>
   <a href="https://ko-fi.com/erneywhite"><img src="https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
@@ -46,7 +47,7 @@ It is portable: unzip it anywhere and run. Nothing is installed into the system 
 
 ## Getting started
 
-1. Download `eViSTool-<version>-win-x64.zip` from [Releases](https://github.com/erneywhite/eViSTool/releases).
+1. Download `eViSTool-<version>-win-x64.zip` from the [ModDB page](https://mods.vintagestory.at/evistool) or from [Releases](https://github.com/erneywhite/eViSTool/releases) — it is the same file.
 2. Unzip it into any folder you like (not into the game folder) and run `eViSTool.exe`.
 3. eViSTool finds the game and your mods by itself and opens **My mods**.
    If the game is installed somewhere unusual, set its folder in **Settings**.
