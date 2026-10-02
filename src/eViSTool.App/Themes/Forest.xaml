@@ -206,6 +206,13 @@
     <!-- все кнопки по умолчанию — лесные; старые ссылки на AccentButtonStyle ведут на песочную -->
     <Style TargetType="Button" BasedOn="{StaticResource Forest.Button}" />
 
+    <!-- Fluent-шаблон выпадающего списка вешает на него меню текстового поля («Копировать / Вырезать / Вставить»),
+         хотя вводить туда нечего — у выпадашек без ввода текста его нет -->
+    <Style x:Key="Forest.ComboBox" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+        <Setter Property="ContextMenuService.IsEnabled" Value="False" />
+    </Style>
+    <Style TargetType="ComboBox" BasedOn="{StaticResource Forest.ComboBox}" />
+
     <Style x:Key="Forest.PrimaryButton" TargetType="Button" BasedOn="{StaticResource Forest.Button}">
         <Setter Property="Background" Value="{StaticResource Forest.Accent}" />
         <Setter Property="BorderBrush" Value="{StaticResource Forest.Accent}" />
