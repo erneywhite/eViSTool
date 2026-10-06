@@ -254,6 +254,92 @@ public sealed class ProfileClonerTests : IDisposable
         Assert.Equal(["Mods", Path.Combine(_data, "Mods")], Config(to2)["ModPaths"]!.Select(t => t.ToString()));
     }
 
+    // ---------- сбои: в папке назначения ничего чужого не трогается (аудит, пункт 7) ----------
+
+    /// <summary>Временные папки клонирования рядом с назначением (после сбоя их быть не должно).</summary>
+    private static string[] Stages(string to) =>
+        Directory.GetDirectories(Path.GetDirectoryName(to)!, "." + Path.GetFileName(to) + ".evistool-clone-*");
+
+    [Fact]
+    public async Task FileThatAppearedAfterThePlan_IsKept_AndTheCloneIsRefused()
+    {
+        var to = Target("appeared");
+        var plan = ProfileCloner.Plan(_source, new CloneOptions { Name = "A", TargetDir = to });
+        Directory.CreateDirectory(to);
+        File.WriteAllText(Path.Combine(to, "mine.txt"), "моё");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => ProfileCloner.ApplyAsync(plan));
+
+        Assert.Equal(["mine.txt"], Directory.EnumerateFileSystemEntries(to).Select(Path.GetFileName));
+        Assert.Equal("моё", File.ReadAllText(Path.Combine(to, "mine.txt")));
+        Assert.Empty(Stages(to));
+    }
+
+    [Fact]
+    public async Task FileThatAppearsWhileCopying_IsKept_AndTheCloneIsRefused()
+    {
+        var to = Target("during");
+        var plan = ProfileCloner.Plan(_source, new CloneOptions { Name = "D", TargetDir = to });
+        var progress = new SyncProgress(_ =>
+        {
+            if (File.Exists(Path.Combine(to, "mine.txt"))) return;
+            Directory.CreateDirectory(to);
+            File.WriteAllText(Path.Combine(to, "mine.txt"), "моё");
+        });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => ProfileCloner.ApplyAsync(plan, progress));
+
+        Assert.Equal(["mine.txt"], Directory.EnumerateFileSystemEntries(to).Select(Path.GetFileName));
+        Assert.Empty(Stages(to));
+    }
+
+    [Fact]
+    public async Task Cancelled_KeepsWhatAppearedInTheTarget()
+    {
+        var to = Target("cancel-keep");
+        var plan = ProfileCloner.Plan(_source, new CloneOptions { Name = "C", TargetDir = to });
+        Directory.CreateDirectory(to);
+        File.WriteAllText(Path.Combine(to, "mine.txt"), "моё");
+        using var cts = new CancellationTokenSource();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ProfileCloner.ApplyAsync(plan, new SyncProgress(_ => cts.Cancel()), cts.Token));
+
+        Assert.Equal("моё", File.ReadAllText(Path.Combine(to, "mine.txt")));
+        Assert.Empty(Stages(to));
+    }
+
+    [Fact]
+    public async Task UnreadableSourceFile_FailsWithoutTouchingTheTarget()
+    {
+        var to = Target("locked");
+        var plan = ProfileCloner.Plan(_source, new CloneOptions { Name = "L", TargetDir = to });
+        Directory.CreateDirectory(to);
+        File.WriteAllText(Path.Combine(to, "mine.txt"), "моё");
+
+        // файл исходного профиля занят без права чтения (отказ доступа)
+        using (new FileStream(Path.Combine(_data, "ModConfig", "carryon.json"), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            await Assert.ThrowsAnyAsync<IOException>(() => ProfileCloner.ApplyAsync(plan));
+
+        Assert.Equal(["mine.txt"], Directory.EnumerateFileSystemEntries(to).Select(Path.GetFileName));
+        Assert.Empty(Stages(to));
+    }
+
+    [Fact]
+    public async Task EmptyTargetFolder_IsUsed_AndLeftoversOfAnInterruptedCloneAreCleaned()
+    {
+        var to = Target("empty");
+        Directory.CreateDirectory(to);
+        var leftover = Directory.CreateDirectory(Path.Combine(_root, ".empty.evistool-clone-dead0000")).FullName; // процесс убили
+        File.WriteAllText(Path.Combine(leftover, "half.bin"), "x");
+        var other = Directory.CreateDirectory(Path.Combine(_root, ".other.evistool-clone-dead0000")).FullName; // чужая цель — не наша
+
+        await ProfileCloner.ApplyAsync(ProfileCloner.Plan(_source, new CloneOptions { Name = "E", TargetDir = to }));
+
+        Assert.True(File.Exists(Path.Combine(to, "serverconfig.json")));
+        Assert.Empty(Stages(to));
+        Assert.True(Directory.Exists(other));
+    }
+
     private sealed class SyncProgress(Action<CloneProgress> action) : IProgress<CloneProgress>
     {
         public void Report(CloneProgress value) => action(value);

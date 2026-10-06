@@ -356,6 +356,7 @@
   "clone.copySuffix": "{0} (copy)",
   "clone.copying": "Copying {0}… {1} of {2}",
   "clone.done": "Profile «{0}» created: {1}",
+  "clone.errAppeared": "Something appeared in the new profile folder while copying: {0}\nIts contents were not touched and the copy was not put in place. Choose an empty or new folder.",
   "clone.errName": "Enter a name for the new profile.",
   "clone.errNested": "The new folder must not be the source folder or lie inside it (or contain it).",
   "clone.errNoSource": "The data folder of the source profile was not found: {0}",

@@ -228,7 +228,8 @@ public partial class CloneProfileWindow : Window
         {
             Finish(Loc.T("clone.cancelled"));
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Newtonsoft.Json.JsonException
+                                       or InvalidOperationException) // в папке назначения что-то появилось — копия не поставлена
         {
             Finish(Loc.T("clone.failed", ex.Message));
         }

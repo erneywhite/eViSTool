@@ -73,6 +73,33 @@ public sealed class ClientProfileClonerTests : IDisposable
         JObject.Parse(File.ReadAllText(Path.Combine(dir, file)))["stringListSettings"]!["modPaths"]!.Select(t => t.ToString()).ToList();
 
     [Fact]
+    public async Task FileThatAppearedAfterThePlan_IsKept_AndTheCloneIsRefused()
+    {
+        var dir = ClientProfileLayout.SuggestDir(_data, "appeared");
+        var plan = ClientProfileCloner.Plan(_source, new ClientCloneOptions { Name = "appeared", TargetDir = dir, Mods = ClientModsMode.Copy });
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "mine.txt"), "моё");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => ClientProfileCloner.ApplyAsync(plan));
+
+        Assert.Equal(["mine.txt"], Directory.EnumerateFileSystemEntries(dir).Select(Path.GetFileName));
+        Assert.Empty(Directory.GetDirectories(Path.GetDirectoryName(dir)!, ".appeared.evistool-clone-*"));
+    }
+
+    [Fact]
+    public async Task UnreadableSourceFile_FailsWithoutLeavingAnything()
+    {
+        var dir = ClientProfileLayout.SuggestDir(_data, "locked");
+        var plan = ClientProfileCloner.Plan(_source, new ClientCloneOptions { Name = "locked", TargetDir = dir, Mods = ClientModsMode.Copy });
+
+        using (new FileStream(Path.Combine(_data, "Mods", "carryon_1.0.0.zip"), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            await Assert.ThrowsAnyAsync<IOException>(() => ClientProfileCloner.ApplyAsync(plan));
+
+        Assert.False(Directory.Exists(dir));
+        Assert.Empty(Directory.GetDirectories(Path.GetDirectoryName(dir)!, ".locked.evistool-clone-*"));
+    }
+
+    [Fact]
     public async Task SharedMods_CopiedSettings_NoWorlds()
     {
         var (profile, dir) = await Clone("Тест модов", ClientModsMode.Shared);

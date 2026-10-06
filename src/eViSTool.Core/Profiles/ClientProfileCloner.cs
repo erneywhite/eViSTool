@@ -152,22 +152,16 @@ public static class ClientProfileCloner
         };
     }
 
-    /// <summary>Скопировать по плану и вернуть новый профиль. При отмене или ошибке недокопированная папка удаляется.</summary>
+    /// <summary>Скопировать по плану и вернуть новый профиль. При отмене или ошибке в папке назначения ничего не трогается.</summary>
     public static async Task<GameProfile> ApplyAsync(ClientClonePlan plan, IProgress<CloneProgress>? progress = null, CancellationToken ct = default)
     {
         var to = Full(plan.Options.TargetDir);
-        try
+        // во временной папке рядом, на место — переименованием; сбой убирает только её (см. ProfileCloner.StageAsync)
+        await ProfileCloner.StageAsync(to, async stage =>
         {
-            await ProfileCloner.CopyAsync(plan.Files, plan.Directories, to, progress, ct).ConfigureAwait(false);
-            WriteSettings(plan, to);
-        }
-        catch
-        {
-            // папка была пустой или не существовала — внутри только то, что успели скопировать мы
-            try { if (Directory.Exists(to)) Directory.Delete(to, recursive: true); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
-            throw;
-        }
+            await ProfileCloner.CopyAsync(plan.Files, plan.Directories, stage, progress, ct).ConfigureAwait(false);
+            WriteSettings(plan, to, stage);
+        }).ConfigureAwait(false);
 
         return new GameProfile
         {
@@ -184,9 +178,9 @@ public static class ClientProfileCloner
     /// Настройки нового профиля. Игра ищет моды только в папках из modPaths, поэтому список пишем сами: встроенная
     /// папка игры («Mods») остаётся, дальше — папки модов нового профиля.
     /// </summary>
-    private static void WriteSettings(ClientClonePlan plan, string to)
+    private static void WriteSettings(ClientClonePlan plan, string to, string writeTo)
     {
-        var settings = Path.Combine(to, plan.SettingsName);
+        var settings = Path.Combine(writeTo, plan.SettingsName); // пути внутри — на итоговую папку to
         if (plan.Options.CopySettings && plan.SettingsPath is not null)
         {
             var root = ModConfigEditor.Load(plan.SettingsPath);
@@ -208,7 +202,7 @@ public static class ClientProfileCloner
         if (single["ModPaths"] is JArray) single["ModPaths"] = ModPaths(single["ModPaths"], plan);
         if (single["WorldConfig"] is JObject world && world["SaveFileLocation"] is JValue { Type: JTokenType.String } save)
             world["SaveFileLocation"] = ProfileCloner.RebasePath(save.ToString(), from, to);
-        ModConfigEditor.Save(Path.Combine(to, SinglePlayerConfig), single);
+        ModConfigEditor.Save(Path.Combine(writeTo, SinglePlayerConfig), single);
     }
 
     /// <summary>Относительные записи (встроенная папка игры) — как были, вместо остальных — папки модов нового профиля.</summary>

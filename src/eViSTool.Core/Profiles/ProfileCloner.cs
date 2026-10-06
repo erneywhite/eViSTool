@@ -170,24 +170,20 @@ public static class ProfileCloner
         return new ClonePlan { Source = source, Options = options, Files = files, Directories = dirs, ConfigPath = configPath, TargetSave = targetSave };
     }
 
-    /// <summary>Скопировать по плану и вернуть новый профиль. При отмене или ошибке недокопированная папка удаляется.</summary>
+    /// <summary>
+    /// Скопировать по плану и вернуть новый профиль. Копия собирается во временной папке рядом и встаёт на место
+    /// одним переименованием; при отмене или ошибке удаляется только она — в папке назначения ничего не трогается.
+    /// </summary>
     public static async Task<GameProfile> ApplyAsync(ClonePlan plan, IProgress<CloneProgress>? progress = null, CancellationToken ct = default)
     {
         var from = Path.GetFullPath(plan.Source.DataDir!).TrimEnd('\\', '/');
         var to = Path.GetFullPath(plan.Options.TargetDir).TrimEnd('\\', '/');
 
-        try
+        await StageAsync(to, async stage =>
         {
-            await CopyAsync(plan.Files, plan.Directories, to, progress, ct).ConfigureAwait(false);
-            if (plan.ConfigPath is not null) WriteConfig(plan, from, to);
-        }
-        catch
-        {
-            // папка была пустой или не существовала — внутри только то, что успели скопировать мы
-            try { if (Directory.Exists(to)) Directory.Delete(to, recursive: true); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
-            throw;
-        }
+            await CopyAsync(plan.Files, plan.Directories, stage, progress, ct).ConfigureAwait(false);
+            if (plan.ConfigPath is not null) WriteConfig(plan, from, to, stage);
+        }).ConfigureAwait(false);
 
         return new GameProfile
         {
@@ -198,6 +194,50 @@ public static class ProfileCloner
             PinnedMods = new(plan.Source.PinnedMods, StringComparer.OrdinalIgnoreCase),
             BlockedVersions = plan.Source.BlockedVersions.ToDictionary(kv => kv.Key, kv => kv.Value.ToList(), StringComparer.OrdinalIgnoreCase),
         };
+    }
+
+    private const string StageMarker = ".evistool-clone-";
+    private const string StageLock = ".evistool-clone.lock";
+
+    /// <summary>
+    /// Собрать новую папку профиля во временной «.&lt;имя&gt;.evistool-clone-&lt;id&gt;» рядом с назначением (тот же диск)
+    /// и поставить на место переименованием. Назначение к этому моменту должно быть пустым или отсутствовать: появилось
+    /// в нём что-то, пока шло копирование, — отказ, назначение не трогаем. При любом сбое удаляется только своя
+    /// временная папка. Оставшиеся от оборванных прошлых попыток (процесс убит) убираются здесь же; идущая сейчас
+    /// чужая попытка держит в своей папке замок, и её папку удалить не выйдет.
+    /// </summary>
+    internal static async Task StageAsync(string to, Func<string, Task> fill)
+    {
+        var parent = Path.GetDirectoryName(to) ?? throw new InvalidOperationException(Loc.T("clone.errNoTarget"));
+        var prefix = "." + Path.GetFileName(to) + StageMarker;
+        Directory.CreateDirectory(parent);
+        foreach (var old in Directory.EnumerateDirectories(parent, prefix + "*"))
+            try { Directory.Delete(old, recursive: true); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+
+        var stage = Path.Combine(parent, prefix + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(stage);
+        File.SetAttributes(stage, File.GetAttributes(stage) | FileAttributes.Hidden);
+        try
+        {
+            var lockPath = Path.Combine(stage, StageLock);
+            using (new FileStream(lockPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None))
+                await fill(stage).ConfigureAwait(false);
+            File.Delete(lockPath);
+            File.SetAttributes(stage, File.GetAttributes(stage) & ~FileAttributes.Hidden);
+
+            // назначение проверяется сейчас, а не по плану: за время копирования в нём могло что-то появиться
+            if (File.Exists(to) || (Directory.Exists(to) && Directory.EnumerateFileSystemEntries(to).Any()))
+                throw new InvalidOperationException(Loc.T("clone.errAppeared", to));
+            if (Directory.Exists(to)) Directory.Delete(to); // пустая; не пустая — упадёт, а не удалит чужое
+            Directory.Move(stage, to);
+        }
+        catch
+        {
+            try { if (Directory.Exists(stage)) Directory.Delete(stage, recursive: true); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            throw;
+        }
     }
 
     /// <summary>Создать папку профиля и скопировать в неё файлы по плану (общее для серверных и клиентских профилей).</summary>
@@ -233,7 +273,7 @@ public static class ProfileCloner
     }
 
     /// <summary>serverconfig.json клона: пути — на новую папку; для нового мира — свой файл сохранения, пустой сид, своё имя.</summary>
-    private static void WriteConfig(ClonePlan plan, string from, string to)
+    private static void WriteConfig(ClonePlan plan, string from, string to, string writeTo)
     {
         var root = ModConfigEditor.Load(plan.ConfigPath!);
 
@@ -260,7 +300,7 @@ public static class ProfileCloner
             }
         }
 
-        ModConfigEditor.Save(Path.Combine(to, MainConfig), root);
+        ModConfigEditor.Save(Path.Combine(writeTo, MainConfig), root); // пути в нём — на итоговую папку
     }
 
     /// <summary>
