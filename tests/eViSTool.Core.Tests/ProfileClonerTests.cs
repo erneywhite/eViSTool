@@ -246,12 +246,81 @@ public sealed class ProfileClonerTests : IDisposable
         // путь, записанный под другим пользователем, стал настоящим путём к модам исходного профиля
         Assert.Equal(["Mods", Path.Combine(_data, "Mods")], Config(to)["ModPaths"]!.Select(t => t.ToString()));
 
-        // клон общего профиля остаётся на тех же общих модах
+        // клон общего профиля со «своей копией» — действительно свой: моды общей папки скопированы к нему,
+        // и его конфиг на общую папку больше не ссылается (аудит, пункт 8)
         var shared = new GameProfile { Name = "shared", Kind = ProfileKind.Server, DataDir = to };
         var to2 = ProfileCloner.SuggestTargetDir(to, "second");
         await ProfileCloner.ApplyAsync(ProfileCloner.Plan(shared, new CloneOptions { Name = "second", TargetDir = to2, NewWorld = true }));
         Assert.Equal(Path.Combine(_data, "ServerProfiles", "second"), to2);
-        Assert.Equal(["Mods", Path.Combine(_data, "Mods")], Config(to2)["ModPaths"]!.Select(t => t.ToString()));
+        Assert.Equal(["Mods", Path.Combine(to2, "Mods")], Config(to2)["ModPaths"]!.Select(t => t.ToString()));
+        Assert.Equal("mod", File.ReadAllText(Path.Combine(to2, "Mods", "carryon.zip")));
+
+        // а «общие моды» у клона общего профиля — те же общие
+        var to3 = ProfileCloner.SuggestTargetDir(to, "third");
+        await ProfileCloner.ApplyAsync(ProfileCloner.Plan(shared, new CloneOptions { Name = "third", TargetDir = to3, NewWorld = true, ShareMods = true }));
+        Assert.Equal(["Mods", Path.Combine(_data, "Mods")], Config(to3)["ModPaths"]!.Select(t => t.ToString()));
+    }
+
+    // ---------- своя копия модов — действительно своя (аудит, пункт 8) ----------
+
+    /// <summary>Конфиг источника с такими ModPaths (остальное — как было).</summary>
+    private void SetModPaths(params string[] paths)
+    {
+        var config = Config(_data);
+        config["ModPaths"] = new JArray(paths);
+        File.WriteAllText(Path.Combine(_data, "serverconfig.json"), config.ToString());
+    }
+
+    private string External(string rel, string text)
+    {
+        var path = Path.Combine(_root, "shared-mods", rel);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, text);
+        return Path.GetDirectoryName(path)!;
+    }
+
+    [Fact]
+    public async Task OwnCopy_GathersModsFromExternalFolders_AndTheCloneNoLongerPointsThere()
+    {
+        var external = External("library.zip", "lib");
+        SetModPaths("Mods", Path.Combine(_data, "Mods"), external);
+        var to = Target("own");
+
+        var plan = ProfileCloner.Plan(_source, new CloneOptions { Name = "own", TargetDir = to });
+        Assert.Equal([Path.Combine(_data, "Mods"), external], plan.ModSources);
+        Assert.Empty(plan.ModNotes);
+        await ProfileCloner.ApplyAsync(plan);
+
+        Assert.Equal(["carryon.zip", "library.zip"], Directory.GetFiles(Path.Combine(to, "Mods")).Select(Path.GetFileName).Order());
+        Assert.Equal(["Mods", Path.Combine(to, "Mods")], Config(to)["ModPaths"]!.Select(t => t.ToString()));
+
+        // мод, поставленный в клон, к источнику не попадает
+        File.WriteAllText(Path.Combine(to, "Mods", "new.zip"), "new");
+        Assert.False(File.Exists(Path.Combine(external, "new.zip")));
+        Assert.False(File.Exists(Path.Combine(_data, "Mods", "new.zip")));
+    }
+
+    [Fact]
+    public async Task OwnCopy_NameClashes_AreNotSilentlyDropped()
+    {
+        External("carryon.zip", "mod");          // тот же файл, что в своей папке источника — копируется один раз
+        var external = External("extra.zip", "внешний");
+        Write("Mods/extra.zip", "свой");          // другой файл с тем же именем — оба
+        var missing = Path.Combine(_root, "нет-такой");
+        SetModPaths("Mods", Path.Combine(_data, "Mods"), external, missing);
+        var to = Target("clash");
+
+        var plan = ProfileCloner.Plan(_source, new CloneOptions { Name = "clash", TargetDir = to });
+        Assert.Equal(3, plan.ModNotes.Count); // дубль, переименование, нет папки
+        Assert.Contains(plan.ModNotes, n => n.Contains("carryon.zip"));
+        Assert.Contains(plan.ModNotes, n => n.Contains("extra (2).zip"));
+        Assert.Contains(plan.ModNotes, n => n.Contains(missing));
+        await ProfileCloner.ApplyAsync(plan);
+
+        var mods = Path.Combine(to, "Mods");
+        Assert.Equal(["carryon.zip", "extra (2).zip", "extra.zip"], Directory.GetFiles(mods).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+        Assert.Equal("свой", File.ReadAllText(Path.Combine(mods, "extra.zip")));
+        Assert.Equal("внешний", File.ReadAllText(Path.Combine(mods, "extra (2).zip")));
     }
 
     // ---------- сбои: в папке назначения ничего чужого не трогается (аудит, пункт 7) ----------

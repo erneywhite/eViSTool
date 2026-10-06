@@ -174,12 +174,19 @@ public partial class CloneProfileWindow : Window
 
         var free = FreeSpace(options.TargetDir);
         Summary.Text = Loc.T("clone.summary", plan.Files.Count, Sizes.Format(plan.TotalBytes), free is { } f ? Sizes.Format(f) : "—")
+                       + ModsText(plan.ModSources, plan.ModNotes)
                        + " " + Loc.T("clone.summarySkipped");
         var noSpace = free is { } available && available < plan.TotalBytes;
         ShowError(noSpace ? Loc.T("clone.noSpace") : _notice);
         _plan = plan;
         GoButton.IsEnabled = !noSpace && !_serverRunning;
     }
+
+    /// <summary>Своя копия модов: откуда соберутся и что не один к одному (дубли, переименования, нет папки).</summary>
+    internal static string ModsText(IReadOnlyList<string> sources, IReadOnlyList<string> notes) =>
+        sources.Count == 0 && notes.Count == 0 ? ""
+            : Environment.NewLine + Loc.T("clone.modsFrom", string.Join(", ", sources))
+              + string.Concat(notes.Select(n => Environment.NewLine + "• " + n));
 
     private void ShowError(string? text)
     {

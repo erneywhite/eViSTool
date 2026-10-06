@@ -54,6 +54,12 @@ public sealed record ClientClonePlan
 
     /// <summary>Моды общие с исходным профилем (ModDirs — его папки), а не своя папка Mods.</summary>
     public bool SharedMods { get; init; }
+
+    /// <summary>Своя копия модов: из каких папок исходного профиля они соберутся.</summary>
+    public IReadOnlyList<string> ModSources { get; init; } = [];
+
+    /// <summary>Что при сборке модов пошло не один к одному: дубли, переименования, отсутствующие папки.</summary>
+    public IReadOnlyList<string> ModNotes { get; init; } = [];
 }
 
 /// <summary>
@@ -123,19 +129,17 @@ public static class ClientProfileCloner
 
         // общие моды — только если у исходного профиля есть откуда их брать
         var shared = options.Mods == ClientModsMode.Shared && resolved.ModDirs.Count > 0;
+        CloneModsPlan? mods = null;
         if (!shared)
         {
             dirs.Add(ModsDir);
             if (options.Mods == ClientModsMode.Copy)
             {
-                // моды исходного профиля могут лежать в нескольких папках (и не в его папке данных) — собираем в одну
-                var seen = new HashSet<string>(files.Select(f => f.Relative), StringComparer.OrdinalIgnoreCase);
-                foreach (var modDir in resolved.ModDirs.Where(Directory.Exists))
-                {
-                    var found = new List<CloneFile>();
-                    AddTree(found, dirs, modDir, ModsDir);
-                    files.AddRange(found.Where(f => seen.Add(f.Relative)));
-                }
+                // моды исходного профиля могут лежать в нескольких папках (и не в его папке данных) — собираем в одну,
+                // совпадения имён не теряются (см. CloneMods)
+                mods = CloneMods.Collect(resolved.ModDirs, ModsDir);
+                files.AddRange(mods.Files);
+                dirs.AddRange(mods.Directories);
             }
         }
 
@@ -148,6 +152,8 @@ public static class ClientProfileCloner
             SettingsPath = resolved.ConfigPath,
             SettingsName = resolved.ConfigPath is { } path ? Path.GetFileName(path) : DefaultSettingsName,
             ModDirs = shared ? resolved.ModDirs : [Path.Combine(to, ModsDir)],
+            ModSources = mods?.Sources ?? [],
+            ModNotes = mods?.Notes ?? [],
             SharedMods = shared,
         };
     }

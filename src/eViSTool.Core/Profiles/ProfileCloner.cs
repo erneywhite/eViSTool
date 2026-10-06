@@ -55,6 +55,12 @@ public sealed record ClonePlan
 
     /// <summary>Куда в клоне будет смотреть SaveFileLocation.</summary>
     public string? TargetSave { get; init; }
+
+    /// <summary>Своя копия модов: из каких папок исходного профиля они соберутся (пусто — моды общие).</summary>
+    public IReadOnlyList<string> ModSources { get; init; } = [];
+
+    /// <summary>Что при сборке модов пошло не один к одному: дубли, переименования, отсутствующие папки.</summary>
+    public IReadOnlyList<string> ModNotes { get; init; } = [];
 }
 
 public sealed record CloneProgress(long DoneBytes, long TotalBytes, string File);
@@ -134,7 +140,8 @@ public static class ProfileCloner
             {
                 if (AlwaysSkipped.Contains(name, StringComparer.OrdinalIgnoreCase)) continue;
                 if (BackupDirs.Contains(name, StringComparer.OrdinalIgnoreCase) && (options.NewWorld || !options.IncludeBackups)) continue;
-                if (options.ShareMods && string.Equals(name, ModsDir, StringComparison.OrdinalIgnoreCase)) continue;
+                // моды — отдельно, ниже: общие не копируются, своя копия собирается из всех папок, что читает сервер
+                if (string.Equals(name, ModsDir, StringComparison.OrdinalIgnoreCase)) continue;
                 if (string.Equals(name, SavesDir, StringComparison.OrdinalIgnoreCase))
                 {
                     if (!options.NewWorld) AddSaves(files, entry, from, sourceSave);
@@ -167,7 +174,31 @@ public static class ProfileCloner
                 files.Add(new CloneFile(part, Path.Combine(SavesDir, Path.GetFileName(part)), new FileInfo(part).Length));
         }
 
-        return new ClonePlan { Source = source, Options = options, Files = files, Directories = dirs, ConfigPath = configPath, TargetSave = targetSave };
+        CloneModsPlan? mods = null;
+        if (!options.ShareMods)
+        {
+            mods = CloneMods.Collect(UsedModDirs(configPath, from), ModsDir);
+            files.AddRange(mods.Files);
+            dirs.AddRange(mods.Directories);
+        }
+
+        return new ClonePlan
+        {
+            Source = source, Options = options, Files = files, Directories = dirs.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            ConfigPath = configPath, TargetSave = targetSave, ModSources = mods?.Sources ?? [], ModNotes = mods?.Notes ?? [],
+        };
+    }
+
+    /// <summary>
+    /// Папки модов, которые читает сервер с этим конфигом: все абсолютные пути из ModPaths (записанные под другим
+    /// пользователем — как они есть на этой машине); относительные — папки игры, их не копируем. Конфига нет — «Mods».
+    /// </summary>
+    private static IEnumerable<string> UsedModDirs(string? configPath, string from)
+    {
+        if (configPath is null) return [Path.Combine(from, ModsDir)];
+        return (ModConfigEditor.Load(configPath)["ModPaths"] as JArray ?? [])
+            .Where(t => t.Type == JTokenType.String && Path.IsPathRooted(t.ToString()))
+            .Select(t => RealPath(t.ToString(), from));
     }
 
     /// <summary>
@@ -279,9 +310,17 @@ public static class ProfileCloner
 
         if (root["ModPaths"] is JArray paths)
         {
-            for (var i = 0; i < paths.Count; i++)
-                if (paths[i].Type == JTokenType.String)
-                    paths[i] = plan.Options.ShareMods ? RealPath(paths[i].ToString(), from) : RebasePath(paths[i].ToString(), from, to);
+            if (plan.Options.ShareMods)
+            {
+                for (var i = 0; i < paths.Count; i++)
+                    if (paths[i].Type == JTokenType.String) paths[i] = RealPath(paths[i].ToString(), from);
+            }
+            else
+            {
+                // своя копия: все внешние папки собраны в одну свою — клон ни на что чужое не ссылается
+                var relative = paths.Where(p => p.Type == JTokenType.String && !Path.IsPathRooted(p.ToString())).Select(p => p.ToString());
+                root["ModPaths"] = paths = new JArray(relative.Append(Path.Combine(to, ModsDir)).Distinct(StringComparer.OrdinalIgnoreCase));
+            }
 
             // общие моды: папка модов исходного профиля должна быть в списке, даже если конфиг на неё не ссылался
             var shared = Path.Combine(from, ModsDir);

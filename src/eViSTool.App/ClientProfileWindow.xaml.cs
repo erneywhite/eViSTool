@@ -169,6 +169,7 @@ public partial class ClientProfileWindow : Window
 
         var free = FreeSpace(options.TargetDir);
         Summary.Text = Loc.T("clone.summary", plan.Files.Count, Sizes.Format(plan.TotalBytes), free is { } f ? Sizes.Format(f) : "—")
+                       + CloneProfileWindow.ModsText(plan.ModSources, plan.ModNotes)
                        + " " + Loc.T("cprofile.summarySkipped");
         var noSpace = free is { } available && available < plan.TotalBytes;
         ShowError(noSpace ? Loc.T("clone.noSpace") : _notice);

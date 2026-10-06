@@ -169,6 +169,30 @@ public sealed class ClientProfileClonerTests : IDisposable
     }
 
     [Fact]
+    public async Task OwnCopy_ADifferentModWithTheSameName_IsKeptUnderAnotherName()
+    {
+        // вторая папка модов источника: тот же carryon (одинаковый) и другой файл под именем, что уже есть
+        var extra = Directory.CreateDirectory(Path.Combine(_root, "more-mods")).FullName;
+        File.WriteAllText(Path.Combine(extra, "carryon_1.0.0.zip"), "carryon");
+        File.WriteAllText(Path.Combine(extra, "Mods.rar"), "other");
+        Directory.CreateDirectory(Path.Combine(extra, "unpacked"));
+        File.WriteAllText(Path.Combine(extra, "unpacked", "modinfo.json"), "{ \"other\": true }");
+        var settings = JObject.Parse(File.ReadAllText(Path.Combine(_data, "myclientsettings.json")));
+        ((JArray)settings["stringListSettings"]!["modPaths"]!).Add(extra);
+        File.WriteAllText(Path.Combine(_data, "myclientsettings.json"), settings.ToString());
+
+        var dir = ClientProfileLayout.SuggestDir(_data, "clash");
+        var plan = ClientProfileCloner.Plan(_source, new ClientCloneOptions { Name = "clash", TargetDir = dir, Mods = ClientModsMode.Copy });
+        Assert.Equal(2, plan.ModNotes.Count); // carryon — дубль; unpacked — другая папка с тем же именем
+        await ClientProfileCloner.ApplyAsync(plan);
+
+        var mods = Path.Combine(dir, "Mods");
+        Assert.Equal(["Mods.rar", "carryon_1.0.0.zip"], Directory.GetFiles(mods).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+        Assert.Equal("{}", File.ReadAllText(Path.Combine(mods, "unpacked", "modinfo.json")));
+        Assert.Contains("other", File.ReadAllText(Path.Combine(mods, "unpacked (2)", "modinfo.json")));
+    }
+
+    [Fact]
     public async Task EmptyMods_CleanSettings_LeavesOnlyAnEmptyModsFolder()
     {
         var (profile, dir) = await Clone("С нуля", ClientModsMode.Empty, settings: false);
