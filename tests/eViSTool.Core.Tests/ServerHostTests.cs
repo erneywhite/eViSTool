@@ -140,6 +140,57 @@ public sealed class ServerHostTests : IAsyncLifetime
         Assert.True(host.Console.GetSince(0, 10000).Count(l => l.Kind == ConsoleLineKind.Error) >= 4000);
         await host.StopAsync();
     }
+    // ---------- неудачный запуск (аудит, пункт 11) ----------
+
+    /// <summary>Мир свободен (сервер не держит замок).</summary>
+    private bool WorldIsFree()
+    {
+        using var probe = WorldLock.TryTake(_data, WorldLock.Copy);
+        return probe is not null;
+    }
+
+    [Fact]
+    public async Task BrokenExe_FailsCleanly_AndAFixedOneStartsWithoutANewHost()
+    {
+        var game = Directory.CreateDirectory(Path.Combine(_data, "game")).FullName;
+        var exe = Path.Combine(game, "VintagestoryServer.exe");
+        await File.WriteAllTextAsync(exe, "это не программа");
+        var host = Host(o => o with { ExePath = exe });
+
+        for (var attempt = 0; attempt < 3; attempt++) // несколько неудачных попыток подряд — каждая чистая
+        {
+            await Assert.ThrowsAnyAsync<Exception>(host.StartAsync);
+            Assert.Equal(ServerState.Stopped, host.State);
+            Assert.Null(host.Pid);
+            Assert.True(WorldIsFree());
+        }
+
+        // исправили: на место — настоящий (поддельный) сервер; тот же хост запускает его
+        var fakeBin = Path.GetDirectoryName(FakeExe)!;
+        foreach (var f in Directory.GetFiles(fakeBin)) File.Copy(f, Path.Combine(game, Path.GetFileName(f)), overwrite: true);
+        File.Copy(FakeExe, exe, overwrite: true);
+
+        await host.StartAsync();
+        await Until(() => host.State == ServerState.Running);
+        Assert.NotNull(host.Pid);
+        Assert.False(WorldIsFree());
+        await host.StopAsync();
+        Assert.True(WorldIsFree());
+    }
+
+    [Fact]
+    public async Task MissingExe_IsReported_AndNothingIsLeftBusy()
+    {
+        var host = Host(o => o with { ExePath = Path.Combine(_data, "нет-такого", "VintagestoryServer.exe") });
+
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            await Assert.ThrowsAsync<FileNotFoundException>(host.StartAsync);
+            Assert.Equal(ServerState.Stopped, host.State);
+            Assert.True(WorldIsFree());
+        }
+    }
+
     // ---------- замок мира (аудит, пункт 5) ----------
 
     [Fact]

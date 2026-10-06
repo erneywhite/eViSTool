@@ -161,14 +161,12 @@ public sealed class ServerHost : IAsyncDisposable
             }
             catch
             {
-                ReleaseWorld();
-                SetState(ServerState.Stopped);
-                throw;
+                FailStart(process);
+                throw; // исходная причина (нет файла, не exe, нет доступа) — тому, кто запускал
             }
             if (!started)
             {
-                ReleaseWorld();
-                SetState(ServerState.Stopped);
+                FailStart(process);
                 throw new InvalidOperationException(Loc.T("srv.startFailed"));
             }
 
@@ -180,6 +178,19 @@ public sealed class ServerHost : IAsyncDisposable
             _ = PumpAsync(process.StandardError, ConsoleLineKind.Error);
         }
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Процесс не запустился: всё как до попытки — «остановлен», мир свободен, объект процесса освобождён. Следующий
+    /// запуск (исправили exe, дали доступ) проходит без перезапуска агента.
+    /// </summary>
+    private void FailStart(Process process)
+    {
+        process.Dispose();
+        _exited?.TrySetResult();
+        _exited = null;
+        ReleaseWorld();
+        SetState(ServerState.Stopped);
     }
 
     private async Task PumpAsync(StreamReader reader, ConsoleLineKind kind)
