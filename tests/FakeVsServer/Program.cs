@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 //   /fakejoin N имя, /fakeleave N — строки входа и выхода игрока
 //   /moderrors Ns    — ошибки со стеком мода (пространство имён Ns), затем «too many errors» и остановка, как у настоящего
 //   /modfatal id     — отчёт о вылете, где сервер сам называет мод id@1.0.0, и падение (код 1)
+//   /modnoise Ns N   — N «тихих» ошибок мода (стек Ns), сервер работает дальше
 //   прочее           — «Handling Console Command …»
 // Аргументы: --dataPath <путь> (обязателен, как у нас), --slowstart <мс>
 
@@ -64,6 +65,15 @@ var reader = new Thread(() =>
             }
             Log("Error", "More then 100000 errors detected. Shutting down now. Threshold can be changed in serverconfig.json \"DieAboveErrorCount\"");
             stopping.Set();
+        }
+        else if (line.StartsWith("/modnoise "))
+        {
+            var parts = line.Split(' ');
+            for (var n = 0; n < int.Parse(parts[2]); n++)
+            {
+                Log("Error", "Exception: CrashTest: boom in a tick listener (caught)");
+                Console.WriteLine($"   at {parts[1]}.Boom.Now(String where)");
+            }
         }
         else if (line.StartsWith("/modfatal "))
         {

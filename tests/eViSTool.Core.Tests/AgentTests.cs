@@ -82,6 +82,15 @@ public sealed class AgentTests : IAsyncLifetime
         Assert.False(string.IsNullOrEmpty(crash.Id));
         // и строка в консоли сервера — видно и без окна
         Assert.Contains((await _client.ConsoleAsync(0, 0)), l => l.Kind == ConsoleLineKind.System && l.Text.Contains("Crash Test"));
+
+        if (source == "Stack")
+        {
+            // «ошибки модов» за этот запуск — для «!» у профиля в окне
+            await Until(async () => (await _client.StatusAsync()).ModErrors is not null);
+            var errors = (await _client.StatusAsync()).ModErrors!;
+            var line = Assert.Single(errors.Mods);
+            Assert.Equal(("crashtest", 5), (line.ModId, line.Count));
+        }
     }
 
     [Fact]

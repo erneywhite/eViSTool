@@ -267,6 +267,7 @@ public sealed partial class MainViewModel : ObservableObject
             foreach (var profile in Profiles.Where(p => p.Model.Kind == ProfileKind.Server).Select(p => p.Model).ToList())
             {
                 Core.Server.ServerCrashInfo? crash;
+                Core.Diagnostics.ModErrorReport? errors;
                 try
                 {
                     using var client = profile.IsRemote
@@ -274,13 +275,17 @@ public sealed partial class MainViewModel : ObservableObject
                         : Core.Server.AgentClient.TryConnect(profile.Id);
                     if (client is null) continue; // агента нет — сервер не работает и не падал под нами
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(6));
-                    crash = (await client.StatusAsync(cts.Token)).LastCrash;
+                    var status = await client.StatusAsync(cts.Token);
+                    (crash, errors) = (status.LastCrash, status.ModErrors);
                 }
                 catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or TaskCanceledException or InvalidOperationException
                                                or IOException or Newtonsoft.Json.JsonException)
                 {
                     continue; // нет связи — спросим в следующий раз
                 }
+
+                // «ошибки модов» сервера — в «!» у профиля (и сохраняются, как у игры: «скрыть» помнится)
+                if (errors is not null) UpdateErrorReport(profile, errors);
 
                 var first = !_seenServerCrash.ContainsKey(profile.Id);
                 var seen = _seenServerCrash.GetValueOrDefault(profile.Id);

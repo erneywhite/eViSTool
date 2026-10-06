@@ -73,9 +73,57 @@ var commands = ServerCommands.Load(commandsFile).ToDictionary(c => c.Name, Strin
 var commandsDirty = false;
 var mods = new ServerMods(opts.ProfileId, Path.GetDirectoryName(Path.GetFullPath(opts.ExePath)) ?? "", opts.DataPath);
 
+// «ошибки модов» за запуск сервера: раз в полминуты — новые строки вывода в сборщик (консоль хранит только
+// последние строки, поэтому копим по ходу), сводка — в статусе. Новый запуск — счёт с нуля
+var errorCollector = new ModErrorCollector();
+DateTime? errorRun = null;
+long errorSeq = 0;
+var nextErrorScan = DateTime.MinValue;
+ModFingerprints? errorPrints = null;
+ModErrorReport? modErrors = null;
+var errorLock = new object();
+
+// из главного цикла и при остановке сервера — по очереди
+void ScanModErrors()
+{
+    lock (errorLock) ScanModErrorsLocked();
+}
+
+void ScanModErrorsLocked()
+{
+    if (errorRun is null) return;
+    var lines = host.Console.GetSince(errorSeq, 100_000);
+    if (lines.Count == 0) return;
+    errorSeq = lines[^1].Seq;
+    errorCollector.Add(lines.Where(l => l.Kind is ConsoleLineKind.Output or ConsoleLineKind.Error).Select(l => l.Text),
+        final: host.State == ServerState.Stopped);
+    if (errorCollector.Errors.Count == 0) return;
+    errorPrints ??= ModFingerprints.Build(mods.Locals()); // моды читаем раз за запуск — zip-ов может быть сотня
+    modErrors = ModErrorReport.Build(errorCollector.Errors, errorPrints, errorRun.Value);
+}
+
 // сервер остановился сам (упал, выключился от ошибок) — разобрать его вывод за этот запуск: какой мод виноват.
 // Результат — в статусе (LastCrash): окна всех, кто следит за этим сервером, покажут оповещение
 ServerCrashInfo? lastCrash = null;
+// новый запуск — счёт ошибок с нуля, с его первой строки (сервер может упасть раньше первого обхода)
+host.StateChanged += state =>
+{
+    if (state != ServerState.Starting) return;
+    lock (errorLock)
+        (errorCollector, errorRun, errorSeq, errorPrints) = (new ModErrorCollector(), DateTime.Now, host.SessionStartSeq, null);
+};
+
+// сервер остановился (как угодно) — дочитать его ошибки сразу, не дожидаясь обхода раз в полминуты
+host.StateChanged += state =>
+{
+    if (state != ServerState.Stopped) return;
+    _ = Task.Run(() =>
+    {
+        try { ScanModErrors(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { }
+    });
+};
+
 host.StateChanged += state =>
 {
     if (state != ServerState.Stopped || !host.LastExitOnItsOwn) return;
@@ -232,6 +280,7 @@ var gameVersion = GameInstall.DetectVersion(Path.GetDirectoryName(Path.GetFullPa
 AgentStatus Status() => new()
 {
     LastCrash = lastCrash,
+    ModErrors = modErrors,
     GameVersion = gameVersion,
     State = host.State,
     ServerPid = host.Pid,
@@ -512,6 +561,13 @@ try
     while (!shutdown.IsCancellationRequested)
     {
         await Task.Delay(TimeSpan.FromSeconds(5), shutdown.Token).ContinueWith(_ => { });
+
+        if (DateTime.Now >= nextErrorScan)
+        {
+            nextErrorScan = DateTime.Now.AddSeconds(30);
+            try { ScanModErrors(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { }
+        }
 
         // настройки расписания поменяли в окне — подхватываем
         var stamp = File.Exists(automationFile) ? File.GetLastWriteTimeUtc(automationFile) : default;

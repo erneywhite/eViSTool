@@ -84,6 +84,9 @@ public sealed record AgentStatus
     /// <summary>Последнее падение сервера, разобранное агентом (null — не падал с запуска агента).</summary>
     public ServerCrashInfo? LastCrash { get; init; }
 
+    /// <summary>«Ошибки модов» за текущий (или последний) запуск сервера — для «!» у профиля в окне.</summary>
+    public Diagnostics.ModErrorReport? ModErrors { get; init; }
+
     public ServerState State { get; init; }
     public int? ServerPid { get; init; }
     public DateTime? StartedAt { get; init; }
