@@ -46,6 +46,14 @@ with the copyright line given below.
 | .NET libraries (System.Security.Cryptography.ProtectedData) | © .NET Foundation and Contributors | https://github.com/dotnet/runtime |
 | CommunityToolkit.Mvvm | © .NET Foundation and Contributors | https://github.com/CommunityToolkit/dotnet |
 | Newtonsoft.Json | © 2007 James Newton-King | https://github.com/JamesNK/Newtonsoft.Json |
+| Microsoft.Data.Sqlite | © .NET Foundation and Contributors | https://github.com/dotnet/efcore |
+
+## SQLite
+
+World backups use SQLite through the following components:
+
+- **SQLite** (native library `e_sqlite3`, bundled into both executables) — public domain, https://sqlite.org/copyright.html
+- **SQLitePCLRaw** — © 2014-2024 SourceGear, LLC, Apache License 2.0, https://github.com/ericsink/SQLitePCL.raw
 
 ## Acknowledgements
 

@@ -55,7 +55,7 @@ public sealed class BackupTests : IDisposable
     }
 
     [Fact]
-    public void CopySave_MakesStampedCopy_AndRefusesDirtySave()
+    public void CopySave_MakesStampedCopy()
     {
         var save = Path.Combine(_data, "Saves", "default.vcdbs");
         Directory.CreateDirectory(Path.GetDirectoryName(save)!);
@@ -66,10 +66,6 @@ public sealed class BackupTests : IDisposable
         Assert.Equal("world-2026-09-30_12-00-00.vcdbs", copy.Name);
         Assert.Equal("world", File.ReadAllText(copy.Path));
         Assert.True(store.List().Single().IsStamped);
-
-        // рядом непустой журнал SQLite — сервер упал, файл мира может быть неполным
-        File.WriteAllText(save + "-wal", "pending");
-        Assert.Throws<InvalidOperationException>(() => store.CopySave(save, T0.AddMinutes(1)));
         Assert.Throws<FileNotFoundException>(() => store.CopySave(Path.Combine(_data, "Saves", "none.vcdbs"), T0));
     }
 
@@ -107,7 +103,6 @@ public sealed class BackupTests : IDisposable
         var save = Path.Combine(_data, "Saves", "default.vcdbs");
         Directory.CreateDirectory(Path.GetDirectoryName(save)!);
         File.WriteAllText(save, "current world");
-        File.WriteAllText(save + "-wal", "journal of the current world");
         File.WriteAllText(save + "-shm", "index");
         var store = new BackupStore(_data, "Дуо");
         Backup("Дуо-2026-09-29_10-00-00.vcdbs", "yesterday's world");
@@ -125,7 +120,6 @@ public sealed class BackupTests : IDisposable
         Assert.NotNull(safety);
         Assert.Equal("Дуо-before-restore-2026-09-30_12-00-00.vcdbs", safety.Name);
         Assert.Equal("current world", File.ReadAllText(safety.Path));
-        Assert.Equal("journal of the current world", File.ReadAllText(safety.Path + "-wal"));
         Assert.False(store.Find(safety.Name)!.IsOwn);
         Assert.DoesNotContain(store.Prune(1), b => b.Name == safety.Name);
         Assert.True(File.Exists(backup.Path)); // сама копия остаётся
@@ -133,6 +127,59 @@ public sealed class BackupTests : IDisposable
         // откат восстановления — тем же способом
         store.Restore(store.Find(safety.Name)!, save, T0.AddMinutes(1));
         Assert.Equal("current world", File.ReadAllText(save));
+    }
+
+    // ---------- журнал SQLite (аудит, пункт 3) ----------
+
+    [Fact]
+    public void CopySave_OfACrashedServer_MergesTheJournalIntoOneFile_AndLeavesTheWorldAlone()
+    {
+        var save = Path.Combine(_data, "Saves", "default.vcdbs");
+        SqliteWorld.WriteCrashed(save, saved: ["a", "b"], pending: ["c"]);
+        var (db, wal) = (File.ReadAllBytes(save), File.ReadAllBytes(save + "-wal"));
+
+        var copy = new BackupStore(_data).CopySave(save, T0);
+
+        Assert.Equal(["a", "b", "c"], SqliteWorld.Read(copy.Path));
+        Assert.False(File.Exists(copy.Path + "-wal"));
+        Assert.Empty(Directory.GetDirectories(Path.Combine(_data, "Backups"))); // временная папка убрана
+        Assert.Equal(db, File.ReadAllBytes(save)); // сам мир не тронут
+        Assert.Equal(wal, File.ReadAllBytes(save + "-wal"));
+    }
+
+    [Fact]
+    public void Restore_AndBack_KeepsTransactionsThatWereOnlyInTheJournal()
+    {
+        var save = Path.Combine(_data, "Saves", "default.vcdbs");
+        SqliteWorld.WriteCrashed(save, saved: ["now-1"], pending: ["now-2", "now-3"]);
+        var store = new BackupStore(_data, "Дуо");
+        SqliteWorld.WriteClean(Path.Combine(_data, "Backups", "Дуо-2026-09-29_10-00-00.vcdbs"), "old");
+
+        var safety = store.Restore(store.Find("Дуо-2026-09-29_10-00-00.vcdbs")!, save, T0)!;
+
+        Assert.Equal(["old"], SqliteWorld.Read(save));
+        Assert.False(File.Exists(save + "-wal")); // журнал прежнего мира восстановленный не испортит
+        Assert.Equal(["now-1", "now-2", "now-3"], SqliteWorld.Read(safety.Path));
+        Assert.False(File.Exists(safety.Path + "-wal")); // страховочная копия — один цельный файл
+
+        store.Restore(store.Find(safety.Name)!, save, T0.AddMinutes(1));
+        Assert.Equal(["now-1", "now-2", "now-3"], SqliteWorld.Read(save));
+    }
+
+    [Fact]
+    public void Restore_OfAnOldSafetyCopyWithItsJournalBeside_BringsTheJournalBack()
+    {
+        // так страховочные копии лежали до исправления: .vcdbs и рядом его -wal
+        var old = Path.Combine(_data, "Backups", "Дуо-before-restore-2026-09-29_10-00-00.vcdbs");
+        SqliteWorld.WriteCrashed(old, saved: ["x"], pending: ["y"]);
+        var save = Path.Combine(_data, "Saves", "default.vcdbs");
+        var store = new BackupStore(_data, "Дуо");
+
+        store.Restore(store.Find(Path.GetFileName(old))!, save, T0);
+
+        Assert.Equal(["x", "y"], SqliteWorld.Read(save));
+        Assert.False(File.Exists(save + "-wal"));
+        Assert.True(File.Exists(old + "-wal")); // сама копия остаётся как была
     }
 
     [Fact]

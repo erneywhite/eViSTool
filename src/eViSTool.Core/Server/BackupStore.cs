@@ -83,19 +83,17 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
 
     /// <summary>
     /// Копия сохранения при ОСТАНОВЛЕННОМ сервере (на работающем копию делает сам сервер — /genbackup).
-    /// Если рядом с сохранением остался непустой журнал SQLite (-wal), сервер завершился нештатно и файл мира
-    /// может быть неполным — копировать такое как «бэкап» нельзя: InvalidOperationException.
+    /// Если рядом с сохранением остался непустой журнал SQLite (-wal) — сервер завершился нештатно, — журнал сводится
+    /// в копию: она получается одним цельным файлом (см. <see cref="WorldDb"/>).
     /// </summary>
     public BackupFile CopySave(string saveFile, DateTime now)
     {
         if (!File.Exists(saveFile)) throw new FileNotFoundException(Loc.T("backup.noSave", saveFile), saveFile);
-        var wal = new FileInfo(saveFile + "-wal");
-        if (wal.Exists && wal.Length > 0) throw new InvalidOperationException(Loc.T("backup.dirtySave"));
-
         Directory.CreateDirectory(Dir);
         var name = NameFor(now);
         var target = Path.Combine(Dir, name);
-        File.Copy(saveFile, target, overwrite: false);
+        // после нештатной остановки часть мира — в журнале -wal: копия получает его внутрь, одним файлом
+        WorldDb.Snapshot(saveFile, target);
         var made = new BackupFile(target, name, now, new FileInfo(target).Length) { IsStamped = true, IsOwn = true };
         return made with { ModDataSize = PackModData(made) };
     }
@@ -112,9 +110,9 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
 
     /// <summary>
     /// Восстановить мир из копии — только при ОСТАНОВЛЕННОМ сервере. Текущий мир сначала сохраняется в Backups как
-    /// «&lt;профиль&gt;-before-restore-&lt;время&gt;.vcdbs» (вместе с журналом SQLite, если он остался) — восстановление можно откатить;
-    /// ротация такой файл не удаляет. Затем копия встаёт на место файла мира, а остатки журнала убираются:
-    /// они от прежнего мира и испортили бы восстановленный.
+    /// «&lt;профиль&gt;-before-restore-&lt;время&gt;.vcdbs» (журнал SQLite, если он остался, сведён внутрь) — восстановление
+    /// можно откатить; ротация такой файл не удаляет. Затем копия встаёт на место файла мира (журнал старой страховочной
+    /// копии, лежащий рядом, тоже сводится внутрь), а остатки журнала прежнего мира убираются — они испортили бы восстановленный.
     /// Данные модов (Saves без миров, ModData) возвращаются из архива копии, если он есть, — текущие перед этим
     /// упаковываются рядом со страховочной копией. У старой копии без архива данные модов остаются как есть.
     /// Возвращает страховочную копию (null — файла мира не было).
@@ -135,16 +133,16 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
             Directory.CreateDirectory(Dir);
             var name = safetyName;
             var target = Path.Combine(Dir, name);
-            File.Copy(saveFile, target, overwrite: false);
-            foreach (var tail in JournalTails)
-                if (File.Exists(saveFile + tail)) File.Copy(saveFile + tail, target + tail, overwrite: true);
+            WorldDb.Snapshot(saveFile, target); // прежний мир вместе с его журналом — одним цельным файлом
             safety = new BackupFile(target, name, now, new FileInfo(target).Length) { IsStamped = true };
         }
 
         // сначала рядом, потом подмена: оборванное копирование не оставит на месте мира половину файла
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(saveFile)!);
         var tmp = saveFile + ".evistool.restore";
-        File.Copy(backup.Path, tmp, overwrite: true);
+        File.Delete(tmp);
+        // у страховочных копий прежних версий журнал лежит рядом отдельным файлом — сводим его внутрь
+        WorldDb.Snapshot(backup.Path, tmp);
         File.Move(tmp, saveFile, overwrite: true);
         foreach (var tail in JournalTails) File.Delete(saveFile + tail);
         if (File.Exists(modArchive)) WorldModData.Restore(dataDir, modArchive);

@@ -25,6 +25,11 @@
     <TrimmerRootAssembly Include="eViSTool.Agent" />
     <TrimmerRootAssembly Include="eViSTool.Core" />
     <TrimmerRootAssembly Include="Newtonsoft.Json" />
+    <!-- SQLite (копии мира после вылета сервера) находит нативную библиотеку через рефлексию -->
+    <TrimmerRootAssembly Include="Microsoft.Data.Sqlite" />
+    <TrimmerRootAssembly Include="SQLitePCLRaw.core" />
+    <TrimmerRootAssembly Include="SQLitePCLRaw.batteries_v2" />
+    <TrimmerRootAssembly Include="SQLitePCLRaw.provider.e_sqlite3" />
   </ItemGroup>
 
 </Project>

@@ -87,6 +87,9 @@ public sealed class ServerFiles(string profileId, string dataDir, string? backup
         var backup = Store.Find(name) ?? throw new FileNotFoundException(Loc.T("sched.noBackup", name));
         RecycleBin.Send(backup.Path);
         if (backup.ModDataSize > 0) RecycleBin.Send(WorldModData.ArchiveFor(backup.Path)); // данные модов — вместе с копией
+        // у страховочных копий прежних версий рядом лежал журнал SQLite — он без копии не нужен
+        foreach (var tail in new[] { "-wal", "-shm" })
+            if (File.Exists(backup.Path + tail)) RecycleBin.Send(backup.Path + tail);
     }
 
     // ---- serverconfig.json — для окна на другой машине

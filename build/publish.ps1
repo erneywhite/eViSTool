@@ -24,13 +24,15 @@ Get-ChildItem (Join-Path $root 'src') -Directory | ForEach-Object {
     Remove-Item -Recurse -Force (Join-Path $_.FullName 'bin/Release'), (Join-Path $_.FullName 'obj/Release') -ErrorAction SilentlyContinue
 }
 
-$common = @('-c', 'Release', '-r', 'win-x64', "-p:Version=$Version", '-p:PublishSingleFile=true', '-p:DebugType=None', '-p:DebugSymbols=false')
+# нативная библиотека SQLite (копии мира) вшивается в exe: в релиз попадают только сами программы
+$common = @('-c', 'Release', '-r', 'win-x64', "-p:Version=$Version", '-p:PublishSingleFile=true', '-p:DebugType=None', '-p:DebugSymbols=false',
+    '-p:IncludeNativeLibrariesForSelfExtract=true')
 
 dotnet publish (Join-Path $root 'src/eViSTool.App') @common --self-contained false -o $out
 if ($LASTEXITCODE) { throw "publish eViSTool.App: $LASTEXITCODE" }
 
 dotnet publish (Join-Path $root 'src/eViSTool.Agent') @common --self-contained true `
-    '-p:EnableCompressionInSingleFile=true' '-p:IncludeNativeLibrariesForSelfExtract=true' `
+    '-p:EnableCompressionInSingleFile=true' `
     '-p:PublishTrimmed=true' '-p:TrimMode=full' '-p:EnableTrimAnalyzer=false' -o $out  # обрезка: ~17 МБ вместо ~50; что сохраняется целиком — в eViSTool.Agent.csproj
 if ($LASTEXITCODE) { throw "publish eViSTool.Agent: $LASTEXITCODE" }
 

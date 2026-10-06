@@ -257,6 +257,12 @@ public sealed class AgentTests : IAsyncLifetime
         Assert.Equal("world v1", File.ReadAllText(save));
         Assert.Contains("before-restore", restored.SafetyName);
 
+        // сервер упал: часть мира только в журнале SQLite — копия через агента получает её внутрь, одним файлом
+        await Task.Delay(1100); // имя копии — по секундам
+        SqliteWorld.WriteCrashed(save, saved: ["a"], pending: ["b"]);
+        var crashed = await data.CopyWorldAsync();
+        Assert.Equal(["a", "b"], SqliteWorld.Read(Path.Combine(_profile.DataDir!, "Backups", crashed.Name)));
+
         // чужие пути и несуществующие копии — отказ
         await Assert.ThrowsAsync<InvalidOperationException>(() => data.RestoreAsync(@"..\..\serverconfig.json"));
         await Assert.ThrowsAsync<InvalidOperationException>(() => data.DeleteBackupAsync("нет-такой.vcdbs"));
