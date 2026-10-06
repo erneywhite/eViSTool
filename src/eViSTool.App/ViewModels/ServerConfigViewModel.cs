@@ -149,14 +149,47 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     /// Активный профиль сменился или его правят в настройках (этот вызов приходит на каждую букву имени).
     /// Пока путь к файлу тот же — документ не трогаем. dataDir = null — профиль не серверный.
     /// </summary>
+    /// <summary>Файл конфига, с которым работает редактор для такого профиля (у удалённого — копия в кэше).</summary>
+    private static string? PathFor(string? dataDir, GameProfile? remoteProfile)
+    {
+        if (remoteProfile is not null) dataDir = Path.Combine(Core.AppPaths.Cache, "remote", remoteProfile.Id);
+        return string.IsNullOrWhiteSpace(dataDir) ? null : Path.Combine(dataDir, ProfileResolver.ServerConfigName);
+    }
+
+    /// <summary>
+    /// Можно ли уйти на другой профиль (выбор в списке, удаление профиля): «Сохранить правки? Да / Нет / Отмена».
+    /// Сохраняется в СТАРОМ контексте — свой файл или сервер через его агента, пока связь с ним не закрыта.
+    /// false — остаться: отменили или сохранить не удалось (правки на месте, ошибка видна в редакторе).
+    /// </summary>
+    public bool ConfirmSwitch()
+    {
+        if (_doc is not { IsDirty: true }) return true;
+        if (!ConfirmLeave(Loc.T("srvcfg.askSaveOnSwitch", _profileName))) return false;
+        if (_doc is { IsDirty: true }) Unload(); // «Нет» — правки отброшены, второй раз не спрашиваем
+        return true;
+    }
+
+    /// <summary>
+    /// Профиль вот-вот сменится так, что отменить нельзя (в настройках поменяли папку данных или код подключения):
+    /// правки сохраняются, пока старый контекст (и связь с его агентом) ещё жив. Не вышло — правки не пропадают молча:
+    /// текст — в черновик рядом с настройками программы. Вызывать ДО того, как закрыта связь со старым агентом.
+    /// </summary>
+    public void BeforeSwitch(string? dataDir, GameProfile? remoteProfile)
+    {
+        if (string.Equals(PathFor(dataDir, remoteProfile), _path, StringComparison.OrdinalIgnoreCase)) return;
+        if (_doc is not { IsDirty: true } doc) return;
+        if (Ask(Loc.T("srvcfg.askSaveOnSwitch", _profileName), MessageBoxButton.YesNo) == MessageBoxResult.Yes && !SaveOnLeave())
+            SaveDraft(doc);
+        Unload();
+    }
+
     public void OnProfileSwitched(string? dataDir, string profileName, string? gameDir = null,
         GameProfile? remoteProfile = null, Func<AgentClient?>? remoteClient = null)
     {
-        // удалённый сервер: копия его конфига живёт в кэше этого окна
-        if (remoteProfile is not null) dataDir = Path.Combine(Core.AppPaths.Cache, "remote", remoteProfile.Id);
+        // правки старого профиля к этому моменту уже сохранены или отброшены — см. ConfirmSwitch / BeforeSwitch
         _remote = remoteProfile is null ? null : remoteClient;
         IsRemote = remoteProfile is not null;
-        var path = string.IsNullOrWhiteSpace(dataDir) ? null : Path.Combine(dataDir, ProfileResolver.ServerConfigName);
+        var path = PathFor(dataDir, remoteProfile);
         _gameDir = gameDir;
         GenerateCommand.NotifyCanExecuteChanged();
         if (string.Equals(path, _path, StringComparison.OrdinalIgnoreCase))
@@ -165,10 +198,6 @@ public sealed partial class ServerConfigViewModel : ObservableObject
             return;
         }
         GenerateError = "";
-
-        // уходим с файла, в котором остались правки: молча их не теряем
-        if (_doc is { IsDirty: true } && Ask(Loc.T("srvcfg.askSaveOnSwitch", _profileName), MessageBoxButton.YesNo) == MessageBoxResult.Yes)
-            SaveOnLeave();
 
         _path = path;
         _profileName = profileName;
@@ -304,26 +333,45 @@ public sealed partial class ServerConfigViewModel : ObservableObject
         }
     }
 
-    /// <summary>Сохранение при уходе с профиля: отменить уход уже нельзя, поэтому вопросы — только «да/нет».</summary>
-    private void SaveOnLeave()
+    /// <summary>Сохранение при уходе с профиля: отменить уход уже нельзя, поэтому вопросы — только «да/нет». false — не сохранено.</summary>
+    private bool SaveOnLeave()
     {
-        if (_doc is not { } doc) return;
+        if (_doc is not { } doc) return true;
         if (_roleErrors.Count > 0)
         {
             // роли с ошибками (пустой или повторяющийся код) серверу отдавать нельзя — он не запустится
             Warn(Loc.T("srvcfg.notSavedRoleErrors", string.Join(Environment.NewLine, _roleErrors)));
-            return;
+            return false;
         }
-        if (ChangedExternally(doc) && Ask(Loc.T("srvcfg.askOverwrite"), MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        if (ChangedExternally(doc) && Ask(Loc.T("srvcfg.askOverwrite"), MessageBoxButton.YesNo) != MessageBoxResult.Yes) return false;
         try
         {
             if (IsRemote) UploadRemote(doc, force: true); // о перезаписи уже спросили
             doc.Save();
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException or InvalidOperationException
                                        or TaskCanceledException)
         {
             Warn(Loc.T("srvcfg.statusSaveFailed", IsRemote ? RemoteSecret.Describe(ex) : ex.Message));
+            return false;
+        }
+    }
+
+    /// <summary>Правки, которые не удалось сохранить при необратимом уходе с профиля, — в черновик; путь — пользователю.</summary>
+    private void SaveDraft(ServerConfigDocument doc)
+    {
+        try
+        {
+            var dir = Directory.CreateDirectory(Path.Combine(Core.AppPaths.Root, "drafts")).FullName;
+            var name = string.Concat(_profileName.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+            var path = Path.Combine(dir, $"serverconfig-{name}-{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.json");
+            File.WriteAllText(path, doc.Root.ToString(Formatting.Indented));
+            Warn(Loc.T("srvcfg.draftSaved", path));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Warn(Loc.T("srvcfg.draftFailed", ex.Message));
         }
     }
 
@@ -743,9 +791,7 @@ public sealed partial class ServerConfigViewModel : ObservableObject
         GenerateCommand.NotifyCanExecuteChanged();
     }
 
-    private static MessageBoxResult Ask(string text, MessageBoxButton buttons) =>
-        MessageBox.Show(Application.Current.MainWindow!, text, "eViSTool", buttons, MessageBoxImage.Question);
+    private static MessageBoxResult Ask(string text, MessageBoxButton buttons) => Dialogs.Ask(text, buttons);
 
-    private static void Warn(string text) =>
-        MessageBox.Show(Application.Current.MainWindow!, text, "eViSTool", MessageBoxButton.OK, MessageBoxImage.Warning);
+    private static void Warn(string text) => Dialogs.Warn(text);
 }

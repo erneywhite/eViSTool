@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="System.IO" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- образец serverconfig.json — тот же, что у тестов ядра -->
+    <None Include="..\eViSTool.Core.Tests\TestData\serverconfig-real.json" Link="TestData\serverconfig-real.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\eViSTool.App\eViSTool.App.csproj" />
+    <ProjectReference Include="..\..\src\eViSTool.Core\eViSTool.Core.csproj" />
+    <!-- удалённый сервер в тестах — настоящий агент с поддельным сервером: только собрать -->
+    <ProjectReference Include="..\FakeVsServer\FakeVsServer.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\eViSTool.Agent\eViSTool.Agent.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>

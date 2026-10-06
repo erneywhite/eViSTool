@@ -29,6 +29,9 @@ jobs:
       - name: Test
         run: dotnet test tests/eViSTool.Core.Tests --no-build -c Debug --logger "console;verbosity=normal"
 
+      - name: Test the window models
+        run: dotnet test tests/eViSTool.App.Tests --no-build -c Debug --logger "console;verbosity=normal"
+
       - name: Release build
         shell: pwsh
         run: ./build/publish.ps1

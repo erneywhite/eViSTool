@@ -5,6 +5,7 @@
     <Project Path="src/eViSTool.Core/eViSTool.Core.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/eViSTool.App.Tests/eViSTool.App.Tests.csproj" />
     <Project Path="tests/eViSTool.Core.Tests/eViSTool.Core.Tests.csproj" />
     <Project Path="tests/FakeVsServer/FakeVsServer.csproj" />
   </Folder>

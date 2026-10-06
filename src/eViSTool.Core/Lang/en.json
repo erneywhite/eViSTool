@@ -1114,6 +1114,8 @@
   "srvcfg.badgeWorldCreationTip": "The server reads this only when it creates the world. For an existing world the change does nothing.",
   "srvcfg.cantSave": "Can't save right now: some fields have errors, or the server is running. Open Server → Configuration to sort it out.",
   "srvcfg.choiceEmpty": "(not set)",
+  "srvcfg.draftFailed": "The config changes were not saved, and writing a draft failed too: {0}",
+  "srvcfg.draftSaved": "The config changes could not be saved, so they were written to a draft:\n{0}\n\nOpen it and copy what you need once the server is reachable.",
   "srvcfg.failedHint": "The file is left as it is. Fix it by hand, then press “Reload”.",
   "srvcfg.failedTitle": "Could not read serverconfig.json",
   "srvcfg.genFailed": "Could not start {0}",

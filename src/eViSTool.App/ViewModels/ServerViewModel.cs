@@ -272,6 +272,11 @@ public sealed partial class ServerViewModel : ObservableObject
     /// <summary>Сменился профиль: отключиться от старого агента, подключиться к агенту нового (если он работает).</summary>
     public void OnProfileSwitched()
     {
+        // правки конфига старого профиля — сохранить, пока связь с его агентом ещё открыта
+        var next = _main.ActiveProfile?.Model;
+        var nextServer = next?.Kind == ProfileKind.Server;
+        Config.BeforeSwitch(nextServer && next is { IsRemote: false } ? next.DataDir : null, nextServer && next!.IsRemote ? next : null);
+
         _stateKnown = false;
         _session?.Cancel();
         _client?.Dispose();

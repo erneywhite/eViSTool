@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using eViSTool.App.ViewModels;
 
 namespace eViSTool.App;
@@ -35,6 +35,14 @@ public partial class MainWindow : Window
     // размер окна — как в прошлый раз (но не больше экрана)
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
+        // смену профиля отменили (правки конфига) — вернуть список на текущий профиль, когда он закончит обработку выбора.
+        // По индексу: после отказа у списка SelectedItem уже прежний, а SelectedIndex и показ — на отвергнутом пункте,
+        // и присвоение того же SelectedItem ничего не меняет
+        Vm.ProfileSwitchDeclined += () => Dispatcher.BeginInvoke(() =>
+        {
+            if (Vm.ActiveProfile is { } active) ProfileCombo.SelectedIndex = Vm.Profiles.IndexOf(active);
+        }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+
         var l = Vm.Layout;
         var area = SystemParameters.WorkArea;
         Width = Math.Min(l.Width, area.Width);

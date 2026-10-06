@@ -42,7 +42,26 @@ public sealed partial class MainViewModel : ObservableObject
     public ObservableCollection<ProfileViewModel> Profiles { get; } = [];
 
     /// <summary>Профиль, с которым сейчас работаем (переключатель в шапке).</summary>
-    [ObservableProperty] private ProfileViewModel? _activeProfile;
+    private ProfileViewModel? _activeProfile;
+
+    /// <summary>
+    /// Активный профиль. Перед сменой — правки конфига сервера: «Сохранить? Да / Нет / Отмена»; отмена или неудачное
+    /// сохранение оставляют прежний профиль (и список выбора возвращается на него).
+    /// </summary>
+    public ProfileViewModel? ActiveProfile
+    {
+        get => _activeProfile;
+        set
+        {
+            if (value == _activeProfile) return;
+            if (Server is not null && !Server.Config.ConfirmSwitch())
+            {
+                ProfileSwitchDeclined?.Invoke(); // список уже показывает новый выбор — окно вернёт его на прежний
+                return;
+            }
+            if (SetProperty(ref _activeProfile, value)) OnActiveProfileChanged(value);
+        }
+    }
 
     /// <summary>Профиль, открытый в редакторе на вкладке «Настройки».</summary>
     [ObservableProperty] private ProfileViewModel? _editedProfile;
@@ -189,7 +208,10 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void ShowAbout() => SelectedTab = 4;
 
-    partial void OnActiveProfileChanged(ProfileViewModel? value)
+    /// <summary>Смену профиля отменили (правки конфига) — выбор в списке надо вернуть на текущий профиль.</summary>
+    public event Action? ProfileSwitchDeclined;
+
+    private void OnActiveProfileChanged(ProfileViewModel? value)
     {
         _settings.ActiveProfileId = value?.Model.Id;
         Save();
@@ -381,6 +403,8 @@ public sealed partial class MainViewModel : ObservableObject
         if (profile is null || Profiles.Count <= 1) return; // последний профиль не удаляем
         var model = profile.Model;
         var owner = System.Windows.Application.Current.MainWindow!;
+        // удаляем активный — сначала правки его конфига (отмена — профиль не удаляем)
+        if (profile == ActiveProfile && !Server.Config.ConfirmSwitch()) return;
 
         if (model.Kind == ProfileKind.Server && await IsServerRunningAsync(model))
         {
