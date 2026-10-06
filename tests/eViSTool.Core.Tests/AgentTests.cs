@@ -53,6 +53,50 @@ public sealed class AgentTests : IAsyncLifetime
         }
     }
 
+    /// <summary>Сервер с модом CrashTest (настоящая DLL с пространством имён CrashTestMod) в своей папке модов.</summary>
+    private void ServerWithCrashTestMod()
+    {
+        var mods = Directory.CreateDirectory(Path.Combine(_profile.DataDir!, "Mods")).FullName;
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "TestData", "Crash", "CrashTest_1.0.0.zip"), Path.Combine(mods, "CrashTest_1.0.0.zip"));
+        File.WriteAllText(Path.Combine(_profile.DataDir!, "serverconfig.json"),
+            Newtonsoft.Json.JsonConvert.SerializeObject(new { ModPaths = new[] { "Mods", mods } }));
+    }
+
+    [Theory]
+    [InlineData("/moderrors CrashTestMod", "Stack")]   // ошибки со стеком мода → «too many errors» → сервер выключился сам
+    [InlineData("/modfatal crashtest", "GameReport")]  // отчёт о вылете, где сервер сам назвал мод
+    public async Task ServerStoppedByAMod_TheAgentNamesTheMod(string command, string source)
+    {
+        ServerWithCrashTestMod();
+        _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: true, AgentExe, AgentsDir);
+        await Until(async () => (await _client.StatusAsync()).State == ServerState.Running);
+        Assert.Null((await _client.StatusAsync()).LastCrash);
+
+        await _client.CommandAsync(command);
+        await Until(async () => (await _client.StatusAsync()).LastCrash is not null);
+
+        var crash = (await _client.StatusAsync()).LastCrash!;
+        Assert.Equal("crashtest", crash.ModId);
+        Assert.Equal(source, crash.Source.ToString());
+        Assert.EndsWith("CrashTest_1.0.0.zip", crash.ModPath); // по этому пути окно выключит мод через агента
+        Assert.False(string.IsNullOrEmpty(crash.Id));
+        // и строка в консоли сервера — видно и без окна
+        Assert.Contains((await _client.ConsoleAsync(0, 0)), l => l.Kind == ConsoleLineKind.System && l.Text.Contains("Crash Test"));
+    }
+
+    [Fact]
+    public async Task ServerStoppedFromTheWindow_IsNotACrash()
+    {
+        ServerWithCrashTestMod();
+        _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: true, AgentExe, AgentsDir);
+        await Until(async () => (await _client.StatusAsync()).State == ServerState.Running);
+
+        await _client.StopAsync();
+        await Until(async () => (await _client.StatusAsync()).State == ServerState.Stopped);
+        await Task.Delay(500);
+        Assert.Null((await _client.StatusAsync()).LastCrash);
+    }
+
     [Fact]
     public async Task AgentRunsServerAndIsControlledOverHttp()
     {

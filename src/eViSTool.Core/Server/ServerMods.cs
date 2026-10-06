@@ -27,6 +27,9 @@ public sealed class ServerMods(string profileId, string gameDir, string dataDir)
 
     public ResolvedProfile Resolve() => ProfileResolver.Resolve(Profile);
 
+    /// <summary>Моды сервера (с разбором modinfo) — для поиска мода-виновника падения.</summary>
+    public IReadOnlyList<LocalMod> Locals() => ModUpdateService.ScanLocal(Resolve());
+
     public RemoteModList List()
     {
         var resolved = Resolve();

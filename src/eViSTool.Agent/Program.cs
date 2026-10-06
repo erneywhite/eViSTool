@@ -1,6 +1,7 @@
 using System.Reflection;
 using eViSTool.Core;
 using eViSTool.Core.Game;
+using eViSTool.Core.Diagnostics;
 using eViSTool.Core.Server;
 using eViSTool.Core.Server.Remote;
 using Microsoft.AspNetCore.Builder;
@@ -59,6 +60,7 @@ host.StateChanged += state =>
     if (state is ServerState.Stopped or ServerState.Starting) players.Reset();
 };
 
+
 // резервные копии по расписанию: копию делает сам сервер (/genbackup), агент решает когда и убирает старые
 var automation = ServerAutomation.Load(opts.ProfileId, opts.AgentsDir);
 var automationFile = ServerAutomation.FileFor(opts.ProfileId, opts.AgentsDir);
@@ -70,6 +72,32 @@ var commandsFile = ServerCommands.FileFor(opts.ProfileId, opts.AgentsDir);
 var commands = ServerCommands.Load(commandsFile).ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
 var commandsDirty = false;
 var mods = new ServerMods(opts.ProfileId, Path.GetDirectoryName(Path.GetFullPath(opts.ExePath)) ?? "", opts.DataPath);
+
+// сервер остановился сам (упал, выключился от ошибок) — разобрать его вывод за этот запуск: какой мод виноват.
+// Результат — в статусе (LastCrash): окна всех, кто следит за этим сервером, покажут оповещение
+ServerCrashInfo? lastCrash = null;
+host.StateChanged += state =>
+{
+    if (state != ServerState.Stopped || !host.LastExitOnItsOwn) return;
+    var (startSeq, crashed) = (host.SessionStartSeq, host.LastExitCrashed);
+    _ = Task.Run(() =>
+    {
+        try
+        {
+            var lines = host.Console.GetSince(startSeq, 100_000)
+                .Where(l => l.Kind is ConsoleLineKind.Output or ConsoleLineKind.Error).Select(l => l.Text).ToList();
+            string? report = null;
+            if (CrashAnalyzer.CrashFilePath(lines) is { } path && File.Exists(path)) report = File.ReadAllText(path);
+            var finding = CrashAnalyzer.AnalyzeServer(GameLog.Parse(lines), report, crashed, ModFingerprints.Build(mods.Locals()));
+            if (finding is null) return;
+            lastCrash = ServerCrashInfo.From(finding, DateTime.Now);
+            host.Console.Add(ConsoleLineKind.System, finding.Culprit is { } c
+                ? eViSTool.Core.Localization.Loc.T("srv.crashCulprit", c.Mod?.Name ?? c.ModId, c.Version ?? "")
+                : eViSTool.Core.Localization.Loc.T("srv.crashNoCulprit"));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { }
+    });
+};
 var scheduler = new BackupScheduler();
 scheduler.Seed(backups.List().FirstOrDefault(b => b.IsOwn)?.Time);
 string? pendingBackup = null; // имя копии, которую сервер делает по нашей просьбе
@@ -203,6 +231,7 @@ var gameVersion = GameInstall.DetectVersion(Path.GetDirectoryName(Path.GetFullPa
 
 AgentStatus Status() => new()
 {
+    LastCrash = lastCrash,
     GameVersion = gameVersion,
     State = host.State,
     ServerPid = host.Pid,

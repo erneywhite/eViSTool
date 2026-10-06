@@ -195,9 +195,63 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void ShowCrash(GameProfile profile, Core.Diagnostics.CrashFinding finding)
     {
-        var window = new CrashWindow(this, profile, finding);
+        var window = CrashWindow.ForGame(this, profile, finding);
         window.Show(); // не модально: игра (если мир закрылся, она открыта) и программа остаются доступны
         window.Activate();
+    }
+
+    /// <summary>Сделать профиль активным и открыть вкладку (0 — «Мои моды», 2 — «Сервер»).</summary>
+    public void SwitchTo(GameProfile profile, int tab)
+    {
+        if (Profiles.FirstOrDefault(p => p.Model.Id == profile.Id) is { } vm && ActiveProfile != vm) ActiveProfile = vm;
+        if (ActiveProfile?.Model.Id == profile.Id) SelectedTab = tab;
+    }
+
+    // ---- падения серверов: следим за всеми серверными профилями (свои — через их агентов, удалённые — по коду),
+    // а не только за активным: сервер упал, пока открыт клиент, — оповещение всё равно приходит
+    private readonly System.Windows.Threading.DispatcherTimer _serverWatch = new() { Interval = TimeSpan.FromSeconds(15) };
+    private readonly Dictionary<string, string?> _seenServerCrash = [];
+    private readonly DateTime _startedAt = DateTime.Now;
+    private bool _serverChecking;
+
+    private async Task CheckServersAsync()
+    {
+        if (_serverChecking) return;
+        _serverChecking = true;
+        try
+        {
+            foreach (var profile in Profiles.Where(p => p.Model.Kind == ProfileKind.Server).Select(p => p.Model).ToList())
+            {
+                Core.Server.ServerCrashInfo? crash;
+                try
+                {
+                    using var client = profile.IsRemote
+                        ? Core.Server.Remote.RemoteSecret.Unprotect(profile.RemoteCode) is { } code ? Core.Server.AgentClient.ForRemote(code) : null
+                        : Core.Server.AgentClient.TryConnect(profile.Id);
+                    if (client is null) continue; // агента нет — сервер не работает и не падал под нами
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(6));
+                    crash = (await client.StatusAsync(cts.Token)).LastCrash;
+                }
+                catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or TaskCanceledException or InvalidOperationException
+                                               or IOException or Newtonsoft.Json.JsonException)
+                {
+                    continue; // нет связи — спросим в следующий раз
+                }
+
+                var first = !_seenServerCrash.ContainsKey(profile.Id);
+                var seen = _seenServerCrash.GetValueOrDefault(profile.Id);
+                _seenServerCrash[profile.Id] = crash?.Id;
+                if (crash is null || crash.Id == seen) continue;
+                if (first && crash.At < _startedAt) continue; // упал ещё до запуска окна — не тревожим задним числом
+                var window = CrashWindow.ForServer(this, profile, crash);
+                window.Show();
+                window.Activate();
+            }
+        }
+        finally
+        {
+            _serverChecking = false;
+        }
     }
 
     public string PlayTip => ActiveProfile is not { Kind: ProfileKind.Client } profile ? ""
@@ -335,6 +389,8 @@ public sealed partial class MainViewModel : ObservableObject
         _keepRemote.Start();
         _gameWatch.Tick += (_, _) => _ = CheckGameAsync();
         _gameWatch.Start();
+        _serverWatch.Tick += (_, _) => _ = CheckServersAsync();
+        _serverWatch.Start();
         _ = CheckGameAsync();
         _ = KeepRemoteAgentsAsync();
     }

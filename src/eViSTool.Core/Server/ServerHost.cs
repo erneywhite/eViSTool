@@ -68,6 +68,15 @@ public sealed class ServerHost : IAsyncDisposable
     public int? Pid => _process is { HasExited: false } p ? p.Id : null;
     public int? LastExitCode { get; private set; }
 
+    /// <summary>С какой строки консоли начался текущий (или последний) запуск — вывод именно этого запуска.</summary>
+    public long SessionStartSeq { get; private set; }
+
+    /// <summary>Последний выход процесса: остановили мы (кнопка, расписание, /stop из окна) — false; сам — true.</summary>
+    public bool LastExitOnItsOwn { get; private set; }
+
+    /// <summary>Последний выход процесса был падением (не штатная остановка) — так решил и сторож.</summary>
+    public bool LastExitCrashed { get; private set; }
+
     /// <summary>Когда сторож перезапустит сервер (если ждёт).</summary>
     public DateTime? RestartScheduledAt { get; private set; }
 
@@ -152,6 +161,7 @@ public sealed class ServerHost : IAsyncDisposable
             var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
             process.Exited += (_, _) => OnExited(process);
 
+            SessionStartSeq = Console.LastSeq;
             SetState(ServerState.Starting);
             Sys(Loc.T("srv.starting"));
             bool started;
@@ -225,6 +235,8 @@ public sealed class ServerHost : IAsyncDisposable
             LastExitCode = code;
             // остановка «изнутри» (/stop от админа в игре) — тоже штатная
             unexpected = !_stopRequested && State != ServerState.Stopping;
+            LastExitOnItsOwn = !_stopRequested;
+            LastExitCrashed = unexpected;
             _stdin = null;
             _process = null;
             StartedAt = null;

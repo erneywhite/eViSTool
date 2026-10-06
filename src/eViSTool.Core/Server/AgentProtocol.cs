@@ -45,8 +45,45 @@ public static class AgentProtocol
 public sealed record AgentEndpoint(int Pid, int Port, DateTime StartedAt, string Version);
 
 /// <summary>Ответ GET /status.</summary>
+/// <summary>
+/// Сервер остановился сам (упал или выключился от ошибок) — что разобрал агент: причина, ошибка, стек и, если нашёлся,
+/// мод-виновник (путь — на машине сервера: по нему окно выключает мод через агента). Id — новое падение для окна.
+/// </summary>
+public sealed record ServerCrashInfo
+{
+    public string Id { get; init; } = "";
+    public DateTime At { get; init; }
+    public string Reason { get; init; } = "";
+    public string? Error { get; init; }
+    public IReadOnlyList<string> Stack { get; init; } = [];
+    public int ErrorCount { get; init; }
+    public string? ModId { get; init; }
+    public string? ModName { get; init; }
+    public string? ModVersion { get; init; }
+    public string? ModPath { get; init; }
+    public Diagnostics.CulpritSource? Source { get; init; }
+
+    public static ServerCrashInfo From(Diagnostics.CrashFinding f, DateTime at) => new()
+    {
+        Id = Guid.NewGuid().ToString("N"),
+        At = at,
+        Reason = f.Reason,
+        Error = f.Error,
+        Stack = [.. f.Stack.Take(40)],
+        ErrorCount = f.ErrorCount,
+        ModId = f.Culprit?.ModId,
+        ModName = f.Culprit?.Mod?.Name ?? f.Culprit?.ModId,
+        ModVersion = f.Culprit?.Version,
+        ModPath = f.Culprit?.Mod?.Path,
+        Source = f.Culprit?.Source,
+    };
+}
+
 public sealed record AgentStatus
 {
+    /// <summary>Последнее падение сервера, разобранное агентом (null — не падал с запуска агента).</summary>
+    public ServerCrashInfo? LastCrash { get; init; }
+
     public ServerState State { get; init; }
     public int? ServerPid { get; init; }
     public DateTime? StartedAt { get; init; }

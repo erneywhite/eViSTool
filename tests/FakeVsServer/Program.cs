@@ -8,6 +8,8 @@ using System.Runtime.InteropServices;
 //   /spam N          — N строк в stderr (проверка, что stderr читается и сервер не виснет)
 //   /genbackup       — копия мира в Backups, как у настоящего: «default-ГГГГ-ММ-ДД_ЧЧ-ММ-СС.vcdbs»; конец — по-русски
 //   /fakejoin N имя, /fakeleave N — строки входа и выхода игрока
+//   /moderrors Ns    — ошибки со стеком мода (пространство имён Ns), затем «too many errors» и остановка, как у настоящего
+//   /modfatal id     — отчёт о вылете, где сервер сам называет мод id@1.0.0, и падение (код 1)
 //   прочее           — «Handling Console Command …»
 // Аргументы: --dataPath <путь> (обязателен, как у нас), --slowstart <мс>
 
@@ -51,6 +53,29 @@ var reader = new Thread(() =>
             Log("Warning", "(hang) ignoring /stop");
         }
         else if (line == "/crash") Environment.Exit(1);
+        else if (line.StartsWith("/moderrors "))
+        {
+            var ns = line[11..].Trim();
+            for (var n = 0; n < 5; n++)
+            {
+                Log("Error", "Exception: CrashTest: boom in a server callback");
+                Console.WriteLine($"   at {ns}.Boom.Now(String where)");
+                Console.WriteLine($"   at {ns}.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)");
+            }
+            Log("Error", "More then 100000 errors detected. Shutting down now. Threshold can be changed in serverconfig.json \"DieAboveErrorCount\"");
+            stopping.Set();
+        }
+        else if (line.StartsWith("/modfatal "))
+        {
+            var id = line[10..].Trim();
+            var crash = Path.Combine(Directory.CreateDirectory(Path.Combine(dataPath, "Logs")).FullName, "server-crash.log");
+            File.WriteAllText(crash, $"Game Version: v1.22.7 (Stable)\nCritical error occurred in the following mod: {id}@1.0.0\n"
+                                     + "System.InvalidOperationException: boom\n   at CrashTestMod.Boom.Now(String where)\n");
+            Log("Fatal", "Game Version: v1.22.7 (Stable)");
+            Console.WriteLine($"Critical error occurred in the following mod: {id}@1.0.0");
+            Console.WriteLine($"Crash written to file at \"{crash}\"");
+            Environment.Exit(1);
+        }
         else if (line == "/hang") { hang = true; Log("Notification", "Now ignoring /stop"); }
         else if (line.StartsWith("/spam ")) { for (var n = 0; n < int.Parse(line[6..]); n++) Console.Error.WriteLine($"stderr line {n} " + new string('x', 200)); }
         // список команд — как у настоящего: строки в разметке игры, без префикса времени

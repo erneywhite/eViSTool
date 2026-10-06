@@ -8,6 +8,8 @@ public enum GameExitKind
     Crashed,
     /// <summary>Игра работает, но мир закрылся из-за ошибки (экран отключения: встроенный сервер упал).</summary>
     WorldClosed,
+    /// <summary>Выделенный сервер остановился сам: упал или выключился от числа ошибок.</summary>
+    ServerDown,
 }
 
 /// <summary>Как найден виновник: сама игра назвала мод, его код в стеке, его метка в сообщении, его строка перевода.</summary>
@@ -34,6 +36,35 @@ public static partial class CrashAnalyzer
 
     [GeneratedRegex(@"Critical error occurred in the following mod: (?<id>[^@\s]+)(?:@(?<ver>\S+))?")]
     private static partial Regex CriticalMod();
+
+    [GeneratedRegex(@"Crash written to file at ""(?<path>[^""]+)""")]
+    private static partial Regex CrashFileLine();
+
+    private const string TooManyErrors = "errors detected. Shutting down now";
+
+    /// <summary>Путь к отчёту о вылете, если игра или сервер его записали («Crash written to file at "…"»).</summary>
+    public static string? CrashFilePath(IEnumerable<string> lines) =>
+        lines.Select(l => CrashFileLine().Match(l)).FirstOrDefault(m => m.Success)?.Groups["path"].Value;
+
+    /// <summary>
+    /// Выделенный сервер остановился не по нашей команде: разбор его вывода за этот запуск. Отчёт о вылете (сервер сам
+    /// назвал мод), «too many errors» или просто падение процесса (<paramref name="crashedExit"/>) — находка; тихая
+    /// остановка без ошибок (админ набрал /stop в игре) — null.
+    /// </summary>
+    public static CrashFinding? AnalyzeServer(IReadOnlyList<LogEntry> entries, string? crashReport, bool crashedExit, ModFingerprints mods)
+    {
+        var text = string.Join("\n", entries.SelectMany(e => e.Details.Prepend(e.Message)));
+        if (crashReport is not null || CriticalMod().IsMatch(text))
+            return FromCrash(entries, crashReport ?? text, null, mods) with { Kind = GameExitKind.ServerDown };
+
+        var tooMany = entries.Any(e => e.Message.Contains(TooManyErrors, StringComparison.Ordinal));
+        var errors = Errors(entries).Where(e => !e.Entry.Message.Contains(TooManyErrors, StringComparison.Ordinal)).ToList();
+        if (!tooMany && !crashedExit) return null;
+        var reason = tooMany ? "Too many errors" : "Server process crashed";
+        if (errors.Count == 0) return new CrashFinding(GameExitKind.ServerDown, reason, null, [], null, 0);
+        var (culprit, last, count) = Blame(errors, mods);
+        return new CrashFinding(GameExitKind.ServerDown, reason, last.Entry.Message, [.. last.Entry.StackFrames], culprit, count);
+    }
 
     // метки, которыми моды подписывают свои сообщения: «[carryon] …», «[PlayerModelLib] [CustomModelsSystem] …», «… for mod X»
     [GeneratedRegex(@"^\s*(?:\[(?<tag>[^\]\[]{2,60})\]\s*)+")]

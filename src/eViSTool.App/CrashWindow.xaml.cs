@@ -3,71 +3,120 @@ using eViSTool.Core.Diagnostics;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Mods;
 using eViSTool.Core.Profiles;
+using eViSTool.Core.Server;
 
 namespace eViSTool.App;
 
+/// <summary>Что показать в окне вылета — для игры (разбор её логов) и для сервера (разбор агента).</summary>
+public sealed record CrashView(string Title, string ProfileName, string? ModId, string? ModName, string? ModVersion, CulpritSource? Source,
+    bool ModInstalled, string Reason, int ErrorCount, string? Error, IReadOnlyList<string> Stack)
+{
+    public static CrashView ForGame(GameProfile profile, CrashFinding f) =>
+        new(Loc.T(f.Kind == GameExitKind.Crashed ? "crash.titleCrashed" : "crash.titleWorld"), profile.Name,
+            f.Culprit?.ModId, f.Culprit?.Mod?.Name ?? f.Culprit?.ModId, f.Culprit?.Version, f.Culprit?.Source, f.Culprit?.Mod is not null,
+            f.Reason, f.ErrorCount, f.Error, f.Stack);
+
+    public static CrashView ForServer(GameProfile profile, ServerCrashInfo c) =>
+        new(Loc.T("crash.titleServer", profile.Name), profile.Name, c.ModId, c.ModName, c.ModVersion, c.Source, c.ModPath is not null,
+            c.Reason, c.ErrorCount, c.Error, c.Stack);
+}
+
 /// <summary>
-/// «Игра вылетела» / «Мир закрылся из-за ошибки»: какой мод, похоже, виноват и почему мы так думаем, и что с ним
-/// сделать — выключить, найти в «Моих модах», открыть его страницу. Подробности (ошибка и стек) — для автора мода.
+/// «Игра вылетела» / «Мир закрылся из-за ошибки» / «Сервер упал»: какой мод, похоже, виноват и почему мы так думаем,
+/// и что с ним сделать — выключить, найти, открыть его страницу. Подробности (ошибка и стек) — для автора мода.
 /// </summary>
 public partial class CrashWindow : Window
 {
-    private readonly CrashFinding _finding;
-    private readonly GameProfile _profile;
+    private readonly CrashView _view;
     private readonly ViewModels.MainViewModel _main;
+    private readonly Func<Task<string>>? _disable;
+    private readonly Action _show;
 
-    public CrashWindow(ViewModels.MainViewModel main, GameProfile profile, CrashFinding finding)
+    /// <param name="disable">Выключить мод-виновник; возвращает, что сказать (null — выключать нечего).</param>
+    /// <param name="show">Перейти к моду или серверу в программе.</param>
+    public CrashWindow(ViewModels.MainViewModel main, CrashView view, Func<Task<string>>? disable, Action show, string showLabel)
     {
         InitializeComponent();
-        (_main, _profile, _finding) = (main, profile, finding);
-        Title = Heading.Text = Loc.T(finding.Kind == GameExitKind.Crashed ? "crash.titleCrashed" : "crash.titleWorld");
-        Profile.Text = Loc.T("crash.profile", profile.Name);
+        (_main, _view, _disable, _show) = (main, view, disable, show);
+        Title = Heading.Text = view.Title;
+        Profile.Text = Loc.T("crash.profile", view.ProfileName);
+        ShowButton.Content = showLabel;
 
-        if (finding.Culprit is { } c)
+        if (view.ModId is not null)
         {
-            var name = c.Mod?.Name ?? c.ModId;
-            Culprit.Text = Loc.T("crash.culprit", name, c.Version ?? "");
-            How.Text = c.Source switch
+            Culprit.Text = Loc.T("crash.culprit", view.ModName ?? view.ModId, view.ModVersion ?? "");
+            How.Text = view.Source switch
             {
                 CulpritSource.GameReport => Loc.T("crash.howGameReport"),
                 CulpritSource.Stack => Loc.T("crash.howStack"),
                 CulpritSource.Message => Loc.T("crash.howMessage"),
                 _ => Loc.T("crash.howTranslation"),
-            } + (c.Mod is null ? " " + Loc.T("crash.notInstalled") : "");
+            } + (view.ModInstalled ? "" : " " + Loc.T("crash.notInstalled"));
         }
         else
         {
             Culprit.Text = Loc.T("crash.unknown");
             How.Text = Loc.T("crash.unknownHint");
         }
-        Reason.Text = Loc.T("crash.reason", finding.Reason.TrimEnd('.', ' '))
-                      + (finding.ErrorCount > 1 ? " " + Loc.T("crash.errorCount", finding.ErrorCount) : "");
-        Details.Text = string.Join(Environment.NewLine, new[] { finding.Error ?? "" }.Concat(finding.Stack.Select(f => "   at " + f)));
+        Reason.Text = Loc.T("crash.reason", view.Reason.TrimEnd('.', ' '))
+                      + (view.ErrorCount > 1 ? " " + Loc.T("crash.errorCount", view.ErrorCount) : "");
+        Details.Text = string.Join(Environment.NewLine, new[] { view.Error ?? "" }.Concat(view.Stack.Select(f => "   at " + f)));
 
-        var installed = finding.Culprit?.Mod is not null;
-        DisableButton.Visibility = ShowButton.Visibility = installed ? Visibility.Visible : Visibility.Collapsed;
-        CatalogButton.Visibility = finding.Culprit is null ? Visibility.Collapsed : Visibility.Visible;
+        DisableButton.Visibility = disable is not null && view.ModInstalled ? Visibility.Visible : Visibility.Collapsed;
+        CatalogButton.Visibility = view.ModId is null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>Окно вылета игры профиля: выключение мода — сразу, а пока игра открыта — после её закрытия.</summary>
+    public static CrashWindow ForGame(ViewModels.MainViewModel main, GameProfile profile, CrashFinding finding)
+    {
+        Func<Task<string>>? disable = null;
+        if (finding.Culprit?.Mod is { } mod && ModTarget.For(profile) is { } target)
+            disable = async () =>
+            {
+                if (main.IsGameRunningFor(profile))
+                {
+                    // мир закрылся, а игра открыта: при выходе она перезапишет список выключенных модов — выключаем после
+                    main.RunAfterGameExit(profile, () => ModTargets.SetEnabledAsync(target, ModScanner.ReadZip(mod.Path), enabled: false));
+                    return Loc.T("crash.disableAfterExit", mod.Name);
+                }
+                await ModTargets.SetEnabledAsync(target, ModScanner.ReadZip(mod.Path), enabled: false);
+                if (main.ActiveProfile?.Model.Id == profile.Id) main.Mods.ReloadLocal();
+                return Loc.T("crash.disabled", mod.Name);
+            };
+        return new CrashWindow(main, CrashView.ForGame(profile, finding), disable, () =>
+        {
+            main.SwitchTo(profile, tab: 0);
+            if (finding.Culprit is { } c) main.Mods.Search = c.ModId;
+        }, Loc.T("crash.showInMods"));
+    }
+
+    /// <summary>Окно падения сервера: мод выключается в конфиге сервера (свой — на диске, удалённый — через агента).</summary>
+    public static CrashWindow ForServer(ViewModels.MainViewModel main, GameProfile profile, ServerCrashInfo crash)
+    {
+        Func<Task<string>>? disable = null;
+        if (crash.ModPath is { } path && ModTarget.For(profile) is { } target)
+            disable = async () =>
+            {
+                // путь — на машине сервера; у своего сервера читаем мод с диска, удалённому хватит пути
+                var mod = target.IsRemote ? new LocalMod(path, null, null) : ModScanner.ReadZip(path);
+                await ModTargets.SetEnabledAsync(target, mod, enabled: false);
+                if (main.ActiveProfile?.Model.Id == profile.Id) main.Mods.ReloadLocal();
+                return Loc.T("crash.disabledServer", crash.ModName ?? crash.ModId);
+            };
+        return new CrashWindow(main, CrashView.ForServer(profile, crash), disable, () => main.SwitchTo(profile, tab: 2),
+            Loc.T("crash.showServer"));
     }
 
     private async void Disable_Click(object sender, RoutedEventArgs e)
     {
-        if (_finding.Culprit?.Mod is not { } mod || ModTarget.For(_profile) is not { } target) return;
+        if (_disable is null) return;
         DisableButton.IsEnabled = false;
-        if (_main.IsGameRunningFor(_profile))
-        {
-            // мир закрылся, а игра открыта: при выходе она перезапишет список выключенных модов — выключаем после
-            _main.RunAfterGameExit(_profile, () => ModTargets.SetEnabledAsync(target, ModScanner.ReadZip(mod.Path), enabled: false));
-            Status.Text = Loc.T("crash.disableAfterExit", mod.Name);
-            return;
-        }
         try
         {
-            // игра в этот момент могла ещё работать (мир закрылся, а сама она открыта) — выключение применится при следующем входе
-            await ModTargets.SetEnabledAsync(target, ModScanner.ReadZip(mod.Path), enabled: false);
-            Status.Text = Loc.T("crash.disabled", mod.Name);
-            if (_main.ActiveProfile?.Model.Id == _profile.Id) _main.Mods.ReloadLocal();
+            Status.Text = await _disable();
         }
-        catch (Exception ex) when (ex is System.IO.IOException or InvalidOperationException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is System.IO.IOException or InvalidOperationException or UnauthorizedAccessException
+                                       or System.Net.Http.HttpRequestException or TaskCanceledException)
         {
             Status.Text = Loc.T("crash.disableFailed", ex.Message);
             DisableButton.IsEnabled = true;
@@ -76,18 +125,14 @@ public partial class CrashWindow : Window
 
     private void Show_Click(object sender, RoutedEventArgs e)
     {
-        if (_finding.Culprit is not { } c) return;
-        var profile = _main.Profiles.FirstOrDefault(p => p.Model.Id == _profile.Id);
-        if (profile is not null && _main.ActiveProfile != profile) _main.ActiveProfile = profile;
-        _main.SelectedTab = 0;
-        _main.Mods.Search = c.ModId;
+        _show();
         Application.Current.MainWindow?.Activate();
     }
 
     private void Catalog_Click(object sender, RoutedEventArgs e)
     {
-        if (_finding.Culprit is not { } c) return;
-        _ = _main.ShowInCatalogAsync(null, c.ModId, c.Mod?.Name);
+        if (_view.ModId is not { } id) return;
+        _ = _main.ShowInCatalogAsync(null, id, _view.ModName);
         Application.Current.MainWindow?.Activate();
     }
 
