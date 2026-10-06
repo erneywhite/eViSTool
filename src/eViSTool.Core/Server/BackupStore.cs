@@ -115,38 +115,46 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
     /// копии, лежащий рядом, тоже сводится внутрь), а остатки журнала прежнего мира убираются — они испортили бы восстановленный.
     /// Данные модов (Saves без миров, ModData) возвращаются из архива копии, если он есть, — текущие перед этим
     /// упаковываются рядом со страховочной копией. У старой копии без архива данные модов остаются как есть.
+    /// Всё или ничего — см. <see cref="WorldRestore"/>: при сбое рабочие файлы остаются прежними.
     /// Возвращает страховочную копию (null — файла мира не было).
     /// </summary>
-    public BackupFile? Restore(BackupFile backup, string saveFile, DateTime now)
+    public BackupFile? Restore(BackupFile backup, string saveFile, DateTime now, RestoreHooks? hooks = null)
     {
         var source = new FileInfo(backup.Path);
         if (!source.Exists) throw new FileNotFoundException(Loc.T("backup.noSave", backup.Path), backup.Path);
         if (source.Length == 0) throw new InvalidOperationException(Loc.T("backup.empty", backup.Name));
 
+        WorldRestore.Recover(dataDir); // прошлое восстановление оборвалось — сначала вернуть как было
+
         BackupFile? safety = null;
         var safetyName = $"{prefix ?? "world"}-{BeforeRestore}-{now.ToString(StampFormat, CultureInfo.InvariantCulture)}{Extension}";
+        var safetyPath = Path.Combine(Dir, safetyName);
         var modArchive = WorldModData.ArchiveFor(backup.Path);
-        if (File.Exists(modArchive))
-            WorldModData.Pack(dataDir, WorldModData.ArchiveFor(Path.Combine(Dir, safetyName))); // текущие данные модов — в сторону
-        if (File.Exists(saveFile))
+        var withMods = File.Exists(modArchive);
+        try
         {
-            Directory.CreateDirectory(Dir);
-            var name = safetyName;
-            var target = Path.Combine(Dir, name);
-            WorldDb.Snapshot(saveFile, target); // прежний мир вместе с его журналом — одним цельным файлом
-            safety = new BackupFile(target, name, now, new FileInfo(target).Length) { IsStamped = true };
-        }
+            if (withMods) WorldModData.Pack(dataDir, WorldModData.ArchiveFor(safetyPath)); // текущие данные модов — в сторону
+            if (File.Exists(saveFile))
+            {
+                Directory.CreateDirectory(Dir);
+                WorldDb.Snapshot(saveFile, safetyPath); // прежний мир вместе с его журналом — одним цельным файлом
+                safety = new BackupFile(safetyPath, safetyName, now, new FileInfo(safetyPath).Length) { IsStamped = true };
+            }
 
-        // сначала рядом, потом подмена: оборванное копирование не оставит на месте мира половину файла
-        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(saveFile)!);
-        var tmp = saveFile + ".evistool.restore";
-        File.Delete(tmp);
-        // у страховочных копий прежних версий журнал лежит рядом отдельным файлом — сводим его внутрь
-        WorldDb.Snapshot(backup.Path, tmp);
-        File.Move(tmp, saveFile, overwrite: true);
-        foreach (var tail in JournalTails) File.Delete(saveFile + tail);
-        if (File.Exists(modArchive)) WorldModData.Restore(dataDir, modArchive);
-        return safety;
+            // всё или ничего: подготовка во временной папке, подмена с возвратом при сбое (журнал копии сводится внутрь)
+            WorldRestore.Run(dataDir, saveFile, backup.Path, withMods ? modArchive : null, hooks);
+            return safety;
+        }
+        catch
+        {
+            // рабочие файлы остались прежними — страховочная копия не нужна и только путала бы список
+            // (если временная папка осталась — возврат не удался или процесс оборвался, и страховочная копия как раз нужна;
+            // проверка — здесь, а не фильтром catch: фильтр выполняется раньше, чем WorldRestore уберёт за собой)
+            if (!Directory.Exists(WorldRestore.StageFor(dataDir)))
+                foreach (var file in new[] { safetyPath, WorldModData.ArchiveFor(safetyPath) })
+                    try { File.Delete(file); } catch (IOException) { }
+            throw;
+        }
     }
 
     /// <summary>
@@ -201,7 +209,6 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
     /// <summary>Часть имени страховочной копии, сделанной перед восстановлением.</summary>
     public const string BeforeRestore = "before-restore";
 
-    private static readonly string[] JournalTails = ["-wal", "-shm"];
 
     /// <summary>Файл копии по имени (null — такого нет).</summary>
     public BackupFile? Find(string name) => List().FirstOrDefault(b => string.Equals(b.Name, name, StringComparison.OrdinalIgnoreCase));

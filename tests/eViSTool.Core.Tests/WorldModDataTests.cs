@@ -126,7 +126,8 @@ public sealed class WorldModDataTests : IDisposable
             w.Write("evil");
         }
 
-        Assert.Throws<InvalidDataException>(() => WorldModData.Restore(_data, archive));
+        Assert.Throws<InvalidDataException>(() => WorldModData.ExtractTo(archive, Path.Combine(_data, "stage")));
+        Assert.False(Directory.Exists(Path.Combine(_data, "stage"))); // проверка путей — до первой записи
         Assert.Equal("skills B", Read("Saves/XLeveling/Erney.json")); // ничего не стёрто
         Assert.Equal("world B", Read("Saves/default.vcdbs"));
     }

@@ -110,6 +110,8 @@ public sealed class ServerHost : IAsyncDisposable
 
             if (!File.Exists(_options.ExePath))
                 throw new FileNotFoundException(Loc.T("srv.exeNotFound", _options.ExePath), _options.ExePath);
+            // восстановление мира оборвалось посреди подмены — сервер не должен стартовать на половине старого и нового
+            if (WorldRestore.Recover(_options.DataPath)) Sys(Loc.T("backup.recovered"));
 
             // есть своя консоль (агент) — делим её с сервером в UTF-8; нет — отдельная скрытая консоль в OEM-кодировке
             var shareConsole = ConsoleInterop.TryUseUtf8();

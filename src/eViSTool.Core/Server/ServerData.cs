@@ -60,7 +60,14 @@ public sealed class ServerFiles(string profileId, string dataDir, string? backup
     public ServerAutomation LoadAutomation() => ServerAutomation.Load(profileId, agentsDir);
     public void SaveAutomation(ServerAutomation settings) => settings.Save(profileId, agentsDir);
 
-    public IReadOnlyList<BackupEntry> ListBackups() =>
+    public IReadOnlyList<BackupEntry> ListBackups()
+    {
+        // оборванное восстановление (процесс убили посреди подмены) — вернуть мир как был; не вышло — скажет запуск сервера
+        try { WorldRestore.Recover(dataDir); } catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException) { }
+        return ListBackupsAsIs();
+    }
+
+    private IReadOnlyList<BackupEntry> ListBackupsAsIs() =>
         [.. Store.List().Select(b => new BackupEntry(b.Name, b.Time, b.Size, b.IsOwn) { LocalPath = b.Path, ModDataSize = b.ModDataSize })];
 
     public BackupEntry CopyWorld(DateTime now)

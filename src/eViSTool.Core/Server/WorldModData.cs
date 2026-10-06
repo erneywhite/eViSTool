@@ -53,25 +53,58 @@ public static class WorldModData
     }
 
     /// <summary>
-    /// Вернуть данные модов из архива: текущие убираются (вызывающий их перед этим упаковал), содержимое архива встаёт на место.
-    /// Пишется только в Saves и ModData профиля — запись «..\..\что-то» из чужого архива отвергается.
+    /// Распаковать архив данных модов в папку <paramref name="root"/> (её содержимое — как у папки данных профиля).
+    /// Сначала проверяются все пути — пишется только в Saves и ModData, запись «..\..\что-то» из чужого архива
+    /// отвергается, — потом читается весь архив: битый обнаружится здесь, до того как рабочие файлы тронуты.
     /// </summary>
-    public static void Restore(string dataDir, string archive)
+    public static void ExtractTo(string archive, string root)
     {
-        var root = Path.GetFullPath(dataDir).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var full = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         using var zip = ZipFile.OpenRead(archive);
-        // сначала проверка всего архива, потом изменения: на битом архиве ничего не сотрём
-        foreach (var entry in zip.Entries) Target(root, entry.FullName);
-
-        Clear(dataDir);
+        foreach (var entry in zip.Entries) Target(full, entry.FullName);
         foreach (var entry in zip.Entries)
         {
-            if (entry.FullName.EndsWith('/')) continue;
-            var target = Target(root, entry.FullName);
+            // файл мира в подпапке Saves (так паковали прежние версии) — не данные модов
+            if (entry.FullName.EndsWith('/') || IsWorldFile(entry.Name)) continue;
+            var target = Target(full, entry.FullName);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             entry.ExtractToFile(target, overwrite: true);
         }
     }
+
+    /// <summary>Сколько займут данные модов после распаковки.</summary>
+    public static long UnpackedSize(string archive)
+    {
+        using var zip = ZipFile.OpenRead(archive);
+        return zip.Entries.Sum(e => e.Length);
+    }
+
+    /// <summary>
+    /// Данные модов профиля крупными кусками — пути относительно папки данных: файлы и папки внутри Saves и ModData.
+    /// Папка, где лежит файл мира (на любой глубине), целиком не берётся — только её содержимое без миров.
+    /// </summary>
+    public static IEnumerable<string> Items(string dataDir)
+    {
+        foreach (var top in new[] { SavesDir, ModDataDir })
+            if (Directory.Exists(Path.Combine(dataDir, top)))
+                foreach (var item in Expand(dataDir, top)) yield return item;
+    }
+
+    private static IEnumerable<string> Expand(string dataDir, string rel)
+    {
+        var dir = Path.Combine(dataDir, rel);
+        foreach (var file in Directory.EnumerateFiles(dir).Where(f => !IsWorldFile(Path.GetFileName(f))))
+            yield return Path.Combine(rel, Path.GetFileName(file));
+        foreach (var sub in Directory.EnumerateDirectories(dir))
+        {
+            var subRel = Path.Combine(rel, Path.GetFileName(sub));
+            if (HasWorld(sub)) foreach (var item in Expand(dataDir, subRel)) yield return item;
+            else yield return subRel;
+        }
+    }
+
+    private static bool HasWorld(string dir) =>
+        Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Any(f => IsWorldFile(Path.GetFileName(f)));
 
     private static string Target(string root, string name)
     {
@@ -93,7 +126,7 @@ public static class WorldModData
             foreach (var file in Directory.EnumerateFiles(saves).Where(f => !IsWorldFile(Path.GetFileName(f))))
                 yield return (file, $"{SavesDir}/{Path.GetFileName(file)}");
             foreach (var dir in Directory.EnumerateDirectories(saves))
-                foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
+                foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Where(f => !IsWorldFile(Path.GetFileName(f))))
                     yield return (file, $"{SavesDir}/{Rel(saves, file)}");
         }
         var modData = Path.Combine(dataDir, ModDataDir);
@@ -103,17 +136,4 @@ public static class WorldModData
     }
 
     private static string Rel(string root, string file) => Path.GetRelativePath(root, file).Replace('\\', '/');
-
-    /// <summary>Убрать текущие данные модов: в Saves — всё, кроме файлов миров; ModData — целиком.</summary>
-    private static void Clear(string dataDir)
-    {
-        var saves = Path.Combine(dataDir, SavesDir);
-        if (Directory.Exists(saves))
-        {
-            foreach (var file in Directory.EnumerateFiles(saves).Where(f => !IsWorldFile(Path.GetFileName(f)))) File.Delete(file);
-            foreach (var dir in Directory.EnumerateDirectories(saves)) Directory.Delete(dir, recursive: true);
-        }
-        var modData = Path.Combine(dataDir, ModDataDir);
-        if (Directory.Exists(modData)) Directory.Delete(modData, recursive: true);
-    }
 }

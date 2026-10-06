@@ -115,7 +115,7 @@ public sealed class ModManagementTests : IDisposable
         MakeZip(_mods, "common.zip", "other", "1.0.0");
         MakeZip(_mods, "common_alpha.zip", "beta", "1.0.0");
         MakeZip(_mods, "common_alpha_2.zip", "gamma", "1.0.0");
-        var before = Directory.GetFiles(_mods).ToDictionary(Path.GetFileName, File.ReadAllBytes);
+        var before = Directory.GetFiles(_mods).ToDictionary(f => Path.GetFileName(f), File.ReadAllBytes);
         var incoming = MakeZip(Directory.CreateDirectory(Path.Combine(_root, "dl")).FullName, "common.zip", "alpha", "1.0.0");
 
         var plan = ModInstaller.Plan(incoming, p, ModUpdateService.ScanLocal(p));
@@ -162,7 +162,7 @@ public sealed class ModManagementTests : IDisposable
         var p = Server("""{ "ModPaths": [] }""");
         MakeZip(_mods, "alpha_1.0.0.zip", "alpha", "1.0.0");
         MakeZip(_mods, "alpha_0.9.0.zip", "alpha", "0.9.0"); // две копии одного мода — обе будут убраны
-        var before = Directory.GetFiles(_mods).ToDictionary(Path.GetFileName, File.ReadAllBytes);
+        var before = Directory.GetFiles(_mods).ToDictionary(f => Path.GetFileName(f), File.ReadAllBytes);
         var incoming = MakeZip(Directory.CreateDirectory(Path.Combine(_root, "dl")).FullName, "alpha_1.1.0.zip", "alpha", "1.1.0");
         var plan = ModInstaller.Plan(incoming, p, ModUpdateService.ScanLocal(p));
         Assert.Equal(2, plan.Replaces.Count);
