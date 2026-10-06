@@ -391,12 +391,28 @@ public sealed partial class CatalogViewModel : ObservableObject
         StatusText = "";
         if (!options.Any(o => o.CanInstall)) return [];
 
+        var linked = others.Select(x => active.Model.IsLinkedTo(x.Profile.Model)).ToList();
+        // «без вопроса»: связанные есть, и во все, где мода ещё нет, его можно поставить — окно не нужно
+        var linkedOptions = options.Where((_, i) => linked[i]).ToList();
+        if (_main.AlsoInstallWithoutAsking && linkedOptions.Count > 0
+            && linkedOptions.All(o => o.CanInstall || o.State == AlsoInstallState.AlreadyThere))
+            return [.. linkedOptions.Where(o => o.CanInstall)];
+
         var game = AlsoInstall.GameText(_main.Mods.GameVersion);
         var dlg = new AlsoInstallWindow(details.Name, active.Name, active.KindText,
             Loc.T("also.thisProfile") + " · " + Loc.T("also.willInstall", game, release.ModVersion),
-            options.Select((o, i) => (o, others[i].Profile.Name, others[i].Profile.KindText)))
+            options.Select((o, i) => (o, others[i].Profile.Name, others[i].Profile.KindText, linked[i])))
         { Owner = Application.Current.MainWindow };
-        return dlg.ShowDialog() == true ? dlg.Chosen : null;
+        if (dlg.ShowDialog() != true) return null;
+        if (dlg.RememberChoice)
+        {
+            // связь — ровно с отмеченными; с остальными из окна — снять
+            var chosen = dlg.Chosen.Select(o => o.Target.ProfileId).ToHashSet();
+            foreach (var x in others) active.Model.SetLinked(x.Profile.Model, chosen.Contains(x.Profile.Model.Id));
+            _main.SaveSettings();
+            _main.RefreshLinks();
+        }
+        return dlg.Chosen;
     }
 }
 

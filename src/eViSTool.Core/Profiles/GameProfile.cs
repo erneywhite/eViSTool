@@ -43,6 +43,23 @@ public sealed class GameProfile
 
     public Mods.ModPolicy ToPolicy() => new(PinnedMods, BlockedVersions);
 
+    /// <summary>
+    /// Связанные профили (id): моды, нужные обоим, предлагается ставить заодно — например, сервер и клиентский
+    /// профиль, из которого на нём играют. Связь двусторонняя: хватает записи у одного из двух (см. <see cref="IsLinkedTo"/>).
+    /// </summary>
+    public List<string> LinkedProfiles { get; set; } = [];
+
+    public bool IsLinkedTo(GameProfile other) =>
+        LinkedProfiles.Contains(other.Id, StringComparer.Ordinal) || other.LinkedProfiles.Contains(Id, StringComparer.Ordinal);
+
+    /// <summary>Связать или развязать (с обеих сторон: развязка убирает запись и у второго профиля).</summary>
+    public void SetLinked(GameProfile other, bool linked)
+    {
+        LinkedProfiles.RemoveAll(id => id == other.Id);
+        other.LinkedProfiles.RemoveAll(id => id == Id);
+        if (linked) LinkedProfiles.Add(other.Id);
+    }
+
     public override string ToString() => Name;
 }
 

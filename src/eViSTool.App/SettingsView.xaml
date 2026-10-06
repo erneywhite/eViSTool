@@ -201,6 +201,27 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- связанные профили редактируемого: моды ставить заодно -->
+                    <Border Style="{StaticResource SettingsCard}" Visibility="{Binding HasLinkChoices, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr settings.links}" Style="{StaticResource CardTitle}" />
+                            <TextBlock Text="{local:Tr settings.linksHint}" Style="{StaticResource Hint}" />
+                            <ItemsControl ItemsSource="{Binding LinkChoices}" Margin="0,8,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsLinked}" Margin="0,6,0,0" AutomationProperties.Name="{Binding Name}">
+                                            <TextBlock FontSize="13" Foreground="{StaticResource Forest.Text}">
+                                                <Run Text="{Binding Name, Mode=OneWay}" />
+                                                <Run Text="·" Foreground="{StaticResource Forest.Muted}" />
+                                                <Run Text="{Binding KindText, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" />
+                                            </TextBlock>
+                                        </CheckBox>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
                     <!-- поведение программы -->
                     <Border Style="{StaticResource SettingsCard}">
                         <StackPanel>
@@ -226,6 +247,16 @@
                                     <StackPanel Margin="0,0,16,0">
                                         <TextBlock Text="{local:Tr settings.allowUnstable}" FontSize="13" Foreground="{StaticResource Forest.Text}" TextWrapping="Wrap" />
                                         <TextBlock Text="{local:Tr settings.allowUnstableHint}" Style="{StaticResource Hint}" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+                            <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,14,0,0">
+                                <DockPanel>
+                                    <CheckBox DockPanel.Dock="Right" Style="{StaticResource Forest.Switch}" IsChecked="{Binding AlsoInstallWithoutAsking}"
+                                              VerticalAlignment="Center" AutomationProperties.AutomationId="AlsoWithoutAsking" />
+                                    <StackPanel Margin="0,0,16,0">
+                                        <TextBlock Text="{local:Tr settings.alsoSilent}" FontSize="13" Foreground="{StaticResource Forest.Text}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{local:Tr settings.alsoSilentHint}" Style="{StaticResource Hint}" />
                                     </StackPanel>
                                 </DockPanel>
                             </Border>

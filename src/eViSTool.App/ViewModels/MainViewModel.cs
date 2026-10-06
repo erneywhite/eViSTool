@@ -66,6 +66,36 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Профиль, открытый в редакторе на вкладке «Настройки».</summary>
     [ObservableProperty] private ProfileViewModel? _editedProfile;
 
+    /// <summary>«Установить также в» без вопроса — сразу в связанные профили.</summary>
+    [ObservableProperty] private bool _alsoInstallWithoutAsking;
+
+    /// <summary>Связи редактируемого профиля: в какие профили ставить моды заодно.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<LinkChoice> LinkChoices { get; } = [];
+
+    public bool HasLinkChoices => LinkChoices.Count > 0;
+
+    /// <summary>Пересобрать список связей (сменили редактируемый профиль, добавили/удалили профиль, запомнили выбор).</summary>
+    public void RefreshLinks()
+    {
+        LinkChoices.Clear();
+        if (EditedProfile is { } edited)
+            foreach (var other in Profiles.Where(p => p != edited))
+                LinkChoices.Add(new LinkChoice(other.Name, other.KindText, edited.Model.IsLinkedTo(other.Model), linked =>
+                {
+                    edited.Model.SetLinked(other.Model, linked);
+                    Save();
+                }));
+        OnPropertyChanged(nameof(HasLinkChoices));
+    }
+
+    partial void OnEditedProfileChanged(ProfileViewModel? value) => RefreshLinks();
+
+    partial void OnAlsoInstallWithoutAskingChanged(bool value)
+    {
+        _settings.AlsoInstallWithoutAsking = value;
+        Save();
+    }
+
     // ---- запуск игры с активным клиентским профилем
 
     /// <summary>Кнопка «Играть» — только для клиентского профиля (у серверного свой раздел «Сервер»).</summary>
@@ -173,10 +203,12 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var p in _settings.Profiles) Profiles.Add(new ProfileViewModel(p, OnProfileChanged));
 
         _allowUnstable = _settings.AllowUnstable;
+        _alsoInstallWithoutAsking = _settings.AlsoInstallWithoutAsking;
         _autoCheckUpdates = _settings.AutoCheckUpdates;
         _selectedLanguage = Languages.FirstOrDefault(l => l.Value == Loc.Instance.Language) ?? Languages[0];
         _activeProfile = Profiles.FirstOrDefault(p => p.Model == _settings.ActiveProfile);
         _editedProfile = _activeProfile;
+        RefreshLinks(); // поле выше задано мимо свойства — список связей собрать самим
 
         var db = new ModDbClient();
         Mods = new ModsViewModel(this, db);
@@ -347,6 +379,7 @@ public sealed partial class MainViewModel : ObservableObject
         var vm = new ProfileViewModel(model, OnProfileChanged);
         Profiles.Add(vm);
         EditedProfile = vm;
+        RefreshLinks();
         Save();
     }
 
@@ -472,6 +505,8 @@ public sealed partial class MainViewModel : ObservableObject
         Profiles.Remove(profile);
         if (ActiveProfile == profile) ActiveProfile = Profiles[0];
         if (EditedProfile == profile) EditedProfile = ActiveProfile;
+        foreach (var p in _settings.Profiles) p.LinkedProfiles.RemoveAll(id => id == model.Id); // связи с удалённым — не нужны
+        RefreshLinks();
         Save();
     }
 }

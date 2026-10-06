@@ -14,6 +14,12 @@ public sealed class AppSettings
     /// <summary>Сверять моды с модбазой сразу при запуске и при смене профиля.</summary>
     public bool AutoCheckUpdates { get; set; } = true;
 
+    /// <summary>
+    /// «Установить также в» без вопроса: мод сразу ставится и в связанные профили (если туда подходит), окно — только
+    /// когда связанных нет или в какой-то из них поставить нельзя.
+    /// </summary>
+    public bool AlsoInstallWithoutAsking { get; set; }
+
     /// <summary>Язык интерфейса (en, ru). По умолчанию английский.</summary>
     public string Language { get; set; } = "en";
 

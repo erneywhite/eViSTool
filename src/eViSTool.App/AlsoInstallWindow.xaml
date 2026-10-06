@@ -30,6 +30,10 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
+        <CheckBox x:Name="Remember" Margin="0,8,0,0" AutomationProperties.AutomationId="AlsoRemember">
+            <TextBlock x:Name="RememberText" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource Forest.Text}" />
+        </CheckBox>
+
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
             <Button Content="{local:Tr also.install}" IsDefault="True" Click="Ok_Click" Padding="18,8"
                     Style="{StaticResource Forest.PrimaryButton}" AutomationProperties.AutomationId="AlsoOk" />

@@ -28,17 +28,23 @@ public partial class AlsoInstallWindow : Window
     /// <summary>Отмеченные профили, кроме текущего (после «Установить»).</summary>
     public IReadOnlyList<AlsoInstallOption> Chosen { get; private set; } = [];
 
+    /// <summary>Запомнить отмеченное как связь текущего профиля (в следующий раз отмечено заранее).</summary>
+    public bool RememberChoice { get; private set; }
+
+    /// <param name="others">Другие профили; Linked — связан с текущим (отмечен заранее, если туда можно поставить).</param>
     public AlsoInstallWindow(string modName, string currentName, string currentKind, string currentDetail,
-        IEnumerable<(AlsoInstallOption Option, string Name, string KindText)> others)
+        IEnumerable<(AlsoInstallOption Option, string Name, string KindText, bool Linked)> others)
     {
         InitializeComponent();
         Hint.Text = Loc.T("also.hint", modName);
+        RememberText.Text = Loc.T("also.remember", currentName);
         _rows =
         [
             new AlsoInstallRow { Name = currentName, KindText = currentKind, Detail = currentDetail, IsEnabled = false, IsChecked = true },
             .. others.Select(o => new AlsoInstallRow
             {
                 Name = o.Name, KindText = o.KindText, Detail = o.Option.Describe(), Option = o.Option, IsEnabled = o.Option.CanInstall,
+                IsChecked = o.Linked && o.Option.CanInstall,
             }),
         ];
         Rows.ItemsSource = _rows;
@@ -47,6 +53,7 @@ public partial class AlsoInstallWindow : Window
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
         Chosen = [.. _rows.Where(r => r.IsChecked && r.Option is { CanInstall: true }).Select(r => r.Option!)];
+        RememberChoice = Remember.IsChecked == true;
         DialogResult = true;
     }
 }
