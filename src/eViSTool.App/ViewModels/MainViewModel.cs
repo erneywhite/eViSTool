@@ -103,13 +103,53 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty] private bool _isLaunching;
 
-    public string PlayText => Loc.T(IsLaunching ? "play.starting" : "play.button");
+    public string PlayText => Loc.T(IsGameRunning ? "play.running" : IsLaunching ? "play.starting" : "play.button");
+
+    /// <summary>Игра этого профиля запущена (нами или как угодно ещё: ярлык, лаунчер) — второй экземпляр не даём.</summary>
+    [ObservableProperty] private bool _isGameRunning;
+
+    partial void OnIsGameRunningChanged(bool value)
+    {
+        OnPropertyChanged(nameof(PlayText));
+        PlayCommand.NotifyCanExecuteChanged();
+    }
+
+    private bool CanPlayNow => !IsGameRunning && !IsLaunching;
+
+    // раз в пару секунд: запущена ли игра активного клиентского профиля
+    private readonly System.Windows.Threading.DispatcherTimer _gameWatch = new() { Interval = TimeSpan.FromSeconds(2) };
+    private bool _gameChecking;
+
+    private async Task CheckGameAsync()
+    {
+        if (_gameChecking) return;
+        if (ActiveProfile is not { Kind: ProfileKind.Client } profile)
+        {
+            IsGameRunning = false;
+            return;
+        }
+        _gameChecking = true;
+        try
+        {
+            var model = profile.Model;
+            var running = await Task.Run(() => GameProcess.FindClientPids(model).Count > 0);
+            if (ActiveProfile?.Model == model) IsGameRunning = running; // пока проверяли, профиль могли сменить
+        }
+        finally
+        {
+            _gameChecking = false;
+        }
+    }
 
     public string PlayTip => ActiveProfile is not { Kind: ProfileKind.Client } profile ? ""
         : GameLauncher.DataPathFor(profile.Model) is { } dataPath ? Loc.T("play.tipOwnData", profile.Name, dataPath)
         : Loc.T("play.tip", profile.Name);
 
-    partial void OnIsLaunchingChanged(bool value) => OnPropertyChanged(nameof(PlayText));
+    partial void OnIsLaunchingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(PlayText));
+        PlayCommand.NotifyCanExecuteChanged();
+    }
 
     /// <summary>
     /// Значок игры для блока «Vintage Story» внизу слева — из установленной игры активного профиля, а если у него
@@ -122,6 +162,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void NotifyPlay()
     {
+        _ = CheckGameAsync(); // сменили профиль — у нового своя игра
         OnPropertyChanged(nameof(GameIcon));
         OnPropertyChanged(nameof(HasGameIcon));
         OnPropertyChanged(nameof(CanPlay));
@@ -129,17 +170,19 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(PlayTip));
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanPlayNow))]
     private async Task Play()
     {
         if (ActiveProfile is not { Kind: ProfileKind.Client } profile) return;
         var owner = System.Windows.Application.Current.MainWindow!;
 
-        // вторая копия игры с той же папкой данных перезапишет настройки первой — спрашиваем
-        if (GameProcess.IsRunning(profile.Model)
-            && System.Windows.MessageBox.Show(owner, Loc.T("play.alreadyRunning"), "eViSTool", System.Windows.MessageBoxButton.YesNo,
-                System.Windows.MessageBoxImage.Question, System.Windows.MessageBoxResult.No) != System.Windows.MessageBoxResult.Yes)
+        // вторая копия игры с той же папкой данных перезапишет настройки первой: кнопка в это время неактивна,
+        // а здесь — на случай, если игру запустили только что (ярлык), а опрос ещё не заметил
+        if (await Task.Run(() => GameProcess.FindClientPids(profile.Model).Count > 0))
+        {
+            IsGameRunning = true;
             return;
+        }
 
         try
         {
@@ -152,10 +195,15 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        // окно игры появляется не сразу — пока не даём нажать второй раз
+        // процесс уже есть — дальше кнопку держит опрос («Игра запущена»)
         IsLaunching = true;
-        try { await Task.Delay(TimeSpan.FromSeconds(8)); }
+        try
+        {
+            await CheckGameAsync();
+            if (!IsGameRunning) await Task.Delay(TimeSpan.FromSeconds(3));
+        }
         finally { IsLaunching = false; }
+        await CheckGameAsync();
     }
 
     [ObservableProperty] private bool _allowUnstable;
@@ -226,6 +274,9 @@ public sealed partial class MainViewModel : ObservableObject
         _keepRemote = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         _keepRemote.Tick += (_, _) => _ = KeepRemoteAgentsAsync();
         _keepRemote.Start();
+        _gameWatch.Tick += (_, _) => _ = CheckGameAsync();
+        _gameWatch.Start();
+        _ = CheckGameAsync();
         _ = KeepRemoteAgentsAsync();
     }
 
