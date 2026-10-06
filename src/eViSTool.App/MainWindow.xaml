@@ -13,6 +13,7 @@
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:InvertBoolToVisibilityConverter x:Key="InvBoolToVis" />
     </Window.Resources>
 
     <Grid Background="{StaticResource Forest.Base}">
@@ -43,8 +44,14 @@
                 <Border Background="{StaticResource Forest.Surface}" CornerRadius="8" Padding="10,8">
                     <DockPanel>
                         <Border Background="{StaticResource Forest.Raised}" CornerRadius="6" Width="30" Height="30" Margin="0,0,10,0">
-                            <TextBlock Text="VS" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Grid>
+                                <!-- значок из установленной игры; игры на компьютере нет — буквы -->
+                                <Image Source="{Binding GameIcon}" Width="24" Height="24" RenderOptions.BitmapScalingMode="HighQuality"
+                                       Visibility="{Binding HasGameIcon, Converter={StaticResource BoolToVis}}" />
+                                <TextBlock Text="VS" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           Visibility="{Binding HasGameIcon, Converter={StaticResource InvBoolToVis}}" />
+                            </Grid>
                         </Border>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Vintage Story" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" />
