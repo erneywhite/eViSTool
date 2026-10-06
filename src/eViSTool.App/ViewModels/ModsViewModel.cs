@@ -514,6 +514,10 @@ public sealed partial class ModsViewModel : ObservableObject
         }
 
         if (CurrentTarget() is not { } target || !ConfirmIfRunning(target)) return;
+        // моды, нужные и в других профилях (сервер ↔ клиент), — предложить поставить и туда
+        var also = await PickAlsoForFilesAsync(target, zips);
+        if (also is null) return; // отменили
+        also = [.. also.Where(a => ConfirmIfRunning(a.Target))];
 
         var installed = new List<string>();
         var problems = new List<string>();
@@ -522,6 +526,10 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             foreach (var zip in zips)
                 await InstallZipAsync(target, zip, interactive: true, installed, problems);
+            foreach (var a in also)
+                foreach (var (path, _) in a.ToInstall)
+                    await Labelled(a.Target, label: true, installed, problems,
+                        () => InstallZipAsync(a.Target, path, interactive: false, installed, problems));
         }
         finally
         {
@@ -537,6 +545,34 @@ public sealed partial class ModsViewModel : ObservableObject
                        + Loc.T("report.attention") + ":\n• " + string.Join("\n• ", problems);
             MessageBox.Show(Application.Current.MainWindow, text, "eViSTool", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    /// <summary>Окно «Установить также в» для добавленных файлов. Пустой список — только сюда, null — отмена.</summary>
+    private async Task<IReadOnlyList<AlsoInstallFiles>?> PickAlsoForFilesAsync(ModTarget target, IReadOnlyList<string> zips)
+    {
+        if (_main.ActiveProfile is not { } active) return [];
+        var files = zips.Select(z => (Path: z, ModScanner.ReadZip(z).Info))
+            .Where(f => f.Info is not null && AlsoInstall.WorthOffering(ModSides.Parse(f.Info.Side)))
+            .Select(f => (f.Path, f.Info!)).ToList();
+        if (files.Count == 0) return [];
+        var others = _main.Profiles
+            .Where(p => p != active && files.Any(f => AlsoInstall.Needed(ModSides.Parse(f.Item2.Side), p.Model.Kind)))
+            .Select(p => (Profile: p, Target: ModTarget.For(p.Model)))
+            .Where(x => x.Target is not null)
+            .ToList();
+        if (others.Count == 0) return [];
+
+        StatusText = Loc.T("also.checking");
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var options = await Task.WhenAll(others.Select(x => AlsoInstall.EvaluateFilesAsync(x.Target!, files, cts.Token)));
+        StatusText = "";
+
+        var names = string.Join(", ", files.Select(f => f.Item2.Name));
+        var chosen = AlsoInstallWindow.Choose(_main, active, Loc.T("also.hintFiles", names),
+            Loc.T("also.thisProfile") + " · " + AlsoInstall.GameText(Profile?.GameVersion),
+            [.. options.Select((o, i) => new AlsoChoice(others[i].Profile, o, o.Describe(), o.CanInstall,
+                o.Error is null && o.ToInstall.Count == 0, active.Model.IsLinkedTo(others[i].Profile.Model)))]);
+        return chosen?.Cast<AlsoInstallFiles>().ToList();
     }
 
     /// <summary>
@@ -923,32 +959,56 @@ public sealed partial class ModsViewModel : ObservableObject
 
     public event EventHandler? LocalModsChanged;
 
-    /// <summary>Скачать и поставить релиз из каталога, затем предложить доставить его зависимости.</summary>
-    public async Task<bool> InstallFromCatalogAsync(string modId, string name, ModDbRelease release)
+    /// <summary>
+    /// Скачать и поставить релиз из каталога — в текущий профиль и, если выбрали, ещё в другие (каждому свой релиз),
+    /// затем предложить доставить зависимости: в каждом профиле, куда мод встал, — по одному общему вопросу.
+    /// </summary>
+    public async Task<bool> InstallFromCatalogAsync(string modId, string name, ModDbRelease release,
+        IReadOnlyList<(ModTarget Target, ModDbRelease Release)>? also = null)
     {
         if (Profile is not { } profile || IsBusy || CurrentTarget() is not { } target) return false;
         if (!ConfirmIfRunning(target)) return false;
+        var extra = (also ?? []).Where(a => ConfirmIfRunning(a.Target)).ToList(); // игра или сервер там запущены — спросить
 
         var installed = new List<string>();
         var problems = new List<string>();
         IsBusy = true;
         try
         {
-            if (!await DownloadAndInstallAsync(target, modId, name, release, installed, problems))
+            var done = new List<ModTarget>();
+            foreach (var (t, r) in extra.Prepend((target, release)))
+                if (await Labelled(t, t != target && extra.Count > 0, installed, problems,
+                        () => DownloadAndInstallAsync(t, modId, name, r, installed, problems)))
+                    done.Add(t);
+            if (done.Count == 0)
             {
                 await ReportAsync(Loc.T("report.install"), installed, problems);
                 return false;
             }
 
-            // зависимости — у той цели, куда ставили, даже если профиль успели переключить
-            var (resolved, mods) = await ModTargets.ScanAsync(target);
-            var issues = Dependencies.FindIssues(mods);
-            if (IsActive(target)) await ReloadAsync();
-            if (issues.Count > 0 && (resolved.GameVersion ?? profile.GameVersion) is { } game)
+            // зависимости — у тех целей, куда ставили, даже если профиль успели переключить
+            var pending = new List<(ModTarget Target, ModVersion Game, IReadOnlyList<DependencyIssue> Issues)>();
+            foreach (var t in done)
             {
-                var list = string.Join("\n", issues.Select(i => "• " + i.Describe()));
+                var (resolved, mods) = await ModTargets.ScanAsync(t);
+                var issues = Dependencies.FindIssues(mods);
+                if (issues.Count > 0 && (resolved.GameVersion ?? (t == target ? profile.GameVersion : null)) is { } game)
+                    pending.Add((t, game, issues));
+            }
+            if (done.Any(IsActive)) await ReloadAsync();
+            if (pending.Count > 0)
+            {
+                var list = pending.Count == 1 && pending[0].Target == target
+                    ? string.Join("\n", pending[0].Issues.Select(i => "• " + i.Describe()))
+                    : string.Join("\n\n", pending.Select(p => p.Target.Name + ":\n" + string.Join("\n", p.Issues.Select(i => "• " + i.Describe()))));
                 if (Confirm(Loc.T("mods.installDepsConfirm", name, list)))
-                    await FixDependencyIssuesAsync(target, game, installed, problems);
+                    foreach (var (t, game, _) in pending)
+                        await Labelled(t, pending.Count > 1 || t != target, installed, problems, async () =>
+                        {
+                            await FixDependencyIssuesAsync(t, game, installed, problems);
+                            return true;
+                        });
+                if (done.Any(IsActive)) await ReloadAsync();
             }
         }
         finally
@@ -957,6 +1017,19 @@ public sealed partial class ModsViewModel : ObservableObject
         }
         await ReportAsync(Loc.T("report.installed"), installed, problems);
         return true;
+    }
+
+    /// <summary>Сделать шаг и, если ставим в несколько профилей, подписать его строки отчёта профилем: «Carry On 1.14 → Client C».</summary>
+    private static async Task<bool> Labelled(ModTarget target, bool label, List<string> installed, List<string> problems, Func<Task<bool>> step)
+    {
+        var (i0, p0) = (installed.Count, problems.Count);
+        var ok = await step();
+        if (label)
+        {
+            for (var i = i0; i < installed.Count; i++) installed[i] += " → " + target.Name;
+            for (var i = p0; i < problems.Count; i++) problems[i] = target.Name + ": " + problems[i];
+        }
+        return ok;
     }
 
     // ---------- модпаки ----------

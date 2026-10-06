@@ -82,4 +82,47 @@ public sealed class AlsoInstallTests : IDisposable
         Assert.Equal(AlsoInstallState.Unavailable, option.State);
         Assert.False(option.CanInstall);
     }
+
+    private string Zip(string name, string id, string version, string side = "Universal")
+    {
+        var path = Path.Combine(Directory.CreateDirectory(Path.Combine(_root, "files")).FullName, name);
+        using var zip = ZipFile.Open(path, ZipArchiveMode.Create);
+        using var w = new StreamWriter(zip.CreateEntry("modinfo.json").Open());
+        w.Write($$"""{ "modid": "{{id}}", "name": "{{id}}", "version": "{{version}}", "side": "{{side}}" }""");
+        return path;
+    }
+
+    private static (string, ModInfo) F(string path) => (path, ModScanner.ReadZip(path).Info!);
+
+    [Fact]
+    public async Task Files_WhatIsAlreadyThereIsSkipped_AndClientModsDoNotGoToAServer()
+    {
+        var files = new[]
+        {
+            F(Zip("carryon_1.0.0.zip", "carryon", "1.0.0")),            // у клиента уже стоит
+            F(Zip("extra_2.0.0.zip", "extra", "2.0.0")),                // нет — встанет
+            F(Zip("hud_1.0.0.zip", "hud", "1.0.0", side: "Client")),    // клиентский — серверу не нужен
+        };
+
+        var client = await AlsoInstall.EvaluateFilesAsync(ModTarget.For(Client("c", "1.0.0"))!, files);
+        Assert.True(client.CanInstall);
+        Assert.Equal(["extra", "hud"], client.ToInstall.Select(f => f.Info.ModId));
+        Assert.Equal(1, client.AlreadyThere);
+
+        var serverData = Directory.CreateDirectory(Path.Combine(_root, "srv")).FullName;
+        Directory.CreateDirectory(Path.Combine(serverData, "Mods"));
+        File.WriteAllText(Path.Combine(serverData, "serverconfig.json"),
+            JsonConvert.SerializeObject(new { ModPaths = new[] { "Mods", Path.Combine(serverData, "Mods") } }));
+        var server = new GameProfile { Id = "srv", Name = "srv", Kind = ProfileKind.Server, DataDir = serverData };
+        var onServer = await AlsoInstall.EvaluateFilesAsync(ModTarget.For(server)!, files);
+        Assert.Equal(["carryon", "extra"], onServer.ToInstall.Select(f => f.Info.ModId));
+    }
+
+    [Fact]
+    public async Task Files_AllAlreadyThere_NothingToOffer()
+    {
+        var option = await AlsoInstall.EvaluateFilesAsync(ModTarget.For(Client("c", "1.0.0"))!, [F(Zip("carryon_1.0.0.zip", "carryon", "1.0.0"))]);
+        Assert.False(option.CanInstall);
+        Assert.Null(option.Error);
+    }
 }

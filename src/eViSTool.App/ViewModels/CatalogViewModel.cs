@@ -364,10 +364,7 @@ public sealed partial class CatalogViewModel : ObservableObject
         // мод нужен и в других профилях (сервер ↔ клиент) — предложить поставить заодно, каждому свою версию
         var also = await PickAlsoAsync(details, id, release);
         if (also is null) return; // отменили
-        await _main.Mods.InstallFromCatalogAsync(id, details.Name, release);
-        if (also.Count > 0)
-            _main.Mods.Enqueue(also.Select(o => new UpdateQueueItem(o.Target, id, details.Name, o.Installed ?? "",
-                o.Release!.ModVersion ?? "?", o.Release, null)));
+        await _main.Mods.InstallFromCatalogAsync(id, details.Name, release, [.. also.Select(o => (o.Target, o.Release!))]);
     }
 
     /// <summary>
@@ -389,30 +386,12 @@ public sealed partial class CatalogViewModel : ObservableObject
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)); // удалённый сервер не на связи — не ждать вечно
         var options = await Task.WhenAll(others.Select(x => AlsoInstall.EvaluateAsync(x.Target!, id, mod.Releases, release, cts.Token)));
         StatusText = "";
-        if (!options.Any(o => o.CanInstall)) return [];
-
-        var linked = others.Select(x => active.Model.IsLinkedTo(x.Profile.Model)).ToList();
-        // «без вопроса»: связанные есть, и во все, где мода ещё нет, его можно поставить — окно не нужно
-        var linkedOptions = options.Where((_, i) => linked[i]).ToList();
-        if (_main.AlsoInstallWithoutAsking && linkedOptions.Count > 0
-            && linkedOptions.All(o => o.CanInstall || o.State == AlsoInstallState.AlreadyThere))
-            return [.. linkedOptions.Where(o => o.CanInstall)];
-
         var game = AlsoInstall.GameText(_main.Mods.GameVersion);
-        var dlg = new AlsoInstallWindow(details.Name, active.Name, active.KindText,
+        var chosen = AlsoInstallWindow.Choose(_main, active, Loc.T("also.hint", details.Name),
             Loc.T("also.thisProfile") + " · " + Loc.T("also.willInstall", game, release.ModVersion),
-            options.Select((o, i) => (o, others[i].Profile.Name, others[i].Profile.KindText, linked[i])))
-        { Owner = Application.Current.MainWindow };
-        if (dlg.ShowDialog() != true) return null;
-        if (dlg.RememberChoice)
-        {
-            // связь — ровно с отмеченными; с остальными из окна — снять
-            var chosen = dlg.Chosen.Select(o => o.Target.ProfileId).ToHashSet();
-            foreach (var x in others) active.Model.SetLinked(x.Profile.Model, chosen.Contains(x.Profile.Model.Id));
-            _main.SaveSettings();
-            _main.RefreshLinks();
-        }
-        return dlg.Chosen;
+            [.. options.Select((o, i) => new AlsoChoice(others[i].Profile, o, o.Describe(), o.CanInstall,
+                o.State == AlsoInstallState.AlreadyThere, active.Model.IsLinkedTo(others[i].Profile.Model)))]);
+        return chosen?.Cast<AlsoInstallOption>().ToList();
     }
 }
 

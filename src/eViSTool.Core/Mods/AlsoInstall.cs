@@ -58,6 +58,32 @@ public static class AlsoInstall
     /// <summary>Нужен ли мод с этой стороной в профиле такого типа.</summary>
     public static bool Needed(ModSide side, ProfileKind kind) => !ModSides.IsUnneeded(side, kind);
 
+    /// <summary>
+    /// Файлы модов (добавленные вручную) — в другой профиль: какие из них туда нужны и ещё не стоят в этой версии.
+    /// Версию игры по файлу не проверить — совместимость решает тот, кто их добавляет.
+    /// </summary>
+    public static async Task<AlsoInstallFiles> EvaluateFilesAsync(ModTarget target, IReadOnlyList<(string Path, ModInfo Info)> files,
+        CancellationToken ct = default)
+    {
+        var wanted = files.Where(f => Needed(ModSides.Parse(f.Info.Side), target.Profile.Kind)).ToList();
+        try
+        {
+            var (resolved, mods) = await ModTargets.ScanAsync(target, ct).ConfigureAwait(false);
+            var have = mods.Where(m => m.Info is not null)
+                .GroupBy(m => m.Info!.ModId, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().Info!.Version, StringComparer.OrdinalIgnoreCase);
+            var toInstall = wanted.Where(f => !(have.TryGetValue(f.Info.ModId, out var v)
+                                                && ModVersion.ParseOrNull(v) is { } a && ModVersion.ParseOrNull(f.Info.Version) is { } b
+                                                && a.CompareTo(b) == 0)).ToList();
+            return new AlsoInstallFiles(target, resolved.GameVersion, toInstall, wanted.Count - toInstall.Count, null);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidOperationException or UnauthorizedAccessException
+                                       or TaskCanceledException or Newtonsoft.Json.JsonException)
+        {
+            return new AlsoInstallFiles(target, null, [], 0, target.IsRemote ? Server.Remote.RemoteSecret.Describe(ex) : ex.Message);
+        }
+    }
+
     public static async Task<AlsoInstallOption> EvaluateAsync(ModTarget target, string modId, IReadOnlyList<ModDbRelease> releases,
         ModDbRelease chosen, CancellationToken ct = default)
     {
@@ -84,4 +110,16 @@ public static class AlsoInstall
         var state = same ? AlsoInstallState.AlreadyThere : game is null ? AlsoInstallState.UnknownGame : AlsoInstallState.Ready;
         return new AlsoInstallOption(target, state, game, installed, release);
     }
+}
+
+/// <summary>Файлы модов для другого профиля: что туда встанет; сколько уже стоит; ошибка — профиль не прочитать.</summary>
+public sealed record AlsoInstallFiles(ModTarget Target, ModVersion? Game, IReadOnlyList<(string Path, ModInfo Info)> ToInstall,
+    int AlreadyThere, string? Error)
+{
+    public bool CanInstall => Error is null && ToInstall.Count > 0;
+
+    public string Describe() => Error is not null ? Loc.T("also.unavailable", Error)
+        : ToInstall.Count == 0 ? Loc.T("also.allThere", AlsoInstall.GameText(Game))
+        : Loc.T("also.files", AlsoInstall.GameText(Game), string.Join(", ", ToInstall.Select(f => $"{f.Info.Name} {f.Info.Version}")))
+          + (AlreadyThere > 0 ? " " + Loc.T("also.filesSome", AlreadyThere) : "");
 }
