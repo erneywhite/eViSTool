@@ -1060,8 +1060,12 @@ public sealed partial class ModsViewModel : ObservableObject
                 var (mirror, applyConfig) = (dlg.Mirror, dlg.ApplyConfig);
                 // в фоне: иначе при паке «всё внутри» импорт идёт синхронно, окно подвисает,
                 // а сообщения прогресса приходят уже после итога и затирают его
+                // файлы с модбазы, перезалитые авторами модов, — ставить ли (спрашиваем до любых изменений профиля)
+                bool AskChanged(IReadOnlyList<string> mods) => Application.Current.Dispatcher.Invoke(() =>
+                    MessageBox.Show(Application.Current.MainWindow!, Loc.T("pack.askChanged", string.Join("\n", mods.Select(x => "• " + x))),
+                        "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes);
                 result = await Task.Run(() => importer.ApplyAsync(pack, plan, profile, mirror, applyConfig,
-                    ModBackupStore.ForProfile(profile.Profile), progress));
+                    ModBackupStore.ForProfile(profile.Profile), progress, confirmChanged: AskChanged));
             }
             finally
             {

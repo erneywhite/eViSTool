@@ -30,7 +30,7 @@ public partial class ImportPackWindow : Window
         }
 
         Items.ItemsSource = plan.Items
-            .OrderBy(i => i.Action == PackItemAction.Same) // сначала то, что изменится
+            .OrderBy(i => i.Action is PackItemAction.Same or PackItemAction.Duplicate) // сначала то, что изменится
             .ThenBy(i => i.Mod.Name, StringComparer.OrdinalIgnoreCase)
             .Select(i => new PackItemRow(
                 i.Mod.Name + (i.Mod.Enabled ? "" : " " + Loc.T("packi.disabledMark")),
@@ -41,9 +41,10 @@ public partial class ImportPackWindow : Window
                     PackItemAction.Install => "packi.actInstall",
                     PackItemAction.Update => "packi.actUpdate",
                     PackItemAction.Downgrade => "packi.actDowngrade",
+                    PackItemAction.Duplicate => "packi.actDuplicate",
                     _ => "packi.actSame",
                 }),
-                i.Action == PackItemAction.Same ? "" : Loc.T(i.Mod.Bundled ? "packi.srcInside" : "packi.srcModDb")))
+                i.Action is PackItemAction.Same or PackItemAction.Duplicate ? "" : Loc.T(i.Mod.Bundled ? "packi.srcInside" : "packi.srcModDb")))
             .ToList();
 
         MirrorMode.Content = Loc.T("packi.modeMirror", plan.NotInPack.Count);
@@ -58,8 +59,8 @@ public partial class ImportPackWindow : Window
             ConfigBox.IsChecked = true;
         }
 
-        var changes = plan.Items.Count(i => i.Action != PackItemAction.Same);
-        var downloads = plan.Items.Count(i => i.Action != PackItemAction.Same && !i.Mod.Bundled);
+        var changes = plan.Items.Count(i => i.Action is not (PackItemAction.Same or PackItemAction.Duplicate));
+        var downloads = plan.Items.Count(i => i.Action is not (PackItemAction.Same or PackItemAction.Duplicate) && !i.Mod.Bundled);
         Summary.Text = Loc.T("packi.summary", changes, downloads);
     }
 

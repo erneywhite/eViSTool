@@ -68,6 +68,8 @@ public enum PackItemAction
     Update,
     Downgrade,
     Same,
+    /// <summary>Тот же modid в паке второй раз — ставится только первая запись.</summary>
+    Duplicate,
 }
 
 public sealed record PackItemPlan(PackMod Mod, LocalMod? Installed, PackItemAction Action);
@@ -79,6 +81,9 @@ public sealed record PackImportResult(IReadOnlyList<string> Done, IReadOnlyList<
 /// <summary>Импорт .evpack в профиль.</summary>
 public sealed class PackImporter(ModDbClient db, ModUpdater updater)
 {
+    /// <summary>Как получить мод, которого нет внутри пака (по умолчанию — ровно эта версия с модбазы). Подменяется в тестах.</summary>
+    public Func<PackMod, CancellationToken, Task<string>>? Download { get; init; }
+
     /// <summary>Что произойдёт: новые, обновляемые, откатываемые, уже стоящие; и какие моды профиля в паке не упомянуты.</summary>
     public static PackImportPlan Plan(PackManifest manifest, ResolvedProfile profile, IReadOnlyList<LocalMod> locals)
     {
@@ -86,9 +91,11 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
             .GroupBy(l => l.Info!.ModId, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var items = manifest.Mods.Select(m =>
         {
             byId.TryGetValue(m.ModId, out var have);
+            if (!seen.Add(m.ModId)) return new PackItemPlan(m, have, PackItemAction.Duplicate);
             var action = PackItemAction.Install;
             if (have is not null)
             {
@@ -121,53 +128,85 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
     /// <summary>
     /// Применить план. mirror — выключить моды профиля, которых нет в паке (не удаляя).
     /// Всё заменяемое уходит в хранилище версий, прежние настройки модов — в архив там же.
+    /// Сначала все моды извлекаются или скачиваются и проверяются — профиль до этого не меняется:
+    /// в архиве должен быть тот мод и та версия, что в описании пака, и файл — тот же, что был у автора пака.
+    /// Не тот мод или испорченный вложенный файл — пункт пропускается. Файл с модбазы, перезалитый автором мода, —
+    /// решает <paramref name="confirmChanged"/> (список «имя версия»; null или false — такие пункты пропускаются).
+    /// Отчёт — по тому, что реально установлено.
     /// </summary>
     public async Task<PackImportResult> ApplyAsync(PackFile pack, PackImportPlan plan, ResolvedProfile profile,
-        bool mirror, bool applyConfig, ModBackupStore backups, IProgress<string>? progress = null, CancellationToken ct = default)
+        bool mirror, bool applyConfig, ModBackupStore backups, IProgress<string>? progress = null, CancellationToken ct = default,
+        Func<IReadOnlyList<string>, bool>? confirmChanged = null)
     {
         var done = new List<string>();
         var problems = new List<string>();
         var temp = System.IO.Path.Combine(updater.DownloadDir, "pack-" + Guid.NewGuid().ToString("N")[..8]);
+        var fetched = new List<string>();
 
         try
         {
-            foreach (var item in plan.Items.Where(i => i.Action != PackItemAction.Same))
+            // ---- 1. получить и проверить всё — профиль пока не трогаем
+            var ready = new List<(PackItemPlan Item, string File, ModInfo Info)>();
+            var changed = new List<(PackItemPlan Item, string File, ModInfo Info)>();
+            foreach (var item in plan.Items.Where(i => i.Action is not (PackItemAction.Same or PackItemAction.Duplicate)))
             {
                 ct.ThrowIfCancellationRequested();
                 var m = item.Mod;
-                progress?.Report(Loc.T("pack.installing", m.Name, m.Version));
+                progress?.Report(Loc.T("pack.checking", m.Name, m.Version));
 
                 string file;
                 try
                 {
-                    file = pack.HasFile(m) ? pack.ExtractMod(m, temp) : await DownloadExactAsync(m, ct).ConfigureAwait(false);
+                    file = pack.HasFile(m) ? pack.ExtractMod(m, temp)
+                        : await (Download ?? DownloadExactAsync)(m, ct).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or TaskCanceledException && !ct.IsCancellationRequested)
                 {
                     problems.Add($"{m.Name} {m.Version}: {ex.Message}");
                     continue;
                 }
+                fetched.Add(file);
 
-                if (!string.IsNullOrEmpty(m.Sha256)
-                    && !string.Equals(PackBuilder.Sha256Of(file), m.Sha256, StringComparison.OrdinalIgnoreCase))
-                    problems.Add(Loc.T("pack.hashMismatch", m.Name, m.Version));
+                var info = ModScanner.ReadZip(file).Info;
+                if (info is null || !string.Equals(info.ModId, m.ModId, StringComparison.OrdinalIgnoreCase) || !SameVersion(info.Version, m.Version))
+                {
+                    problems.Add(Loc.T("pack.wrongMod", m.Name, m.Version, info is null ? "?" : $"{info.ModId} {info.Version}"));
+                    continue;
+                }
+                if (!string.IsNullOrEmpty(m.Sha256) && !string.Equals(PackBuilder.Sha256Of(file), m.Sha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (pack.HasFile(m)) problems.Add(Loc.T("pack.hashBroken", m.Name, m.Version)); // вложенный файл испорчен или подменён
+                    else changed.Add((item, file, info));                                          // автор мода перезалил релиз
+                    continue;
+                }
+                ready.Add((item, file, info));
+            }
 
+            if (changed.Count > 0)
+            {
+                if (confirmChanged?.Invoke([.. changed.Select(c => $"{c.Info.Name} {c.Info.Version}")]) == true) ready.AddRange(changed);
+                else problems.AddRange(changed.Select(c => Loc.T("pack.hashSkipped", c.Info.Name, c.Info.Version)));
+            }
+
+            // ---- 2. установка проверенного
+            foreach (var (item, file, info) in ready)
+            {
+                ct.ThrowIfCancellationRequested();
+                progress?.Report(Loc.T("pack.installing", info.Name, info.Version));
                 try
                 {
                     var installPlan = ModInstaller.Plan(file, profile, ModUpdateService.ScanLocal(profile));
                     ModInstaller.Apply(installPlan, backups);
-                    done.Add(item.Installed is null ? $"{m.Name} {m.Version}" : $"{m.Name}: {item.Installed.Info!.Version} → {m.Version}");
+                    var old = installPlan.Replaces.FirstOrDefault()?.Info?.Version;
+                    done.Add(old is null ? $"{info.Name} {info.Version}" : $"{info.Name}: {old} → {info.Version}");
                 }
                 catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException)
                 {
-                    problems.Add($"{m.Name}: {ex.Message}");
-                }
-                finally
-                {
-                    if (file.StartsWith(updater.DownloadDir, StringComparison.OrdinalIgnoreCase) && !file.StartsWith(temp, StringComparison.OrdinalIgnoreCase))
-                        updater.Cleanup(file);
+                    problems.Add($"{info.Name}: {ex.Message}");
                 }
             }
+            foreach (var dup in plan.Items.Where(i => i.Action == PackItemAction.Duplicate))
+                problems.Add(Loc.T("pack.duplicate", dup.Mod.Name, dup.Mod.Version));
 
             // включено/выключено — как в паке; при зеркалировании лишние выключаются
             var fresh = ProfileResolver.Resolve(profile.Profile);
@@ -176,7 +215,8 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
                 var now = ModUpdateService.ScanLocal(fresh).Where(l => l.Info is not null)
                     .GroupBy(l => l.Info!.ModId, StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-                foreach (var m in plan.Manifest.Mods)
+                // повторяющаяся запись не переопределяет первую
+                foreach (var m in plan.Manifest.Mods.DistinctBy(m => m.ModId, StringComparer.OrdinalIgnoreCase))
                     if (now.TryGetValue(m.ModId, out var local))
                         ModConfigEditor.SetEnabled(fresh, local.Info!, m.Enabled);
                 if (mirror)
@@ -200,10 +240,19 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
         }
         finally
         {
+            foreach (var file in fetched.Where(f => f.StartsWith(updater.DownloadDir, StringComparison.OrdinalIgnoreCase)
+                                                     && !f.StartsWith(temp, StringComparison.OrdinalIgnoreCase)))
+                updater.Cleanup(file);
             try { if (Directory.Exists(temp)) Directory.Delete(temp, recursive: true); } catch (IOException) { }
         }
         return new PackImportResult(done, problems);
     }
+
+    /// <summary>Версии равны с точностью до записи: «1.0» и «1.0.0» — одно и то же.</summary>
+    private static bool SameVersion(string? actual, string? expected) =>
+        ModVersion.ParseOrNull(actual) is { } a && ModVersion.ParseOrNull(expected) is { } e
+            ? a.CompareTo(e) == 0
+            : string.Equals(actual?.Trim(), expected?.Trim(), StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Скачать ровно ту версию, что в паке (не «последнюю совместимую»).</summary>
     private async Task<string> DownloadExactAsync(PackMod m, CancellationToken ct)
