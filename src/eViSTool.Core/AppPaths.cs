@@ -15,6 +15,9 @@ public static class AppPaths
 
     public static string SettingsFile => Path.Combine(Root, "settings.json");
     public static string ModBackups => Path.Combine(Root, "ModBackups");
+
+    /// <summary>Прежние версии конфигов модов, сохранённые перед правкой в редакторе (по профилям).</summary>
+    public static string ModConfigBackups => Path.Combine(Root, "ModConfigBackups");
     public static string Downloads => Path.Combine(Root, "Downloads");
     public static string Logs => Path.Combine(Root, "logs");
     public static string Cache => Path.Combine(Root, "cache");

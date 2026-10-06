@@ -557,6 +557,8 @@
   "mcard.versionsLoading": "Loading versions…",
   "mcard.versionsNone": "No versions for this game version and no saved copies.",
   "mcard.whatsNew": "What's new in {0}",
+  "mcfg.jsonError": "The JSON is broken at line {0}, position {1}: {2}",
+  "mcfg.jsonTrailing": "Extra text after the JSON at line {0}, position {1}",
   "menu.delete": "Delete (to Recycle Bin)",
   "menu.openPage": "Open mod page",
   "menu.pin": "Pin / unpin version",
