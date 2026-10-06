@@ -120,25 +120,84 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly System.Windows.Threading.DispatcherTimer _gameWatch = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _gameChecking;
 
+    // наблюдение за запущенной игрой: её логи — с момента запуска; вылет или закрытие мира — окно с виновником.
+    // Сессия привязана к профилю, где запущена игра, — переключение активного профиля её не обрывает
+    private Core.Diagnostics.GameSession? _session;
+    private GameProfile? _sessionProfile;
+    private readonly List<(string ProfileId, Func<Task> Action)> _afterGameExit = [];
+
+    /// <summary>Игра этого профиля сейчас запущена (по последней проверке).</summary>
+    public bool IsGameRunningFor(GameProfile profile) => _sessionProfile?.Id == profile.Id;
+
+    /// <summary>
+    /// Сделать, когда игра профиля закроется: игра при выходе перезаписывает свои настройки (и список выключенных
+    /// модов) — менять их, пока она открыта, бесполезно.
+    /// </summary>
+    public void RunAfterGameExit(GameProfile profile, Func<Task> action) => _afterGameExit.Add((profile.Id, action));
+
+    private async Task RunPendingAsync(GameProfile profile)
+    {
+        var due = _afterGameExit.Where(a => a.ProfileId == profile.Id).ToList();
+        _afterGameExit.RemoveAll(a => a.ProfileId == profile.Id);
+        foreach (var (_, action) in due)
+        {
+            try { await action(); }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException) { }
+        }
+        if (due.Count > 0 && ActiveProfile?.Model.Id == profile.Id) Mods.ReloadLocal();
+    }
+
     private async Task CheckGameAsync()
     {
         if (_gameChecking) return;
-        if (ActiveProfile is not { Kind: ProfileKind.Client } profile)
-        {
-            IsGameRunning = false;
-            return;
-        }
         _gameChecking = true;
         try
         {
-            var model = profile.Model;
-            var running = await Task.Run(() => GameProcess.FindClientPids(model).Count > 0);
-            if (ActiveProfile?.Model == model) IsGameRunning = running; // пока проверяли, профиль могли сменить
+            var active = ActiveProfile is { Kind: ProfileKind.Client } p ? p.Model : null;
+            var activePids = active is null ? [] : await Task.Run(() => GameProcess.FindClientPids(active));
+            if (ActiveProfile?.Model == active) IsGameRunning = activePids.Count > 0; // пока проверяли, профиль могли сменить
+
+            if (_session is { } session && _sessionProfile is { } watched)
+            {
+                var alive = watched == active ? activePids.Count > 0 : await Task.Run(() => GameProcess.FindClientPids(watched).Count > 0);
+                var finding = await Task.Run(() => alive ? session.Poll(() => Fingerprints(watched)) : session.Finish(() => Fingerprints(watched)));
+                if (!alive)
+                {
+                    (_session, _sessionProfile) = (null, null);
+                    await RunPendingAsync(watched); // отложенное до выхода из игры (например, выключение мода из окна вылета)
+                }
+                if (finding is not null) ShowCrash(watched, finding);
+            }
+            else if (active is not null && activePids.Count > 0)
+            {
+                // игра этого профиля только что запущена (нами или как угодно) — начинаем следить с её старта
+                var started = DateTime.UtcNow;
+                try { using var proc = System.Diagnostics.Process.GetProcessById(activePids[0]); started = proc.StartTime.ToUniversalTime(); }
+                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception) { }
+                var dataDir = string.IsNullOrWhiteSpace(active.DataDir) ? GameInstall.DefaultDataDir : active.DataDir;
+                _session = new Core.Diagnostics.GameSession(dataDir, started);
+                _sessionProfile = active;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            // логи не прочитать — следующая проверка через пару секунд
         }
         finally
         {
             _gameChecking = false;
         }
+    }
+
+    /// <summary>Отпечатки модов профиля — по чему узнавать их в логах.</summary>
+    private static Core.Diagnostics.ModFingerprints Fingerprints(GameProfile profile) =>
+        Core.Diagnostics.ModFingerprints.Build(Core.Mods.ModUpdateService.ScanLocal(ProfileResolver.Resolve(profile)));
+
+    private void ShowCrash(GameProfile profile, Core.Diagnostics.CrashFinding finding)
+    {
+        var window = new CrashWindow(this, profile, finding);
+        window.Show(); // не модально: игра (если мир закрылся, она открыта) и программа остаются доступны
+        window.Activate();
     }
 
     public string PlayTip => ActiveProfile is not { Kind: ProfileKind.Client } profile ? ""

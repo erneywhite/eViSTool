@@ -1,0 +1,38 @@
+<Window x:Class="eViSTool.App.CrashWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:eViSTool.App"
+        Icon="Assets/eViSTool.ico" Width="600" SizeToContent="Height" ResizeMode="NoResize"
+        Background="{StaticResource Forest.Base}" WindowStartupLocation="CenterScreen" ShowInTaskbar="True" Topmost="True">
+    <StackPanel Margin="24,20,24,22">
+        <TextBlock x:Name="Heading" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" TextWrapping="Wrap" />
+        <TextBlock x:Name="Profile" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="0,2,0,0" />
+
+        <!-- виновник -->
+        <Border Background="{StaticResource Forest.Surface}" CornerRadius="6" Padding="14,10" Margin="0,14,0,0">
+            <StackPanel>
+                <TextBlock x:Name="Culprit" FontSize="14" Foreground="{StaticResource Forest.Text}" TextWrapping="Wrap" />
+                <TextBlock x:Name="How" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap" Margin="0,4,0,0" />
+            </StackPanel>
+        </Border>
+
+        <TextBlock x:Name="Reason" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap" Margin="0,10,0,0" />
+
+        <!-- подробности: ошибка и стек — для автора мода или форума -->
+        <Expander Header="{local:Tr crash.details}" Margin="0,10,0,0" Foreground="{StaticResource Forest.Text}">
+            <TextBox x:Name="Details" IsReadOnly="True" TextWrapping="NoWrap" FontFamily="Consolas" FontSize="11" MaxHeight="220"
+                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Margin="0,6,0,0" />
+        </Expander>
+
+        <TextBlock x:Name="Status" FontSize="12" Foreground="{StaticResource Forest.Accent}" TextWrapping="Wrap" Margin="0,10,0,0" />
+
+        <WrapPanel HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button x:Name="DisableButton" Content="{local:Tr crash.disable}" Click="Disable_Click" Padding="14,8" Margin="0,0,8,0"
+                    Style="{StaticResource Forest.PrimaryButton}" AutomationProperties.AutomationId="CrashDisable" />
+            <Button x:Name="ShowButton" Content="{local:Tr crash.showInMods}" Click="Show_Click" Padding="14,8" Margin="0,0,8,0" />
+            <Button x:Name="CatalogButton" Content="{local:Tr crash.catalog}" Click="Catalog_Click" Padding="14,8" Margin="0,0,8,0" />
+            <Button Content="{local:Tr crash.copy}" Click="Copy_Click" Padding="14,8" Margin="0,0,8,0" />
+            <Button Content="{local:Tr common.close}" IsCancel="True" Padding="16,8" AutomationProperties.AutomationId="CrashClose" />
+        </WrapPanel>
+    </StackPanel>
+</Window>
