@@ -1,0 +1,39 @@
+<Window x:Class="eViSTool.App.AlsoInstallWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:eViSTool.App"
+        Icon="Assets/eViSTool.ico" Width="560" SizeToContent="Height" ResizeMode="NoResize"
+        Background="{StaticResource Forest.Base}" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Title="{local:Tr also.title}">
+    <StackPanel Margin="24,20,24,22">
+        <TextBlock Text="{local:Tr also.title}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" />
+        <TextBlock x:Name="Hint" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap" Margin="0,4,0,0" />
+
+        <!-- профили: текущий отмечен всегда; недоступные — с причиной, без галочки -->
+        <ItemsControl x:Name="Rows" Margin="0,14,0,0">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Background="{StaticResource Forest.Surface}" CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
+                        <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding IsEnabled}" VerticalContentAlignment="Center"
+                                  AutomationProperties.Name="{Binding Name}">
+                            <StackPanel Margin="4,0,0,0">
+                                <TextBlock FontSize="13" Foreground="{StaticResource Forest.Text}">
+                                    <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" />
+                                    <Run Text="·" Foreground="{StaticResource Forest.Muted}" />
+                                    <Run Text="{Binding KindText, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" />
+                                </TextBlock>
+                                <TextBlock Text="{Binding Detail}" FontSize="11" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </CheckBox>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button Content="{local:Tr also.install}" IsDefault="True" Click="Ok_Click" Padding="18,8"
+                    Style="{StaticResource Forest.PrimaryButton}" AutomationProperties.AutomationId="AlsoOk" />
+            <Button Content="{local:Tr common.cancel}" IsCancel="True" Margin="8,0,0,0" Padding="16,8" />
+        </StackPanel>
+    </StackPanel>
+</Window>

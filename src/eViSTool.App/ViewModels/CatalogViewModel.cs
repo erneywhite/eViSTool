@@ -360,7 +360,43 @@ public sealed partial class CatalogViewModel : ObservableObject
                            string.Join(", ", release.GameVersions.TakeLast(3)), game),
                    "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
             return;
+
+        // мод нужен и в других профилях (сервер ↔ клиент) — предложить поставить заодно, каждому свою версию
+        var also = await PickAlsoAsync(details, id, release);
+        if (also is null) return; // отменили
         await _main.Mods.InstallFromCatalogAsync(id, details.Name, release);
+        if (also.Count > 0)
+            _main.Mods.Enqueue(also.Select(o => new UpdateQueueItem(o.Target, id, details.Name, o.Installed ?? "",
+                o.Release!.ModVersion ?? "?", o.Release, null)));
+    }
+
+    /// <summary>
+    /// Окно «Установить также в». Пустой список — ставить только сюда (предлагать некуда или не о чем), null — отмена.
+    /// </summary>
+    private async Task<IReadOnlyList<AlsoInstallOption>?> PickAlsoAsync(ModDetailsViewModel details, string id, ModDbRelease release)
+    {
+        if (details.Mod is not { } mod || _main.ActiveProfile is not { } active) return [];
+        var side = ModSides.Parse(mod.Side ?? details.RawSide);
+        if (!AlsoInstall.WorthOffering(side)) return [];
+        var others = _main.Profiles
+            .Where(p => p != active && AlsoInstall.Needed(side, p.Model.Kind))
+            .Select(p => (Profile: p, Target: ModTarget.For(p.Model)))
+            .Where(x => x.Target is not null)
+            .ToList();
+        if (others.Count == 0) return [];
+
+        StatusText = Loc.T("also.checking");
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)); // удалённый сервер не на связи — не ждать вечно
+        var options = await Task.WhenAll(others.Select(x => AlsoInstall.EvaluateAsync(x.Target!, id, mod.Releases, release, cts.Token)));
+        StatusText = "";
+        if (!options.Any(o => o.CanInstall)) return [];
+
+        var game = AlsoInstall.GameText(_main.Mods.GameVersion);
+        var dlg = new AlsoInstallWindow(details.Name, active.Name, active.KindText,
+            Loc.T("also.thisProfile") + " · " + Loc.T("also.willInstall", game, release.ModVersion),
+            options.Select((o, i) => (o, others[i].Profile.Name, others[i].Profile.KindText)))
+        { Owner = Application.Current.MainWindow };
+        return dlg.ShowDialog() == true ? dlg.Chosen : null;
     }
 }
 
