@@ -40,6 +40,9 @@ public partial class ServerView : UserControl
             {
                 if (!e.Cancel && _vm is not null && !_vm.Config.ConfirmClose()) e.Cancel = true;
             };
+            // подсказки — отдельное окно (Popup) и сами за окном не едут: окно сдвинули или растянули — переставить
+            window.LocationChanged += (_, _) => RepositionSuggestions();
+            window.SizeChanged += (_, _) => RepositionSuggestions();
         };
 
         // пока была открыта «Конфигурация», строки копились без прокрутки — вернулись к консоли, догоняем
@@ -47,6 +50,15 @@ public partial class ServerView : UserControl
         {
             if (e.NewValue is true) OnLinesAppended(force: false);
         };
+    }
+
+    private void RepositionSuggestions()
+    {
+        if (!SuggestionPopup.IsOpen) return;
+        // смена смещения заставляет Popup пересчитать место относительно поля
+        var offset = SuggestionPopup.HorizontalOffset;
+        SuggestionPopup.HorizontalOffset = offset + 1;
+        SuggestionPopup.HorizontalOffset = offset;
     }
 
     // Автопрокрутка как в терминале: консоль «прилипает» к низу, пока пользователь сам не отмотал вверх.

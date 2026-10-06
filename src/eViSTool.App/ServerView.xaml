@@ -236,7 +236,7 @@
                                          LostKeyboardFocus="CommandBox_LostKeyboardFocus"
                                          Padding="28,7,10,7" ToolTip="{local:Tr server.commandTip}" AutomationProperties.AutomationId="SrvCommandBox" />
                                 <!-- подсказки команд — над полем: оно внизу окна -->
-                                <Popup IsOpen="{Binding ShowSuggestions}" PlacementTarget="{Binding ElementName=CommandBox}" Placement="Top"
+                                <Popup x:Name="SuggestionPopup" IsOpen="{Binding ShowSuggestions}" PlacementTarget="{Binding ElementName=CommandBox}" Placement="Top"
                                        AllowsTransparency="True" StaysOpen="True" Focusable="False" VerticalOffset="-4">
                                     <Border Background="{StaticResource Forest.Surface}" BorderBrush="{StaticResource Forest.Line}" BorderThickness="1"
                                             CornerRadius="6" Padding="4" MinWidth="{Binding ActualWidth, ElementName=CommandBox}" MaxWidth="900">
