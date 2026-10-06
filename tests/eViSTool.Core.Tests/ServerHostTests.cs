@@ -76,7 +76,7 @@ public sealed class ServerHostTests : IAsyncLifetime
         var firstPid = host.Pid;
 
         await host.SendCommandAsync("/crash");
-        await Until(() => host.State == ServerState.Running && host.Pid != firstPid);
+        await Until(() => host.State == ServerState.Running && host.Pid is { } pid && pid != firstPid);
         Assert.Contains(host.Console.GetSince(0), l => l.Kind == ConsoleLineKind.System && l.Text.Contains("1"));
     }
 
@@ -89,7 +89,7 @@ public sealed class ServerHostTests : IAsyncLifetime
 
         var firstPid = host.Pid;
         await host.SendCommandAsync("/crash");                       // 1-е падение — перезапуск
-        await Until(() => host.State == ServerState.Running && host.Pid != firstPid);
+        await Until(() => host.State == ServerState.Running && host.Pid is { } pid && pid != firstPid);
         await host.SendCommandAsync("/crash");                       // 2-е — сторож сдаётся
         await Until(() => host.State == ServerState.Stopped);
         await Task.Delay(600);
