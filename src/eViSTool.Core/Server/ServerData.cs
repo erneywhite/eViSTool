@@ -74,6 +74,8 @@ public sealed class ServerFiles(string profileId, string dataDir, string? backup
     {
         var save = SaveFileOf(dataDir) ?? throw new InvalidOperationException(Loc.T("sched.noConfig"));
         var store = Store;
+        // мир занят на время копии: сервер (в том числе сторож в агенте) не стартует посреди неё
+        using var world = WorldLock.Take(dataDir, WorldLock.Copy);
         var made = store.CopySave(save, now);
         var settings = LoadAutomation();
         if (settings.BackupEnabled && settings.BackupKeep > 0) store.Prune(settings.BackupKeep);
@@ -86,6 +88,8 @@ public sealed class ServerFiles(string profileId, string dataDir, string? backup
         // имя — только из списка копий: путь «..\..\что-то» сюда не пройдёт
         var backup = store.Find(name) ?? throw new FileNotFoundException(Loc.T("sched.noBackup", name));
         var save = SaveFileOf(dataDir) ?? throw new InvalidOperationException(Loc.T("sched.noConfig"));
+        // мир занят на всё восстановление; работает или запускается сервер — отказ (замок держит он)
+        using var world = WorldLock.Take(dataDir, WorldLock.Restore);
         return new RestoreResult(store.Restore(backup, save, now)?.Name) { ModDataRestored = backup.ModDataSize > 0 };
     }
 
@@ -121,8 +125,9 @@ public sealed class ServerFiles(string profileId, string dataDir, string? backup
     public ConfigSaveResult WriteConfig(ConfigSaveRequest request)
     {
         var path = ConfigPath;
-        if (!request.Force && StampOf(path) != request.ExpectedStamp) return new ConfigSaveResult(true, ReadConfig());
         var root = ModConfigEditor.Parse(request.Text);
+        using var world = WorldLock.Take(dataDir, WorldLock.Config); // сервер не стартует на полузаписанном конфиге
+        if (!request.Force && StampOf(path) != request.ExpectedStamp) return new ConfigSaveResult(true, ReadConfig());
         ModConfigEditor.Save(path, root);
         return new ConfigSaveResult(false, ReadConfig());
     }
@@ -146,7 +151,11 @@ public sealed class ServerFiles(string profileId, string dataDir, string? backup
 }
 
 /// <summary>Сервер на этой машине: те же файлы, в фоне.</summary>
-public sealed class LocalServerData(ServerFiles files) : IServerData
+/// <summary>
+/// Сервер на этой машине: файлы напрямую. Восстановление — через агента профиля, если он запущен: агент владеет
+/// сервером и отменит ожидающий перезапуск сторожа (иначе сервер, упавший перед восстановлением, поднялся бы сам).
+/// </summary>
+public sealed class LocalServerData(ServerFiles files, Func<AgentClient?>? agent = null) : IServerData
 {
     public ServerFiles Files => files;
     public bool IsRemote => false;
@@ -154,7 +163,8 @@ public sealed class LocalServerData(ServerFiles files) : IServerData
     public Task SaveAutomationAsync(ServerAutomation settings, CancellationToken ct = default) => Task.Run(() => files.SaveAutomation(settings), ct);
     public Task<IReadOnlyList<BackupEntry>> ListBackupsAsync(CancellationToken ct = default) => Task.Run(files.ListBackups, ct);
     public Task<BackupEntry> CopyWorldAsync(CancellationToken ct = default) => Task.Run(() => files.CopyWorld(DateTime.Now), ct);
-    public Task<RestoreResult> RestoreAsync(string name, CancellationToken ct = default) => Task.Run(() => files.Restore(name, DateTime.Now), ct);
+    public Task<RestoreResult> RestoreAsync(string name, CancellationToken ct = default) =>
+        agent?.Invoke() is { } client ? client.RestoreAsync(name, ct) : Task.Run(() => files.Restore(name, DateTime.Now), ct);
     public Task DeleteBackupAsync(string name, CancellationToken ct = default) => Task.Run(() => files.DeleteBackup(name), ct);
 }
 

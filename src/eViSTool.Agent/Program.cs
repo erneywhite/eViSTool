@@ -305,7 +305,14 @@ web.MapPut("/automation", async (HttpContext ctx) =>
 web.MapGet("/backups", () => Guard(files.ListBackups));
 web.MapPost("/backups/copy", () => WhenStopped(() => files.CopyWorld(DateTime.Now)));
 web.MapPost("/backups/restore", async (HttpContext ctx) =>
-    await ReadName(ctx) is { Length: > 0 } name ? WhenStopped(() => files.Restore(name, DateTime.Now)) : Results.BadRequest());
+    await ReadName(ctx) is { Length: > 0 } name
+        ? WhenStopped(() =>
+        {
+            // мир возвращают вручную — сервер, упавший перед этим, не должен подняться сам (сторож ждал паузу)
+            host.CancelPendingRestart();
+            return files.Restore(name, DateTime.Now);
+        })
+        : Results.BadRequest());
 // моды сервера — для окна на другой машине: список, включение/выключение, удаление, установка присланного архива
 web.MapGet("/mods", () => Guard(mods.List));
 web.MapGet("/commands", () => { lock (commands) return Json(commands.Values.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ToList()); });

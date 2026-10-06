@@ -127,6 +127,9 @@ public sealed class AgentTests : IAsyncLifetime
 
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: true, AgentExe, AgentsDir);
         await Until(async () => (await _client.StatusAsync()).State == ServerState.Running);
+        // мир держит сервер в другом процессе (агенте) — окну на этой машине восстановление не начать
+        Assert.Null(WorldLock.TryTake(_profile.DataDir!, WorldLock.Restore));
+        Assert.Equal(WorldLock.Server, WorldLock.HolderOf(_profile.DataDir!));
         var status = await _client.StatusAsync();
         Assert.Equal(new DateTime(2026, 9, 3, 10, 0, 0), status.LastBackupAt); // самая свежая своя на диске
         Assert.NotNull(status.NextBackupAt);

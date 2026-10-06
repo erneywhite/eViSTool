@@ -140,4 +140,77 @@ public sealed class ServerHostTests : IAsyncLifetime
         Assert.True(host.Console.GetSince(0, 10000).Count(l => l.Kind == ConsoleLineKind.Error) >= 4000);
         await host.StopAsync();
     }
+    // ---------- замок мира (аудит, пункт 5) ----------
+
+    [Fact]
+    public async Task Start_WhileTheWorldIsBeingRestored_IsRefused()
+    {
+        var host = Host();
+        using (WorldLock.Take(_data, WorldLock.Restore))
+        {
+            var ex = await Assert.ThrowsAsync<WorldBusyException>(host.StartAsync);
+            Assert.Equal(WorldLock.BusyMessage(_data), ex.Message);
+            Assert.Equal(ServerState.Stopped, host.State);
+            Assert.Null(host.Pid);
+        }
+
+        await host.StartAsync(); // освободилось — запускается
+        await Until(() => host.State == ServerState.Running);
+        await host.StopAsync();
+    }
+
+    [Fact]
+    public async Task RunningServer_HoldsTheWorld_UntilItExits()
+    {
+        var host = Host();
+        await host.StartAsync();
+        Assert.Null(WorldLock.TryTake(_data, WorldLock.Restore)); // уже в «запускается» — восстановлению отказ
+        Assert.Equal(WorldLock.Server, WorldLock.HolderOf(_data));
+        await Until(() => host.State == ServerState.Running);
+        Assert.Null(WorldLock.TryTake(_data, WorldLock.Copy));
+
+        await host.StopAsync();
+        using var after = WorldLock.TryTake(_data, WorldLock.Restore);
+        Assert.NotNull(after);
+    }
+
+    [Fact]
+    public async Task Watchdog_WaitsWhileTheWorldIsBusy_ThenStarts()
+    {
+        var host = Host(o => o with { RestartDelay = TimeSpan.FromMilliseconds(300) });
+        await host.StartAsync();
+        await Until(() => host.State == ServerState.Running);
+
+        WorldLock? restore = null;
+        host.StateChanged += s => { if (s == ServerState.Stopped) restore ??= WorldLock.TryTake(_data, WorldLock.Restore); };
+        await host.SendCommandAsync("/crash");
+        await Until(() => restore is not null);
+
+        await Task.Delay(1200); // несколько пауз сторожа — мир занят, сервер не стартует
+        Assert.Equal(ServerState.Stopped, host.State);
+        Assert.Single(host.Console.GetSince(0), l => l.Text.Contains(WorldLock.BusyMessage(_data))); // сказал один раз
+
+        restore!.Dispose();
+        await Until(() => host.State == ServerState.Running);
+        await host.StopAsync();
+    }
+
+    [Fact]
+    public async Task CancelledRestart_DoesNotStartTheServerAfterTheRestore()
+    {
+        var host = Host(o => o with { RestartDelay = TimeSpan.FromMilliseconds(300) });
+        await host.StartAsync();
+        await Until(() => host.State == ServerState.Running);
+
+        WorldLock? restore = null;
+        host.StateChanged += s => { if (s == ServerState.Stopped) restore ??= WorldLock.TryTake(_data, WorldLock.Restore); };
+        await host.SendCommandAsync("/crash");
+        await Until(() => restore is not null);
+
+        host.CancelPendingRestart(); // так делает восстановление через агента
+        Assert.Null(host.RestartScheduledAt);
+        restore!.Dispose();
+        await Task.Delay(1000);
+        Assert.Equal(ServerState.Stopped, host.State);
+    }
 }

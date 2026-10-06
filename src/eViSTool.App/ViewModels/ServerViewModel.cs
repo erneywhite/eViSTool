@@ -191,7 +191,10 @@ public sealed partial class ServerViewModel : ObservableObject
 
     public bool HasForeign => ForeignPid is not null;
     public string ForeignText => ForeignPid is { } pid ? Loc.T("server.foreign", pid) : "";
-    public bool CanStart => IsServerProfile && !IsBusy && ForeignPid is null && State == ServerState.Stopped && (!IsRemoteProfile || AgentRunning);
+    public bool CanStart => IsServerProfile && !IsBusy && ForeignPid is null && State == ServerState.Stopped && (!IsRemoteProfile || AgentRunning)
+                            && Schedule?.IsRestoring != true;
+
+    internal void NotifyCanStart() => OnPropertyChanged(nameof(CanStart));
     public bool CanStop => AgentRunning && !IsBusy && State is ServerState.Running or ServerState.Starting;
     public bool CanCommand => AgentRunning && State is ServerState.Running or ServerState.Starting;
 

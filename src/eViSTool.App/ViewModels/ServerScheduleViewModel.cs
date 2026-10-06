@@ -99,7 +99,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         if (key == _profileKey)
         {
             // только имя профиля: оно идёт в имена копий — источник данных пересоздаём, настройки не перечитываем
-            if (profile is { IsRemote: false, DataDir: { } dir }) _data = Local(profile, dir);
+            if (profile is { IsRemote: false, DataDir: { } dir }) _data = Local(profile, dir, remoteClient);
             return;
         }
         _profileKey = key;
@@ -107,7 +107,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         _dataDir = profile is { IsRemote: false } ? profile.DataDir : null;
         _data = profile is null ? null
             : profile.IsRemote ? new RemoteServerData(remoteClient)
-            : profile.DataDir is { } data ? Local(profile, data) : null;
+            : profile.DataDir is { } data ? Local(profile, data, remoteClient) : null;
         IsLocal = _data is LocalServerData;
         _lastSeenBackup = null;
         _seenAutomationChange = null;
@@ -125,8 +125,14 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         _ = LoadAsync(_generation);
     }
 
-    private static LocalServerData Local(GameProfile profile, string dataDir) =>
-        new(new ServerFiles(profile.Id, dataDir, BackupStore.Slug(profile.Name)));
+    // агент своего сервера (если запущен) — для восстановления: он отменит ожидающий перезапуск сторожа
+    private static LocalServerData Local(GameProfile profile, string dataDir, Func<AgentClient?> agent) =>
+        new(new ServerFiles(profile.Id, dataDir, BackupStore.Slug(profile.Name)), agent);
+
+    /// <summary>Идёт восстановление мира — «Запустить» неактивна (защищает замок мира, это — для понятности).</summary>
+    [ObservableProperty] private bool _isRestoring;
+
+    partial void OnIsRestoringChanged(bool value) => _server.NotifyCanStart();
 
     /// <summary>Прочитать настройки расписания и список копий (у удалённого сервера — когда есть связь).</summary>
     private async Task LoadAsync(int generation)
@@ -441,6 +447,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
             return;
 
         IsBusy = true;
+        IsRestoring = true;
         try
         {
             var result = await data.RestoreAsync(row.Name);
@@ -455,6 +462,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            IsRestoring = false;
         }
         await RefreshListAsync();
     }
