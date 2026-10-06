@@ -91,7 +91,20 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HasLinkChoices));
     }
 
-    partial void OnEditedProfileChanged(ProfileViewModel? value) => RefreshLinks();
+    /// <summary>Копии одиночных миров редактируемого профиля (только у игрового профиля).</summary>
+    [ObservableProperty] private WorldCopiesViewModel? _worldCopies;
+
+    partial void OnEditedProfileChanged(ProfileViewModel? value)
+    {
+        RefreshLinks();
+        WorldCopies = value?.Model.Kind == ProfileKind.Client ? new WorldCopiesViewModel(value.Model) : null;
+    }
+
+    /// <summary>Сделаны новые копии миров — обновить список в настройках, если открыт этот профиль.</summary>
+    public void RefreshWorldCopies(GameProfile profile)
+    {
+        if (EditedProfile?.Model == profile) WorldCopies?.Refresh();
+    }
 
     partial void OnAlsoInstallWithoutAskingChanged(bool value)
     {
@@ -428,7 +441,7 @@ public sealed partial class MainViewModel : ObservableObject
         _selectedLanguage = Languages.FirstOrDefault(l => l.Value == Loc.Instance.Language) ?? Languages[0];
         _activeProfile = Profiles.FirstOrDefault(p => p.Model == _settings.ActiveProfile);
         _editedProfile = _activeProfile;
-        RefreshLinks(); // поле выше задано мимо свойства — список связей собрать самим
+        OnEditedProfileChanged(_editedProfile); // поле выше задано мимо свойства — связи и копии миров собрать самим
 
         var db = new ModDbClient();
         Mods = new ModsViewModel(this, db);

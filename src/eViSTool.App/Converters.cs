@@ -40,6 +40,16 @@ public sealed class ScreenshotThumbConverter : IValueConverter
         throw new NotSupportedException();
 }
 
+/// <summary>Есть объект — видно, null — скрыто.</summary>
+public sealed class NullToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 /// <summary>Число больше нуля — видно, иначе скрыто.</summary>
 public sealed class CountToVisibilityConverter : IValueConverter
 {

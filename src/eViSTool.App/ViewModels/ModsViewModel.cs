@@ -614,6 +614,7 @@ public sealed partial class ModsViewModel : ObservableObject
         StatusText = Loc.T("wcopy.copying");
         var (copied, failed) = await Task.Run(() => WorldCopies.Refresh(data));
         _copiedWorlds.AddRange(copied.Where(c => !_copiedWorlds.Contains(c)));
+        if (copied.Count > 0) _main.RefreshWorldCopies(target.Profile);
         StatusText = "";
         foreach (var f in failed) Note(f);
     }

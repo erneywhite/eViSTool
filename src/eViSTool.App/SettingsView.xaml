@@ -5,6 +5,8 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <local:InvertBoolToVisibilityConverter x:Key="InvertVis" />
+        <local:NullToVisibilityConverter x:Key="NullToVis" />
+        <local:TextToVisibilityConverter x:Key="TextToVis" />
         <local:InvertBoolConverter x:Key="Invert" />
 
         <!-- заголовок карточки и пояснение к нему -->
@@ -219,6 +221,44 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- копии одиночных миров игрового профиля: снимаются перед изменением модов, здесь — вернуть -->
+                    <Border Style="{StaticResource SettingsCard}" DataContext="{Binding WorldCopies}"
+                            Visibility="{Binding Converter={StaticResource NullToVis}}">
+                        <StackPanel>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="{local:Tr wcopy.openFolder}" Command="{Binding OpenFolderCommand}"
+                                        Padding="12,5" MinHeight="0" VerticalAlignment="Top"
+                                        Visibility="{Binding IsEmpty, Converter={StaticResource InvertVis}}" />
+                                <TextBlock Text="{local:Tr wcopy.title}" Style="{StaticResource CardTitle}" />
+                            </DockPanel>
+                            <TextBlock Text="{local:Tr wcopy.hint}" Style="{StaticResource Hint}" />
+                            <TextBlock Text="{local:Tr wcopy.none}" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap"
+                                       Margin="0,10,0,0" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}" />
+                            <ItemsControl ItemsSource="{Binding Rows}" Margin="0,6,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,0,0,1" Padding="0,8">
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Right" Content="{local:Tr wcopy.restore}" Padding="12,5" MinHeight="0"
+                                                        VerticalAlignment="Center" CommandParameter="{Binding}"
+                                                        Command="{Binding DataContext.RestoreCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                        AutomationProperties.Name="{Binding Name}" />
+                                                <StackPanel Margin="0,0,12,0">
+                                                    <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{StaticResource Forest.Text}" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Details}" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="{Binding Summary}" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="0,8,0,0"
+                                       Visibility="{Binding Summary, Converter={StaticResource TextToVis}}" />
+                            <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{StaticResource Forest.Accent}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                       Visibility="{Binding Status, Converter={StaticResource TextToVis}}" />
                         </StackPanel>
                     </Border>
 

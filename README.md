@@ -128,6 +128,16 @@ so the game sees it exactly the same way. Do it with the game closed: the game r
 **Dependencies.** If an enabled mod needs another mod that is missing, outdated or disabled, a banner appears above the table.
 **Fix** downloads what is missing from the ModDB and enables what is disabled.
 
+**Needs a newer game.** If a mod's own files say it needs a newer game than the profile has (say 1.22.8 while you have 1.22.7),
+its status is *Needs game 1.22.8*: the game would not load it. eViSTool also looks inside a downloaded mod before installing it
+and asks first, updates included — the ModDB marks releases only by branch (1.22.x), so the mod file is the only place that says it.
+
+**World copies.** Before the mods of a game profile change, eViSTool copies the single-player worlds you played since the last copy —
+one copy per world, kept next to the worlds in the profile's data folder (`eViSTool-world-copies`). If an update breaks a world,
+open **Settings → the profile → World copies** and press **Put back**. The world it replaces is set aside in the same list,
+so this can be undone too. It is on by default (**Copy single-player worlds before changing mods** in **Settings**).
+Data that mods keep next to the worlds (for example `Saves/XLeveling`) is shared by all worlds and is not part of these copies.
+
 **Adding mods by hand.** **Add**, or just drag zip files onto the list. If it is the same version, an older one or a mod
 that is already installed, eViSTool asks before replacing. **Delete** moves the file to the Recycle Bin.
 
