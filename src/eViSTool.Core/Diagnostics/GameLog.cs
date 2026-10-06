@@ -46,6 +46,9 @@ public static partial class GameLog
         return result;
     }
 
+    /// <summary>Строка начинает новую запись лога (дата, время, [уровень]).</summary>
+    public static bool IsEntryStart(string line) => EntryLine().IsMatch(line);
+
     public static IReadOnlyList<LogEntry> Parse(string text) => Parse(text.Split('\n').Select(l => l.TrimEnd('\r')));
 
     /// <summary>«at A.B.C(x)» — «A.B.C»; в одной строке бывает несколько «at» (лог склеивает стеки).</summary>

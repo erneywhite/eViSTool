@@ -17,6 +17,10 @@ public sealed class GameSession
     private readonly DateTime _crashBaseline;
     private readonly List<string> _clientLines = [];
     private readonly List<string> _serverLines = [];
+    // ошибки за весь запуск (для «Ошибок модов») — их не сбрасывает и закрытие мира
+    private readonly List<LogEntry> _errors = [];
+    private readonly List<string> _pendingErrorLines = [];
+    private readonly List<string> _pendingServerErrorLines = [];
 
     /// <param name="dataDir">Папка данных профиля (там Logs).</param>
     /// <param name="startedUtc">Когда запущена игра: лог, начатый после этого, читается с начала, иначе — с текущего конца.</param>
@@ -52,8 +56,13 @@ public sealed class GameSession
     /// <summary>Игра закрылась: был ли вылет (или закрытие мира, которое не успели заметить). null — обычный выход.</summary>
     public CrashFinding? Finish(Func<ModFingerprints> mods)
     {
-        _clientLines.AddRange(_client.Flush());
-        _serverLines.AddRange(_server.Flush());
+        var client = _client.Flush();
+        var server = _server.Flush();
+        _clientLines.AddRange(client);
+        _serverLines.AddRange(server);
+        _pendingErrorLines.AddRange(client);
+        _pendingServerErrorLines.AddRange(server);
+        CollectAll(final: true);
         string? report = null;
         if (File.Exists(_crashFile) && File.GetLastWriteTimeUtc(_crashFile) > _crashBaseline)
         {
@@ -63,11 +72,44 @@ public sealed class GameSession
         return CrashAnalyzer.Analyze(GameLog.Parse(_clientLines), report, GameLog.Parse(_serverLines), mods());
     }
 
+    /// <summary>«Ошибки модов» за этот запуск: игра их проглотила, но они копятся (и бывают фризы).</summary>
+    public ModErrorReport ErrorReport(Func<ModFingerprints> mods)
+    {
+        Read();
+        return ModErrorReport.Build(_errors, mods(), StartedUtc.ToLocalTime());
+    }
+
+    // из новых строк каждого лога — только записи-ошибки (и строка перевода за ними): весь лог хранить незачем.
+    // Последняя запись может быть ещё не дописана (стек придёт следующим чтением) — её придерживаем, кроме final.
+    // Клиентский и серверный логи — каждый в своём буфере: склеенные, записи спутались бы на стыке
+    private void CollectAll(bool final)
+    {
+        CollectErrors(_pendingErrorLines, final);
+        CollectErrors(_pendingServerErrorLines, final);
+    }
+
+    private void CollectErrors(List<string> pending, bool final)
+    {
+        var cut = final ? pending.Count : pending.FindLastIndex(GameLog.IsEntryStart);
+        if (cut <= 0) return;
+        var entries = GameLog.Parse(pending.Take(cut).ToList());
+        pending.RemoveRange(0, cut);
+        for (var i = 0; i < entries.Count; i++)
+            if (entries[i].IsError || (i > 0 && entries[i - 1].IsError && entries[i].Level == "Warning"))
+                _errors.Add(entries[i]);
+        if (_errors.Count > MaxLines) _errors.RemoveRange(0, _errors.Count - MaxLines);
+    }
+
     private IReadOnlyList<string> Read()
     {
         var fresh = _client.ReadNew();
+        var server = _server.ReadNew();
         Keep(_clientLines, fresh);
-        Keep(_serverLines, _server.ReadNew());
+        Keep(_serverLines, server);
+        // клиентский и серверный логи разбираются порознь: склеенные, записи спутались бы на стыке
+        _pendingErrorLines.AddRange(fresh);
+        _pendingServerErrorLines.AddRange(server);
+        CollectAll(final: false);
         return fresh;
     }
 

@@ -126,6 +126,47 @@ public sealed partial class MainViewModel : ObservableObject
     private GameProfile? _sessionProfile;
     private readonly List<(string ProfileId, Func<Task> Action)> _afterGameExit = [];
 
+    // ---- «Ошибки модов» активного профиля: «!» у выбора профиля, когда их много
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasErrorBadge), nameof(ErrorBadgeTip))]
+    private Core.Diagnostics.ModErrorReport? _errorReport;
+
+    public bool HasErrorBadge => ErrorReport is { IsNoisy: true, Dismissed: false };
+
+    public string ErrorBadgeTip => ErrorReport is { } r ? Loc.T("errs.badgeTip", r.Mods.Count, r.Total) : "";
+
+    private int _errorTicks;
+
+    /// <summary>Отчёт профиля: из прошлых запусков (с диска).</summary>
+    private void LoadErrorReport() =>
+        ErrorReport = ActiveProfile is { } p ? Core.Diagnostics.ModErrorReport.Load(p.Model.Id) : null;
+
+    /// <summary>Свежий отчёт запуска: сохраняем; «скрыто» держится до конца этого запуска (мод шумит постоянно —
+    /// «!» иначе возвращалась бы каждые полминуты), следующий запуск с ошибками покажет её снова.</summary>
+    private void UpdateErrorReport(GameProfile profile, Core.Diagnostics.ModErrorReport report)
+    {
+        var old = Core.Diagnostics.ModErrorReport.Load(profile.Id);
+        if (old is { Dismissed: true } && Math.Abs((old.At - report.At).TotalSeconds) < 1) report = report with { Dismissed = true };
+        if (report.Total > 0 || old is not null) report.Save(profile.Id);
+        if (ActiveProfile?.Model.Id == profile.Id) ErrorReport = report;
+    }
+
+    /// <summary>«Скрыть»: игрок посмотрел — «!» уходит до новых ошибок.</summary>
+    public void DismissErrorReport(GameProfile profile, Core.Diagnostics.ModErrorReport report)
+    {
+        var dismissed = report with { Dismissed = true };
+        dismissed.Save(profile.Id);
+        if (ActiveProfile?.Model.Id == profile.Id) ErrorReport = dismissed;
+    }
+
+    [RelayCommand]
+    private void ShowErrors()
+    {
+        if (ActiveProfile is not { } p || ErrorReport is not { } r) return;
+        new ModErrorsWindow(this, p.Model, r) { Owner = System.Windows.Application.Current.MainWindow }.Show();
+    }
+
     /// <summary>Игра этого профиля сейчас запущена (по последней проверке).</summary>
     public bool IsGameRunningFor(GameProfile profile) => _sessionProfile?.Id == profile.Id;
 
@@ -161,6 +202,9 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 var alive = watched == active ? activePids.Count > 0 : await Task.Run(() => GameProcess.FindClientPids(watched).Count > 0);
                 var finding = await Task.Run(() => alive ? session.Poll(() => Fingerprints(watched)) : session.Finish(() => Fingerprints(watched)));
+                // «ошибки модов» — раз в полминуты, пока игра идёт, и после выхода
+                if (!alive || ++_errorTicks % 15 == 0)
+                    UpdateErrorReport(watched, await Task.Run(() => session.ErrorReport(() => Fingerprints(watched))));
                 if (!alive)
                 {
                     (_session, _sessionProfile) = (null, null);
@@ -389,6 +433,7 @@ public sealed partial class MainViewModel : ObservableObject
         _keepRemote.Start();
         _gameWatch.Tick += (_, _) => _ = CheckGameAsync();
         _gameWatch.Start();
+        LoadErrorReport();
         _serverWatch.Tick += (_, _) => _ = CheckServersAsync();
         _serverWatch.Start();
         _ = CheckGameAsync();
@@ -427,6 +472,7 @@ public sealed partial class MainViewModel : ObservableObject
         NotifyPlay();
         Mods.OnProfileSwitched();
         Server.OnProfileSwitched();
+        LoadErrorReport();
     }
 
     partial void OnAllowUnstableChanged(bool value)

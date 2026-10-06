@@ -127,6 +127,12 @@
                         </StackPanel>
                     </Button>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- моды профиля сыплют ошибками (игра работает, но лог пухнет и бывают фризы) — отчёт по кнопке -->
+                        <Button Command="{Binding ShowErrorsCommand}" ToolTip="{Binding ErrorBadgeTip}" Margin="0,0,10,0" Padding="10,4" MinHeight="0"
+                                Visibility="{Binding HasErrorBadge, Converter={StaticResource BoolToVis}}" AutomationProperties.AutomationId="ErrorBadge"
+                                Background="{StaticResource Forest.Warn}" BorderBrush="{StaticResource Forest.Warn}">
+                            <TextBlock Text="!" FontWeight="Bold" FontSize="14" Foreground="{StaticResource Forest.Base}" />
+                        </Button>
                         <TextBlock Text="{local:Tr shell.activeProfile}" VerticalAlignment="Center" Margin="0,0,10,0"
                                    Foreground="{StaticResource Forest.Muted}" FontSize="12" />
                         <ComboBox x:Name="ProfileCombo" ItemsSource="{Binding Profiles}" SelectedItem="{Binding ActiveProfile}" MinWidth="240"
