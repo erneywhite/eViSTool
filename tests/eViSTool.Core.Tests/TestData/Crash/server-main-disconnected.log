@@ -1,0 +1,460 @@
+7.10.2026 00:19:55 [Notification] Server logger started.
+7.10.2026 00:19:55 [Notification] Game Version: v1.22.7 (Stable)
+7.10.2026 00:19:55 [Event] It begins...
+7.10.2026 00:19:55 [Event] Launching server...
+7.10.2026 00:19:55 [Event] It senses...
+7.10.2026 00:19:55 [Event] Server v1.22.7, network v1.22.6, api v1.22.0
+7.10.2026 00:19:55 [Notification] Entering runphase Initialization
+7.10.2026 00:19:55 [Event] Loading configuration...
+7.10.2026 00:19:55 [Notification] Entering runphase Configuration
+7.10.2026 00:19:55 [Notification] Loading savegame
+7.10.2026 00:19:55 [Notification] Loaded existing save game data. Playstyle: creativebuilding, Playstyle Lang code: creativebuilding, WorldType: superflat
+7.10.2026 00:19:55 [Notification] Savegame C:\Games\VSData\Saves\crashtest.vcdbs loaded
+7.10.2026 00:19:55 [Notification] World size = 1024000 256 1024000
+7.10.2026 00:19:55 [Notification] Start discovering assets
+7.10.2026 00:19:55 [Notification] Found 2 base assets in category blocktypes
+7.10.2026 00:19:55 [Notification] Found 0 base assets in category itemtypes
+7.10.2026 00:19:55 [Notification] Found 35 base assets in category lang
+7.10.2026 00:19:55 [Notification] Found 0 base assets in category patches
+7.10.2026 00:19:55 [Notification] Found 24 base assets in category config
+7.10.2026 00:19:55 [Notification] Found 0 base assets in category worldproperties
+7.10.2026 00:19:55 [Notification] Found 49 base assets in category sounds
+7.10.2026 00:19:55 [Notification] Found 230 base assets in category shapes
+7.10.2026 00:19:55 [Notification] Found 182 base assets in category textures
+7.10.2026 00:19:55 [Notification] Found 0 base assets in category recipes
+7.10.2026 00:19:55 [Notification] Found 0 base assets in category worldgen
+7.10.2026 00:19:55 [Notification] Found 3 base assets in category entities
+7.10.2026 00:19:55 [Notification] Found 525 base assets in total
+7.10.2026 00:19:55 [Event] Building assets...
+7.10.2026 00:19:55 [Notification] Entering runphase LoadAssets
+7.10.2026 00:19:55 [Notification] Will search the following paths for mods:
+7.10.2026 00:19:55 [Notification]     S:\Games\Vintagestory\Mods
+7.10.2026 00:19:55 [Notification]     C:\Games\VSData\Mods
+7.10.2026 00:19:55 [Notification] Found 4 mods (0 disabled)
+7.10.2026 00:19:55 [Notification] Mods, sorted by dependency: game, crashtest, creative, survival
+7.10.2026 00:19:55 [Notification] Instantiated 149 mod systems from 4 enabled mods
+7.10.2026 00:19:55 [Notification] External Origins in load order: modorigin@S:\Games\Vintagestory\assets\creative\, modorigin@S:\Games\Vintagestory\assets\survival\
+7.10.2026 00:19:55 [Notification] Found 541 external assets in category blocktypes
+7.10.2026 00:19:55 [Notification] Found 315 external assets in category itemtypes
+7.10.2026 00:19:55 [Notification] Found 0 external assets in category lang
+7.10.2026 00:19:55 [Notification] Found 10 external assets in category patches
+7.10.2026 00:19:55 [Notification] Found 128 external assets in category config
+7.10.2026 00:19:55 [Notification] Found 25 external assets in category worldproperties
+7.10.2026 00:19:55 [Notification] Found 681 external assets in category sounds
+7.10.2026 00:19:55 [Notification] Found 6123 external assets in category shapes
+7.10.2026 00:19:55 [Notification] Found 9459 external assets in category textures
+7.10.2026 00:19:55 [Notification] Found 419 external assets in category recipes
+7.10.2026 00:19:55 [Notification] Found 1455 external assets in category worldgen
+7.10.2026 00:19:55 [Notification] Found 74 external assets in category entities
+7.10.2026 00:19:55 [Notification] Found 0 external assets in category compatibility
+7.10.2026 00:19:55 [Notification] Reloaded lang file with mod assets
+7.10.2026 00:19:55 [Notification] Compatibility lib: 0 assets added, 0 assets replaced.
+7.10.2026 00:19:56 [Notification] JsonPatch Loader: 21 patches total, successfully applied 21 patches, unmet conditions on 16 patches, no errors
+7.10.2026 00:19:56 [Event] It remembers...
+7.10.2026 00:19:57 [Notification] Loaded 4468 unique items
+7.10.2026 00:19:57 [Event] All that came before...
+7.10.2026 00:19:58 [Notification] Loaded 14089 unique blocks
+7.10.2026 00:19:59 [Notification] Loaded 820 unique entitiess
+7.10.2026 00:19:59 [Notification] BlockLoader: Entities, Blocks and Items loaded
+7.10.2026 00:19:59 [Notification] Remapper: No applicable remappings found for this save game, all seems good for now
+7.10.2026 00:19:59 [Event] Remapping blocks and items...
+7.10.2026 00:19:59 [Event] 15 cooking recipes loaded
+7.10.2026 00:19:59 [Event] Taste and smell...
+7.10.2026 00:19:59 [Event] 9 metal alloys loaded
+7.10.2026 00:19:59 [Event] Glimmers in the soil...
+7.10.2026 00:20:00 [Event] 1152 grid recipes loaded from 268 files
+7.10.2026 00:20:00 [Event] Grand inventions...
+7.10.2026 00:20:00 [Event] 44 smithing recipes loaded from 43 files
+7.10.2026 00:20:00 [Event] Burning sparks...
+7.10.2026 00:20:00 [Event] 31 clay forming recipes loaded from 31 files
+7.10.2026 00:20:00 [Event] Molded forms...
+7.10.2026 00:20:00 [Event] 12 knapping recipes loaded from 12 files
+7.10.2026 00:20:00 [Event] Simple tools...
+7.10.2026 00:20:00 [Event] 90 barrel recipe recipes loaded from 41 files
+7.10.2026 00:20:00 [Notification] Tags registry was locked.
+7.10.2026 00:20:00 [Notification] Entering runphase AssetsFinalize
+7.10.2026 00:20:00 [Event] Server assets loaded, parsed, registered and finalized
+7.10.2026 00:20:00 [Event] Initialising systems...
+7.10.2026 00:20:00 [Notification] Entering runphase LoadGamePre
+7.10.2026 00:20:00 [Notification] Reloaded 19 weather patterns, 5 wind patterns and 5 weather events
+7.10.2026 00:20:00 [Notification] CrashTest server mode: server
+7.10.2026 00:20:00 [Notification] Started 126 systems on Server:
+7.10.2026 00:20:00 [Notification]     Mod 'VSEssentials.dll' (game):
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.Core
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenTerra
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenSnowLayer
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.EntityPartitioning
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ErrorReporter
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenTerraPostProcess
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.ModCompatiblityUtil
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.NoObf.ModJsonPatchLoader
+7.10.2026 00:20:00 [Notification]         FluffyClouds.FluffyCloudsModSystem
+7.10.2026 00:20:00 [Notification]         Vintagestory.Systems.ModSystemTfEditFromAttributes
+7.10.2026 00:20:00 [Notification]         Vintagestory.Essentials.PathfindSystem
+7.10.2026 00:20:00 [Notification]         Vintagestory.Essentials.PathFindDebug
+7.10.2026 00:20:00 [Notification]         Vintagestory.Essentials.PathfindingAsync
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.JsonExport
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.ModBasicBlocksLoader
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenMaps
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenRockStrataNew
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenHotSprings
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenCreatures
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.ModSystemWorldGenStructures
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemItemRendererOptimizer
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.AiRuntimeConfig
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemSyncHarvestableDropsToClient
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemEmotes
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.LeafBlockDecay
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.POIRegistry
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.RoomRegistry
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.WeatherSystemCommands
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.WeatherSystemServer
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.SystemRemotePlayerTracking
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.WorldMapManager
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenDeposits
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.NoObf.ModRegistryObjectTypeLoader
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.LoadColorMaps
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenCaves
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenStructures
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.WgenCommands
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenBlockLayers
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenPonds
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ClothManager
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenStructuresPosPass
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenVegetationAndPatches
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenRivulets
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenLightSurvival
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.CollectibleBuffDebug
+7.10.2026 00:20:00 [Notification]     Mod 'VSSurvivalMod.dll' (survival):
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemControlPoints
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.SurvivalCoreSystem
+7.10.2026 00:20:00 [Notification]         Vintagestory.Systems.StoryLockableDoor
+7.10.2026 00:20:00 [Notification]         Vintagestory.Client.NoObf.StoryGenFailedSystem
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.UpgradeTasks
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.ChiselBlockBulkSetMaterial
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.ModSystemDetailModeSync
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.NpcControl
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.ModSystemTiledDungeons
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemExplosionAffectedStability
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.MyceliumSystem
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModsystemButterflySpawnCondsExtra
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemFishInstaFlee
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemCatchCreature
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.FishingSupportModSystem
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemGliding
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemSnowShoveling
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemSubTongsDurability
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemSwoopDev
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.Timeswitch
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ClutterBookshelfUtil
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ScreenshakeToClientModSystem
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemResoArchiveCommands
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.StoryStructuresSpawnConditions
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemNPCHairStyling
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemSkinnableAdditions
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemVillagerDebug
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemAuction
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemBlockReinforcement
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.Core
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemBoatingSoundAndRatlineStamina
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.CharacterSystem
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.CustomSpawnConditions
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.VariablesModSystem
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModsystemElevator
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ActivityModSystem
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ActivityEditorSystem
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemFarming
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemCommandHandbook
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemTutorial
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.HeldItemMouseInputHandler
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemCorpseReturnTeleporter
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemNightVision
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.TobiasTeleporter
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModJournal
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.LiquidItemStackRenderer
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemStructureLocator
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModLootRandomizer
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemEntityOwnership
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemRifts
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemRiftWeather
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSleeping
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemSupportBeamPlacer
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.TeleporterManager
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModTemperature
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.SystemTemporalStability
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.TemporalStabilityEffects
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemClimateSpecificTraderTypes
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemWearableStats
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemEditableBook
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.Mechanics.ModSystemWindTurbulence
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.Mechanics.MechanicalPowerMod
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenDungeons
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.GenStoryStructures
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.WgenCommandsExt
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenDevastationLayer
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.RecipeRegistrySystem
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.RecipeLoader
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemFishDepletion
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemWormGrunting
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemFireFromLightning
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemOreMap
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemSnowballs
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.HumanoidOutfits
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.ModSystemDevastationEffects
+7.10.2026 00:20:00 [Notification]         Vintagestory.GameContent.DisableRecipeRegisteringSystem
+7.10.2026 00:20:00 [Notification]     Mod 'VSCreativeMod.dll' (creative):
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.Core
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.WorldEdit.WorldEdit
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenBlockLayersFlat
+7.10.2026 00:20:00 [Notification]         Vintagestory.ServerMods.GenLightCreative
+7.10.2026 00:20:00 [Notification]     Mod 'CrashTest_1.0.0.zip' (crashtest):
+7.10.2026 00:20:00 [Notification]         CrashTestMod.CrashTestSystem
+7.10.2026 00:20:00 [Event] 26 traits loaded from 1 files
+7.10.2026 00:20:00 [Event] 6 classes loaded from 1 files
+7.10.2026 00:20:03 [Notification] Server map set
+7.10.2026 00:20:03 [Event] A world unbroken...
+7.10.2026 00:20:03 [Notification] Entering runphase GameReady
+7.10.2026 00:20:03 [Notification] Entering runphase WorldReady
+7.10.2026 00:20:03 [Event] The center unfolding...
+7.10.2026 00:20:03 [Event] Starting world generators...
+7.10.2026 00:20:03 [Notification] Reloaded 35 tree generators
+7.10.2026 00:20:03 [Event] Loading 7x7x8 spawn chunks...
+7.10.2026 00:20:03 [Event] 0% (49 in queue)
+7.10.2026 00:20:03 [Event] The carved mountains...
+7.10.2026 00:20:03 [Event] Begin game ticking...
+7.10.2026 00:20:03 [Event] ... it calls to you
+7.10.2026 00:20:03 [Notification] Entering runphase RunGame
+7.10.2026 00:20:03 [Notification] Starting server threads
+7.10.2026 00:20:03 [Event] Singleplayer Server now running!
+7.10.2026 00:20:03 [Event] Return again.
+7.10.2026 00:20:03 [Notification] Please be aware that as of 1.20, servers default configurations have changed - servers no longer register themselves to the public servers list and are invite-only (whitelisted) out of the box. If you desire so, you can enable server advertising with '/serverconfig advertise on' and disable the whitelist mode with '/serverconfig whitelistmode off'
+7.10.2026 00:20:03 [Notification] Sending server identification. Server control privilege is True
+7.10.2026 00:20:08 [Notification] A Client attempts connecting via Dummy connection on 127.0.0.1:0, assigning client id 1
+7.10.2026 00:20:08 [Notification] Client 1 uid PLAYER-UID attempting identification. Name: Player
+7.10.2026 00:20:08 [Notification] Upped server view distance to: 256, because player is in singleplayer
+7.10.2026 00:20:08 [Notification] Delayed join, attempt random spawn position.
+7.10.2026 00:20:08 [Notification] Placing Player at 512010,5 3 512048,5
+7.10.2026 00:20:10 [Event] Player 127.0.0.1:0 joins.
+7.10.2026 00:20:12 [Event] Saved 300 generating chunks...
+7.10.2026 00:20:12 [Event] ...
+7.10.2026 00:20:12 [Event] Saved 600 generating chunks...
+7.10.2026 00:20:12 [Event] ...
+7.10.2026 00:20:12 [Event] Saved 900 generating chunks...
+7.10.2026 00:20:12 [Event] ...
+7.10.2026 00:20:12 [Event] Saved 1200 generating chunks...
+7.10.2026 00:20:12 [Event] ...
+7.10.2026 00:20:12 [Notification] Server ticking has been suspended
+7.10.2026 00:20:15 [Notification] Server ticking has been resumed
+7.10.2026 00:20:15 [Notification] A client reconnected, resuming game calendar.
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:19 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:20 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:20 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:20 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:20 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:20 [Error] Exception: CrashTest: boom in a server callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartServerSide>b__2_0(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Server.ServerMain.Process() in VintagestoryLib\Server\ServerMain.cs:line 883
+7.10.2026 00:20:20 [Notification] Client 1 disconnected: Server shutting down - Too many errors detected. See server-main.log file
+7.10.2026 00:20:20 [Notification] Last player disconnected, compacting large object heap...
+7.10.2026 00:20:21 [Event] Player Player got removed. Reason: Server shutting down - Too many errors detected. See server-main.log file
+7.10.2026 00:20:21 [Notification] Server stop requested, begin shutdown sequence. Stop reason: Too many errors detected. See server-main.log file
+7.10.2026 00:20:21 [Notification] Server ticking has been suspended
+7.10.2026 00:20:21 [Notification] Entering runphase Shutdown
+7.10.2026 00:20:21 [Event] Mods and systems notified, now saving everything...
+7.10.2026 00:20:21 [Event] It pauses.
+7.10.2026 00:20:21 [Event] One last gaze...
+7.10.2026 00:20:21 [Event] Saved player world data...
+7.10.2026 00:20:21 [Event] Saved map regions...
+7.10.2026 00:20:21 [Event] Then all goes quiet...
+7.10.2026 00:20:21 [Event] Saved map chunks...
+7.10.2026 00:20:21 [Event] The waters recede...
+7.10.2026 00:20:21 [Event] Saved 300 chunks...
+7.10.2026 00:20:21 [Event] Saved 600 chunks...
+7.10.2026 00:20:21 [Event] Saved 900 chunks...
+7.10.2026 00:20:21 [Event] Saved 1200 chunks...
+7.10.2026 00:20:21 [Event] Saved loaded chunks...
+7.10.2026 00:20:21 [Event] The mountains fade...
+7.10.2026 00:20:21 [Event] The dark settles in.
+7.10.2026 00:20:21 [Event] Saved generating chunks...
+7.10.2026 00:20:21 [Event] Saved savegamedata...2
+7.10.2026 00:20:21 [Event] World saved! Saved 1353 chunks, 169 mapchunks, 16 mapregions.
+7.10.2026 00:20:21 [Event] It sighs...
+7.10.2026 00:20:21 [Event] Shutting down 10 server threads... 
+7.10.2026 00:20:21 [Event] Killed console thread
+7.10.2026 00:20:21 [Event] Alone again...
+7.10.2026 00:20:22 [Event] All threads gracefully shut down
+7.10.2026 00:20:22 [Event] Time to rest.
+7.10.2026 00:20:22 [Event] Doing last tick...
+7.10.2026 00:20:22 [Event] Stopped the server!
+7.10.2026 00:20:22 [Error] More then 100000 errors detected. Shutting down now. Threshold can be changed in serverconfig.json "DieAboveErrorCount"

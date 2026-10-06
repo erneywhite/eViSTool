@@ -1,0 +1,16 @@
+Game Version: v1.22.7 (Stable)
+07.10.2026 00:18:55: Critical error occurred in the following mod: crashtest@1.0.0
+Loaded Mods: game@1.22.7, crashtest@1.0.0, creative@1.22.7, survival@1.22.7
+System.InvalidOperationException: CrashTest: boom in a world callback
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c.<StartClientSide>b__1_3(Single _)
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 160
+   at Vintagestory.Client.NoObf.ClientMain.MainRenderLoop(Single dt) in VintagestoryLib\Client\ClientMain.cs:line 867
+   at Vintagestory.Client.GuiScreenRunningGame.RenderToPrimary(Single dt) in VintagestoryLib\Client\MainMenu\Screens\GuiScreenRunningGame.cs:line 173
+   at Vintagestory.Client.ScreenManager.Render(Single dt) in VintagestoryLib\Client\ScreenManager.cs:line 742
+   at Vintagestory.Client.ScreenManager.OnNewFrame(Single dt) in VintagestoryLib\Client\ScreenManager.cs:line 686
+   at Vintagestory.Client.NoObf.ClientPlatformWindows.window_RenderFrame(FrameEventArgs e) in VintagestoryLib\Client\ClientPlatform\GameWindow.cs:line 112
+   at OpenTK.Windowing.Desktop.GameWindow.Run()
+   at Vintagestory.Client.ClientProgram.Start(ClientProgramArgs args, String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 354
+   at Vintagestory.Client.ClientProgram.<>c__DisplayClass10_0.<.ctor>b__1() in VintagestoryLib\Client\ClientProgram.cs:line 131
+   at Vintagestory.ClientNative.CrashReporter.Start(ThreadStart start) in VintagestoryLib\Client\ClientPlatform\ClientNative\CrashReporter.cs:line 95

@@ -1,0 +1,13 @@
+5.10.2026 23:27:12 [Notification] Client logger started.
+5.10.2026 23:27:12 [Error] Exception: Index (zero based) must be greater than or equal to zero and less than the size of the argument list.
+   at System.String.FormatHelper(IFormatProvider provider, String format, ReadOnlySpan`1 args)
+   at System.String.Format(String format, Object[] args)
+   at Vintagestory.API.Config.TranslationService.TryFormat(String value, Object[] args) in VintagestoryApi\Localization\TranslationService.cs:line 227
+5.10.2026 23:27:12 [Warning] Translation string format exception thrown for: "Configured radius: {0} | Configured height: {1}-{2}"
+   Args were: 
+5.10.2026 23:27:25 [Error] Exception: Index (zero based) must be greater than or equal to zero and less than the size of the argument list.
+   at System.String.FormatHelper(IFormatProvider provider, String format, ReadOnlySpan`1 args)
+   at System.String.Format(String format, Object[] args)
+   at Vintagestory.API.Config.TranslationService.TryFormat(String value, Object[] args) in VintagestoryApi\Localization\TranslationService.cs:line 227
+5.10.2026 23:27:25 [Warning] Translation string format exception thrown for: "Enabled targets: {0}"
+   Args were: 

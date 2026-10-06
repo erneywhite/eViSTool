@@ -1,0 +1,420 @@
+7.10.2026 00:20:49 [Notification] Client logger started.
+7.10.2026 00:20:49 [Notification] Game Version: v1.22.7 (Stable)
+7.10.2026 00:20:49 [Notification] Process path: S:\Games\Vintagestory\Vintagestory.exe
+7.10.2026 00:20:49 [Notification] Operating System: Windows 10.0.26300.0
+7.10.2026 00:20:49 [Notification] CPU Cores: 16
+7.10.2026 00:20:49 [Notification] CPU: AMD Ryzen 7 7700 8-Core Processor              
+7.10.2026 00:20:49 [Notification] Available RAM: 31860 MB
+7.10.2026 00:20:49 [Notification] OpenAL Initialized. Available Mono/Stereo Sources: 255/1
+7.10.2026 00:20:49 [Notification] Graphics Card Vendor: NVIDIA Corporation
+7.10.2026 00:20:49 [Notification] Graphics Card Version: 4.3.0 NVIDIA 617.14
+7.10.2026 00:20:49 [Notification] Graphics Card Renderer: NVIDIA GeForce RTX 5070/PCIe/SSE2
+7.10.2026 00:20:49 [Notification] Graphics Card ShadingLanguageVersion: 4.30 NVIDIA via Cg compiler
+7.10.2026 00:20:49 [Notification] GL.MaxVertexUniformComponents: 4096
+7.10.2026 00:20:49 [Notification] GL.MaxUniformBlockSize: 65536
+7.10.2026 00:20:49 [Notification] C# Framework: .net 10.0.12
+7.10.2026 00:20:49 [Notification] Cairo Graphics Version: 1.17.3
+7.10.2026 00:20:49 [Notification] OpenAL Version: 1.1 ALSOFT 1.23.0
+7.10.2026 00:20:49 [Notification] Zstd Version: 1.5.7
+7.10.2026 00:20:49 [Notification] Start discovering assets
+7.10.2026 00:20:49 [Notification] Found 35 base assets in category lang
+7.10.2026 00:20:49 [Notification] Found 0 base assets in category patches
+7.10.2026 00:20:49 [Notification] Found 24 base assets in category config
+7.10.2026 00:20:49 [Notification] Found 0 base assets in category worldproperties
+7.10.2026 00:20:49 [Notification] Found 49 base assets in category sounds
+7.10.2026 00:20:49 [Notification] Found 230 base assets in category shapes
+7.10.2026 00:20:49 [Notification] Found 84 base assets in category shaders
+7.10.2026 00:20:49 [Notification] Found 19 base assets in category shaderincludes
+7.10.2026 00:20:49 [Notification] Found 182 base assets in category textures
+7.10.2026 00:20:49 [Notification] Found 4 base assets in category music
+7.10.2026 00:20:49 [Notification] Found 0 base assets in category dialog
+7.10.2026 00:20:49 [Notification] Found 627 base assets in total
+7.10.2026 00:20:49 [Notification] Loading sounds
+7.10.2026 00:20:49 [Notification] (Re-)loaded frame buffers
+7.10.2026 00:20:49 [Notification] Loaded Shaderprogramm for render pass .
+7.10.2026 00:20:50 [Notification] Sounds loaded
+7.10.2026 00:20:50 [Notification] Begin loading shaders
+7.10.2026 00:20:50 [Notification] Load shaders now
+7.10.2026 00:20:50 [Notification] Loading shaders...
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass standard.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass particlescube.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass particlesquad.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass sky.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass nightsky.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass woittest.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass transparentcompose.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass debugdepthbuffer.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass helditem.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass chunkopaque.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass chunkliquid.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass decals.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass final.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass gui.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass blur.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass chunktransparent.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass findbright.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass chunktopsoil.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass godrays.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass autocamera.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass blockhighlights.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass wireframe.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass entityanimated.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass luma.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass blit.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass particlesquad2d.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass shadowmapentityanimated.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass chunkshadowmap.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass texture2texture.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass celestialobject.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass guitopsoil.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass colorgrade.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass guigear.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass ssao.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass bilateralblur.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass chunkliquiddepth.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass aurora.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass cloudmap.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass cloudvolumetric.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass instanced.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass lines.
+7.10.2026 00:20:50 [Notification] Loaded Shaderprogramm for render pass entityanimated.
+7.10.2026 00:20:50 [Notification] Cached session key is valid, validating with server
+7.10.2026 00:20:50 [Notification] Server validation response: Good
+7.10.2026 00:20:50 [Notification] Will search the following paths for mods:
+7.10.2026 00:20:50 [Notification]     S:\Games\Vintagestory\Mods
+7.10.2026 00:20:50 [Notification]     C:\Games\VSData\Mods
+7.10.2026 00:20:51 [Notification] Initialized GUI Manager
+7.10.2026 00:20:51 [Notification] Initialized Server Connection
+7.10.2026 00:20:51 [Notification] Server args parsed
+7.10.2026 00:20:51 [Notification] Server main instantiated
+7.10.2026 00:20:58 [Notification] Server launched
+7.10.2026 00:20:59 [Notification] Processed server identification
+7.10.2026 00:20:59 [Notification] Map initialized
+7.10.2026 00:20:59 [Notification] Received server assets
+7.10.2026 00:20:59 [Notification] Loading and pre-starting client side mods...
+7.10.2026 00:20:59 [Notification] Will search the following paths for mods:
+7.10.2026 00:20:59 [Notification]     S:\Games\Vintagestory\Mods
+7.10.2026 00:20:59 [Notification]     C:\Games\VSData\Mods
+7.10.2026 00:20:59 [Notification] Found 4 mods (0 disabled)
+7.10.2026 00:20:59 [Notification] Mods, sorted by dependency: game, crashtest, creative, survival
+7.10.2026 00:20:59 [Notification] Instantiated 149 mod systems from 4 enabled mods
+7.10.2026 00:20:59 [Notification] Done loading and pre-starting client side mods.
+7.10.2026 00:20:59 [Notification] External Origins in load order: modorigin@S:\Games\Vintagestory\assets\creative\, modorigin@S:\Games\Vintagestory\assets\survival\
+7.10.2026 00:20:59 [Notification] Found 0 external assets in category lang
+7.10.2026 00:20:59 [Notification] Tags registries now locked.
+7.10.2026 00:20:59 [Notification] Found 10 external assets in category patches
+7.10.2026 00:20:59 [Notification] Found 128 external assets in category config
+7.10.2026 00:20:59 [Notification] Found 25 external assets in category worldproperties
+7.10.2026 00:20:59 [Notification] Found 681 external assets in category sounds
+7.10.2026 00:20:59 [Notification] Found 6123 external assets in category shapes
+7.10.2026 00:20:59 [Notification] Found 5 external assets in category shaders
+7.10.2026 00:20:59 [Notification] Found 0 external assets in category shaderincludes
+7.10.2026 00:20:59 [Notification] Found 9459 external assets in category textures
+7.10.2026 00:20:59 [Notification] Found 83 external assets in category music
+7.10.2026 00:20:59 [Notification] Found 18 external assets in category dialog
+7.10.2026 00:20:59 [Notification] Found 0 external assets in category compatibility
+7.10.2026 00:20:59 [Notification] Reloaded lang file now with mod assets
+7.10.2026 00:20:59 [Notification] Compatibility lib: 0 assets added, 0 assets replaced.
+7.10.2026 00:20:59 [Notification] JsonPatch Loader: 6 patches total, successfully applied 6 patches, no errors
+7.10.2026 00:21:00 [Notification] Received 4469 item types from server
+7.10.2026 00:21:00 [Notification] Loaded 14091 block types from server
+7.10.2026 00:21:01 [Notification] Reloaded sounds, now with mod assets
+7.10.2026 00:21:01 [Notification] Composed 1 4096x2048 entities texture atlases from 695 textures
+7.10.2026 00:21:01 [Notification] Collected 3096 shapes to tesselate.
+7.10.2026 00:21:02 [Notification] Composed 1 4096x2048 items texture atlases from 2329 textures
+7.10.2026 00:21:03 [Notification] Composed 2 4096x2048 blocks texture atlases from 7449 textures
+7.10.2026 00:21:04 [Notification] Server assets loaded
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass standard.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass standard.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass entityanimated.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass particlescube.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass lines.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass aurora.
+7.10.2026 00:21:04 [Notification] Initialised WeatherSystemClient. simLightning is loaded.
+7.10.2026 00:21:04 [Notification] CrashTest client mode: noise
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass sleepoverlay.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass machinegear.
+7.10.2026 00:21:04 [Notification] Started 99 systems on Client:
+7.10.2026 00:21:04 [Notification]     Mod 'VSEssentials.dll' (game):
+7.10.2026 00:21:04 [Notification]         Vintagestory.ServerMods.Core
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.EntityPartitioning
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ErrorReporter
+7.10.2026 00:21:04 [Notification]         Vintagestory.ServerMods.ModCompatiblityUtil
+7.10.2026 00:21:04 [Notification]         Vintagestory.ServerMods.NoObf.ModJsonPatchLoader
+7.10.2026 00:21:04 [Notification]         FluffyClouds.FluffyCloudsModSystem
+7.10.2026 00:21:04 [Notification]         Vintagestory.Systems.ModSystemTfEditFromAttributes
+7.10.2026 00:21:04 [Notification]         Vintagestory.ServerMods.GenMaps
+7.10.2026 00:21:04 [Notification]         Vintagestory.ServerMods.ModSystemWorldGenStructures
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemRenderFallingBlocksFast
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.FallingBlockParticlesModSystem
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemItemRendererOptimizer
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemFpHands
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.CharacterExtraDialogs
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.EntityNameTagRendererRegistry
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemAmbientParticles
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.EntityParticleSpawner
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.EntityParticleSystem
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.POIRegistry
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemProgressBar
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.RoomRegistry
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.WeatherSystemCommands
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.WeatherSystemClient
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.SystemRemotePlayerTracking
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.WorldMapManager
+7.10.2026 00:21:04 [Notification]         Vintagestory.ServerMods.LoadColorMaps
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ClothManager
+7.10.2026 00:21:04 [Notification]     Mod 'VSSurvivalMod.dll' (survival):
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemControlPoints
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.SurvivalCoreSystem
+7.10.2026 00:21:04 [Notification]         Vintagestory.Systems.StoryLockableDoor
+7.10.2026 00:21:04 [Notification]         Vintagestory.Client.NoObf.StoryGenFailedSystem
+7.10.2026 00:21:04 [Notification]         Vintagestory.Client.NoObf.ModSystemBossHealthBars
+7.10.2026 00:21:04 [Notification]         Vintagestory.ServerMods.UpgradeTasks
+7.10.2026 00:21:04 [Notification]         Vintagestory.ServerMods.ModSystemDetailModeSync
+7.10.2026 00:21:04 [Notification]         Vintagestory.ServerMods.ModSystemTiledDungeons
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.MSShapeFromAttrCacheHelper
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.MyceliumSystem
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemLabelMeshCache
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemShapeFromAttributesTransform
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemCatchCreature
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.FishingSupportModSystem
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemGliding
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemMeasuringRope
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemStopRaiseShieldAnim
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemSnowShoveling
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemSubTongsDurability
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.Timeswitch
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ScreenshakeToClientModSystem
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.StoryStructuresSpawnConditions
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemNPCHairStyling
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemSkinnableAdditions
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemVillagerDebug
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemAuction
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemBlockReinforcement
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.Core
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemBoatingSoundAndRatlineStamina
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemShipConstructionSitePreview
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.CharacterSystem
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.MealMeshCache
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.VariablesModSystem
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModsystemElevator
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ActivityModSystem
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ActivityEditorSystem
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemFarming
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemCommandHandbook
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemSurvivalHandbook
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemTutorial
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.HeldItemMouseInputHandler
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemNightVision
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.TobiasTeleporter
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModJournal
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.LiquidItemStackRenderer
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemStructureLocator
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModLootRandomizer
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemChiselCommands
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.MicroBlockModelCache
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemEntityOwnership
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemRifts
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemRiftWeather
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSleeping
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemUnbreakSupportBeam
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemSupportBeamPlacer
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.TeleporterManager
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModTemperature
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.SystemTemporalStability
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.TemporalStabilityEffects
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemWearableStats
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemEditableBook
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.Mechanics.MechanicalPowerMod
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.TradeHandbookInfo
+7.10.2026 00:21:04 [Notification]         Vintagestory.ServerMods.GenDevastationLayer
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.RecipeRegistrySystem
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemOreMap
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemSnowballs
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.HumanoidOutfits
+7.10.2026 00:21:04 [Notification]         Vintagestory.GameContent.ModSystemDevastationEffects
+7.10.2026 00:21:04 [Notification]     Mod 'VSCreativeMod.dll' (creative):
+7.10.2026 00:21:04 [Notification]         Vintagestory.ServerMods.Core
+7.10.2026 00:21:04 [Notification]         Vintagestory.ServerMods.WorldEdit.WorldEdit
+7.10.2026 00:21:04 [Notification]     Mod 'CrashTest_1.0.0.zip' (crashtest):
+7.10.2026 00:21:04 [Notification]         CrashTestMod.CrashTestSystem
+7.10.2026 00:21:04 [Notification] Loading shaders...
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass standard.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass particlescube.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass particlesquad.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass sky.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass nightsky.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass woittest.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass transparentcompose.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass debugdepthbuffer.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass helditem.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass chunkopaque.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass chunkliquid.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass decals.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass final.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass gui.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass blur.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass chunktransparent.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass findbright.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass chunktopsoil.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass godrays.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass autocamera.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass blockhighlights.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass wireframe.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass entityanimated.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass luma.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass blit.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass particlesquad2d.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass shadowmapentityanimated.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass chunkshadowmap.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass texture2texture.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass celestialobject.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass guitopsoil.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass colorgrade.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass guigear.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass ssao.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass bilateralblur.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass chunkliquiddepth.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass aurora.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass cloudmap.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass cloudvolumetric.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass instanced.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass lines.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass entityanimated.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass chunkshadowmap.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass standard.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass standard.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass entityanimated.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass particlescube.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass lines.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass aurora.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass sleepoverlay.
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass machinegear.
+7.10.2026 00:21:04 [Notification] Reloaded shaders now with mod assets
+7.10.2026 00:21:04 [Notification] Received level init
+7.10.2026 00:21:04 [Notification] Loaded Shaderprogramm for render pass instanced.
+7.10.2026 00:21:04 [Event] 26 traits loaded from 1 files
+7.10.2026 00:21:04 [Event] 6 classes loaded from 1 files
+7.10.2026 00:21:04 [Notification] Initialized Music Engine
+7.10.2026 00:21:04 [Notification] Blocks tesselated
+7.10.2026 00:21:05 [Notification] Texture size is 32 so decal atlas size of 128x128 should suffice
+7.10.2026 00:21:06 [Notification] Received level finalize
+7.10.2026 00:21:06 [Notification] Loaded Shaderprogramm for render pass cloudmap.
+7.10.2026 00:21:06 [Notification] Loaded Shaderprogramm for render pass cloudvolumetric.
+7.10.2026 00:21:06 [Notification] Loaded Shaderprogramm for render pass clouds.
+7.10.2026 00:21:06 [Notification] Loading world map cache db...
+7.10.2026 00:21:07 [Notification] ===============================================================
+7.10.2026 00:21:07 [Notification] (^_^) No issues captured during startup
+7.10.2026 00:21:07 [Notification] ===============================================================
+7.10.2026 00:21:09 [Error] Exception: CrashTest: boom in a tick listener (caught)
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c__DisplayClass1_0.<StartClientSide>b__3(Single _)   at Vintagestory.API.Common.LoggerBase.Error(Exception e) in VintagestoryApi\Common\API\ILogger.cs:line 269
+   at CrashTestMod.CrashTestSystem.<>c__DisplayClass1_0.<StartClientSide>b__3(Single _)
+   at Vintagestory.Common.GameTickListener.OnTriggered(Int64 ellapsedMilliseconds) in VintagestoryLib\Common\Model\GameTickListener.cs:line 36
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 134
+   at Vintagestory.Client.NoObf.ClientMain.MainRenderLoop(Single dt) in VintagestoryLib\Client\ClientMain.cs:line 890
+   at Vintagestory.Client.NoObf.ClientMain.MainGameLoop(Single deltaTime) in VintagestoryLib\Client\ClientMain.cs:line 782
+   at Vintagestory.Client.GuiScreenRunningGame.RenderToPrimary(Single dt) in VintagestoryLib\Client\MainMenu\Screens\GuiScreenRunningGame.cs:line 173
+   at Vintagestory.Client.ScreenManager.Render(Single dt) in VintagestoryLib\Client\ScreenManager.cs:line 742
+   at Vintagestory.Client.ScreenManager.OnNewFrame(Single dt) in VintagestoryLib\Client\ScreenManager.cs:line 686
+   at Vintagestory.Client.NoObf.ClientPlatformWindows.window_RenderFrame(FrameEventArgs e) in VintagestoryLib\Client\ClientPlatform\GameWindow.cs:line 112
+   at OpenTK.Windowing.Desktop.GameWindow.Run()
+   at Vintagestory.Client.ClientProgram.Start(ClientProgramArgs args, String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 354
+   at Vintagestory.Client.ClientProgram.<>c__DisplayClass10_0.<.ctor>b__1() in VintagestoryLib\Client\ClientProgram.cs:line 131
+   at Vintagestory.ClientNative.CrashReporter.Start(ThreadStart start) in VintagestoryLib\Client\ClientPlatform\ClientNative\CrashReporter.cs:line 95
+   at Vintagestory.Client.ClientProgram..ctor(String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 131
+   at Vintagestory.Client.ClientProgram.Main(String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 51
+   at Vintagestory.ClientWindows.Main(String[] args) in VintagestoryClient\Windows\ClientWindows.cs:line 11
+7.10.2026 00:21:12 [Error] Exception: CrashTest: boom in a tick listener (caught)
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c__DisplayClass1_0.<StartClientSide>b__3(Single _)   at Vintagestory.API.Common.LoggerBase.Error(Exception e) in VintagestoryApi\Common\API\ILogger.cs:line 269
+   at CrashTestMod.CrashTestSystem.<>c__DisplayClass1_0.<StartClientSide>b__3(Single _)
+   at Vintagestory.Common.GameTickListener.OnTriggered(Int64 ellapsedMilliseconds) in VintagestoryLib\Common\Model\GameTickListener.cs:line 36
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 134
+   at Vintagestory.Client.NoObf.ClientMain.MainRenderLoop(Single dt) in VintagestoryLib\Client\ClientMain.cs:line 890
+   at Vintagestory.Client.NoObf.ClientMain.MainGameLoop(Single deltaTime) in VintagestoryLib\Client\ClientMain.cs:line 782
+   at Vintagestory.Client.GuiScreenRunningGame.RenderToPrimary(Single dt) in VintagestoryLib\Client\MainMenu\Screens\GuiScreenRunningGame.cs:line 173
+   at Vintagestory.Client.ScreenManager.Render(Single dt) in VintagestoryLib\Client\ScreenManager.cs:line 742
+   at Vintagestory.Client.ScreenManager.OnNewFrame(Single dt) in VintagestoryLib\Client\ScreenManager.cs:line 686
+   at Vintagestory.Client.NoObf.ClientPlatformWindows.window_RenderFrame(FrameEventArgs e) in VintagestoryLib\Client\ClientPlatform\GameWindow.cs:line 112
+   at OpenTK.Windowing.Desktop.GameWindow.Run()
+   at Vintagestory.Client.ClientProgram.Start(ClientProgramArgs args, String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 354
+   at Vintagestory.Client.ClientProgram.<>c__DisplayClass10_0.<.ctor>b__1() in VintagestoryLib\Client\ClientProgram.cs:line 131
+   at Vintagestory.ClientNative.CrashReporter.Start(ThreadStart start) in VintagestoryLib\Client\ClientPlatform\ClientNative\CrashReporter.cs:line 95
+   at Vintagestory.Client.ClientProgram..ctor(String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 131
+   at Vintagestory.Client.ClientProgram.Main(String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 51
+   at Vintagestory.ClientWindows.Main(String[] args) in VintagestoryClient\Windows\ClientWindows.cs:line 11
+7.10.2026 00:21:15 [Error] Exception: CrashTest: boom in a tick listener (caught)
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c__DisplayClass1_0.<StartClientSide>b__3(Single _)   at Vintagestory.API.Common.LoggerBase.Error(Exception e) in VintagestoryApi\Common\API\ILogger.cs:line 269
+   at CrashTestMod.CrashTestSystem.<>c__DisplayClass1_0.<StartClientSide>b__3(Single _)
+   at Vintagestory.Common.GameTickListener.OnTriggered(Int64 ellapsedMilliseconds) in VintagestoryLib\Common\Model\GameTickListener.cs:line 36
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 134
+   at Vintagestory.Client.NoObf.ClientMain.MainRenderLoop(Single dt) in VintagestoryLib\Client\ClientMain.cs:line 867
+   at Vintagestory.Client.GuiScreenRunningGame.RenderToPrimary(Single dt) in VintagestoryLib\Client\MainMenu\Screens\GuiScreenRunningGame.cs:line 173
+   at Vintagestory.Client.ScreenManager.Render(Single dt) in VintagestoryLib\Client\ScreenManager.cs:line 742
+   at Vintagestory.Client.ScreenManager.OnNewFrame(Single dt) in VintagestoryLib\Client\ScreenManager.cs:line 686
+   at Vintagestory.Client.NoObf.ClientPlatformWindows.window_RenderFrame(FrameEventArgs e) in VintagestoryLib\Client\ClientPlatform\GameWindow.cs:line 112
+   at OpenTK.Windowing.Desktop.GameWindow.Run()
+   at Vintagestory.Client.ClientProgram.Start(ClientProgramArgs args, String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 354
+   at Vintagestory.Client.ClientProgram.<>c__DisplayClass10_0.<.ctor>b__1() in VintagestoryLib\Client\ClientProgram.cs:line 131
+   at Vintagestory.ClientNative.CrashReporter.Start(ThreadStart start) in VintagestoryLib\Client\ClientPlatform\ClientNative\CrashReporter.cs:line 95
+   at Vintagestory.Client.ClientProgram..ctor(String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 131
+   at Vintagestory.Client.ClientProgram.Main(String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 51
+   at Vintagestory.ClientWindows.Main(String[] args) in VintagestoryClient\Windows\ClientWindows.cs:line 11
+7.10.2026 00:21:18 [Error] Exception: CrashTest: boom in a tick listener (caught)
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c__DisplayClass1_0.<StartClientSide>b__3(Single _)   at Vintagestory.API.Common.LoggerBase.Error(Exception e) in VintagestoryApi\Common\API\ILogger.cs:line 269
+   at CrashTestMod.CrashTestSystem.<>c__DisplayClass1_0.<StartClientSide>b__3(Single _)
+   at Vintagestory.Common.GameTickListener.OnTriggered(Int64 ellapsedMilliseconds) in VintagestoryLib\Common\Model\GameTickListener.cs:line 36
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 134
+   at Vintagestory.Client.NoObf.ClientMain.MainRenderLoop(Single dt) in VintagestoryLib\Client\ClientMain.cs:line 867
+   at Vintagestory.Client.GuiScreenRunningGame.RenderToPrimary(Single dt) in VintagestoryLib\Client\MainMenu\Screens\GuiScreenRunningGame.cs:line 173
+   at Vintagestory.Client.ScreenManager.Render(Single dt) in VintagestoryLib\Client\ScreenManager.cs:line 742
+   at Vintagestory.Client.ScreenManager.OnNewFrame(Single dt) in VintagestoryLib\Client\ScreenManager.cs:line 686
+   at Vintagestory.Client.NoObf.ClientPlatformWindows.window_RenderFrame(FrameEventArgs e) in VintagestoryLib\Client\ClientPlatform\GameWindow.cs:line 112
+   at OpenTK.Windowing.Desktop.GameWindow.Run()
+   at Vintagestory.Client.ClientProgram.Start(ClientProgramArgs args, String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 354
+   at Vintagestory.Client.ClientProgram.<>c__DisplayClass10_0.<.ctor>b__1() in VintagestoryLib\Client\ClientProgram.cs:line 131
+   at Vintagestory.ClientNative.CrashReporter.Start(ThreadStart start) in VintagestoryLib\Client\ClientPlatform\ClientNative\CrashReporter.cs:line 95
+   at Vintagestory.Client.ClientProgram..ctor(String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 131
+   at Vintagestory.Client.ClientProgram.Main(String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 51
+   at Vintagestory.ClientWindows.Main(String[] args) in VintagestoryClient\Windows\ClientWindows.cs:line 11
+7.10.2026 00:21:21 [Error] Exception: CrashTest: boom in a tick listener (caught)
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c__DisplayClass1_0.<StartClientSide>b__3(Single _)   at Vintagestory.API.Common.LoggerBase.Error(Exception e) in VintagestoryApi\Common\API\ILogger.cs:line 269
+   at CrashTestMod.CrashTestSystem.<>c__DisplayClass1_0.<StartClientSide>b__3(Single _)
+   at Vintagestory.Common.GameTickListener.OnTriggered(Int64 ellapsedMilliseconds) in VintagestoryLib\Common\Model\GameTickListener.cs:line 36
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 134
+   at Vintagestory.Client.NoObf.ClientMain.MainRenderLoop(Single dt) in VintagestoryLib\Client\ClientMain.cs:line 867
+   at Vintagestory.Client.GuiScreenRunningGame.RenderToPrimary(Single dt) in VintagestoryLib\Client\MainMenu\Screens\GuiScreenRunningGame.cs:line 173
+   at Vintagestory.Client.ScreenManager.Render(Single dt) in VintagestoryLib\Client\ScreenManager.cs:line 742
+   at Vintagestory.Client.ScreenManager.OnNewFrame(Single dt) in VintagestoryLib\Client\ScreenManager.cs:line 686
+   at Vintagestory.Client.NoObf.ClientPlatformWindows.window_RenderFrame(FrameEventArgs e) in VintagestoryLib\Client\ClientPlatform\GameWindow.cs:line 112
+   at OpenTK.Windowing.Desktop.GameWindow.Run()
+   at Vintagestory.Client.ClientProgram.Start(ClientProgramArgs args, String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 354
+   at Vintagestory.Client.ClientProgram.<>c__DisplayClass10_0.<.ctor>b__1() in VintagestoryLib\Client\ClientProgram.cs:line 131
+   at Vintagestory.ClientNative.CrashReporter.Start(ThreadStart start) in VintagestoryLib\Client\ClientPlatform\ClientNative\CrashReporter.cs:line 95
+   at Vintagestory.Client.ClientProgram..ctor(String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 131
+   at Vintagestory.Client.ClientProgram.Main(String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 51
+   at Vintagestory.ClientWindows.Main(String[] args) in VintagestoryClient\Windows\ClientWindows.cs:line 11
+7.10.2026 00:21:24 [Notification] Finished fully loading sounds (async)
+7.10.2026 00:21:24 [Error] Exception: CrashTest: boom in a tick listener (caught)
+   at CrashTestMod.Boom.Now(String where)
+   at CrashTestMod.CrashTestSystem.<>c__DisplayClass1_0.<StartClientSide>b__3(Single _)   at Vintagestory.API.Common.LoggerBase.Error(Exception e) in VintagestoryApi\Common\API\ILogger.cs:line 269
+   at CrashTestMod.CrashTestSystem.<>c__DisplayClass1_0.<StartClientSide>b__3(Single _)
+   at Vintagestory.Common.GameTickListener.OnTriggered(Int64 ellapsedMilliseconds) in VintagestoryLib\Common\Model\GameTickListener.cs:line 36
+   at Vintagestory.Common.EventManager.TriggerGameTick(Int64 ellapsedMilliseconds, IWorldAccessor world) in VintagestoryLib\Common\EventManager.cs:line 134
+   at Vintagestory.Client.NoObf.ClientMain.MainRenderLoop(Single dt) in VintagestoryLib\Client\ClientMain.cs:line 867
+   at Vintagestory.Client.GuiScreenRunningGame.RenderToPrimary(Single dt) in VintagestoryLib\Client\MainMenu\Screens\GuiScreenRunningGame.cs:line 173
+   at Vintagestory.Client.ScreenManager.Render(Single dt) in VintagestoryLib\Client\ScreenManager.cs:line 742
+   at Vintagestory.Client.ScreenManager.OnNewFrame(Single dt) in VintagestoryLib\Client\ScreenManager.cs:line 686
+   at Vintagestory.Client.NoObf.ClientPlatformWindows.window_RenderFrame(FrameEventArgs e) in VintagestoryLib\Client\ClientPlatform\GameWindow.cs:line 112
+   at OpenTK.Windowing.Desktop.GameWindow.Run()
+   at Vintagestory.Client.ClientProgram.Start(ClientProgramArgs args, String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 354
+   at Vintagestory.Client.ClientProgram.<>c__DisplayClass10_0.<.ctor>b__1() in VintagestoryLib\Client\ClientProgram.cs:line 131
+   at Vintagestory.ClientNative.CrashReporter.Start(ThreadStart start) in VintagestoryLib\Client\ClientPlatform\ClientNative\CrashReporter.cs:line 95
+   at Vintagestory.Client.ClientProgram..ctor(String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 131
+   at Vintagestory.Client.ClientProgram.Main(String[] rawArgs) in VintagestoryLib\Client\ClientProgram.cs:line 51
+   at Vintagestory.ClientWindows.Main(String[] args) in VintagestoryClient\Windows\ClientWindows.cs:line 11
+7.10.2026 00:21:27 [Error] Exception: CrashTest: boom in a tick listener (caught)
