@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using eViSTool.Core.Localization;
 using eViSTool.Core.ModDb;
+using eViSTool.Core.Mods;
 
 namespace eViSTool.App.ViewModels;
 
@@ -9,8 +10,9 @@ public enum QueueState { Waiting, Working, Done, Failed, Cancelled }
 /// <summary>Пункт очереди установки: обновление, откат или конкретная версия (из модбазы или сохранённая копия).</summary>
 public sealed partial class UpdateQueueItem : ObservableObject
 {
-    public UpdateQueueItem(string modId, string name, string from, string to, ModDbRelease? release, string? path)
+    public UpdateQueueItem(ModTarget target, string modId, string name, string from, string to, ModDbRelease? release, string? path)
     {
+        Target = target;
         ModId = modId;
         Name = name;
         From = from;
@@ -18,6 +20,13 @@ public sealed partial class UpdateQueueItem : ObservableObject
         Release = release;
         Path = path;
     }
+
+    /// <summary>Куда ставить — запомнено при добавлении в очередь; смена активного профиля его не меняет.</summary>
+    public ModTarget Target { get; }
+
+    /// <summary>«→ VM-home-solo» — показывается, когда в очереди пункты для разных профилей.</summary>
+    [ObservableProperty] private bool _showTarget;
+    public string TargetText => "→ " + Target.Name;
 
     public string ModId { get; }
     public string Name { get; }

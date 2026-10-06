@@ -212,6 +212,10 @@
                                     </StackPanel>
                                     <TextBlock DockPanel.Dock="Right" Text="{Binding Versions}" FontFamily="Consolas" FontSize="12"
                                                Foreground="{StaticResource Forest.Muted}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                    <!-- в очереди пункты разных профилей — видно, куда ставится каждый -->
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding TargetText}" FontSize="12" Foreground="{StaticResource Forest.Accent}"
+                                               VerticalAlignment="Center" Margin="12,0,0,0" MaxWidth="160" TextTrimming="CharacterEllipsis"
+                                               Visibility="{Binding ShowTarget, Converter={StaticResource BoolToVis}}" />
                                     <StackPanel>
                                         <TextBlock Text="{Binding Name}" FontSize="12" Foreground="{StaticResource Forest.Text}" TextTrimming="CharacterEllipsis" />
                                         <TextBlock Text="{Binding Message}" FontSize="11" Foreground="{StaticResource Forest.Danger}" TextWrapping="Wrap"

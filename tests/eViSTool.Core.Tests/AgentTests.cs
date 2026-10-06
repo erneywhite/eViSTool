@@ -1,3 +1,4 @@
+using eViSTool.Core.Mods;
 using System.Diagnostics;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Server;
@@ -340,7 +341,8 @@ public sealed class AgentTests : IAsyncLifetime
             fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
         await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
-        using var client = AgentClient.ForRemote(new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint));
+        var code = new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint);
+        using var client = AgentClient.ForRemote(code);
         var backups = Path.Combine(Path.GetDirectoryName(AgentExe)!, "data", "ModBackups", _profile.Id);
         try
         {
@@ -383,10 +385,19 @@ public sealed class AgentTests : IAsyncLifetime
             await Assert.ThrowsAsync<InvalidOperationException>(() => client.SetModEnabledAsync(outside, false));
             Assert.True(File.Exists(outside));
 
+            // цель установки — удалённый сервер по коду: мод уходит на него, а не в «текущий» профиль этой машины
+            var target = new ModTarget(new GameProfile { Id = "remote-test", Name = "Remote", Kind = ProfileKind.Server }, code);
+            var viaTarget = await ModTargets.InstallAsync(target, MakeModZip(Path.Combine(_tmp, "upload"), "gamma_0.5.0.zip", "gamma", "0.5.0"));
+            Assert.Equal("gamma 0.5.0", viaTarget!.Text);
+            Assert.True(File.Exists(Path.Combine(mods, "gamma_0.5.0.zip")));
+            var (_, remoteMods) = await ModTargets.ScanAsync(target);
+            await ModTargets.SetEnabledAsync(target, remoteMods.Single(m => m.Info?.ModId == "gamma"), enabled: false);
+            Assert.Contains("gamma", (await client.ModsAsync()).DisabledMods);
+
             // удаление последней копии — в корзину, и из списка выключенных тоже
             await client.DeleteModAsync(Path.Combine(mods, "carryon_1.1.0.zip"));
             list = await client.ModsAsync();
-            Assert.Single(list.Mods);
+            Assert.Equal(["gamma", "other"], list.Mods.Select(m => m.Info!.ModId).Order());
             Assert.DoesNotContain("CarryOn", list.DisabledMods);
         }
         finally

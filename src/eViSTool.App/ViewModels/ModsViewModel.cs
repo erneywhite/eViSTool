@@ -194,7 +194,19 @@ public sealed partial class ModsViewModel : ObservableObject
     /// <summary>Профиль на этой машине: папку модов можно открыть, модпаки — собрать и поставить.</summary>
     public bool IsLocalProfile => !IsRemote;
 
-    private AgentClient RemoteAgent => _main.Server.RemoteClient ?? throw new InvalidOperationException(Loc.T("mods.remoteOffline"));
+    /// <summary>
+    /// Цель для действия, начатого сейчас: снимок активного профиля. Дальше операция работает только с ней —
+    /// переключение профиля посреди загрузки её не сдвинет (раньше мод мог уйти в прежний профиль).
+    /// </summary>
+    private ModTarget? CurrentTarget()
+    {
+        if (_main.ActiveProfile is not { } profile) return null;
+        if (ModTarget.For(profile.Model) is { } target) return target;
+        Error(Loc.T("remote.errDecrypt"));
+        return null;
+    }
+
+    private bool IsActive(ModTarget target) => target.ProfileId == _main.ActiveProfile?.Model.Id;
 
     // ---- своя машина: моды могли поменять в другом окне (удалённом или втором локальном) — перечитываем сами
     private readonly DispatcherTimer _diskWatch = new() { Interval = TimeSpan.FromSeconds(2) };
@@ -324,15 +336,9 @@ public sealed partial class ModsViewModel : ObservableObject
         StatusText = Loc.T("mods.changedOutside");
     }
 
-    /// <summary>Сервер этого профиля запущен (свой — по процессу, удалённый — со слов агента).</summary>
-    private bool IsRunning(ResolvedProfile profile) =>
-        IsRemote ? _main.Server.IsServerUp : GameProcess.IsRunning(profile.Profile);
-
-    private async Task SetEnabledAsync(ResolvedProfile profile, LocalMod mod, bool enabled)
-    {
-        if (IsRemote) await RemoteAgent.SetModEnabledAsync(mod.Path, enabled);
-        else ModConfigEditor.SetEnabled(profile, mod.Info!, enabled);
-    }
+    /// <summary>Игра или сервер цели запущены (свой — по процессу, удалённый — со слов агента, если это активный профиль).</summary>
+    private bool IsRunning(ModTarget target) =>
+        target.IsRemote ? IsActive(target) && _main.Server.IsServerUp : GameProcess.IsRunning(target.Profile);
 
     private void Rebuild()
     {
@@ -404,12 +410,12 @@ public sealed partial class ModsViewModel : ObservableObject
     [RelayCommand]
     private async Task ToggleEnabledAsync(ModRowViewModel? row)
     {
-        if (row?.Local.Info is null || Profile is not { } profile) return;
+        if (row?.Local.Info is null || CurrentTarget() is not { } target) return;
 
-        if (IsRunning(profile))
+        if (IsRunning(target))
         {
             // клиент при выходе перезаписывает свои настройки, сервер применит только после перезапуска
-            var server = profile.Profile.Kind == ProfileKind.Server;
+            var server = target.Profile.Kind == ProfileKind.Server;
             var what = server
                 ? Loc.T("mods.toggleServerRunning")
                 : Loc.T("mods.toggleGameRunning");
@@ -422,7 +428,7 @@ public sealed partial class ModsViewModel : ObservableObject
 
         try
         {
-            await SetEnabledAsync(profile, row.Local, enabled: !row.IsEnabled);
+            await ModTargets.SetEnabledAsync(target, row.Local, enabled: !row.IsEnabled);
             StatusText = Loc.T(row.IsEnabled ? "mods.disabledOk" : "mods.enabledOk", row.Name);
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException
@@ -438,16 +444,20 @@ public sealed partial class ModsViewModel : ObservableObject
     [RelayCommand]
     private async Task DeleteAsync(ModRowViewModel? row)
     {
-        if (row is null || Profile is not { } profile) return;
+        if (row is null || Profile is not { } profile || CurrentTarget() is not { } target) return;
 
-        var running = IsRunning(profile)
+        var running = IsRunning(target)
             ? "\n\n" + Loc.T("mods.deleteRunning") : "";
         if (!Confirm(Loc.T("mods.deleteConfirm", row.Name, row.Installed) + running))
             return;
 
         try
         {
-            if (IsRemote) await RemoteAgent.DeleteModAsync(row.Local.Path); // на сервере — в его корзину
+            if (target.Remote is { } code)
+            {
+                using var agent = AgentClient.ForRemote(code);
+                await agent.DeleteModAsync(row.Local.Path); // на сервере — в его корзину
+            }
             else
             {
                 Shell.MoveToRecycleBin(row.Local.Path);
@@ -482,7 +492,7 @@ public sealed partial class ModsViewModel : ObservableObject
     /// <summary>Установка набора zip (кнопка или перетаскивание).</summary>
     public async Task AddFilesAsync(IEnumerable<string> files)
     {
-        if (Profile is not { } profile || IsBusy) return;
+        if (Profile is null || IsBusy) return;
 
         var list = files.ToList();
         if (list.FirstOrDefault(f => f.EndsWith(PackManifest.Extension, StringComparison.OrdinalIgnoreCase)) is { } pack)
@@ -497,7 +507,7 @@ public sealed partial class ModsViewModel : ObservableObject
             return;
         }
 
-        if (!ConfirmIfRunning(profile)) return;
+        if (CurrentTarget() is not { } target || !ConfirmIfRunning(target)) return;
 
         var installed = new List<string>();
         var problems = new List<string>();
@@ -505,7 +515,7 @@ public sealed partial class ModsViewModel : ObservableObject
         try
         {
             foreach (var zip in zips)
-                await InstallZipAsync(profile, zip, interactive: true, installed, problems);
+                await InstallZipAsync(target, zip, interactive: true, installed, problems);
         }
         finally
         {
@@ -527,35 +537,22 @@ public sealed partial class ModsViewModel : ObservableObject
     /// Ставит один zip в профиль: старая версия — в хранилище, выключенный мод остаётся выключенным.
     /// interactive — спрашивать про ту же версию и даунгрейд (при обновлении/откате не спрашиваем: решение уже принято).
     /// </summary>
-    private async Task<bool> InstallZipAsync(ResolvedProfile profile, string zip, bool interactive, List<string> installed, List<string> problems)
+    private async Task<bool> InstallZipAsync(ModTarget target, string zip, bool interactive, List<string> installed, List<string> problems)
     {
         try
         {
-            // удалённому серверу план нужен только для вопросов: ставить будет его агент, по тем же правилам
-            var plan = ModInstaller.Plan(zip, profile, IsRemote ? _locals : ModUpdateService.ScanLocal(profile));
-            var info = plan.Incoming.Info!;
-            var old = plan.Replaces.FirstOrDefault()?.Info?.Version;
-
-            if (interactive && plan.IsSameVersion && !Confirm(Loc.T("mods.reinstallConfirm", info.Name, info.Version)))
-                return false;
-            if (interactive && plan.IsDowngrade && !Confirm(Loc.T("mods.downgradeConfirm", info.Name, old, info.Version)))
-                return false;
-
-            if (IsRemote)
+            // ставится строго в цель: свою папку или удалённый сервер (своё соединение), активный профиль не важен
+            var outcome = await ModTargets.InstallAsync(target, zip, plan =>
             {
-                StatusText = Loc.T("mods.uploading", info.Name, info.Version);
-                var result = await RemoteAgent.InstallModAsync(zip);
-                installed.Add(result.OldVersion is not null ? $"{result.Name}: {result.OldVersion} → {result.Version}" : $"{result.Name} {result.Version}");
+                var info = plan.Incoming.Info!;
+                var old = plan.Replaces.FirstOrDefault()?.Info?.Version;
+                if (interactive && plan.IsSameVersion && !Confirm(Loc.T("mods.reinstallConfirm", info.Name, info.Version))) return false;
+                if (interactive && plan.IsDowngrade && !Confirm(Loc.T("mods.downgradeConfirm", info.Name, old, info.Version))) return false;
+                if (target.IsRemote) StatusText = Loc.T("mods.uploading", info.Name, info.Version);
                 return true;
-            }
-
-            var disabledSet = new HashSet<string>(profile.DisabledMods);
-            var wasDisabled = plan.Replaces.Any(r => ModUpdateService.IsDisabled(r, disabledSet));
-            ModInstaller.Apply(plan, ModBackupStore.ForProfile(profile.Profile));
-            // выключенный мод остаётся выключенным и в новой версии
-            if (wasDisabled) ModConfigEditor.SetEnabled(profile, info, enabled: false);
-
-            installed.Add(plan.IsReplace ? $"{info.Name}: {old} → {info.Version}" : $"{info.Name} {info.Version}");
+            });
+            if (outcome is null) return false;
+            installed.Add(outcome.Text);
             return true;
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException
@@ -585,12 +582,12 @@ public sealed partial class ModsViewModel : ObservableObject
         MessageBox.Show(Application.Current.MainWindow, text, "eViSTool", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
-    private bool ConfirmIfRunning(ResolvedProfile profile) =>
-        !IsRunning(profile)
+    private bool ConfirmIfRunning(ModTarget target) =>
+        !IsRunning(target)
         || Confirm(Loc.T("mods.runningContinue"));
 
     /// <summary>Скачать релиз и поставить его. Ошибки — в problems.</summary>
-    private async Task<bool> DownloadAndInstallAsync(ResolvedProfile profile, string modId, string name, ModDbRelease release,
+    private async Task<bool> DownloadAndInstallAsync(ModTarget target, string modId, string name, ModDbRelease release,
         List<string> installed, List<string> problems, Action<double>? onProgress = null, CancellationToken ct = default)
     {
         string? file = null;
@@ -602,7 +599,7 @@ public sealed partial class ModsViewModel : ObservableObject
                 onProgress?.Invoke(x);
             });
             file = await _updater.DownloadReleaseAsync(release, modId, progress, ct);
-            return await InstallZipAsync(profile, file, interactive: false, installed, problems);
+            return await InstallZipAsync(target, file, interactive: false, installed, problems);
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or TaskCanceledException)
         {
@@ -638,8 +635,8 @@ public sealed partial class ModsViewModel : ObservableObject
     [RelayCommand]
     private void UpdateOne(ModRowViewModel? row)
     {
-        if (row is not { CanUpdate: true }) return;
-        Enqueue([QueueItemFor(row, row.Result.LatestCompatible!)]);
+        if (row is not { CanUpdate: true } || CurrentTarget() is not { } target) return;
+        Enqueue([QueueItemFor(target, row, row.Result.LatestCompatible!)]);
     }
 
     [RelayCommand]
@@ -650,12 +647,12 @@ public sealed partial class ModsViewModel : ObservableObject
         if (todo.Count == 0) return;
 
         var list = string.Join("\n", todo.Select(r => $"• {r.Name}: {r.Installed} → {r.Latest}"));
-        if (!Confirm(Loc.T("mods.updateAllConfirm", todo.Count, list))) return;
-        Enqueue(todo.Select(r => QueueItemFor(r, r.Result.LatestCompatible!)));
+        if (CurrentTarget() is not { } target || !Confirm(Loc.T("mods.updateAllConfirm", todo.Count, list))) return;
+        Enqueue(todo.Select(r => QueueItemFor(target, r, r.Result.LatestCompatible!)));
     }
 
-    private static UpdateQueueItem QueueItemFor(ModRowViewModel row, ModDbRelease release) =>
-        new(row.ModId, row.Name, row.Installed, release.ModVersion ?? "?", release, null);
+    private static UpdateQueueItem QueueItemFor(ModTarget target, ModRowViewModel row, ModDbRelease release) =>
+        new(target, row.ModId, row.Name, row.Installed, release.ModVersion ?? "?", release, null);
 
     // ---------- очередь установки ----------
 
@@ -691,36 +688,39 @@ public sealed partial class ModsViewModel : ObservableObject
         OnPropertyChanged(nameof(HasQueueRetry));
     }
 
-    /// <summary>Поставить в очередь; уже ждущий или ставящийся мод второй раз не добавляется.</summary>
+    /// <summary>
+    /// Поставить в очередь; уже ждущий или ставящийся мод той же цели второй раз не добавляется.
+    /// У каждого пункта своя цель: пункты разных профилей ставятся каждый в свой.
+    /// </summary>
     public void Enqueue(IEnumerable<UpdateQueueItem> items)
     {
         if (IsBusy && !IsQueueRunning) return; // идёт другая операция (импорт модпака и т.п.)
+        var adding = items.ToList();
+        // игра или сервер цели запущены — спросить один раз на цель, пока ничего не начато
+        var declined = adding.Select(i => i.Target).DistinctBy(t => t.ProfileId)
+            .Where(t => !ConfirmIfRunning(t)).Select(t => t.ProfileId).ToHashSet();
         if (!IsQueueRunning)
         {
             // прошлый прогон закончен — его итоги убираем
             foreach (var old in Queue.Where(i => i.State is QueueState.Done).ToList()) Queue.Remove(old);
         }
-        foreach (var item in items)
+        foreach (var item in adding.Where(i => !declined.Contains(i.Target.ProfileId)))
         {
-            var same = Queue.FirstOrDefault(i => string.Equals(i.ModId, item.ModId, StringComparison.OrdinalIgnoreCase));
+            var same = Queue.FirstOrDefault(i => i.Target.ProfileId == item.Target.ProfileId
+                                                 && string.Equals(i.ModId, item.ModId, StringComparison.OrdinalIgnoreCase));
             if (same is { State: QueueState.Waiting or QueueState.Working }) continue;
             if (same is not null) Queue.Remove(same);
             Queue.Add(item);
         }
+        // пункты для разных профилей — у каждого видно, куда он ставится
+        var several = Queue.Select(i => i.Target.ProfileId).Distinct().Count() > 1;
+        foreach (var i in Queue) i.ShowTarget = several;
         NotifyQueue();
-        if (!IsQueueRunning) _ = RunQueueAsync();
+        if (!IsQueueRunning && Queue.Any(i => i.State == QueueState.Waiting)) _ = RunQueueAsync();
     }
 
     private async Task RunQueueAsync()
     {
-        if (Profile is not { } profile) return;
-        if (!ConfirmIfRunning(profile))
-        {
-            foreach (var i in Queue.Where(i => i.State == QueueState.Waiting)) i.State = QueueState.Cancelled;
-            NotifyQueue();
-            return;
-        }
-
         _queueCts = new CancellationTokenSource();
         var ct = _queueCts.Token;
         IsBusy = true;
@@ -735,15 +735,16 @@ public sealed partial class ModsViewModel : ObservableObject
                 NotifyQueue();
                 var problems = new List<string>();
                 bool ok;
+                // каждый пункт — в свою цель, запомненную при добавлении
                 if (item.Path is not null)
-                    ok = await InstallZipAsync(profile, item.Path, interactive: false, installed, problems);
+                    ok = await InstallZipAsync(item.Target, item.Path, interactive: false, installed, problems);
                 else
-                    ok = await DownloadAndInstallAsync(profile, item.ModId, item.Name, item.Release!, installed, problems,
+                    ok = await DownloadAndInstallAsync(item.Target, item.ModId, item.Name, item.Release!, installed, problems,
                         x => { item.Progress = x; OnPropertyChanged(nameof(QueueProgress)); }, ct);
 
                 item.State = ok ? QueueState.Done : ct.IsCancellationRequested ? QueueState.Cancelled : QueueState.Failed;
                 item.Message = ok ? "" : ct.IsCancellationRequested ? "" : problems.FirstOrDefault() ?? "";
-                if (ok) await ReloadAsync(); // таблица и карточка сразу показывают новую версию
+                if (ok && IsActive(item.Target)) await ReloadAsync(); // таблица и карточка сразу показывают новую версию
                 NotifyQueue();
             }
             foreach (var i in Queue.Where(i => i.State == QueueState.Waiting)) i.State = QueueState.Cancelled;
@@ -770,6 +771,7 @@ public sealed partial class ModsViewModel : ObservableObject
     private void RetryQueue()
     {
         if (IsQueueRunning) return;
+        // повтор — в ту же цель, что была у пункта
         foreach (var i in Queue.Where(i => i.State is QueueState.Failed or QueueState.Cancelled))
         {
             i.Message = "";
@@ -809,8 +811,11 @@ public sealed partial class ModsViewModel : ObservableObject
     }
 
     /// <summary>Поставить выбранную версию (через очередь).</summary>
-    public void InstallVersion(ModRowViewModel row, VersionOption option) =>
-        Enqueue([new UpdateQueueItem(row.ModId, row.Name, row.Installed, option.Version, option.Release, option.Path)]);
+    public void InstallVersion(ModRowViewModel row, VersionOption option)
+    {
+        if (CurrentTarget() is { } target)
+            Enqueue([new UpdateQueueItem(target, row.ModId, row.Name, row.Installed, option.Version, option.Release, option.Path)]);
+    }
 
     [RelayCommand]
     private async Task RollbackAsync(ModRowViewModel? row)
@@ -833,7 +838,7 @@ public sealed partial class ModsViewModel : ObservableObject
     [RelayCommand]
     private async Task FixDependenciesAsync()
     {
-        if (Profile is not { } start || IsBusy || DependencyIssues.Count == 0) return;
+        if (Profile is not { } start || IsBusy || DependencyIssues.Count == 0 || CurrentTarget() is not { } target) return;
         if (start.GameVersion is not { } game)
         {
             Error(Loc.T("mods.noGameVersion"));
@@ -842,14 +847,14 @@ public sealed partial class ModsViewModel : ObservableObject
 
         var list = string.Join("\n", DependencyIssues.Select(i => "• " + i.Describe()));
         if (!Confirm(Loc.T("mods.fixDepsConfirm", list))) return;
-        if (!ConfirmIfRunning(start)) return;
+        if (!ConfirmIfRunning(target)) return;
 
         var installed = new List<string>();
         var problems = new List<string>();
         IsBusy = true;
         try
         {
-            await FixDependencyIssuesAsync(game, installed, problems);
+            await FixDependencyIssuesAsync(target, game, installed, problems);
         }
         finally
         {
@@ -862,35 +867,36 @@ public sealed partial class ModsViewModel : ObservableObject
     /// Докачивает недостающие/устаревшие зависимости и включает выключенные. Несколько кругов:
     /// у зависимостей бывают свои зависимости. Без вопросов — вызывающий уже спросил.
     /// </summary>
-    private async Task FixDependencyIssuesAsync(ModVersion game, List<string> installed, List<string> problems)
+    private async Task FixDependencyIssuesAsync(ModTarget target, ModVersion game, List<string> installed, List<string> problems)
     {
         var tried = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
             for (var round = 0; round < 5; round++)
             {
-                await ReloadAsync();
-                var issues = DependencyIssues.Where(i => tried.Add(i.ModId)).ToList();
-                if (issues.Count == 0 || Profile is not { } profile) break;
+                // проблемы — по модам самой цели, а не того профиля, что открыт сейчас
+                var (_, mods) = await ModTargets.ScanAsync(target);
+                var issues = Dependencies.FindIssues(mods).Where(i => tried.Add(i.ModId)).ToList();
+                if (issues.Count == 0) break;
 
                 foreach (var issue in issues)
                 {
                     if (issue.IsDisabled)
                     {
-                        var mod = _locals.First(l => string.Equals(l.Info?.ModId, issue.ModId, StringComparison.OrdinalIgnoreCase));
-                        await SetEnabledAsync(profile, mod, enabled: true);
+                        var mod = mods.First(l => string.Equals(l.Info?.ModId, issue.ModId, StringComparison.OrdinalIgnoreCase));
+                        await ModTargets.SetEnabledAsync(target, mod, enabled: true);
                         installed.Add(Loc.T("mods.enabledShort", mod.Info!.Name));
                         continue;
                     }
 
                     StatusText = Loc.T("mods.searchingModDb", issue.ModId);
-                    var found = await _updater.FindBestReleaseAsync(issue.ModId, game, _main.AllowUnstable, profile.Profile.ToPolicy());
+                    var found = await _updater.FindBestReleaseAsync(issue.ModId, game, _main.AllowUnstable, target.Profile.ToPolicy());
                     if (found is not { } f)
                     {
                         problems.Add(Loc.T("mods.depNotFound", issue.ModId, $"{game.Major}.{game.Minor}.x"));
                         continue;
                     }
-                    await DownloadAndInstallAsync(profile, issue.ModId, f.Mod.Name ?? issue.ModId, f.Release, installed, problems);
+                    await DownloadAndInstallAsync(target, issue.ModId, f.Mod.Name ?? issue.ModId, f.Release, installed, problems);
                 }
             }
         }
@@ -914,26 +920,29 @@ public sealed partial class ModsViewModel : ObservableObject
     /// <summary>Скачать и поставить релиз из каталога, затем предложить доставить его зависимости.</summary>
     public async Task<bool> InstallFromCatalogAsync(string modId, string name, ModDbRelease release)
     {
-        if (Profile is not { } profile || IsBusy) return false;
-        if (!ConfirmIfRunning(profile)) return false;
+        if (Profile is not { } profile || IsBusy || CurrentTarget() is not { } target) return false;
+        if (!ConfirmIfRunning(target)) return false;
 
         var installed = new List<string>();
         var problems = new List<string>();
         IsBusy = true;
         try
         {
-            if (!await DownloadAndInstallAsync(profile, modId, name, release, installed, problems))
+            if (!await DownloadAndInstallAsync(target, modId, name, release, installed, problems))
             {
                 await ReportAsync(Loc.T("report.install"), installed, problems);
                 return false;
             }
 
-            await ReloadAsync();
-            if (DependencyIssues.Count > 0 && profile.GameVersion is { } game)
+            // зависимости — у той цели, куда ставили, даже если профиль успели переключить
+            var (resolved, mods) = await ModTargets.ScanAsync(target);
+            var issues = Dependencies.FindIssues(mods);
+            if (IsActive(target)) await ReloadAsync();
+            if (issues.Count > 0 && (resolved.GameVersion ?? profile.GameVersion) is { } game)
             {
-                var list = string.Join("\n", DependencyIssues.Select(i => "• " + i.Describe()));
+                var list = string.Join("\n", issues.Select(i => "• " + i.Describe()));
                 if (Confirm(Loc.T("mods.installDepsConfirm", name, list)))
-                    await FixDependencyIssuesAsync(game, installed, problems);
+                    await FixDependencyIssuesAsync(target, game, installed, problems);
             }
         }
         finally
@@ -1034,7 +1043,7 @@ public sealed partial class ModsViewModel : ObservableObject
             var plan = PackImporter.Plan(pack.Manifest, profile, ModUpdateService.ScanLocal(profile));
             var dlg = new ImportPackWindow(plan) { Owner = Application.Current.MainWindow };
             if (dlg.ShowDialog() != true) return;
-            if (!ConfirmIfRunning(profile)) return;
+            if (CurrentTarget() is not { } target || !ConfirmIfRunning(target)) return;
 
             IsBusy = true;
             PackImportResult result;

@@ -544,7 +544,6 @@
   "mods.readFromServer": "Mods read from the server.",
   "mods.reinstallConfirm": "“{0}” {1} is already installed.\n\nReinstall?",
   "mods.remoteNotFound": "The mod {0} is not on the server (any more).",
-  "mods.remoteOffline": "No connection to the server.",
   "mods.remotePacksLater": "A modpack is installed on the server computer itself: open eViSTool there and import the pack into this server profile.",
   "mods.remoteWaiting": "Waiting for the server to list its mods…",
   "mods.runningContinue": "The game/server is running: changes will apply only after a restart, and replaced files may be locked.\n\nContinue?",
