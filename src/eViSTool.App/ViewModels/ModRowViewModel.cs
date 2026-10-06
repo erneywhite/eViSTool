@@ -1,6 +1,7 @@
 using eViSTool.Core.Mods;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;
+using eViSTool.Core.Versioning;
 
 namespace eViSTool.App.ViewModels;
 
@@ -10,7 +11,8 @@ public enum RowTone { Good, Update, Warn, Danger, Muted }
 /// <summary>Строка таблицы модов.</summary>
 public sealed class ModRowViewModel
 {
-    public ModRowViewModel(ModCheckResult r, IReadOnlyList<DependencyIssue> issues, bool pinned, ProfileKind profileKind)
+    public ModRowViewModel(ModCheckResult r, IReadOnlyList<DependencyIssue> issues, bool pinned, ProfileKind profileKind,
+        ModVersion? game = null)
     {
         Result = r;
         Local = r.Local;
@@ -34,10 +36,14 @@ public sealed class ModRowViewModel
                                              || (ModId.Length > 0 && string.Equals(i.ModId, ModId, StringComparison.OrdinalIgnoreCase)))
                                  .ToList();
 
-        IsProblem = IsDuplicate || DependencyIssues.Count > 0
+        // мод требует игру новее, чем у профиля, — игра его не загрузит (выключенному — не важно)
+        NeedsGame = IsEnabled ? r.Local.Info?.NeedsNewerGame(game) : null;
+
+        IsProblem = IsDuplicate || DependencyIssues.Count > 0 || NeedsGame is not null
                     || r.Status is ModStatus.NoCompatibleRelease or ModStatus.Unreadable or ModStatus.CheckFailed;
 
-        (StatusText, Tone) = DependencyIssues.Count > 0 && IsEnabled ? (Loc.T("state.dependency"), RowTone.Danger)
+        (StatusText, Tone) = NeedsGame is { } need ? (Loc.T("state.needsGame", need), RowTone.Danger)
+            : DependencyIssues.Count > 0 && IsEnabled ? (Loc.T("state.dependency"), RowTone.Danger)
             : IsDuplicate ? (Loc.T("state.duplicate"), RowTone.Danger)
             : r.Status switch
             {
@@ -56,6 +62,7 @@ public sealed class ModRowViewModel
 
         Note = string.Join(" · ", new[]
         {
+            NeedsGame is { } needed ? Loc.T("note.needsGame", needed, game) : null,
             r.Message,
             r.LatestAny is { } any ? Loc.T("note.newerElsewhere", any.ModVersion, string.Join(", ", any.GameVersions.TakeLast(1))) : null,
         }.Concat(DependencyIssues.Select(i => i.Describe())).Where(s => !string.IsNullOrEmpty(s)));
@@ -107,10 +114,13 @@ public sealed class ModRowViewModel
     /// <summary>Предлагается новая версия — её можно пропустить.</summary>
     public bool CanSkip => Kind == ModStatus.UpdateAvailable;
 
-    /// <summary>Требует внимания: дубликат, зависимость, нет версии под игру, не читается, ошибка проверки.</summary>
+    /// <summary>Требует внимания: дубликат, зависимость, нужна игра новее, нет версии под игру, не читается, ошибка проверки.</summary>
     public bool IsProblem { get; }
 
     public IReadOnlyList<DependencyIssue> DependencyIssues { get; }
+
+    /// <summary>Какую версию игры мод требует, если она новее игры профиля; иначе null.</summary>
+    public ModVersion? NeedsGame { get; }
 
     public string StatusText { get; }
     public RowTone Tone { get; }

@@ -363,7 +363,7 @@ public sealed partial class ModsViewModel : ObservableObject
         var kind = _main.ActiveProfile?.Model.Kind ?? ProfileKind.Client;
         Rows.Clear();
         foreach (var r in results)
-            Rows.Add(new ModRowViewModel(r, DependencyIssues, r.Local.Info?.ModId is { } id && pins.ContainsKey(id), kind));
+            Rows.Add(new ModRowViewModel(r, DependencyIssues, r.Local.Info?.ModId is { } id && pins.ContainsKey(id), kind, Profile?.GameVersion));
 
         UpdatesAvailable = Rows.Count(r => r.Kind == ModStatus.UpdateAvailable);
         ProblemCount = Rows.Count(r => r.IsProblem);

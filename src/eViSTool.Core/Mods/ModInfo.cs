@@ -26,6 +26,24 @@ public sealed record ModInfo
     public static bool IsBaseGame(string modId) => BaseGameIds.Contains(modId);
 
     /// <summary>
+    /// Минимальная версия игры, которую мод требует в dependencies ("game", а также "survival"/"creative" — их версия
+    /// совпадает с версией игры); самое строгое из требований. null — не указана ("" или "*").
+    /// </summary>
+    public Versioning.ModVersion? RequiredGame =>
+        Dependencies.Where(d => IsBaseGame(d.Key))
+                    .Select(d => Versioning.ModVersion.ParseOrNull(d.Value))
+                    .Where(v => v is not null)
+                    .Max();
+
+    /// <summary>
+    /// Мод требует игру новее, чем у профиля: игра его не загрузит («Unable to resolve some mod dependencies»),
+    /// а сервер с ним не пустит игрока со старым клиентом. Возвращает требуемую версию, иначе null.
+    /// Версия игры профиля неизвестна — тоже null: сравнить не с чем.
+    /// </summary>
+    public Versioning.ModVersion? NeedsNewerGame(Versioning.ModVersion? game) =>
+        game is not null && RequiredGame is { } need && need.CompareTo(game) > 0 ? need : null;
+
+    /// <summary>
     /// Разбор modinfo.json. Используем Newtonsoft, как сама игра: он прощает комментарии,
     /// ключи без кавычек и хвостовые запятые. Имена полей — без учёта регистра
     /// (авторы пишут и "modid", и "ModID", и "mod_id").
