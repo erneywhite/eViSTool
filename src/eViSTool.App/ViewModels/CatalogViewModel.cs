@@ -45,7 +45,9 @@ public sealed partial class CatalogViewModel : ObservableObject
 
     /// <summary>Моды, у которых есть релиз для ветки активного профиля — для пометки в списке.</summary>
     private IReadOnlySet<long>? _profileCompat;
-    private string? ProfileBranch => _main.ActiveProfile?.Resolved.GameVersion is { } g ? $"{g.Major}.{g.Minor}" : null;
+    // версия игры — та же, что у вкладки «Моды» (у удалённого профиля — от его агента)
+    private string? ProfileBranch => _main.Mods.GameVersion is { } g ? $"{g.Major}.{g.Minor}" : null;
+    private string? _branchSeen;
     private int _searchGeneration;
 
     /// <summary>Ширина карточки мода (разделитель можно тянуть, ширина запоминается).</summary>
@@ -65,7 +67,7 @@ public sealed partial class CatalogViewModel : ObservableObject
 
     /// <summary>Подзаголовок страницы: для какого профиля и версии игры.</summary>
     public string HeaderSubtitle => _main.ActiveProfile is { } p
-        ? Loc.T("catalog.subtitle", p.Name, p.GameVersionText)
+        ? Loc.T("catalog.subtitle", p.Name, _main.Mods.GameVersion?.ToString() ?? p.GameVersionText)
         : "";
     [ObservableProperty] private IReadOnlyList<Choice<CatalogSort>> _sorts = [];
 
@@ -142,8 +144,11 @@ public sealed partial class CatalogViewModel : ObservableObject
         main.Mods.LocalModsChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(HeaderSubtitle)); // перечитывают и при смене профиля
+            // открытая карточка — под версию игры профиля, который активен сейчас (сменили профиль, агент сообщил версию)
+            Details?.Retarget(main.Mods.GameVersion);
             if (!_loaded) return;
-            ApplySearch();
+            if (ProfileBranch != _branchSeen) _ = OnBranchChangedAsync();
+            else ApplySearch();
             Details?.RefreshInstalled(main.Mods.InstalledVersions);
         };
     }
@@ -206,8 +211,9 @@ public sealed partial class CatalogViewModel : ObservableObject
         {
             await _catalog.LoadAsync(force);
             await _catalog.LoadBranchesAsync(force);
-            if (ProfileBranch is { } mine && _catalog.Branches.Contains(mine))
-                _profileCompat = await _catalog.CompatibleAssetsAsync(mine, force);
+            _branchSeen = ProfileBranch;
+            _profileCompat = ProfileBranch is { } mine && _catalog.Branches.Contains(mine)
+                ? await _catalog.CompatibleAssetsAsync(mine, force) : null;
 
             var keepBranch = SelectedBranch?.Value ?? (_loaded ? null : ProfileBranch);
             BuildChoices();
@@ -225,6 +231,28 @@ public sealed partial class CatalogViewModel : ObservableObject
             IsLoading = false;
             if (!_loaded) _loadTask = null; // не загрузилось — следующая попытка начнёт заново
         }
+    }
+
+    /// <summary>Сменилась ветка игры активного профиля: пометки «нет версии для …» и подписи фильтра — под новую.</summary>
+    private async Task OnBranchChangedAsync()
+    {
+        _branchSeen = ProfileBranch;
+        try
+        {
+            _profileCompat = ProfileBranch is { } mine && _catalog.Branches.Contains(mine)
+                ? await _catalog.CompatibleAssetsAsync(mine) : null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            _profileCompat = null; // пометок не будет — лучше, чем пометки от чужой версии
+        }
+        var branch = SelectedBranch?.Value;
+        BuildChoices();
+#pragma warning disable MVVMTK0034
+        _selectedBranch = Branches.FirstOrDefault(b => b.Value == branch) ?? Branches[0];
+#pragma warning restore MVVMTK0034
+        OnPropertyChanged(nameof(SelectedBranch));
+        ApplySearch();
     }
 
     // ошибки поиска не должны теряться молча в фоновой задаче
@@ -300,7 +328,7 @@ public sealed partial class CatalogViewModel : ObservableObject
             Details = null;
             return;
         }
-        Details = new ModDetailsViewModel(value.Item, _main.ActiveProfile?.Resolved.GameVersion, _main.Mods.InstalledVersions, this);
+        Details = new ModDetailsViewModel(value.Item, _main.Mods.GameVersion, _main.Mods.InstalledVersions, this);
         _detailsCts = new CancellationTokenSource();
         _ = Details.LoadAsync(_db, _detailsCts.Token);
     }
@@ -321,6 +349,16 @@ public sealed partial class CatalogViewModel : ObservableObject
             && MessageBox.Show(Application.Current.MainWindow,
                    Loc.T("catalog.clientOnlyAsk", details.Name),
                    "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+        // релиз сверяется с версией игры профиля, куда сейчас поставим (её же запомнит установка как цель)
+        var game = _main.Mods.GameVersion;
+        if (!CatalogPick.Fits(release, game)
+            && MessageBox.Show(Application.Current.MainWindow,
+                   game is null
+                       ? Loc.T("catalog.unknownGameAsk", details.Name, release.ModVersion)
+                       : Loc.T("catalog.otherGameAsk", details.Name, release.ModVersion,
+                           string.Join(", ", release.GameVersions.TakeLast(3)), game),
+                   "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
             return;
         await _main.Mods.InstallFromCatalogAsync(id, details.Name, release);
     }
@@ -350,7 +388,7 @@ public sealed class CatalogItemViewModel(ModDbListItem item, IReadOnlyDictionary
 public sealed partial class ModDetailsViewModel : ObservableObject
 {
     private readonly ModDbListItem _item;
-    private readonly ModVersion? _game;
+    private ModVersion? _game; // версия игры профиля, под которую подобран релиз; меняется вместе с профилем
     private readonly CatalogViewModel _owner;
 
     [ObservableProperty] private string _description = "";
@@ -412,6 +450,34 @@ public sealed partial class ModDetailsViewModel : ObservableObject
         BuildVersions();
     }
 
+    /// <summary>Активный профиль (или его версия игры) сменился — подобрать релиз и список версий под новую.</summary>
+    public void Retarget(ModVersion? game)
+    {
+        if (Equals(game?.ToString(), _game?.ToString())) return;
+        _game = game;
+        if (Mod is null) return; // релизы ещё грузятся — подберутся под новую версию сами
+        Evaluate(Mod);
+        UpdateInstallText();
+        BuildVersions();
+    }
+
+    /// <summary>Лучший релиз и строка совместимости — под версию игры профиля (см. CatalogPick).</summary>
+    private void Evaluate(ModDbMod mod)
+    {
+        var onPrerelease = ModVersion.ParseOrNull(InstalledVersion)?.IsPrerelease == true;
+        var choice = CatalogPick.Best(mod.Releases, _game, onPrerelease);
+        BestRelease = choice.Release;
+        var branch = _game is { } g ? $"{g.Major}.{g.Minor}.x" : "";
+        Compatibility = choice.Fit switch
+        {
+            CatalogFit.UnknownGame => Loc.T("card.unknownGame") + (choice.Release is { } r ? " " + Loc.T("card.latestStable", r.ModVersion) : ""),
+            CatalogFit.NoneForBranch => "✖ " + Loc.T("card.noVersion", branch)
+                                        + (choice.Latest is { } latest ? ". " + Loc.T("card.latestFor", latest.ModVersion, latest.GameVersions.LastOrDefault()) : ""),
+            _ => "✔ " + Loc.T("card.hasVersion", choice.Release!.ModVersion, branch)
+                 + (choice.Fit == CatalogFit.CompatiblePrerelease ? " " + Loc.T("card.prerelease") : ""),
+        };
+    }
+
     public async Task LoadAsync(ModDbClient db, CancellationToken ct)
     {
         try
@@ -428,25 +494,7 @@ public sealed partial class ModDetailsViewModel : ObservableObject
             Description = Html.ToPlainText(mod.Text) ?? Description;
             Screenshots = mod.Screenshots.Select(s => s.MainFile).Where(u => !string.IsNullOrWhiteSpace(u)).ToList()!;
 
-            if (_game is null)
-            {
-                Compatibility = Loc.T("mods.noGameVersion");
-                BestRelease = UpdateChecker.PickLatest(mod.Releases, allowUnstable: true);
-            }
-            else
-            {
-                var branch = $"{_game.Major}.{_game.Minor}.x";
-                // как во вкладке «Моды»: стоит пре-релиз — значит, сознательно на нестабильной ветке мода
-                var onPrerelease = ModVersion.ParseOrNull(InstalledVersion)?.IsPrerelease == true;
-                var stable = UpdateChecker.PickLatestCompatible(mod.Releases, _game, allowUnstable: onPrerelease);
-                BestRelease = stable ?? UpdateChecker.PickLatestCompatible(mod.Releases, _game, allowUnstable: true);
-                var latest = UpdateChecker.PickLatest(mod.Releases, allowUnstable: true);
-                Compatibility = BestRelease is not null
-                    ? "✔ " + Loc.T("card.hasVersion", BestRelease.ModVersion, branch)
-                      + (ModVersion.ParseOrNull(BestRelease.ModVersion)?.IsPrerelease == true ? " " + Loc.T("card.prerelease") : "")
-                    : "✖ " + Loc.T("card.noVersion", branch)
-                      + (latest is not null ? ". " + Loc.T("card.latestFor", latest.ModVersion, latest.GameVersions.LastOrDefault()) : "");
-            }
+            Evaluate(mod);
             UpdateInstallText();
             BuildVersions();
         }

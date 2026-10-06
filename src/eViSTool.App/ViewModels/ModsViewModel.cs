@@ -185,6 +185,12 @@ public sealed partial class ModsViewModel : ObservableObject
     /// <summary>Моды берутся с диска этой машины или — у удалённого сервера — у его агента по сети.</summary>
     private ResolvedProfile? Profile => IsRemote ? _remoteResolved : _main.ActiveProfile?.Resolved;
 
+    /// <summary>
+    /// Версия игры активного профиля — одна на всё окно (каталог берёт её отсюда): у своего — по папке игры,
+    /// у удалённого — та, что сообщил его агент. null — неизвестна (агент ещё не ответил, папка игры не найдена).
+    /// </summary>
+    public ModVersion? GameVersion => Profile?.GameVersion;
+
     // ---- удалённый сервер: список модов и папки — со слов агента, пути — на той машине
     private bool IsRemote => _main.ActiveProfile?.Model.IsRemote == true;
     private ResolvedProfile? _remoteResolved;
