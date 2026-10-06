@@ -20,6 +20,26 @@ public sealed class PixelsToGridLengthConverter : IValueConverter
         value is GridLength g ? g.Value : 400d;
 }
 
+/// <summary>
+/// Размер миниатюры скриншота по ширине ряда: ряд делится на столько картинок, чтобы каждая была не шире 260 px
+/// (узкая карточка — две в ряд, широкая — три-четыре), 16:9. Параметр: "w" — ширина, "h" — высота.
+/// </summary>
+public sealed class ScreenshotThumbConverter : IValueConverter
+{
+    private const double Target = 260, Gap = 6;
+
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        var row = value is double d && d > 0 ? d : 400;
+        var perRow = Math.Max(1, Math.Ceiling(row / Target));
+        var width = Math.Floor(row / perRow) - Gap - 4; // −4: рамка кнопки и округление — чтобы последняя не уехала на новый ряд
+        return parameter as string == "h" ? Math.Round(width * 9 / 16) : width;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 /// <summary>Число больше нуля — видно, иначе скрыто.</summary>
 public sealed class CountToVisibilityConverter : IValueConverter
 {

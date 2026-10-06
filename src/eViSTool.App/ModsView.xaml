@@ -8,6 +8,7 @@
         <local:InvertBoolConverter x:Key="Invert" />
         <local:CountToVisibilityConverter x:Key="CountToVis" />
         <local:PixelsToGridLengthConverter x:Key="PxToGrid" />
+        <local:ScreenshotThumbConverter x:Key="Thumb" />
         <local:EnumEqualsConverter x:Key="EnumEq" />
         <local:TextToVisibilityConverter x:Key="TextToVis" />
         <local:ZeroToVisibleConverter x:Key="ZeroVis" />
@@ -613,7 +614,9 @@
                                             <Button Padding="0" Margin="0,0,6,6" Cursor="Hand" ToolTip="{local:Tr card.screenshotTip}" MinHeight="0"
                                                     Command="{Binding DataContext.OpenScreenshotCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                     CommandParameter="{Binding}">
-                                                <Image Source="{Binding}" Width="120" Height="68" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                                <Image Source="{Binding}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"
+                                                       Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource Thumb}, ConverterParameter=w}"
+                                                       Height="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource Thumb}, ConverterParameter=h}" />
                                             </Button>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
