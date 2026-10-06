@@ -38,6 +38,7 @@ It is portable: unzip it anywhere and run. Nothing is installed into the system 
 - [Profiles](#profiles)
 - [My mods](#my-mods)
 - [Mod catalog](#mod-catalog)
+- [Crashes and mod errors](#crashes-and-mod-errors)
 - [Dedicated server](#dedicated-server)
 - [Remote management](#remote-management)
 - [Updates, data and uninstalling](#updates-data-and-uninstalling)
@@ -69,10 +70,13 @@ The active profile is chosen at the top of the window, and every page works with
 
 - **Client profile** — the game you play. **Play** starts the game with this profile:
   its own mods, settings and worlds. The main profile for your usual game is created automatically.
+  eViSTool sees when the game of a profile is running: **Play** then says *Game is running* and waits until you close it,
+  so the same setup is not started twice.
 - **Server profile** — a dedicated server: the folder with `VintagestoryServer.exe` and the server data folder (`--dataPath`).
 - **Remote server** — a server on another computer, managed over the network (see [Remote management](#remote-management)).
 
 Profiles are created in **Settings** with **+ Client** and **+ Server**, or copied from an existing one with **Clone…**.
+Client profiles show the icon of your installed game.
 
 ![New client profile](docs/screenshots/profile.png)
 
@@ -139,11 +143,48 @@ The list refreshes by itself when mods change outside the window — in another 
 
 The whole ModDB inside the app: search by name, description, author or modid; filter by tag, side and game version;
 sort by trending, downloads, follows or recent updates. By default only mods with a release for your game version are shown
-(★ marks the version of the active profile).
+(★ marks the version of the active profile — a remote server's one too). If the release you pick is marked for another
+game version, eViSTool asks before installing it.
 
 A mod's card has its screenshots, description and every release. **Install** takes the right version for your game
 and offers to install missing dependencies. Installed mods are marked in the list.
 The catalog is cached for 6 hours; **Refresh catalog** downloads a fresh one.
+
+**Also install into.** Many mods are needed in more than one place: a mod for both sides goes onto your server *and* into
+the client profile you play on it with. When you install such a mod, eViSTool offers the other profiles where it belongs.
+Tick the ones you want; each profile gets the release for its own game version, and what is already there is shown.
+The same works for mod files added by hand and for missing dependencies.
+
+![Also install into](docs/screenshots/also-install.png)
+
+**Remember** links the profiles: next time they are ticked already. With **Install mods into linked profiles without asking**
+(**Settings**) the window is skipped altogether, and a mod goes into the linked profiles straight away — the window appears only
+if one of them cannot take the mod.
+
+## Crashes and mod errors
+
+When something breaks, eViSTool reads the game's logs and tells you which mod is most likely to blame —
+so you don't have to dig through a stack trace or disable mods one by one.
+
+![The server went down](docs/screenshots/crash.png)
+
+- **The game crashed** or **the world closed because of an error** (you got thrown back to the main menu):
+  a window pops up with the mod, how it was found and the error.
+- **A dedicated server went down** on its own: the agent works out the culprit, the server console gets a line about it,
+  and the window tells you — for every server profile, remote ones included, whichever profile is active right now.
+
+The mod is found from the game's own crash report, from the stack of the error, from a mod tag in the message,
+or from the mod's translation strings. From the window you can **Disable the mod** (for a running game it happens as soon
+as you close it — otherwise the game would overwrite the setting), find it in **My mods**, open its ModDB page,
+or **Copy** the whole report to send to the mod author. If no mod can be named, the details are still there for a forum post.
+
+**Mod errors.** Some mods keep throwing errors the game swallows: nothing crashes, but the log swells and the game stutters.
+eViSTool counts them during each run of the game or the server. If a mod gets noisy, a yellow **!** appears next to the profile
+at the top of the window. Click it to see which mods and how many errors, with an example of each.
+
+![Mod errors](docs/screenshots/mod-errors.png)
+
+**Hide** removes the **!** until the next run that has errors.
 
 ## Dedicated server
 
@@ -272,7 +313,7 @@ pwsh build/publish.ps1   # release build and zip in dist/
 ```
 
 Projects: `eViSTool.Core` — mods, ModDB, profiles, configs, backups, remote access; `eViSTool.Agent` — background agent that owns
-the server process; `eViSTool.App` — WPF interface; `tests/eViSTool.Core.Tests` — tests.
+the server process; `eViSTool.App` — WPF interface; `tests/eViSTool.Core.Tests` and `tests/eViSTool.App.Tests` — tests.
 
 ## Code signing policy
 
