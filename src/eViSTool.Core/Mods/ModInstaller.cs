@@ -43,12 +43,12 @@ public static class ModInstaller
                   ?? throw new InvalidOperationException(Loc.T("err.noModsDir"));
         var target = Path.Combine(dir, Path.GetFileName(sourceZip));
 
-        // файл с таким именем есть, но это другой мод — не затираем его
-        var targetTaken = File.Exists(target)
-            && !replaces.Any(r => string.Equals(Path.GetFullPath(r.Path), Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase))
-            && !string.Equals(Path.GetFullPath(sourceZip), Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase);
-        if (targetTaken)
-            target = Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(sourceZip)}_{info.ModId}{Path.GetExtension(sourceZip)}");
+        // файл с таким именем есть, но это другой мод — не затираем его: ищем действительно свободное имя
+        // (name.zip → name_modid.zip → name_modid_2.zip …)
+        var stem = Path.GetFileNameWithoutExtension(sourceZip);
+        var ext = Path.GetExtension(sourceZip);
+        for (var n = 1; IsTaken(target, sourceZip, replaces); n++)
+            target = Path.Combine(dir, n == 1 ? $"{stem}_{info.ModId}{ext}" : $"{stem}_{info.ModId}_{n}{ext}");
 
         var newVersion = ModVersion.ParseOrNull(info.Version);
         var oldVersion = replaces.Select(r => ModVersion.ParseOrNull(r.Info!.Version)).Where(v => v is not null).Max();
@@ -71,23 +71,59 @@ public static class ModInstaller
     }
 
     /// <summary>Ставит мод: старые копии — в хранилище бэкапов, новый zip — в папку модов.</summary>
+    /// <summary>Имя занято чем-то, что эта установка не заменяет (другим модом или посторонним файлом).</summary>
+    private static bool IsTaken(string target, string sourceZip, IReadOnlyList<LocalMod> replaces) =>
+        (File.Exists(target) || Directory.Exists(target))
+        && !SamePath(target, sourceZip)
+        && !replaces.Any(r => SamePath(r.Path, target));
+
+    private static bool SamePath(string a, string b) =>
+        string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Ставит мод по плану. Перед записью ещё раз проверяет назначение: файл, появившийся после планирования,
+    /// или заменяемый файл, в котором уже другой мод, не перезаписывается. При сбое прежние версии возвращаются на место.
+    /// </summary>
     public static void Apply(InstallPlan plan, ModBackupStore backups)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(plan.TargetPath)!);
+        if (IsTaken(plan.TargetPath, plan.SourcePath, plan.Replaces) || !StillSameMod(plan))
+            throw new IOException(Loc.T("err.installTargetTaken", Path.GetFileName(plan.TargetPath)));
 
         // копируем во временный файл рядом, чтобы при ошибке не остаться без мода вовсе
         var tmp = plan.TargetPath + ".evistool.tmp";
         File.Copy(plan.SourcePath, tmp, overwrite: true);
+        var kept = new List<(LocalMod Mod, string Stored)>();
         try
         {
             foreach (var old in plan.Replaces)
-                backups.Keep(old);
-            File.Move(tmp, plan.TargetPath, overwrite: true);
+                kept.Add((old, backups.Keep(old)));
+            // замены уже убраны в хранилище — назначение должно быть свободно; что-то появилось — не затираем
+            File.Move(tmp, plan.TargetPath, overwrite: false);
+        }
+        catch
+        {
+            // вернуть прежние версии: без этого после сбоя мод пропал бы из папки совсем
+            foreach (var (mod, stored) in kept)
+            {
+                if (File.Exists(mod.Path) || Directory.Exists(mod.Path)) continue;
+                if (File.Exists(stored)) File.Move(stored, mod.Path);
+                else if (Directory.Exists(stored)) Directory.Move(stored, mod.Path);
+            }
+            throw;
         }
         finally
         {
             if (File.Exists(tmp)) File.Delete(tmp);
         }
+    }
+
+    /// <summary>Если назначение — заменяемый файл, в нём по-прежнему этот же мод (его не подменили после планирования).</summary>
+    private static bool StillSameMod(InstallPlan plan)
+    {
+        if (!File.Exists(plan.TargetPath) || SamePath(plan.TargetPath, plan.SourcePath)) return true;
+        var now = ModScanner.ReadZip(plan.TargetPath).Info?.ModId;
+        return string.Equals(now, plan.Incoming.Info!.ModId, StringComparison.OrdinalIgnoreCase);
     }
 }
 

@@ -107,6 +107,74 @@ public sealed class ModManagementTests : IDisposable
         Assert.Single(store.List("carryon"));
     }
 
+    // аудит, пункт 2: конфликт имён не должен затирать посторонний мод
+    [Fact]
+    public void Install_FindsAFreeName_WhenTheNameAndSeveralFallbacksAreTaken()
+    {
+        var p = Server("""{ "ModPaths": [] }""");
+        MakeZip(_mods, "common.zip", "other", "1.0.0");
+        MakeZip(_mods, "common_alpha.zip", "beta", "1.0.0");
+        MakeZip(_mods, "common_alpha_2.zip", "gamma", "1.0.0");
+        var before = Directory.GetFiles(_mods).ToDictionary(Path.GetFileName, File.ReadAllBytes);
+        var incoming = MakeZip(Directory.CreateDirectory(Path.Combine(_root, "dl")).FullName, "common.zip", "alpha", "1.0.0");
+
+        var plan = ModInstaller.Plan(incoming, p, ModUpdateService.ScanLocal(p));
+        Assert.Equal("common_alpha_3.zip", Path.GetFileName(plan.TargetPath));
+        ModInstaller.Apply(plan, new ModBackupStore(Path.Combine(_root, "backups")));
+
+        foreach (var (name, bytes) in before) Assert.Equal(bytes, File.ReadAllBytes(Path.Combine(_mods, name!)));
+        Assert.Equal(["alpha", "beta", "gamma", "other"],
+            ModUpdateService.ScanLocal(p).Select(m => m.Info!.ModId).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void Install_DoesNotOverwriteAFileThatAppearedAfterPlanning()
+    {
+        var p = Server("""{ "ModPaths": [] }""");
+        var incoming = MakeZip(Directory.CreateDirectory(Path.Combine(_root, "dl")).FullName, "common.zip", "alpha", "1.0.0");
+        var plan = ModInstaller.Plan(incoming, p, ModUpdateService.ScanLocal(p));
+        var stranger = MakeZip(_mods, "common.zip", "other", "1.0.0"); // появился, пока шла загрузка
+        var bytes = File.ReadAllBytes(stranger);
+
+        Assert.Throws<IOException>(() => ModInstaller.Apply(plan, new ModBackupStore(Path.Combine(_root, "backups"))));
+        Assert.Equal(bytes, File.ReadAllBytes(stranger));
+        Assert.Equal(["common.zip"], Directory.GetFiles(_mods).Select(Path.GetFileName));
+    }
+
+    [Fact]
+    public void Install_DoesNotOverwriteAReplacedFileThatNowHoldsAnotherMod()
+    {
+        var p = Server("""{ "ModPaths": [] }""");
+        MakeZip(_mods, "alpha.zip", "alpha", "1.0.0");
+        var incoming = MakeZip(Directory.CreateDirectory(Path.Combine(_root, "dl")).FullName, "alpha.zip", "alpha", "1.1.0");
+        var plan = ModInstaller.Plan(incoming, p, ModUpdateService.ScanLocal(p));
+        File.Delete(Path.Combine(_mods, "alpha.zip"));
+        var swapped = MakeZip(_mods, "alpha.zip", "other", "1.0.0"); // файл подменили после планирования
+        var bytes = File.ReadAllBytes(swapped);
+
+        Assert.Throws<IOException>(() => ModInstaller.Apply(plan, new ModBackupStore(Path.Combine(_root, "backups"))));
+        Assert.Equal(bytes, File.ReadAllBytes(swapped));
+    }
+
+    [Fact]
+    public void Install_PutsTheOldVersionsBack_WhenSomethingFailsMidway()
+    {
+        var p = Server("""{ "ModPaths": [] }""");
+        MakeZip(_mods, "alpha_1.0.0.zip", "alpha", "1.0.0");
+        MakeZip(_mods, "alpha_0.9.0.zip", "alpha", "0.9.0"); // две копии одного мода — обе будут убраны
+        var before = Directory.GetFiles(_mods).ToDictionary(Path.GetFileName, File.ReadAllBytes);
+        var incoming = MakeZip(Directory.CreateDirectory(Path.Combine(_root, "dl")).FullName, "alpha_1.1.0.zip", "alpha", "1.1.0");
+        var plan = ModInstaller.Plan(incoming, p, ModUpdateService.ScanLocal(p));
+        Assert.Equal(2, plan.Replaces.Count);
+
+        // вторая копия занята (игра держит файл) — первая к этому моменту уже ушла в хранилище
+        using (new FileStream(plan.Replaces[1].Path, FileMode.Open, FileAccess.Read, FileShare.None))
+            Assert.ThrowsAny<IOException>(() => ModInstaller.Apply(plan, new ModBackupStore(Path.Combine(_root, "backups"))));
+
+        Assert.Equal(before.Keys.Order(), Directory.GetFiles(_mods).Select(Path.GetFileName).Order());
+        foreach (var (name, bytes) in before) Assert.Equal(bytes, File.ReadAllBytes(Path.Combine(_mods, name!)));
+    }
+
     [Fact]
     public void DetectsDowngrade()
     {

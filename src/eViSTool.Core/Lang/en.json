@@ -444,6 +444,7 @@
   "dl.wrongMod": "The downloaded archive contains a different mod: {0} instead of {1}",
   "err.modsDirNotFound": "Mods folder not found: {0}",
   "err.noGameVersion": "Game version is unknown",
+  "err.installTargetTaken": "The file \"{0}\" in the mods folder belongs to another mod — not overwriting it. Check your mods and try again.",
   "err.noModsDir": "The profile has no mods folder",
   "gamemode.0": "Guest",
   "gamemode.1": "Survival",
