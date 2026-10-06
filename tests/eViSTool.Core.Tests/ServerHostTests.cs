@@ -257,6 +257,8 @@ public sealed class ServerHostTests : IAsyncLifetime
         host.StateChanged += s => { if (s == ServerState.Stopped) restore ??= WorldLock.TryTake(_data, WorldLock.Restore); };
         await host.SendCommandAsync("/crash");
         await Until(() => restore is not null);
+        // сторож назначает перезапуск сразу после «остановлен» — отменять есть что только с этого момента
+        await Until(() => host.RestartScheduledAt is not null);
 
         host.CancelPendingRestart(); // так делает восстановление через агента
         Assert.Null(host.RestartScheduledAt);

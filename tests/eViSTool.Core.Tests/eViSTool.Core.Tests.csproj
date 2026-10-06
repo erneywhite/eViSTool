@@ -21,6 +21,8 @@
   <ItemGroup>
     <!-- образцы serverconfig.json (без личного): тесты берут их из папки сборки и работают с копией -->
     <None Update="TestData\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- настоящие логи вылетов со стенда (личное вычищено) и тестовый мод, который их вызвал -->
+    <None Update="TestData\Crash\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
