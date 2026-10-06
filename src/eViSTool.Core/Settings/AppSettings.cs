@@ -20,6 +20,12 @@ public sealed class AppSettings
     /// </summary>
     public bool AlsoInstallWithoutAsking { get; set; }
 
+    /// <summary>
+    /// Перед изменением модов клиентского профиля — копия одиночных миров, в которые играли с прошлой копии
+    /// (<see cref="Profiles.WorldCopies"/>). По умолчанию включено.
+    /// </summary>
+    public bool CopyWorldsBeforeModChanges { get; set; } = true;
+
     /// <summary>Язык интерфейса (en, ru). По умолчанию английский.</summary>
     public string Language { get; set; } = "en";
 

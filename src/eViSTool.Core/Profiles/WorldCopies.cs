@@ -49,6 +49,10 @@ public static class WorldCopies
     public static bool NeedsCopy(string world, string copy) =>
         !File.Exists(copy) || ChangedUtc(world) > File.GetLastWriteTimeUtc(copy);
 
+    /// <summary>Есть ли что копировать (быстро: только время файлов).</summary>
+    public static bool AnyToCopy(string dataDir) =>
+        Worlds(dataDir).Any(w => NeedsCopy(w, Path.Combine(DirFor(dataDir), Path.GetFileName(w))));
+
     /// <summary>
     /// Обновить копии изменившихся миров. Возвращает имена скопированных миров и ошибки по мирам (места нет,
     /// файл занят) — ошибка одного мира не мешает остальным. Игра при этом должна быть закрыта (проверяет вызывающий).

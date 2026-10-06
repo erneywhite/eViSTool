@@ -69,6 +69,9 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>«Установить также в» без вопроса — сразу в связанные профили.</summary>
     [ObservableProperty] private bool _alsoInstallWithoutAsking;
 
+    /// <summary>Копия одиночных миров перед изменением модов клиентского профиля.</summary>
+    [ObservableProperty] private bool _copyWorldsBeforeModChanges;
+
     /// <summary>Связи редактируемого профиля: в какие профили ставить моды заодно.</summary>
     public System.Collections.ObjectModel.ObservableCollection<LinkChoice> LinkChoices { get; } = [];
 
@@ -93,6 +96,12 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnAlsoInstallWithoutAskingChanged(bool value)
     {
         _settings.AlsoInstallWithoutAsking = value;
+        Save();
+    }
+
+    partial void OnCopyWorldsBeforeModChangesChanged(bool value)
+    {
+        _settings.CopyWorldsBeforeModChanges = value;
         Save();
     }
 
@@ -414,6 +423,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         _allowUnstable = _settings.AllowUnstable;
         _alsoInstallWithoutAsking = _settings.AlsoInstallWithoutAsking;
+        _copyWorldsBeforeModChanges = _settings.CopyWorldsBeforeModChanges;
         _autoCheckUpdates = _settings.AutoCheckUpdates;
         _selectedLanguage = Languages.FirstOrDefault(l => l.Value == Loc.Instance.Language) ?? Languages[0];
         _activeProfile = Profiles.FirstOrDefault(p => p.Model == _settings.ActiveProfile);

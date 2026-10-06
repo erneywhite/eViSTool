@@ -260,6 +260,16 @@
                                     </StackPanel>
                                 </DockPanel>
                             </Border>
+                            <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,14,0,0">
+                                <DockPanel>
+                                    <CheckBox DockPanel.Dock="Right" Style="{StaticResource Forest.Switch}" IsChecked="{Binding CopyWorldsBeforeModChanges}"
+                                              VerticalAlignment="Center" AutomationProperties.AutomationId="CopyWorlds" />
+                                    <StackPanel Margin="0,0,16,0">
+                                        <TextBlock Text="{local:Tr settings.copyWorlds}" FontSize="13" Foreground="{StaticResource Forest.Text}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{local:Tr settings.copyWorldsHint}" Style="{StaticResource Hint}" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
                         </StackPanel>
                     </Border>
 

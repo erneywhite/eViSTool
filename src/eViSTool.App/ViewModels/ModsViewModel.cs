@@ -432,10 +432,11 @@ public sealed partial class ModsViewModel : ObservableObject
             }
         }
 
+        await CopyWorldsAsync(target);
         try
         {
             await ModTargets.SetEnabledAsync(target, row.Local, enabled: !row.IsEnabled);
-            StatusText = Loc.T(row.IsEnabled ? "mods.disabledOk" : "mods.enabledOk", row.Name);
+            StatusText = WithWorldCopies(Loc.T(row.IsEnabled ? "mods.disabledOk" : "mods.enabledOk", row.Name));
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException
                                        or HttpRequestException or TaskCanceledException)
@@ -456,6 +457,7 @@ public sealed partial class ModsViewModel : ObservableObject
             ? "\n\n" + Loc.T("mods.deleteRunning") : "";
         if (!Confirm(Loc.T("mods.deleteConfirm", row.Name, row.Installed) + running))
             return;
+        await CopyWorldsAsync(target);
 
         try
         {
@@ -471,7 +473,7 @@ public sealed partial class ModsViewModel : ObservableObject
                 if (row.Local.Info is { } info && _locals.Count(l => l.Info?.ModId == info.ModId) == 1)
                     ModConfigEditor.Forget(profile, info);
             }
-            StatusText = Loc.T("mods.deletedOk", row.Name);
+            StatusText = WithWorldCopies(Loc.T("mods.deletedOk", row.Name));
         }
         catch (Exception ex) when (ex is IOException or OperationCanceledException or UnauthorizedAccessException
                                        or HttpRequestException or InvalidOperationException)
@@ -575,12 +577,54 @@ public sealed partial class ModsViewModel : ObservableObject
         return chosen?.Cast<AlsoInstallFiles>().ToList();
     }
 
+    private readonly List<string> _copiedWorlds = [];
+
+    /// <summary>Итог операции + «сделана копия мира: …», если была; список копий после этого сбрасывается.</summary>
+    private string WithWorldCopies(string text)
+    {
+        if (_copiedWorlds.Count == 0) return text;
+        var note = Loc.T("wcopy.done", string.Join(", ", _copiedWorlds));
+        _copiedWorlds.Clear();
+        return string.IsNullOrEmpty(text) ? note : text + " · " + note;
+    }
+
+    /// <summary>
+    /// Перед изменением модов игрового профиля — копии одиночных миров, в которые играли с прошлой копии (настройка).
+    /// Повторный вызов в той же операции ничего не копирует: миры с тех пор не менялись. Сбой копии изменение
+    /// не останавливает — уходит в problems (нет списка — в строку статуса). Свои серверы и удалённые — не трогаем:
+    /// у них свои копии мира по расписанию.
+    /// </summary>
+    private async Task CopyWorldsAsync(ModTarget target, List<string>? problems = null)
+    {
+        // скопированные миры — в итоговую строку статуса операции (иначе её сразу затрёт «мод выключен» и т. п.)
+        if (!_main.CopyWorldsBeforeModChanges || target.IsRemote || target.Profile.Kind != ProfileKind.Client) return;
+        var data = string.IsNullOrWhiteSpace(target.Profile.DataDir) ? GameInstall.DefaultDataDir : target.Profile.DataDir;
+        if (!WorldCopies.AnyToCopy(data)) return;
+        void Note(string text)
+        {
+            if (problems is null) StatusText = text;
+            else if (!problems.Contains(text)) problems.Add(text);
+        }
+        // игра пишет в мир прямо сейчас — цельной копии не снять
+        if (GameProcess.IsRunning(target.Profile))
+        {
+            Note(Loc.T("wcopy.gameRunning"));
+            return;
+        }
+        StatusText = Loc.T("wcopy.copying");
+        var (copied, failed) = await Task.Run(() => WorldCopies.Refresh(data));
+        _copiedWorlds.AddRange(copied.Where(c => !_copiedWorlds.Contains(c)));
+        StatusText = "";
+        foreach (var f in failed) Note(f);
+    }
+
     /// <summary>
     /// Ставит один zip в профиль: старая версия — в хранилище, выключенный мод остаётся выключенным.
     /// interactive — спрашивать про ту же версию и даунгрейд (при обновлении/откате не спрашиваем: решение уже принято).
     /// </summary>
     private async Task<bool> InstallZipAsync(ModTarget target, string zip, bool interactive, List<string> installed, List<string> problems)
     {
+        await CopyWorldsAsync(target, problems);
         try
         {
             // ставится строго в цель: свою папку или удалённый сервер (своё соединение), активный профиль не важен.
@@ -626,12 +670,12 @@ public sealed partial class ModsViewModel : ObservableObject
         // зависимости — по итоговому состоянию, а не на момент установки каждого мода
         if (installed.Count > 0)
             problems.AddRange(DependencyIssues.Select(i => Loc.T("report.dependency", i.Describe())));
-        StatusText = installed.Count switch
+        StatusText = WithWorldCopies(installed.Count switch
         {
             0 => Loc.T("report.nothingChanged", title),
             <= 3 => $"{title}: " + string.Join("; ", installed),
             _ => Loc.T("report.changedCount", title, installed.Count), // длинный список — только число
-        };
+        });
         if (problems.Count == 0) return;
         var text = (installed.Count > 0 ? $"{title}:\n• " + string.Join("\n• ", installed) + "\n\n" : "")
                    + Loc.T("report.attention") + ":\n• " + string.Join("\n• ", problems);
@@ -925,6 +969,7 @@ public sealed partial class ModsViewModel : ObservableObject
     /// </summary>
     private async Task FixDependencyIssuesAsync(ModTarget target, ModVersion game, List<string> installed, List<string> problems)
     {
+        await CopyWorldsAsync(target, problems); // включение выключенных идёт мимо установки
         var tried = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
@@ -1140,8 +1185,10 @@ public sealed partial class ModsViewModel : ObservableObject
 
             IsBusy = true;
             PackImportResult result;
+            var copyProblems = new List<string>();
             try
             {
+                await CopyWorldsAsync(target, copyProblems);
                 var importer = new PackImporter(_db, _updater);
                 var progress = new Progress<string>(s => StatusText = s);
                 var (mirror, applyConfig) = (dlg.Mirror, dlg.ApplyConfig);
@@ -1158,7 +1205,7 @@ public sealed partial class ModsViewModel : ObservableObject
             {
                 IsBusy = false;
             }
-            await ReportAsync(Loc.T("report.imported", pack.Manifest.Name), result.Done.ToList(), result.Problems.ToList());
+            await ReportAsync(Loc.T("report.imported", pack.Manifest.Name), result.Done.ToList(), [.. copyProblems, .. result.Problems]);
         }
     }
 
