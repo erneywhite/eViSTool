@@ -12,7 +12,14 @@
 <p>Search, filter by tag, side and game version, sort by what's trending. Every mod shows its screenshots, description and all releases, and installs with one click &mdash; dependencies included.</p>
 
 <h2>Profiles</h2>
-<p>Keep several setups side by side: your main game, a separate mod set for a particular server, a test profile. Each has its own mods, settings and worlds, and the <strong>Play</strong> button starts the game with the one you picked.</p>
+<p>Keep several setups side by side: your main game, a separate mod set for a particular server, a test profile. Each has its own mods, settings and worlds, and the <strong>Play</strong> button starts the game with the one you picked. eViSTool also notices when that game is already running, so you won't start the same setup twice.</p>
+<p>Many mods have to be on both the server and your client. When you install one of those, eViSTool offers to put it into your other profiles as well, and each profile gets the right version for its game. Link the profiles once and it happens without asking.</p>
+
+<p><img src="https://raw.githubusercontent.com/erneywhite/eViSTool/main/docs/screenshots/crash.png" alt="The server went down" width="100%" /></p>
+
+<h2>When something breaks</h2>
+<p>A crash to desktop, a world that throws you back to the main menu, a server that goes down in the middle of the night: eViSTool reads the logs and tells you which mod is most likely to blame. You don't have to scroll through a stack trace or turn mods off one by one. Disable the mod right from that window, or copy the report and send it to the mod's author. For servers, the alert reaches you whichever profile you have open, even when the server is on another PC.</p>
+<p>Some mods never crash anything, they just keep spamming errors while the game swallows them, and the log swells and the game stutters. eViSTool counts those errors during every session. If a mod gets noisy, a yellow <strong>!</strong> shows up next to the profile; click it to see which mods are noisy and how many errors each one threw.</p>
 
 <p><img src="https://raw.githubusercontent.com/erneywhite/eViSTool/main/docs/screenshots/server.png" alt="Server console" width="100%" /></p>
 
@@ -50,7 +57,8 @@
 <ul>
 <li><strong>Моды:</strong> одна кнопка проверяет обновления, можно обновить всё разом, а если что-то сломалось &mdash; откатиться на прежнюю версию. Программа заранее подскажет про нехватку зависимостей (чинится одной кнопкой), дубликаты и версии не для твоей игры. Своим набором можно поделиться модпаком.</li>
 <li><strong>Каталог модбазы</strong> прямо в программе: поиск, фильтры, скриншоты, установка в один клик.</li>
-<li><strong>Профили:</strong> несколько сборок игры рядом, у каждой свои моды, настройки и миры. Кнопка «Играть» запускает нужную.</li>
+<li><strong>Профили:</strong> несколько сборок игры рядом, у каждой свои моды, настройки и миры. Кнопка «Играть» запускает нужную и видит, что игра уже запущена. Мод, нужный и серверу, и клиенту, можно сразу поставить в несколько профилей, и каждому подберётся версия под его игру.</li>
+<li><strong>Вылеты:</strong> вылетела игра, мир выкинул в главное меню или упал сервер, даже на другом компьютере, &mdash; программа подскажет, какой мод скорее всего виноват. Его можно сразу выключить или скопировать отчёт для автора. Моды, которые тихо сыплют ошибками (от них пухнет лог и бывают фризы), отмечаются жёлтой «!» у профиля.</li>
 <li><strong>Сервер:</strong> консоль с подсказками команд, копии мира по расписанию (вместе с данными модов, например прогрессом XLeveling), перезапуски с предупреждением игроков в чате, удобный редактор конфига.</li>
 <li><strong>Сервер на другом компьютере:</strong> включаешь там удалённый доступ, вставляешь код у себя и управляешь им как своим. Соединение зашифровано.</li>
 </ul>
