@@ -362,13 +362,6 @@ public sealed partial class MainViewModel : ObservableObject
         if (dlg.ShowDialog() == true && dlg.Result is { } clone) AddProfile(clone);
     }
 
-    private static bool SameOrInside(string? path, string dir)
-    {
-        if (string.IsNullOrWhiteSpace(path)) return false;
-        var p = Path.GetFullPath(path).TrimEnd('\\', '/');
-        var d = Path.GetFullPath(dir).TrimEnd('\\', '/');
-        return p.Equals(d, StringComparison.OrdinalIgnoreCase) || p.StartsWith(d + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
-    }
 
     private static long FolderSize(string dir)
     {
@@ -416,9 +409,11 @@ public sealed partial class MainViewModel : ObservableObject
         // Папку данных предлагаем удалить только там, где её завела сама программа (…\ServerProfiles\имя, …\ClientProfiles\имя)
         // и где она не нужна другому профилю. Чужие папки (VintagestoryData клиента и т. п.) не трогаем никогда.
         var dir = model.DataDir;
-        var ownFolder = !string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir)
-                        && (model.Kind == ProfileKind.Server ? ServerProfileLayout.IsInContainer(dir) : ClientProfileLayout.IsInContainer(dir))
-                        && !Profiles.Any(p => p != profile && SameOrInside(p.DataDir, dir));
+        var created = !string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir)
+                      && (model.Kind == ProfileKind.Server ? ServerProfileLayout.IsInContainer(dir) : ClientProfileLayout.IsInContainer(dir));
+        // нужна ли папка другим: не только их папки данных внутри, но и моды (общие моды клона) и файл мира
+        var users = created ? ProfileUsage.UsersOf(dir!, Profiles.Where(p => p != profile).Select(p => p.Model)) : [];
+        var ownFolder = created && users.Count == 0;
         var deleteData = false;
         if (ownFolder)
         {
@@ -429,7 +424,10 @@ public sealed partial class MainViewModel : ObservableObject
             if (answer == System.Windows.MessageBoxResult.Cancel) return;
             deleteData = answer == System.Windows.MessageBoxResult.Yes;
         }
-        else if (System.Windows.MessageBox.Show(owner, Loc.T("settings.removeAsk", model.Name, string.IsNullOrWhiteSpace(dir) ? "—" : dir), "eViSTool",
+        else if (System.Windows.MessageBox.Show(owner, users.Count > 0
+                         // папку используют другие профили — удалить её не предлагаем, объясняем почему
+                         ? Loc.T("settings.removeAskShared", model.Name, dir, string.Join("\n", users.Select(u => "• " + u.Describe())))
+                         : Loc.T("settings.removeAsk", model.Name, string.IsNullOrWhiteSpace(dir) ? "—" : dir), "eViSTool",
                      System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question, System.Windows.MessageBoxResult.No)
                  != System.Windows.MessageBoxResult.Yes)
         {
