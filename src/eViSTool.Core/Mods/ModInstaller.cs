@@ -21,6 +21,12 @@ public sealed record InstallPlan
 
     /// <summary>Зависимости, которых нет среди установленных модов.</summary>
     public IReadOnlyList<string> MissingDependencies { get; init; } = [];
+
+    /// <summary>Версия игры профиля (null — неизвестна).</summary>
+    public ModVersion? Game { get; init; }
+
+    /// <summary>Мод требует игру новее, чем у профиля, — какую; иначе null. Игра такой мод не загрузит.</summary>
+    public ModVersion? NeedsGame => Incoming.Info?.NeedsNewerGame(Game);
 }
 
 public static class ModInstaller
@@ -67,6 +73,7 @@ public static class ModInstaller
             IsSameVersion = newVersion is not null && oldVersion is not null && newVersion.CompareTo(oldVersion) == 0,
             IsDowngrade = newVersion is not null && oldVersion is not null && newVersion.CompareTo(oldVersion) < 0,
             MissingDependencies = missing,
+            Game = profile.GameVersion,
         };
     }
 

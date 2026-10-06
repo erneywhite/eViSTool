@@ -583,16 +583,30 @@ public sealed partial class ModsViewModel : ObservableObject
     {
         try
         {
-            // ставится строго в цель: свою папку или удалённый сервер (своё соединение), активный профиль не важен
-            var outcome = await ModTargets.InstallAsync(target, zip, plan =>
+            // ставится строго в цель: свою папку или удалённый сервер (своё соединение), активный профиль не важен.
+            // План приходит из фонового потока (после сканирования), а вопросы — окна: спрашиваем в потоке окна
+            var outcome = await ModTargets.InstallAsync(target, zip, plan => Application.Current.Dispatcher.Invoke(() =>
             {
                 var info = plan.Incoming.Info!;
                 var old = plan.Replaces.FirstOrDefault()?.Info?.Version;
                 if (interactive && plan.IsSameVersion && !Confirm(Loc.T("mods.reinstallConfirm", info.Name, info.Version))) return false;
                 if (interactive && plan.IsDowngrade && !Confirm(Loc.T("mods.downgradeConfirm", info.Name, old, info.Version))) return false;
+                // мод требует игру новее — спрашиваем всегда, и при обновлении: модбаза помечает релизы веткой (1.22.x),
+                // а точное требование видно только в самом файле
+                if (plan.NeedsGame is { } need)
+                {
+                    var question = old is null
+                        ? Loc.T("mods.needsGameConfirm", info.Name, info.Version, need, target.Profile.Name, plan.Game)
+                        : Loc.T("mods.needsGameUpdateConfirm", info.Name, info.Version, need, target.Profile.Name, plan.Game, old);
+                    if (!Confirm(question))
+                    {
+                        problems.Add(Loc.T("mods.needsGameSkipped", info.Name, info.Version, need, target.Profile.Name));
+                        return false;
+                    }
+                }
                 if (target.IsRemote) StatusText = Loc.T("mods.uploading", info.Name, info.Version);
                 return true;
-            });
+            }));
             if (outcome is null) return false;
             installed.Add(outcome.Text);
             return true;

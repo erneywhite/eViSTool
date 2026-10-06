@@ -107,6 +107,20 @@ public sealed class ModManagementTests : IDisposable
         Assert.Single(store.List("carryon"));
     }
 
+    [Theory]
+    [InlineData("1.22.7", "1.22.8")] // игра старее, чем нужно моду, — план это видит
+    [InlineData("1.22.8", null)]
+    [InlineData(null, null)]         // версия игры неизвестна — не спрашиваем
+    public void InstallPlan_KnowsTheModNeedsANewerGame(string? game, string? expected)
+    {
+        var p = Server("""{ "ModPaths": [] }""") with { GameVersion = Versioning.ModVersion.ParseOrNull(game) };
+        var incoming = MakeZip(Directory.CreateDirectory(Path.Combine(_root, "dl")).FullName, "fresh_2.0.0.zip", "fresh", "2.0.0",
+            "\"game\": \"1.22.8\"");
+
+        var plan = ModInstaller.Plan(incoming, p, ModUpdateService.ScanLocal(p));
+        Assert.Equal(expected, plan.NeedsGame?.ToString());
+    }
+
     // аудит, пункт 2: конфликт имён не должен затирать посторонний мод
     [Fact]
     public void Install_FindsAFreeName_WhenTheNameAndSeveralFallbacksAreTaken()
