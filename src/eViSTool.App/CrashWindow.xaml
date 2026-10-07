@@ -32,7 +32,7 @@
             <Button x:Name="ShowButton" Content="{local:Tr crash.showInMods}" Click="Show_Click" Padding="14,8" Margin="0,0,8,0" />
             <Button x:Name="CatalogButton" Content="{local:Tr crash.catalog}" Click="Catalog_Click" Padding="14,8" Margin="0,0,8,0" />
             <Button Content="{local:Tr crash.copy}" Click="Copy_Click" Padding="14,8" Margin="0,0,8,0" />
-            <Button Content="{local:Tr common.close}" IsCancel="True" Padding="16,8" AutomationProperties.AutomationId="CrashClose" />
+            <Button Content="{local:Tr common.close}" IsCancel="True" Click="Close_Click" Padding="16,8" AutomationProperties.AutomationId="CrashClose" />
         </WrapPanel>
     </StackPanel>
 </Window>

@@ -142,4 +142,7 @@ public partial class CrashWindow : Window
         try { Clipboard.SetText(text); Status.Text = Loc.T("crash.copied"); }
         catch (System.Runtime.InteropServices.COMException) { } // буфер занят другой программой
     }
+
+    // окно немодальное (Show, не ShowDialog): IsCancel само его не закрывает — только вызывает Click (в том числе по Esc)
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
 }

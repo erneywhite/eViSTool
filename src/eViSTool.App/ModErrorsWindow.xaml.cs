@@ -79,4 +79,7 @@ public partial class ModErrorsWindow : Window
         try { Clipboard.SetText(text); Status.Text = Loc.T("crash.copied"); }
         catch (System.Runtime.InteropServices.COMException) { }
     }
+
+    // окно немодальное (Show, не ShowDialog): IsCancel само его не закрывает — только вызывает Click (в том числе по Esc)
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
 }
