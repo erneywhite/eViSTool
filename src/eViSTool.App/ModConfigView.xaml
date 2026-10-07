@@ -27,43 +27,68 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+        <!-- строка поля: линия снизу — направляющая от ключа к значению; под мышкой и при правке — подсвечена -->
+        <Style x:Key="FieldRow" TargetType="Border">
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{StaticResource Forest.Line}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource Forest.Raised}" />
+                </Trigger>
+                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                    <Setter Property="Background" Value="{StaticResource Forest.Selected}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- поля формы: по типу значения -->
         <DataTemplate DataType="{x:Type vm:GroupField}">
-            <TextBlock Text="{Binding Key}" Margin="{Binding Indent}" Padding="0,12,0,4" FontSize="13" FontWeight="SemiBold"
+            <TextBlock Text="{Binding Key}" Margin="{Binding Indent}" Padding="8,14,0,4" FontSize="13" FontWeight="SemiBold"
                        Foreground="{StaticResource Forest.Accent}" />
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:BoolField}">
-            <DockPanel Margin="{Binding Indent}" Height="34">
-                <CheckBox DockPanel.Dock="Right" Style="{StaticResource Forest.Switch}" IsChecked="{Binding Value}" VerticalAlignment="Center"
-                          AutomationProperties.Name="{Binding Key}" />
-                <TextBlock Text="{Binding Key}" Style="{StaticResource FieldKey}" />
-            </DockPanel>
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:NumberField}">
-            <StackPanel Margin="{Binding Indent}">
-                <DockPanel MinHeight="34">
-                    <TextBox DockPanel.Dock="Right" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Width="140" VerticalAlignment="Center"
-                             FontFamily="Consolas" AutomationProperties.Name="{Binding Key}" />
+            <Border Style="{StaticResource FieldRow}" Margin="{Binding Indent}">
+                <DockPanel Height="36">
+                    <CheckBox DockPanel.Dock="Right" Style="{StaticResource Forest.Switch}" IsChecked="{Binding Value}" VerticalAlignment="Center"
+                              AutomationProperties.Name="{Binding Key}" />
                     <TextBlock Text="{Binding Key}" Style="{StaticResource FieldKey}" />
                 </DockPanel>
-                <TextBlock Text="{Binding Error}" Style="{StaticResource FieldError}" />
-            </StackPanel>
+            </Border>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:NumberField}">
+            <Border Style="{StaticResource FieldRow}" Margin="{Binding Indent}">
+                <StackPanel>
+                    <DockPanel MinHeight="36">
+                        <TextBox DockPanel.Dock="Right" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Width="140" VerticalAlignment="Center"
+                                 FontFamily="Consolas" AutomationProperties.Name="{Binding Key}" />
+                        <TextBlock Text="{Binding Key}" Style="{StaticResource FieldKey}" />
+                    </DockPanel>
+                    <TextBlock Text="{Binding Error}" Style="{StaticResource FieldError}" />
+                </StackPanel>
+            </Border>
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:TextField}">
-            <DockPanel Margin="{Binding Indent}" MinHeight="34">
-                <TextBox DockPanel.Dock="Right" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Width="260" VerticalAlignment="Center"
-                         ToolTip="{Binding Hint}" AutomationProperties.Name="{Binding Key}" />
-                <TextBlock Text="{Binding Key}" Style="{StaticResource FieldKey}" />
-            </DockPanel>
+            <Border Style="{StaticResource FieldRow}" Margin="{Binding Indent}">
+                <DockPanel MinHeight="36">
+                    <TextBox DockPanel.Dock="Right" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Width="260" VerticalAlignment="Center"
+                             ToolTip="{Binding Hint}" AutomationProperties.Name="{Binding Key}" />
+                    <TextBlock Text="{Binding Key}" Style="{StaticResource FieldKey}" />
+                </DockPanel>
+            </Border>
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:JsonField}">
-            <StackPanel Margin="{Binding Indent}">
-                <TextBlock Text="{Binding Key}" Style="{StaticResource FieldKey}" Margin="0,8,0,4" />
-                <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" FontSize="12"
-                         AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="220" VerticalScrollBarVisibility="Auto"
-                         AutomationProperties.Name="{Binding Key}" />
-                <TextBlock Text="{Binding Error}" Style="{StaticResource FieldError}" />
-            </StackPanel>
+            <Border Style="{StaticResource FieldRow}" Margin="{Binding Indent}" Padding="8,0,8,8">
+                <StackPanel>
+                    <TextBlock Text="{Binding Key}" Style="{StaticResource FieldKey}" Margin="0,8,0,4" />
+                    <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" FontSize="12"
+                             AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="220" VerticalScrollBarVisibility="Auto"
+                             AutomationProperties.Name="{Binding Key}" />
+                    <TextBlock Text="{Binding Error}" Style="{StaticResource FieldError}" />
+                </StackPanel>
+            </Border>
         </DataTemplate>
     </UserControl.Resources>
 
