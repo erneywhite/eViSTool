@@ -85,7 +85,7 @@ public partial class CrashWindow : Window
             };
         return new CrashWindow(main, CrashView.ForGame(profile, finding), disable, () =>
         {
-            main.SwitchTo(profile, tab: 0);
+            main.SwitchTo(profile, tab: ViewModels.AppTab.Mods);
             if (finding.Culprit is { } c) main.Mods.Search = c.ModId;
         }, Loc.T("crash.showInMods"));
     }
@@ -103,7 +103,7 @@ public partial class CrashWindow : Window
                 if (main.ActiveProfile?.Model.Id == profile.Id) main.Mods.ReloadLocal();
                 return Loc.T("crash.disabledServer", crash.ModName ?? crash.ModId);
             };
-        return new CrashWindow(main, CrashView.ForServer(profile, crash), disable, () => main.SwitchTo(profile, tab: 2),
+        return new CrashWindow(main, CrashView.ForServer(profile, crash), disable, () => main.SwitchTo(profile, tab: ViewModels.AppTab.Server),
             Loc.T("crash.showServer"));
     }
 

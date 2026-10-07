@@ -83,10 +83,10 @@ public sealed partial class ServerViewModel : ObservableObject
     public string DataDir => _main.ActiveProfile?.Model.DataDir ?? "";
 
     [RelayCommand]
-    private void OpenServerMods() => _main.SelectedTab = 0;
+    private void OpenServerMods() => _main.SelectedTab = AppTab.Mods;
 
     [RelayCommand]
-    private void OpenSettings() => _main.SelectedTab = 3;
+    private void OpenSettings() => _main.SelectedTab = AppTab.Settings;
     [ObservableProperty] private string _commandText = "";
 
     // ---- подсказки команд: список — из ответа сервера на /help (агент его запоминает), Tab дописывает

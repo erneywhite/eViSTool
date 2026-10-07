@@ -139,6 +139,8 @@
     <Geometry x:Key="Icon.Catalog">M4,10 A6,6 0 1 1 16,10 A6,6 0 1 1 4,10 Z M15,15 L21,21</Geometry>
     <Geometry x:Key="Icon.Server">M3,3 H21 V10 H3 Z M3,14 H21 V21 H3 Z M6,7 H8 M6,18 H8</Geometry>
     <Geometry x:Key="Icon.Settings">M3,7 H6 M12,7 H21 M3,17 H13 M19,17 H21 M6,7 A3,3 0 1 1 12,7 A3,3 0 1 1 6,7 Z M13,17 A3,3 0 1 1 19,17 A3,3 0 1 1 13,17 Z</Geometry>
+    <!-- файл настроек мода: лист с загнутым углом и строками -->
+    <Geometry x:Key="Icon.ModConfig">M6,3 H14 L19,8 V21 H6 Z M14,3 V8 H19 M9,13 H16 M9,17 H14</Geometry>
     <Geometry x:Key="Icon.About">M3,12 A9,9 0 1 1 21,12 A9,9 0 1 1 3,12 Z M12,11 V17 M12,7 V8</Geometry>
     <Geometry x:Key="Icon.Refresh">M20,7 A9,9 0 1 0 21,14 M20,2 V8 H14</Geometry>
     <Geometry x:Key="Icon.Play">M7,4 L20,12 L7,20 Z</Geometry>

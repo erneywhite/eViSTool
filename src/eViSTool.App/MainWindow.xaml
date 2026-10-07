@@ -92,6 +92,12 @@
                     </ListBoxItem>
                     <ListBoxItem>
                         <DockPanel>
+                            <Path Data="{StaticResource Icon.ModConfig}" Style="{StaticResource Forest.Icon}" />
+                            <TextBlock Text="{local:Tr nav.modConfig}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+                        </DockPanel>
+                    </ListBoxItem>
+                    <ListBoxItem>
+                        <DockPanel>
                             <Path Data="{StaticResource Icon.Server}" Style="{StaticResource Forest.Icon}" />
                             <TextBlock Text="{local:Tr nav.server}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
                         </DockPanel>
@@ -165,6 +171,11 @@
             <!-- ============ КАТАЛОГ ============ -->
             <TabItem Header="{local:Tr tab.catalog}">
                 <local:CatalogView DataContext="{Binding Catalog}" />
+            </TabItem>
+
+            <!-- ============ НАСТРОЙКИ МОДОВ ============ -->
+            <TabItem Header="{local:Tr nav.modConfig}">
+                <local:ModConfigView DataContext="{Binding ModConfig}" />
             </TabItem>
 
             <!-- ============ СЕРВЕР ============ -->

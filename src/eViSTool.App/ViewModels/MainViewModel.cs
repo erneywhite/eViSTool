@@ -20,24 +20,29 @@ public sealed partial class MainViewModel : ObservableObject
     public AboutViewModel About { get; } = new();
     public ServerViewModel Server { get; }
 
-    /// <summary>Открытая вкладка: 0 — моды, 1 — каталог, …</summary>
+    /// <summary>Открытая вкладка — номер из <see cref="AppTab"/> (порядок как в боковой панели).</summary>
     [ObservableProperty] private int _selectedTab;
 
     /// <summary>Название открытого раздела — в полосе сверху.</summary>
     public string PageTitle => Loc.T(SelectedTab switch
     {
-        1 => "nav.catalog",
-        2 => "nav.server",
-        3 => "nav.settings",
-        4 => "nav.about",
+        AppTab.Catalog => "nav.catalog",
+        AppTab.ModConfig => "nav.modConfig",
+        AppTab.Server => "nav.server",
+        AppTab.Settings => "nav.settings",
+        AppTab.About => "nav.about",
         _ => "nav.mods",
     });
+
+    /// <summary>Вкладка «Настройки модов»: конфиги модов активного профиля.</summary>
+    public ModConfigViewModel ModConfig { get; }
 
     partial void OnSelectedTabChanged(int value)
     {
         OnPropertyChanged(nameof(PageTitle));
-        Mods.SetActive(value == 0);
-        if (value == 1) _ = Catalog.EnsureLoadedAsync(); // каталог грузим только когда он нужен
+        Mods.SetActive(value == AppTab.Mods);
+        if (value == AppTab.Catalog) _ = Catalog.EnsureLoadedAsync(); // каталог грузим только когда он нужен
+        if (value == AppTab.ModConfig) _ = ModConfig.LoadAsync();    // конфиги — тоже, и свежие при каждом заходе
     }
     public ObservableCollection<ProfileViewModel> Profiles { get; } = [];
 
@@ -54,7 +59,7 @@ public sealed partial class MainViewModel : ObservableObject
         set
         {
             if (value == _activeProfile) return;
-            if (Server is not null && !Server.Config.ConfirmSwitch())
+            if ((Server is not null && !Server.Config.ConfirmSwitch()) || (ModConfig is not null && !ModConfig.ConfirmLeave()))
             {
                 ProfileSwitchDeclined?.Invoke(); // список уже показывает новый выбор — окно вернёт его на прежний
                 return;
@@ -446,6 +451,7 @@ public sealed partial class MainViewModel : ObservableObject
         var db = new ModDbClient();
         Mods = new ModsViewModel(this, db);
         Catalog = new CatalogViewModel(this, db);
+        ModConfig = new ModConfigViewModel(this);
         Server = new ServerViewModel(this);
         About.Profiles = () => _settings.Profiles;
         Server.OnProfileSwitched();
@@ -488,7 +494,7 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ShowAbout() => SelectedTab = 4;
+    private void ShowAbout() => SelectedTab = AppTab.About;
 
     /// <summary>Смену профиля отменили (правки конфига) — выбор в списке надо вернуть на текущий профиль.</summary>
     public event Action? ProfileSwitchDeclined;
@@ -501,6 +507,7 @@ public sealed partial class MainViewModel : ObservableObject
         Mods.OnProfileSwitched();
         Server.OnProfileSwitched();
         LoadErrorReport();
+        if (SelectedTab == AppTab.ModConfig) _ = ModConfig.LoadAsync();
     }
 
     partial void OnAllowUnstableChanged(bool value)
@@ -526,7 +533,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Перейти на вкладку «Каталог» и открыть там мод.</summary>
     public async Task ShowInCatalogAsync(long? assetId, string? modId, string? name)
     {
-        SelectedTab = 1;
+        SelectedTab = AppTab.Catalog;
         await Catalog.ShowModAsync(assetId, modId, name);
     }
 
@@ -749,4 +756,10 @@ public sealed partial class MainViewModel : ObservableObject
         RefreshLinks();
         Save();
     }
+}
+
+/// <summary>Номера вкладок — в порядке боковой панели (MainWindow.xaml).</summary>
+public static class AppTab
+{
+    public const int Mods = 0, Catalog = 1, ModConfig = 2, Server = 3, Settings = 4, About = 5;
 }
