@@ -188,7 +188,7 @@ one belongs to (guessed from the file name — files of removed mods are marked 
 - A mod's card in **My mods** has a **Mod settings** link when the mod has config files.
 
 The game reads the settings when it starts, so a change applies after a restart; eViSTool warns if the game is running.
-For now this works for profiles on this computer; a server on another computer is not supported yet.
+A server on another computer works the same way: its files are edited through the connection, and the previous versions are kept on that computer.
 
 ## Crashes and mod errors
 

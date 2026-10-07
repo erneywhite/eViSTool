@@ -316,6 +316,7 @@ public sealed partial class ModsViewModel : ObservableObject
             LocalModsChanged?.Invoke(this, EventArgs.Empty);
             if (first && _main.AutoCheckUpdates && _remoteResolved.GameVersion is not null && CheckCommand.CanExecute(null))
                 CheckCommand.Execute(null);
+            await CountRemoteConfigsAsync(agent, profile);
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
         {
@@ -348,12 +349,15 @@ public sealed partial class ModsViewModel : ObservableObject
 
     // ---------- настройки модов ----------
 
-    /// <summary>Сколько файлов настроек (ModConfig) у каждого мода профиля: modid → число. Удалённым — пока нет.</summary>
+    /// <summary>Сколько файлов настроек (ModConfig) у каждого мода профиля: modid → число.</summary>
     private Dictionary<string, int> _configCounts = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>У удалённого сервера — со слов агента (запрашиваются после списка модов).</summary>
+    private Dictionary<string, int> _remoteConfigCounts = new(StringComparer.OrdinalIgnoreCase);
 
     private void CountConfigs()
     {
-        _configCounts = new(StringComparer.OrdinalIgnoreCase);
+        _configCounts = IsRemote ? _remoteConfigCounts : new(StringComparer.OrdinalIgnoreCase);
         if (IsRemote || Profile?.Profile is not { } p) return;
         var data = string.IsNullOrWhiteSpace(p.DataDir) ? GameInstall.DefaultDataDir : p.DataDir;
         try
@@ -368,6 +372,24 @@ public sealed partial class ModsViewModel : ObservableObject
     }
 
     public int ConfigCount(string modId) => _configCounts.GetValueOrDefault(modId);
+
+    /// <summary>Конфиги удалённого сервера — для ссылки «Настройки мода» в карточке. Агент старой версии их не знает — без ссылки.</summary>
+    private async Task CountRemoteConfigsAsync(AgentClient agent, GameProfile profile)
+    {
+        try
+        {
+            var counts = (await agent.ModConfigsAsync()).Where(f => f.ModId is not null)
+                .GroupBy(f => f.ModId!, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+            if (_main.ActiveProfile?.Model != profile) return;
+            _remoteConfigCounts = counts;
+            _configCounts = counts;
+            Card?.NotifyConfigs();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
+        {
+        }
+    }
 
     /// <summary>Карточка → вкладка «Настройки модов», сразу на файлах этого мода.</summary>
     [RelayCommand]

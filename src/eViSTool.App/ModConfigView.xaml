@@ -171,7 +171,8 @@
                             <TextBlock Text="{Binding Error}" Foreground="{StaticResource Forest.Danger}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"
                                        Visibility="{Binding Error, Converter={StaticResource TextToVis}}" />
                             <DockPanel>
-                                <Button DockPanel.Dock="Left" Content="{local:Tr mcfg.openFolder}" Command="{Binding OpenFolderCommand}" Padding="12,6" />
+                                <Button DockPanel.Dock="Left" Content="{local:Tr mcfg.openFolder}" Command="{Binding OpenFolderCommand}" Padding="12,6"
+                                        Visibility="{Binding CanShowFile, Converter={StaticResource BoolToVis}}" />
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                     <Button Content="{local:Tr mcfg.reset}" Command="{Binding ResetCommand}" ToolTip="{local:Tr mcfg.resetTip}"
                                             Padding="12,6" AutomationProperties.AutomationId="McfgReset" />

@@ -467,4 +467,64 @@ public sealed class AgentTests : IAsyncLifetime
             try { Directory.Delete(backups, recursive: true); } catch (IOException) { }
         }
     }
+
+    [Fact]
+    public async Task RemoteModConfigs_ReadSaveUndoReset_ThroughTheAgent()
+    {
+        var mods = Path.Combine(_profile.DataDir!, "Mods");
+        File.WriteAllText(Path.Combine(_profile.DataDir!, "serverconfig.json"),
+            "{ \"ModPaths\": [\"Mods\", " + Newtonsoft.Json.JsonConvert.ToString(mods) + "] }");
+        MakeModZip(mods, "carryon_1.0.0.zip", "CarryOn", "1.0.0");
+        var cfgDir = Directory.CreateDirectory(Path.Combine(_profile.DataDir!, "ModConfig")).FullName;
+        File.WriteAllText(Path.Combine(cfgDir, "CarryOnConfig.json"), "{\n  \"Speed\": 1.0\n}");
+        File.WriteAllText(Path.Combine(_profile.DataDir!, "serverconfig-secret.json"), "{}");
+
+        var remote = eViSTool.Core.Server.Remote.RemoteAccess.Enable(_profile.Id, AgentsDir);
+        string fingerprint;
+        using (var cert = eViSTool.Core.Server.Remote.RemoteAccess.EnsureCertificate(_profile.Id, AgentsDir))
+            fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
+        _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
+        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
+        var source = new RemoteModConfigSource(new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint));
+        var backups = Path.Combine(Path.GetDirectoryName(AgentExe)!, "data", "ModConfigBackups", _profile.Id);
+        try
+        {
+            // список с модом, угаданным по имени файла
+            var entry = Assert.Single(await source.ListAsync());
+            Assert.Equal(("CarryOnConfig.json", "carryon"), (entry.RelativePath, entry.ModId));
+
+            var opened = await source.ReadAsync("CarryOnConfig.json");
+            Assert.Equal("{\n  \"Speed\": 1.0\n}", opened.Text);
+
+            // запись: прежняя версия остаётся на сервере
+            var saved = await source.SaveAsync(new ModConfigSaveRequest("CarryOnConfig.json", "{\n  \"Speed\": 2.0\n}", opened.ChangedUtc));
+            Assert.False(saved.Changed);
+            Assert.Equal(1, saved.Content!.Versions);
+            Assert.Contains("2.0", File.ReadAllText(Path.Combine(cfgDir, "CarryOnConfig.json")));
+            Assert.Single(Directory.GetFiles(backups, "*", SearchOption.AllDirectories));
+
+            // поменяли с момента открытия (второе окно) — без вопроса не перезаписывается
+            var stale = await source.SaveAsync(new ModConfigSaveRequest("CarryOnConfig.json", "{}", opened.ChangedUtc));
+            Assert.True(stale.Changed);
+
+            // шаг назад, сброс и его отмена
+            Assert.Contains("1.0", (await source.UndoAsync("CarryOnConfig.json")).Text);
+            Assert.False((await source.ResetAsync("CarryOnConfig.json")).Exists);
+            Assert.Contains("1.0", (await source.UndoAsync("CarryOnConfig.json")).Text);
+
+            // за пределы ModConfig — отказ, файл рядом цел
+            await Assert.ThrowsAsync<InvalidOperationException>(() => source.ReadAsync("../serverconfig-secret.json"));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                source.SaveAsync(new ModConfigSaveRequest("../serverconfig-secret.json", "{ \"x\": 1 }", null)));
+            Assert.Equal("{}", File.ReadAllText(Path.Combine(_profile.DataDir!, "serverconfig-secret.json")));
+
+            // сломанный JSON не записывается
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                source.SaveAsync(new ModConfigSaveRequest("CarryOnConfig.json", "{ \"Speed\": ", null)));
+        }
+        finally
+        {
+            try { Directory.Delete(backups, recursive: true); } catch (IOException) { }
+        }
+    }
 }

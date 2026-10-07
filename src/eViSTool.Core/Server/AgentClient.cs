@@ -126,6 +126,19 @@ public sealed class AgentClient : IDisposable
         Post<AgentStatus>("mods/toggle", new ModToggleRequest(path, enabled), ct);
     public Task DeleteModAsync(string path, CancellationToken ct = default) => Post<AgentStatus>("mods/delete", new ModPathRequest(path), ct);
 
+    // ---- настройки модов сервера (ModConfig) — для окна на другой машине
+
+    public Task<IReadOnlyList<ModConfigEntry>> ModConfigsAsync(CancellationToken ct = default) =>
+        Get<IReadOnlyList<ModConfigEntry>>("modconfig", ct);
+    public Task<ModConfigContent> ReadModConfigAsync(string path, CancellationToken ct = default) =>
+        Post<ModConfigContent>("modconfig/read", new ModConfigPathRequest(path), ct);
+    public Task<ModConfigSaveResult> SaveModConfigAsync(ModConfigSaveRequest request, CancellationToken ct = default) =>
+        Post<ModConfigSaveResult>("modconfig/save", request, ct);
+    public Task<ModConfigContent> UndoModConfigAsync(string path, CancellationToken ct = default) =>
+        Post<ModConfigContent>("modconfig/undo", new ModConfigPathRequest(path), ct);
+    public Task<ModConfigContent> ResetModConfigAsync(string path, CancellationToken ct = default) =>
+        Post<ModConfigContent>("modconfig/reset", new ModConfigPathRequest(path), ct);
+
     /// <summary>Отправить архив мода агенту — он поставит его в папку модов сервера (как установка на этой машине).</summary>
     public async Task<ModInstallResult> InstallModAsync(string zipPath, CancellationToken ct = default)
     {

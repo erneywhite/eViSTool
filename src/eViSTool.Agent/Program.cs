@@ -2,6 +2,7 @@ using System.Reflection;
 using eViSTool.Core;
 using eViSTool.Core.Game;
 using eViSTool.Core.Diagnostics;
+using eViSTool.Core.Profiles;
 using eViSTool.Core.Server;
 using eViSTool.Core.Server.Remote;
 using Microsoft.AspNetCore.Builder;
@@ -72,6 +73,9 @@ var commandsFile = ServerCommands.FileFor(opts.ProfileId, opts.AgentsDir);
 var commands = ServerCommands.Load(commandsFile).ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
 var commandsDirty = false;
 var mods = new ServerMods(opts.ProfileId, Path.GetDirectoryName(Path.GetFullPath(opts.ExePath)) ?? "", opts.DataPath);
+// настройки модов (ModConfig) — для окна на другой машине; прежние версии хранятся здесь, рядом с файлами
+var modConfigs = new ModConfigService(opts.DataPath,
+    new ModConfigBackups(Path.Combine(eViSTool.Core.AppPaths.ModConfigBackups, opts.ProfileId)), mods.Locals);
 
 // «ошибки модов» за запуск сервера: раз в полминуты — новые строки вывода в сборщик (консоль хранит только
 // последние строки, поэтому копим по ходу), сводка — в статусе. Новый запуск — счёт с нуля
@@ -340,6 +344,19 @@ IResult WhenStopped(Func<object> action) =>
         ? Results.Problem(eViSTool.Core.Localization.Loc.T("sched.needStopped"), statusCode: StatusCodes.Status409Conflict)
         : Guard(action);
 
+async Task<T?> ReadBody<T>(HttpContext ctx) where T : class
+{
+    using var reader = new StreamReader(ctx.Request.Body);
+    try
+    {
+        return JsonConvert.DeserializeObject<T>(await reader.ReadToEndAsync());
+    }
+    catch (JsonException)
+    {
+        return null;
+    }
+}
+
 async Task<string?> ReadName(HttpContext ctx)
 {
     using var reader = new StreamReader(ctx.Request.Body);
@@ -406,6 +423,16 @@ web.MapPost("/mods/delete", async (HttpContext ctx) =>
     var request = JsonConvert.DeserializeObject<ModPathRequest>(await reader.ReadToEndAsync());
     return request is null ? Results.BadRequest() : Guard(() => { mods.Delete(request.Path); return Status(); });
 });
+// настройки модов сервера: список, чтение, запись (с проверкой, не поменяли ли файл), шаг назад, сброс
+web.MapGet("/modconfig", () => Guard(modConfigs.List));
+web.MapPost("/modconfig/read", async (HttpContext ctx) =>
+    await ReadBody<ModConfigPathRequest>(ctx) is { } r ? Guard(() => modConfigs.Read(r.Path)) : Results.BadRequest());
+web.MapPost("/modconfig/save", async (HttpContext ctx) =>
+    await ReadBody<ModConfigSaveRequest>(ctx) is { } r ? Guard(() => modConfigs.Save(r)) : Results.BadRequest());
+web.MapPost("/modconfig/undo", async (HttpContext ctx) =>
+    await ReadBody<ModConfigPathRequest>(ctx) is { } r ? Guard(() => modConfigs.Undo(r.Path)) : Results.BadRequest());
+web.MapPost("/modconfig/reset", async (HttpContext ctx) =>
+    await ReadBody<ModConfigPathRequest>(ctx) is { } r ? Guard(() => modConfigs.Reset(r.Path)) : Results.BadRequest());
 web.MapPost("/mods/install", async (HttpContext ctx) =>
 {
     // имя файла — только имя, без пути: мод ляжет в папку модов под ним

@@ -52,6 +52,14 @@ public sealed partial class ModCardViewModel : ObservableObject
     public int ConfigCount => Owner.ConfigCount(Row.ModId);
     public bool HasConfigs => ConfigCount > 0;
     public string ConfigText => Loc.T("mcard.configs", ConfigCount);
+
+    /// <summary>Число конфигов стало известно позже (удалённый сервер) — обновить ссылку.</summary>
+    public void NotifyConfigs()
+    {
+        OnPropertyChanged(nameof(ConfigCount));
+        OnPropertyChanged(nameof(HasConfigs));
+        OnPropertyChanged(nameof(ConfigText));
+    }
     public string ProfileName { get; }
     public string ByLine => Author.Length > 0 ? Loc.T("mcard.by", Author, Row.ModId) : Row.ModId;
     public string UpdateText => Loc.T("mcard.updateTo", Row.Latest);
