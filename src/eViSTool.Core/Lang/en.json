@@ -531,6 +531,7 @@
   "mcard.compatNone": "no version for VS {0}",
   "mcard.compatUnknown": "unknown (not checked)",
   "mcard.compatYes": "VS {0} ✔",
+  "mcard.configs": "Mod settings ({0})",
   "mcard.enabledIn": "Enabled in profile",
   "mcard.file": "File",
   "mcard.fromModDb": "ModDB",

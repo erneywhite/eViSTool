@@ -586,6 +586,10 @@
                                             Visibility="{Binding Row.PageUrl, Converter={StaticResource TextToVis}}" />
                                     <Button Style="{StaticResource Forest.LinkButton}" Content="{local:Tr mcard.inCatalog}" Margin="0,0,14,4"
                                             Command="{Binding Owner.ShowInCatalogCommand}" CommandParameter="{Binding Row}" />
+                                    <Button Style="{StaticResource Forest.LinkButton}" Content="{Binding ConfigText}" Margin="0,0,14,4"
+                                            Visibility="{Binding HasConfigs, Converter={StaticResource BoolToVis}}"
+                                            Command="{Binding Owner.OpenModConfigCommand}" CommandParameter="{Binding Row}"
+                                            AutomationProperties.AutomationId="CardModConfig" />
                                     <Button Style="{StaticResource Forest.LinkButton}" Content="{local:Tr mcard.showFile}" Margin="0,0,14,4"
                                             Visibility="{Binding Owner.IsLocalProfile, Converter={StaticResource BoolToVis}}"
                                             Command="{Binding Owner.ShowFileCommand}" CommandParameter="{Binding Row}" />

@@ -37,6 +37,14 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Вкладка «Настройки модов»: конфиги модов активного профиля.</summary>
     public ModConfigViewModel ModConfig { get; }
 
+    /// <summary>Открыть «Настройки модов» на файлах этого мода (из карточки в «Моих модах»).</summary>
+    public void OpenModConfig(string modId, string name)
+    {
+        ModConfig.Focus(modId, name);
+        if (SelectedTab == AppTab.ModConfig) _ = ModConfig.LoadAsync();
+        else SelectedTab = AppTab.ModConfig; // перечитает при открытии
+    }
+
     partial void OnSelectedTabChanged(int value)
     {
         OnPropertyChanged(nameof(PageTitle));

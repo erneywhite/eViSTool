@@ -47,6 +47,11 @@ public sealed partial class ModCardViewModel : ObservableObject
     }
 
     public string Name => Row.Name;
+
+    /// <summary>«Настройки мода (2)» — у мода есть файлы в ModConfig; ссылка ведёт на вкладку «Настройки модов».</summary>
+    public int ConfigCount => Owner.ConfigCount(Row.ModId);
+    public bool HasConfigs => ConfigCount > 0;
+    public string ConfigText => Loc.T("mcard.configs", ConfigCount);
     public string ProfileName { get; }
     public string ByLine => Author.Length > 0 ? Loc.T("mcard.by", Author, Row.ModId) : Row.ModId;
     public string UpdateText => Loc.T("mcard.updateTo", Row.Latest);

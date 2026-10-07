@@ -346,6 +346,36 @@ public sealed partial class ModsViewModel : ObservableObject
     private bool IsRunning(ModTarget target) =>
         target.IsRemote ? IsActive(target) && _main.Server.IsServerUp : GameProcess.IsRunning(target.Profile);
 
+    // ---------- настройки модов ----------
+
+    /// <summary>Сколько файлов настроек (ModConfig) у каждого мода профиля: modid → число. Удалённым — пока нет.</summary>
+    private Dictionary<string, int> _configCounts = new(StringComparer.OrdinalIgnoreCase);
+
+    private void CountConfigs()
+    {
+        _configCounts = new(StringComparer.OrdinalIgnoreCase);
+        if (IsRemote || Profile?.Profile is not { } p) return;
+        var data = string.IsNullOrWhiteSpace(p.DataDir) ? GameInstall.DefaultDataDir : p.DataDir;
+        try
+        {
+            foreach (var g in ModConfigs.List(data, _locals).Where(f => f.ModId is not null).GroupBy(f => f.ModId!))
+                _configCounts[g.Key] = g.Count();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // не прочитали папку — просто без ссылки в карточке
+        }
+    }
+
+    public int ConfigCount(string modId) => _configCounts.GetValueOrDefault(modId);
+
+    /// <summary>Карточка → вкладка «Настройки модов», сразу на файлах этого мода.</summary>
+    [RelayCommand]
+    private void OpenModConfig(ModRowViewModel? row)
+    {
+        if (row is not null) _main.OpenModConfig(row.ModId, row.Name);
+    }
+
     private void Rebuild()
     {
         // без версии игры с модбазой не сравнить — покажем только локальное
@@ -356,6 +386,7 @@ public sealed partial class ModsViewModel : ObservableObject
         UpdateCount = results.Count(r => r.Status == ModStatus.UpdateAvailable && r.LatestCompatible?.MainFile is not null);
         ModCount = results.Count;
         DependencyIssues = Dependencies.FindIssues(_locals);
+        CountConfigs();
 
         // после операции таблица строится заново — выбор остаётся на том же моде
         var keep = Card?.Row;

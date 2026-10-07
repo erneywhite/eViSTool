@@ -219,6 +219,16 @@ public sealed partial class ModConfigViewModel : ObservableObject
 
     private ModConfigBackups? Backups => _profile is null ? null : ModConfigBackups.ForProfile(_profile);
 
+    private string? _focusModId;
+
+    /// <summary>Пришли из карточки мода: в поиске — его название, после загрузки выбран его первый файл.</summary>
+    public void Focus(string modId, string name)
+    {
+        if (!ConfirmLeave()) return;
+        _focusModId = modId;
+        Search = name;
+    }
+
     /// <summary>Открыли вкладку или сменили профиль — перечитать список (выбор остаётся на том же файле).</summary>
     public async Task LoadAsync()
     {
@@ -248,7 +258,10 @@ public sealed partial class ModConfigViewModel : ObservableObject
             {
                 Rows.Clear();
                 foreach (var f in files) Rows.Add(new ModConfigRow(f));
-                Selected = Rows.FirstOrDefault(r => r.File.RelativePath == keep);
+                Selected = _focusModId is { } focus
+                    ? Rows.FirstOrDefault(r => string.Equals(r.File.ModId, focus, StringComparison.OrdinalIgnoreCase))
+                    : Rows.FirstOrDefault(r => r.File.RelativePath == keep);
+                _focusModId = null;
             }
             finally
             {

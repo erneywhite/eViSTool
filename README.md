@@ -38,6 +38,7 @@ It is portable: unzip it anywhere and run. Nothing is installed into the system 
 - [Profiles](#profiles)
 - [My mods](#my-mods)
 - [Mod catalog](#mod-catalog)
+- [Mod settings](#mod-settings)
 - [Crashes and mod errors](#crashes-and-mod-errors)
 - [Dedicated server](#dedicated-server)
 - [Remote management](#remote-management)
@@ -170,6 +171,24 @@ The same works for mod files added by hand and for missing dependencies.
 **Remember** links the profiles: next time they are ticked already. With **Install mods into linked profiles without asking**
 (**Settings**) the window is skipped altogether, and a mod goes into the linked profiles straight away — the window appears only
 if one of them cannot take the mod.
+
+## Mod settings
+
+![Mod settings](docs/screenshots/mod-settings.png)
+
+Most mods keep their settings in the `ModConfig` folder of the profile. **Mod settings** lists those files with the mod each
+one belongs to (guessed from the file name — files of removed mods are marked too), and opens the one you pick:
+
+- JSON files open as a **form**: switches for yes/no, fields for numbers and text, lists as `["a", "b"]`, nested settings in groups.
+  Wrong values are pointed out right in the field, and nothing broken can be saved. The **Text** view shows the file as it is;
+  files with comments open there, because saving from the form would drop the comments.
+- Before every save the previous version is kept (the last 5 per file). **Restore previous** brings it back — each press goes one step further back.
+- **Reset to defaults** removes the file, and the mod creates it again with default values the next time the game starts.
+  This can be undone with **Restore previous** too.
+- A mod's card in **My mods** has a **Mod settings** link when the mod has config files.
+
+The game reads the settings when it starts, so a change applies after a restart; eViSTool warns if the game is running.
+For now this works for profiles on this computer; a server on another computer is not supported yet.
 
 ## Crashes and mod errors
 
