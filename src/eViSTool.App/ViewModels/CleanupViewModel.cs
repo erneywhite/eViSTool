@@ -124,7 +124,11 @@ public sealed partial class CleanupViewModel : ObservableObject
     /// <summary>Что-то уже убрано в корзину — показать «Открыть корзину».</summary>
     [ObservableProperty] private bool _hasRecycled;
 
-    public bool IsRunning => GameProcess.IsRunning(_profile);
+    /// <summary>Игра или сервер профиля запущены — убирать нельзя (окно перепроверяет раз в пару секунд: <see cref="CheckRunning"/>).</summary>
+    [ObservableProperty] private bool _isRunning;
+
+    public void CheckRunning() => IsRunning = GameProcess.IsRunning(_profile);
+    partial void OnIsRunningChanged(bool value) => RemoveCommand.NotifyCanExecuteChanged();
     public string RunningText => Loc.T(_profile.Kind == ProfileKind.Server ? "clean.serverRunning" : "clean.gameRunning");
     public bool IsEmpty => !IsBusy && Groups.Count == 0;
 
@@ -155,7 +159,7 @@ public sealed partial class CleanupViewModel : ObservableObject
             IsBusy = false;
             Changed();
             OnPropertyChanged(nameof(IsEmpty));
-            OnPropertyChanged(nameof(IsRunning));
+            CheckRunning();
         }
     }
 
@@ -167,13 +171,13 @@ public sealed partial class CleanupViewModel : ObservableObject
         RemoveCommand.NotifyCanExecuteChanged();
     }
 
-    private bool CanRemove() => !IsBusy && Selected > 0;
+    private bool CanRemove() => !IsBusy && !IsRunning && Selected > 0;
     partial void OnIsBusyChanged(bool value) => RemoveCommand.NotifyCanExecuteChanged();
 
     [RelayCommand(CanExecute = nameof(CanRemove))]
     private async Task Remove()
     {
-        OnPropertyChanged(nameof(IsRunning));
+        CheckRunning();
         if (IsRunning)
         {
             Dialogs.Warn(RunningText);

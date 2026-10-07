@@ -42,6 +42,7 @@ It is portable: unzip it anywhere and run. Nothing is installed into the system 
 - [Crashes and mod errors](#crashes-and-mod-errors)
 - [Dedicated server](#dedicated-server)
 - [Remote management](#remote-management)
+- [Disk cleanup](#disk-cleanup)
 - [Updates, data and uninstalling](#updates-data-and-uninstalling)
 - [Troubleshooting](#troubleshooting)
 - [Building from source](#building-from-source)
@@ -294,6 +295,22 @@ encrypted for your Windows account. If the code got into the wrong hands, **New 
 **Over the internet** you also need to forward the port on your router to the server computer.
 A VPN (Tailscale, ZeroTier, WireGuard and the like) is simpler and safer: use the VPN address of the server computer,
 and nothing is exposed to the internet.
+
+## Disk cleanup
+
+Over time the game piles up gigabytes: every mod version it ever unpacked, mods downloaded from servers you no longer play on,
+maps of old worlds. **Settings → the profile → Disk cleanup…** shows what the game and eViSTool keep for that profile, grouped,
+with sizes and dates:
+
+- **safe** — the game or eViSTool recreate it when needed: unpacked mods (`Cache\unpack`), mods downloaded from servers,
+  old logs, saved versions of mods that are no longer installed, unfinished downloads;
+- **careful** — something you may still want: world maps (the explored map of that world starts empty again), data of mods
+  that are not installed, mod data per world, settings files without a mod, saved versions of installed mods (needed to roll back).
+
+Only the safe things that are surely not needed are selected by default (for example, mods of servers you have not joined
+for a month). Everything you remove goes to the Windows Recycle Bin, so a mistake can be undone — the space is freed once
+the Recycle Bin is emptied. While the game or the server of the profile is running, cleanup waits: they keep these files open.
+It works for game and server profiles on this computer.
 
 ## Updates, data and uninstalling
 
