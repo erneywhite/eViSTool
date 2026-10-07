@@ -81,6 +81,32 @@ public sealed class ModConfigsTests : IDisposable
     public void JsonCheck_IsAsLenientAsTheGame(string text, bool ok) =>
         Assert.Equal(ok, ModConfigs.JsonError(text) is null);
 
+    [Fact]
+    public void Comments_AreDetected()
+    {
+        Assert.True(ModConfigs.HasComments("{ // c\n \"a\": 1 }"));
+        Assert.True(ModConfigs.HasComments("{ \"a\": /* c */ 1 }"));
+        Assert.False(ModConfigs.HasComments("{ \"a\": \"// не комментарий\" }"));
+    }
+
+    [Theory]
+    [InlineData("{\n    \"a\": 1\n}", "{\n    \"a\": 2\n}")]           // 4 пробела
+    [InlineData("{\r\n\t\"a\": 1\r\n}", "{\r\n\t\"a\": 2\r\n}")]       // табы и CRLF
+    [InlineData("{ \"a\": 1 }", "{\n  \"a\": 2\n}")]                   // в одну строку — по умолчанию 2 пробела
+    public void Format_KeepsTheIndentOfTheOriginal(string original, string expected)
+    {
+        var root = ModConfigs.ParseJson(original);
+        root["a"] = 2;
+        Assert.Equal(expected, ModConfigs.Format(root, original));
+    }
+
+    [Fact]
+    public void Format_KeepsNumberKinds()
+    {
+        var root = ModConfigs.ParseJson("{ \"f\": 1.0, \"i\": 3, \"s\": \"x\", \"n\": null }");
+        Assert.Equal("{\n  \"f\": 1.0,\n  \"i\": 3,\n  \"s\": \"x\",\n  \"n\": null\n}", ModConfigs.Format(root, "{}"));
+    }
+
     private ModConfigFile File1(string name, string content)
     {
         File.WriteAllText(Path.Combine(_cfg, name), content);

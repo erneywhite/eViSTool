@@ -149,6 +149,50 @@ public static partial class ModConfigs
         }
     }
 
+    /// <summary>Разобрать JSON так же снисходительно, как игра (комментарии пропускаются).</summary>
+    public static JToken ParseJson(string text)
+    {
+        // строки вида «2024-01-01» — оставить строками: иначе при записи сменился бы их формат
+        using var reader = new JsonTextReader(new StringReader(text)) { DateParseHandling = DateParseHandling.None };
+        return JToken.ReadFrom(reader, new JsonLoadSettings { CommentHandling = CommentHandling.Ignore });
+    }
+
+    /// <summary>В JSON есть комментарии — форма их не сохранит (запись из формы пересобирает файл).</summary>
+    public static bool HasComments(string text)
+    {
+        try
+        {
+            using var reader = new JsonTextReader(new StringReader(text));
+            while (reader.Read())
+                if (reader.TokenType == JsonToken.Comment) return true;
+            return false;
+        }
+        catch (JsonReaderException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// JSON из формы — текстом, с отступом как в исходном файле (табы или N пробелов; по умолчанию 2 пробела),
+    /// чтобы правка одного значения не перекраивала весь файл. Переводы строк — как в исходном.
+    /// </summary>
+    public static string Format(JToken root, string original)
+    {
+        var (ch, n) = (' ', 2);
+        foreach (var line in original.Split('\n'))
+        {
+            var lead = line.Length - line.TrimStart(' ', '\t').Length;
+            if (lead == 0 || line.Trim().Length == 0) continue;
+            (ch, n) = line[0] == '\t' ? ('\t', 1) : (' ', Math.Min(lead, 8));
+            break;
+        }
+        var sw = new StringWriter { NewLine = original.Contains("\r\n") ? "\r\n" : "\n" };
+        using (var w = new JsonTextWriter(sw) { Formatting = Formatting.Indented, IndentChar = ch, Indentation = n })
+            root.WriteTo(w);
+        return sw.ToString();
+    }
+
     /// <summary>
     /// Записать файл: JSON сначала проверяется (сломанный не записывается — <see cref="InvalidDataException"/>),
     /// прежняя версия уходит в резервные копии, запись — через временный файл рядом. BOM сохраняется, если был.

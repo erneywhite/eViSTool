@@ -59,6 +59,99 @@ public sealed partial class ModConfigViewModel : ObservableObject
     [ObservableProperty] private int _versions;
     [ObservableProperty] private bool _isLoading;
 
+    // ---------- форма ----------
+    // Источник правды — текст: правка поля меняет дерево JSON, из него пересобирается текст (сохранение,
+    // «Вернуть предыдущую версию» и вопросы о несохранённом работают как есть). Текст поменяли иначе — форма строится заново.
+
+    public ObservableCollection<ConfigField> Fields { get; } = [];
+    private Newtonsoft.Json.Linq.JToken? _root;
+    private bool _fromForm;
+
+    /// <summary>Открыт вид «Форма» (иначе — «Текст»).</summary>
+    [ObservableProperty] private bool _isFormMode;
+
+    /// <summary>Пометка над формой: в файле комментарии, форма их не сохранит.</summary>
+    [ObservableProperty] private string _formNote = "";
+
+    /// <summary>Форма — только для JSON.</summary>
+    public bool CanUseForm => Selected?.File.Kind == ModConfigKind.Json;
+    public bool ShowForm => CanUseForm && IsFormMode;
+    public bool ShowText => !ShowForm;
+    public bool IsTextMode
+    {
+        get => !IsFormMode;
+        set => IsFormMode = !value;
+    }
+
+    partial void OnIsFormModeChanged(bool value)
+    {
+        if (value && !BuildForm())
+        {
+            // текст сейчас не JSON — форму из него не построить
+            IsFormMode = false;
+            Status = Loc.T("mcfg.formNeedsJson");
+            return;
+        }
+        OnPropertyChanged(nameof(ShowForm));
+        OnPropertyChanged(nameof(ShowText));
+        OnPropertyChanged(nameof(IsTextMode));
+    }
+
+    /// <summary>Построить поля из текущего текста; false — текст не разбирается как JSON.</summary>
+    private bool BuildForm()
+    {
+        Fields.Clear();
+        _root = null;
+        if (!CanUseForm) return false;
+        try
+        {
+            _root = ModConfigs.ParseJson(Text);
+        }
+        catch (Newtonsoft.Json.JsonReaderException)
+        {
+            return false;
+        }
+        foreach (var f in ConfigForm.Build(_root, OnFieldChanged)) Fields.Add(f);
+        return true;
+    }
+
+    /// <summary>Поле изменили: при ошибке в каком-то поле текст не трогаем (и сохранять нельзя), иначе — пересобрать текст.</summary>
+    private void OnFieldChanged()
+    {
+        OnPropertyChanged(nameof(HasFieldErrors));
+        SaveCommand.NotifyCanExecuteChanged();
+        if (_root is null || HasFieldErrors) return;
+        _fromForm = true;
+        try
+        {
+            Text = ModConfigs.Format(_root, _loadedText);
+        }
+        finally
+        {
+            _fromForm = false;
+        }
+    }
+
+    public bool HasFieldErrors => Fields.Any(f => f.Error.Length > 0);
+
+    /// <summary>Открыт новый файл: JSON без комментариев — сразу форма; с комментариями — текст и пометка.</summary>
+    private void ChooseView()
+    {
+        var comments = CanUseForm && ModConfigs.HasComments(Text);
+        FormNote = comments ? Loc.T("mcfg.commentsNote") : "";
+        var form = CanUseForm && !comments && Text.Length > 0 && ModConfigs.JsonError(Text) is null;
+        if (IsFormMode == form)
+        {
+            if (form) BuildForm(); // вид тот же — поля всё равно от нового файла
+            else Fields.Clear();
+        }
+        else IsFormMode = form;
+        OnPropertyChanged(nameof(CanUseForm));
+        OnPropertyChanged(nameof(ShowForm));
+        OnPropertyChanged(nameof(ShowText));
+        OnPropertyChanged(nameof(IsTextMode));
+    }
+
     public bool HasFile => Selected is not null;
     public string Subtitle => Loc.T("mcfg.subtitle", _profile?.Name ?? _main.ActiveProfile?.Name ?? "");
     public bool IsDirty => Selected is not null && Text != _loadedText;
@@ -71,6 +164,8 @@ public sealed partial class ModConfigViewModel : ObservableObject
         Error = Selected?.File.Kind == ModConfigKind.Json ? ModConfigs.JsonError(value) ?? "" : "";
         OnPropertyChanged(nameof(IsDirty));
         SaveCommand.NotifyCanExecuteChanged();
+        // текст поменяли не из формы (вид «Текст» не показывает форму — её перестроим при переключении)
+        if (!_fromForm && IsFormMode && !BuildForm()) IsFormMode = false;
     }
 
     partial void OnVersionsChanged(int value)
@@ -103,6 +198,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
         if (Selected is not { } row)
         {
             (_loadedText, Text, Versions) = ("", "", 0);
+            ChooseView();
             return;
         }
         try
@@ -118,6 +214,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
         if (!System.IO.File.Exists(row.File.Path)) Status = Loc.T("mcfg.missing");
         Versions = Backups is { } b ? b.Versions(row.File.RelativePath).Count : 0;
         OnPropertyChanged(nameof(IsDirty));
+        ChooseView();
     }
 
     private ModConfigBackups? Backups => _profile is null ? null : ModConfigBackups.ForProfile(_profile);
@@ -195,7 +292,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
         }
     }
 
-    private bool CanSave() => IsDirty && Error.Length == 0;
+    private bool CanSave() => IsDirty && Error.Length == 0 && !HasFieldErrors;
 
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
