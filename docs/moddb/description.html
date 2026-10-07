@@ -5,8 +5,14 @@
 
 <h2>Your mods</h2>
 <p>Hit <strong>Check</strong> and you'll see which mods have updates. Update one or all of them in one go. If an update breaks something, roll back to the version you had before &mdash; eViSTool keeps the old files around for exactly that. You can pin a mod to its current version or skip one particular release you don't want.</p>
-<p>It also warns you about the usual headaches before they bite: a missing or outdated dependency (one button fixes it), a duplicate mod, a version made for another game branch. And if you keep a separate mod set for a server, it tells you which mods are client-only and don't belong there.</p>
+<p>It also warns you about the usual headaches before they bite: a missing or outdated dependency (one button fixes it), a duplicate mod, a version made for another game branch, a mod that needs a newer game than you have. And if you keep a separate mod set for a server, it tells you which mods are client-only and don't belong there.</p>
 <p>Want to share your setup with a friend? Save it as a modpack and send them one file.</p>
+<p>Before mods change, eViSTool quietly copies the single-player worlds you played since the last copy. If an update breaks a world, put the copy back with one button.</p>
+
+<p><img src="https://raw.githubusercontent.com/erneywhite/eViSTool/main/docs/screenshots/mod-settings.png" alt="Mod settings" width="100%" /></p>
+
+<h2>Mod settings without editing JSON by hand</h2>
+<p>The <strong>Mod settings</strong> tab lists the config files of your mods and opens them as a form: switches, number fields, lists. A typo can't break the file, every save keeps the previous version (one button brings it back), and <strong>Reset to defaults</strong> lets the mod create a fresh config. It works for your server on another PC too.</p>
 
 <h2>The whole ModDB inside the app</h2>
 <p>Search, filter by tag, side and game version, sort by what's trending. Every mod shows its screenshots, description and all releases, and installs with one click &mdash; dependencies included.</p>
@@ -31,6 +37,9 @@
 
 <h2>Your server on another PC</h2>
 <p>If the server lives on a different computer (a spare PC, a VM, a rented box), turn on remote access there and you'll get a connection code. Paste it into eViSTool on your own PC, and you can manage that server just like a local one: console, config, backups, schedule, and its mods. The connection is encrypted, and there's nothing to set up beyond the code.</p>
+
+<h2>Disk cleanup</h2>
+<p>The game piles up gigabytes over time: every mod version it ever unpacked, mods from servers you no longer join, maps of old worlds. <strong>Disk cleanup</strong> shows all of it with sizes and dates, marks what is safe to remove, and moves your pick to the Recycle Bin.</p>
 
 <h2>Getting started</h2>
 <ol>
@@ -57,6 +66,9 @@
 <ul>
 <li><strong>Моды:</strong> одна кнопка проверяет обновления, можно обновить всё разом, а если что-то сломалось &mdash; откатиться на прежнюю версию. Программа заранее подскажет про нехватку зависимостей (чинится одной кнопкой), дубликаты и версии не для твоей игры. Своим набором можно поделиться модпаком.</li>
 <li><strong>Каталог модбазы</strong> прямо в программе: поиск, фильтры, скриншоты, установка в один клик.</li>
+<li><strong>Настройки модов</strong> без ручной правки JSON: форма с переключателями и полями, проверка значений, «Вернуть предыдущую версию» и «Сбросить к стандартным». Работает и для сервера на другом компьютере.</li>
+<li><strong>Копии миров:</strong> перед изменением модов программа копирует одиночные миры, в которые играли, — испортило обновление мир, вернул копию одной кнопкой.</li>
+<li><strong>Уборка диска:</strong> распакованные версии модов, моды с серверов, карты старых миров — с размерами и датами; выбранное уходит в корзину.</li>
 <li><strong>Профили:</strong> несколько сборок игры рядом, у каждой свои моды, настройки и миры. Кнопка «Играть» запускает нужную и видит, что игра уже запущена. Мод, нужный и серверу, и клиенту, можно сразу поставить в несколько профилей, и каждому подберётся версия под его игру.</li>
 <li><strong>Вылеты:</strong> вылетела игра, мир выкинул в главное меню или упал сервер, даже на другом компьютере, &mdash; программа подскажет, какой мод скорее всего виноват. Его можно сразу выключить или скопировать отчёт для автора. Моды, которые тихо сыплют ошибками (от них пухнет лог и бывают фризы), отмечаются жёлтой «!» у профиля.</li>
 <li><strong>Сервер:</strong> консоль с подсказками команд, копии мира по расписанию (вместе с данными модов, например прогрессом XLeveling), перезапуски с предупреждением игроков в чате, удобный редактор конфига.</li>
