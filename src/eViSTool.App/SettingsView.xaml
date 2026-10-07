@@ -88,6 +88,15 @@
                                 <TextBlock Text="{local:Tr settings.clone}" />
                             </StackPanel>
                         </Button>
+                        <!-- что копят игра и eViSTool в этом профиле — убрать в корзину -->
+                        <Button Command="{Binding CleanupDiskCommand}" CommandParameter="{Binding EditedProfile}" HorizontalAlignment="Stretch"
+                                Margin="0,0,0,8" ToolTip="{local:Tr clean.buttonTip}" ToolTipService.ShowOnDisabled="True"
+                                AutomationProperties.AutomationId="CleanupDisk">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource Icon.Folder}" Style="{StaticResource Forest.Icon}" Width="13" Height="13" Margin="0,0,8,0" />
+                                <TextBlock Text="{local:Tr clean.button}" />
+                            </StackPanel>
+                        </Button>
                         <Button Content="{local:Tr settings.removeProfile}" Command="{Binding RemoveProfileCommand}" CommandParameter="{Binding EditedProfile}"
                                 Style="{StaticResource Forest.DangerButton}" HorizontalAlignment="Stretch" />
                     </StackPanel>

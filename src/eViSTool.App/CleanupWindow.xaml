@@ -1,0 +1,102 @@
+<Window x:Class="eViSTool.App.CleanupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:eViSTool.App"
+        Icon="Assets/eViSTool.ico" Width="760" Height="720" MinWidth="560" MinHeight="420"
+        Background="{StaticResource Forest.Base}" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Title="{Binding Heading}">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:TextToVisibilityConverter x:Key="TextToVis" />
+        <local:InvertBoolConverter x:Key="Invert" />
+    </Window.Resources>
+    <DockPanel Margin="24,20,24,20">
+        <StackPanel DockPanel.Dock="Top">
+            <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" />
+            <TextBlock Text="{local:Tr clean.intro}" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap" Margin="0,4,0,0" />
+            <TextBlock Text="{Binding Summary}" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Forest.Accent}" Margin="0,12,0,0" />
+            <!-- игра профиля запущена — убирать нельзя -->
+            <TextBlock Text="{Binding RunningText}" FontSize="12" Foreground="{StaticResource Forest.Warn}" TextWrapping="Wrap" Margin="0,8,0,0"
+                       Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}" />
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+            <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{StaticResource Forest.Accent}" TextWrapping="Wrap" Margin="0,0,0,10"
+                       Visibility="{Binding Status, Converter={StaticResource TextToVis}}" />
+            <DockPanel>
+                <Button DockPanel.Dock="Left" Content="{local:Tr clean.openBin}" Command="{Binding OpenRecycleBinCommand}" Padding="14,8"
+                        Visibility="{Binding HasRecycled, Converter={StaticResource BoolToVis}}" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="{Binding RemoveText}" Command="{Binding RemoveCommand}" Style="{StaticResource Forest.PrimaryButton}"
+                            Padding="16,8" AutomationProperties.AutomationId="CleanRemove" />
+                    <Button Content="{local:Tr common.close}" IsCancel="True" Margin="8,0,0,0" Padding="16,8" />
+                </StackPanel>
+            </DockPanel>
+        </StackPanel>
+
+        <TextBlock DockPanel.Dock="Top" Text="{local:Tr clean.nothing}" Foreground="{StaticResource Forest.Muted}" FontSize="13" Margin="0,20,0,0"
+                   Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}" />
+
+        <ScrollViewer Margin="0,14,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl ItemsSource="{Binding Groups}" IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="{StaticResource Forest.Surface}" CornerRadius="6" Padding="14,10" Margin="0,0,10,8">
+                            <StackPanel>
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding SizeText}" FontSize="13" FontWeight="SemiBold"
+                                               Foreground="{StaticResource Forest.Text}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                    <Border DockPanel.Dock="Right" CornerRadius="4" Padding="7,1" VerticalAlignment="Center" Margin="12,0,0,0">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="{StaticResource Forest.Selected}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsCareful}" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource Forest.Raised}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding SafetyText}" FontSize="11">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{StaticResource Forest.Good}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsCareful}" Value="True">
+                                                            <Setter Property="Foreground" Value="{StaticResource Forest.Warn}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
+                                    <CheckBox IsChecked="{Binding IsChecked}" VerticalAlignment="Center" AutomationProperties.Name="{Binding Title}">
+                                        <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}"
+                                                   TextWrapping="Wrap" />
+                                    </CheckBox>
+                                </DockPanel>
+                                <TextBlock Text="{Binding Hint}" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap" Margin="0,4,0,4" />
+                                <!-- пункты: у папки целиком (распакованные моды, логи) списка нет — галочка группы и есть она -->
+                                <ItemsControl ItemsSource="{Binding Items}" Margin="26,2,0,0"
+                                              Visibility="{Binding ShowItems, Converter={StaticResource BoolToVis}}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,3,0,0">
+                                                <TextBlock DockPanel.Dock="Right" Text="{Binding Details}" FontSize="12" Foreground="{StaticResource Forest.Muted}"
+                                                           VerticalAlignment="Center" Margin="12,0,0,0" />
+                                                <CheckBox IsChecked="{Binding IsChecked}" VerticalAlignment="Center" AutomationProperties.Name="{Binding Title}">
+                                                    <TextBlock Text="{Binding Title}" FontSize="12" Foreground="{StaticResource Forest.Text}"
+                                                               TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}" />
+                                                </CheckBox>
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

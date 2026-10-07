@@ -62,9 +62,12 @@ public sealed partial class WorldCopiesViewModel : ObservableObject
         OnPropertyChanged(nameof(IsEmpty));
     }
 
+    /// <summary>«1,4 ГБ», «230 МБ», «12 КБ»; ноль — «0 МБ».</summary>
     public static string SizeText(long bytes) =>
         bytes >= 1L << 30 ? Loc.T("wcopy.sizeGb", (bytes / (double)(1L << 30)).ToString("0.0"))
-        : Loc.T("wcopy.sizeMb", Math.Max(1, bytes >> 20));
+        : bytes >= 1L << 20 ? Loc.T("wcopy.sizeMb", bytes >> 20)
+        : bytes > 0 ? Loc.T("wcopy.sizeKb", Math.Max(1, bytes >> 10))
+        : Loc.T("wcopy.sizeMb", 0);
 
     [RelayCommand]
     private async Task RestoreAsync(WorldCopyRow? row)

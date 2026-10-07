@@ -110,8 +110,20 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnEditedProfileChanged(ProfileViewModel? value)
     {
         RefreshLinks();
+        CleanupDiskCommand.NotifyCanExecuteChanged();
         WorldCopies = value?.Model.Kind == ProfileKind.Client ? new WorldCopiesViewModel(value.Model) : null;
     }
+
+    /// <summary>«Уборка диска» профиля (файлы на этой машине; у удалённого сервера — пока нет).</summary>
+    [RelayCommand(CanExecute = nameof(CanCleanupDisk))]
+    private void CleanupDisk(ProfileViewModel? profile)
+    {
+        if (profile is null || System.Windows.Application.Current.MainWindow is not { } owner) return;
+        CleanupWindow.Open(owner, profile.Model);
+        WorldCopies?.Refresh();
+    }
+
+    private static bool CanCleanupDisk(ProfileViewModel? profile) => profile is { Model.IsRemote: false };
 
     /// <summary>Сделаны новые копии миров — обновить список в настройках, если открыт этот профиль.</summary>
     public void RefreshWorldCopies(GameProfile profile)
