@@ -126,6 +126,11 @@ public sealed class AgentClient : IDisposable
         Post<AgentStatus>("mods/toggle", new ModToggleRequest(path, enabled), ct);
     public Task DeleteModAsync(string path, CancellationToken ct = default) => Post<AgentStatus>("mods/delete", new ModPathRequest(path), ct);
 
+    // ---- игроки сервера (вкладка «Игроки»): чтение и правка файлов у остановленного; у запущенного — команды (CommandAsync)
+
+    public Task<ServerPlayersView> PlayersAsync(CancellationToken ct = default) => Get<ServerPlayersView>("players", ct);
+    public Task<AgentStatus> EditPlayersAsync(PlayerFileEdit edit, CancellationToken ct = default) => Post<AgentStatus>("players/edit", edit, ct);
+
     // ---- настройки модов сервера (ModConfig) — для окна на другой машине
 
     public Task<IReadOnlyList<ModConfigEntry>> ModConfigsAsync(CancellationToken ct = default) =>

@@ -73,6 +73,7 @@ var commandsFile = ServerCommands.FileFor(opts.ProfileId, opts.AgentsDir);
 var commands = ServerCommands.Load(commandsFile).ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
 var commandsDirty = false;
 var mods = new ServerMods(opts.ProfileId, Path.GetDirectoryName(Path.GetFullPath(opts.ExePath)) ?? "", opts.DataPath);
+var playerLists = new ServerPlayers(opts.DataPath); // вкладка «Игроки» окна на другой машине
 // настройки модов (ModConfig) — для окна на другой машине; прежние версии хранятся здесь, рядом с файлами
 var modConfigs = new ModConfigService(opts.DataPath,
     new ModConfigBackups(Path.Combine(eViSTool.Core.AppPaths.ModConfigBackups, opts.ProfileId)), mods.Locals);
@@ -332,6 +333,7 @@ AgentStatus Status() => new()
     AutomationChangedAt = File.Exists(automationFile) ? File.GetLastWriteTimeUtc(automationFile) : null,
     ConfigChangedAt = File.Exists(files.ConfigPath) ? File.GetLastWriteTimeUtc(files.ConfigPath) : null,
     ModsChangedAt = mods.ChangedAt(),
+    PlayersChangedAt = playerLists.ChangedAt(),
     CommandCount = commands.Count,
     RemoteError = remoteError,
 };
@@ -452,6 +454,10 @@ web.MapPost("/mods/delete", async (HttpContext ctx) =>
     var request = JsonConvert.DeserializeObject<ModPathRequest>(await reader.ReadToEndAsync());
     return request is null ? Results.BadRequest() : Guard(() => { mods.Delete(request.Path); return Status(); });
 });
+// игроки: списки — всегда; правка файлов — только у остановленного (работающий держит списки в памяти и перезапишет их)
+web.MapGet("/players", () => Guard(() => playerLists.Read()));
+web.MapPost("/players/edit", async (HttpContext ctx) =>
+    await ReadBody<PlayerFileEdit>(ctx) is { } edit ? WhenStopped(() => { playerLists.Apply(edit); return Status(); }) : Results.BadRequest());
 // настройки модов сервера: список, чтение, запись (с проверкой, не поменяли ли файл), шаг назад, сброс
 web.MapGet("/modconfig", () => Guard(modConfigs.List));
 web.MapPost("/modconfig/read", async (HttpContext ctx) =>

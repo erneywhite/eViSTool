@@ -469,6 +469,34 @@ public sealed class AgentTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Players_ReadAndEdit_OnlyWhileStopped()
+    {
+        var pd = Directory.CreateDirectory(Path.Combine(_profile.DataDir!, "Playerdata")).FullName;
+        File.WriteAllText(Path.Combine(pd, "playerdata.json"),
+            """[ { "PlayerUID": "UID-ANNA", "RoleCode": "suplayer", "LastKnownPlayername": "Anna", "LastJoinDate": "2026-10-07T21:00:00+03:00" } ]""");
+        File.WriteAllText(Path.Combine(pd, "playersbanned.json"),
+            """[ { "PlayerUID": "UID-ANNA", "PlayerName": "Anna", "UntilDate": "2099-01-01T00:00:00+03:00", "Reason": "test", "IssuedByPlayerName": "Console" } ]""");
+
+        _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
+        var view = await _client.PlayersAsync();
+        Assert.Equal("Anna", Assert.Single(view.Players).Name);
+        Assert.NotNull(view.Players[0].Ban);
+        Assert.NotNull((await _client.StatusAsync()).PlayersChangedAt);
+
+        // сервер остановлен — правка файлов
+        await _client.EditPlayersAsync(new PlayerFileEdit("UID-ANNA", Role: "admin", Unban: true));
+        view = await _client.PlayersAsync();
+        Assert.Equal("admin", view.Players[0].Role);
+        Assert.Empty(view.Bans);
+
+        // сервер запущен — файлы не трогаем (он перезапишет их сам): отказ с понятной причиной
+        await _client.StartAsync();
+        await Until(async () => (await _client.StatusAsync()).State == ServerState.Running);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _client.EditPlayersAsync(new PlayerFileEdit("UID-ANNA", Role: "suplayer")));
+        Assert.Equal("admin", (await _client.PlayersAsync()).Players[0].Role);
+    }
+
+    [Fact]
     public async Task RemotePackImport_ThroughTheAgent()
     {
         var mods = Path.Combine(_profile.DataDir!, "Mods");

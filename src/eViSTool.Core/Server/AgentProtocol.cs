@@ -116,6 +116,9 @@ public sealed record AgentStatus
     /// <summary>Когда последний раз менялись настройки расписания — окна по ней замечают чужую правку и перечитывают их.</summary>
     public DateTime? AutomationChangedAt { get; init; }
 
+    /// <summary>Когда менялись игроки и списки (Playerdata, режим белого списка): окна перечитывают вкладку «Игроки».</summary>
+    public DateTime? PlayersChangedAt { get; init; }
+
     /// <summary>Ближайший перезапуск по расписанию (null — расписание выключено или сервер не работает).</summary>
     public DateTime? NextRestartAt { get; init; }
 
