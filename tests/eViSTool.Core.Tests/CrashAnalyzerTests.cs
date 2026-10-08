@@ -95,6 +95,21 @@ public sealed class CrashAnalyzerTests : IDisposable
         Assert.Contains("boom in a server callback", finding.Error);
     }
 
+    [Theory]
+    [InlineData("Вас выгнал Console Admin")]
+    [InlineData("You've been kicked by Console Admin, reason: afk")]
+    [InlineData("Вы были забанены Console Admin до 09.10.2026")]
+    public void KickedOrBanned_IsNotACrash_EvenWithModErrorsInTheLog(string reason)
+    {
+        // ошибки модов в логах есть (как при сломанном моде), но мир закрылся потому, что игрока выгнали
+        var client = Log("client-main-disconnected.log")
+            .Select(e => e.Message.StartsWith("Exiting current game to disconnected screen, reason: ", StringComparison.Ordinal)
+                ? e with { Message = "Exiting current game to disconnected screen, reason: " + reason } : e)
+            .ToList();
+
+        Assert.Null(CrashAnalyzer.Analyze(client, null, Log("server-main-disconnected.log"), Mods()));
+    }
+
     [Fact]
     public void QuietErrors_AreNotACrash_ButEachIsAttributedToItsMod()
     {
