@@ -365,7 +365,9 @@ public sealed partial class ServerPlayersViewModel : ObservableObject
             var text = ConsoleMarkup.ToPlain(line.Text);
             if (text.Contains("Handling Console Command", StringComparison.Ordinal)) continue; // эхо сервера, ответ — следующая строка
             var cut = text.IndexOf("] ", StringComparison.Ordinal); // «08.10.2026 18:00:00 [Server Notification] …»
-            StatusText = Loc.T("players.reply", cut >= 0 ? text[(cut + 2)..] : text);
+            var reply = (cut >= 0 ? text[(cut + 2)..] : text).Trim();
+            if (reply.Length == 0 || reply.EndsWith(']')) continue; // пустая строка сервера — ждём следующую
+            StatusText = Loc.T("players.reply", reply);
             _awaitReply = null;
             return;
         }

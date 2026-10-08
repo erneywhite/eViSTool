@@ -192,8 +192,9 @@ public static class PlayerCommands
     /// <summary>
     /// Сообщение в чат одному игроку: личных сообщений у консоли нет, поэтому «объявление в радиусе 2 блоков»,
     /// выполненное от лица самого игрока, — его увидит он (и кто стоит вплотную). Игрок должен быть в игре.
+    /// Вложенная команда — со слешем: в справке сервера написано «без /», но так она молча не выполняется (проверено в игре на 1.22.7).
     /// </summary>
-    public static string TellNear(string player, string text) => $"/executeas {player} announcenear 2 {text}";
+    public static string TellNear(string player, string text) => $"/executeas {player} /announcenear 2 {text}";
 
     private static string Tail(string? s) => string.IsNullOrWhiteSpace(s) ? "" : " " + s.Trim();
 

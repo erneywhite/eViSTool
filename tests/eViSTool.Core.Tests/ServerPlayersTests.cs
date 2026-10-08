@@ -106,7 +106,7 @@ public sealed class ServerPlayersTests : IDisposable
         Assert.Equal("/whitelist add Anna friend", PlayerCommands.WhitelistAdd("Anna", "friend"));
         Assert.Equal("/ban Boris 1 day griefing", PlayerCommands.Ban("Boris", 1, "day", "griefing"));
         Assert.Equal("/player Anna allowcharselonce", PlayerCommands.AllowCharSelOnce("Anna"));
-        Assert.Equal("/executeas Anna announcenear 2 hi", PlayerCommands.TellNear("Anna", "hi"));
+        Assert.Equal("/executeas Anna /announcenear 2 hi", PlayerCommands.TellNear("Anna", "hi"));
         Assert.False(PlayerCommands.IsValidName("two words"));
     }
 }
