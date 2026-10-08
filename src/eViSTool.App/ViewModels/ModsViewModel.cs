@@ -1212,12 +1212,7 @@ public sealed partial class ModsViewModel : ObservableObject
 
     public async Task ImportPackFileAsync(string path)
     {
-        if (Profile is not { } profile || IsBusy) return;
-        if (IsRemote)
-        {
-            Error(Loc.T("mods.remotePacksLater"));
-            return;
-        }
+        if (Profile is not { } profile || IsBusy || CurrentTarget() is not { } target) return;
 
         PackFile pack;
         try
@@ -1232,18 +1227,33 @@ public sealed partial class ModsViewModel : ObservableObject
 
         using (pack)
         {
-            var plan = PackImporter.Plan(pack.Manifest, profile, ModUpdateService.ScanLocal(profile));
+            // что стоит в цели: своя папка или сервер на другой машине (список — со слов его агента)
+            PackImportPlan plan;
+            try
+            {
+                var (resolved, locals) = await ModTargets.ScanAsync(target);
+                plan = PackImporter.Plan(pack.Manifest, resolved, locals);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException or IOException)
+            {
+                Error(Loc.T("mods.readFailed", ex.Message));
+                return;
+            }
             var dlg = new ImportPackWindow(plan) { Owner = Application.Current.MainWindow };
             if (dlg.ShowDialog() != true) return;
-            if (CurrentTarget() is not { } target || !ConfirmIfRunning(target)) return;
+            if (!ConfirmIfRunning(target)) return;
 
             IsBusy = true;
             PackImportResult result;
             var copyProblems = new List<string>();
+            // поставленные моды — копиями сюда: потом предложим «Установить также в» связанные профили
+            var keep = Path.Combine(eViSTool.Core.AppPaths.Downloads, "pack-also-" + Guid.NewGuid().ToString("N")[..8]);
+            var alsoDone = new List<string>();
+            var alsoProblems = new List<string>();
             try
             {
                 await CopyWorldsAsync(target, copyProblems);
-                var importer = new PackImporter(_db, _updater);
+                var importer = new PackImporter(_db, _updater) { KeepInstalledIn = keep };
                 var progress = new Progress<string>(s => StatusText = s);
                 var (mirror, applyConfig) = (dlg.Mirror, dlg.ApplyConfig);
                 // в фоне: иначе при паке «всё внутри» импорт идёт синхронно, окно подвисает,
@@ -1252,14 +1262,26 @@ public sealed partial class ModsViewModel : ObservableObject
                 bool AskChanged(IReadOnlyList<string> mods) => Application.Current.Dispatcher.Invoke(() =>
                     MessageBox.Show(Application.Current.MainWindow!, Loc.T("pack.askChanged", string.Join("\n", mods.Select(x => "• " + x))),
                         "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes);
-                result = await Task.Run(() => importer.ApplyAsync(pack, plan, profile, mirror, applyConfig,
-                    ModBackupStore.ForProfile(profile.Profile), progress, confirmChanged: AskChanged));
+                result = await Task.Run(() => target.IsRemote
+                    ? importer.ApplyToRemoteAsync(pack, plan, target, mirror, applyConfig, progress, confirmChanged: AskChanged)
+                    : importer.ApplyAsync(pack, plan, profile, mirror, applyConfig,
+                        ModBackupStore.ForProfile(profile.Profile), progress, confirmChanged: AskChanged));
+
+                // моды пака, нужные и в других профилях (сервер ↔ клиент), — как у «Добавить»
+                var zips = Directory.Exists(keep) ? Directory.GetFiles(keep, "*.zip", SearchOption.AllDirectories) : [];
+                if (zips.Length > 0 && await PickAlsoForFilesAsync(target, zips) is { Count: > 0 } also)
+                    foreach (var a in also.Where(a => ConfirmIfRunning(a.Target)))
+                        foreach (var (zipPath, _) in a.ToInstall)
+                            await Labelled(a.Target, label: true, alsoDone, alsoProblems,
+                                () => InstallZipAsync(a.Target, zipPath, interactive: false, alsoDone, alsoProblems));
             }
             finally
             {
                 IsBusy = false;
+                try { if (Directory.Exists(keep)) Directory.Delete(keep, recursive: true); } catch (IOException) { }
             }
-            await ReportAsync(Loc.T("report.imported", pack.Manifest.Name), result.Done.ToList(), [.. copyProblems, .. result.Problems]);
+            await ReportAsync(Loc.T("report.imported", pack.Manifest.Name), [.. result.Done, .. alsoDone],
+                [.. copyProblems, .. result.Problems, .. alsoProblems]);
         }
     }
 

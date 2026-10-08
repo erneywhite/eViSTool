@@ -3,6 +3,7 @@ using eViSTool.Core.Localization;
 using eViSTool.Core.ModDb;
 using eViSTool.Core.Mods;
 using eViSTool.Core.Profiles;
+using eViSTool.Core.Server;
 using eViSTool.Core.Versioning;
 using Newtonsoft.Json;
 
@@ -84,6 +85,12 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
     /// <summary>Как получить мод, которого нет внутри пака (по умолчанию — ровно эта версия с модбазы). Подменяется в тестах.</summary>
     public Func<PackMod, CancellationToken, Task<string>>? Download { get; init; }
 
+    /// <summary>
+    /// Куда класть копии поставленных (проверенных) архивов модов — чтобы окно предложило «Установить также в»
+    /// связанные профили. null — не класть. Каждый мод — в своей подпапке (одинаковые имена файлов не мешают).
+    /// </summary>
+    public string? KeepInstalledIn { get; init; }
+
     /// <summary>Что произойдёт: новые, обновляемые, откатываемые, уже стоящие; и какие моды профиля в паке не упомянуты.</summary>
     public static PackImportPlan Plan(PackManifest manifest, ResolvedProfile profile, IReadOnlyList<LocalMod> locals)
     {
@@ -126,17 +133,111 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
     }
 
     /// <summary>
-    /// Применить план. mirror — выключить моды профиля, которых нет в паке (не удаляя).
+    /// Куда ставится пак: свой профиль (файлы на этой машине) или сервер на другой машине (через его агента).
+    /// Проверки пака общие, разные — только эти четыре действия.
+    /// </summary>
+    private sealed record PackTarget(
+        Func<string, CancellationToken, Task<string>> Install,           // поставить архив → «имя: было → стало»
+        Func<CancellationToken, Task<IReadOnlyList<LocalMod>?>> Scan,      // моды после установки; null — переключать нельзя
+        Func<LocalMod, bool, CancellationToken, Task<bool>> SetEnabled,   // true — состояние поменялось
+        Func<PackFile, CancellationToken, Task<IReadOnlyList<string>>> ApplyConfig); // настройки модов → что не встало
+
+    /// <summary>
+    /// Применить план к своему профилю. mirror — выключить моды профиля, которых нет в паке (не удаляя).
     /// Всё заменяемое уходит в хранилище версий, прежние настройки модов — в архив там же.
-    /// Сначала все моды извлекаются или скачиваются и проверяются — профиль до этого не меняется:
+    /// </summary>
+    public Task<PackImportResult> ApplyAsync(PackFile pack, PackImportPlan plan, ResolvedProfile profile,
+        bool mirror, bool applyConfig, ModBackupStore backups, IProgress<string>? progress = null, CancellationToken ct = default,
+        Func<IReadOnlyList<string>, bool>? confirmChanged = null)
+    {
+        var target = new PackTarget(
+            Install: (file, _) =>
+            {
+                var installPlan = ModInstaller.Plan(file, profile, ModUpdateService.ScanLocal(profile));
+                ModInstaller.Apply(installPlan, backups);
+                var info = installPlan.Incoming.Info!;
+                var old = installPlan.Replaces.FirstOrDefault()?.Info?.Version;
+                return Task.FromResult(old is null ? $"{info.Name} {info.Version}" : $"{info.Name}: {old} → {info.Version}");
+            },
+            Scan: _ =>
+            {
+                var fresh = ProfileResolver.Resolve(profile.Profile);
+                return Task.FromResult<IReadOnlyList<LocalMod>?>(fresh.ConfigPath is null ? null : ModUpdateService.ScanLocal(fresh));
+            },
+            SetEnabled: (mod, enabled, _) => Task.FromResult(ModConfigEditor.SetEnabled(ProfileResolver.Resolve(profile.Profile), mod.Info!, enabled)),
+            ApplyConfig: (p, _) =>
+            {
+                if (profile.Profile.DataDir is { } data) ApplyModConfig(p, System.IO.Path.Combine(data, "ModConfig"), backups);
+                return Task.FromResult<IReadOnlyList<string>>([]);
+            });
+        return ApplyCoreAsync(pack, plan, target, mirror, applyConfig, progress, ct, confirmChanged);
+    }
+
+    /// <summary>
+    /// Применить план к серверу на другой машине: моды уходят агенту по одному (прежние версии остаются там же, для
+    /// отката), включение и выключение — тоже через агента. Настройки модов — по файлу через «Настройки модов»
+    /// агента: прежние версии сохраняются у него; передать можно только текстовые файлы — остальные в отчёте.
+    /// </summary>
+    public Task<PackImportResult> ApplyToRemoteAsync(PackFile pack, PackImportPlan plan, ModTarget target,
+        bool mirror, bool applyConfig, IProgress<string>? progress = null, CancellationToken ct = default,
+        Func<IReadOnlyList<string>, bool>? confirmChanged = null)
+    {
+        if (target.Remote is not { } code) throw new InvalidOperationException("not a remote target");
+        var pt = new PackTarget(
+            Install: async (file, c) =>
+            {
+                var outcome = await ModTargets.InstallAsync(target, file, ct: c).ConfigureAwait(false);
+                return outcome!.Text;
+            },
+            Scan: async c =>
+            {
+                var (_, mods) = await ModTargets.ScanAsync(target, c).ConfigureAwait(false);
+                return mods;
+            },
+            SetEnabled: async (mod, enabled, c) =>
+            {
+                if (mod.IsDisabled == !enabled) return false;
+                await ModTargets.SetEnabledAsync(target, mod, enabled, c).ConfigureAwait(false);
+                return true;
+            },
+            ApplyConfig: async (p, c) =>
+            {
+                var skipped = new List<string>();
+                var source = new RemoteModConfigSource(code);
+                foreach (var entry in p.ConfigEntries)
+                {
+                    var rel = entry.FullName[PackManifest.ConfigFolder.Length..];
+                    if (ModConfigs.KindOf(rel) is null)
+                    {
+                        skipped.Add(Loc.T("pack.configNotText", rel));
+                        continue;
+                    }
+                    string text;
+                    using (var reader = new StreamReader(entry.Open())) text = await reader.ReadToEndAsync(c).ConfigureAwait(false);
+                    try
+                    {
+                        await source.SaveAsync(new ModConfigSaveRequest(rel, text, null), c).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or IOException)
+                    {
+                        skipped.Add($"{rel}: {ex.Message}");
+                    }
+                }
+                return skipped;
+            });
+        return ApplyCoreAsync(pack, plan, pt, mirror, applyConfig, progress, ct, confirmChanged);
+    }
+
+    /// <summary>
+    /// Общая часть. Сначала все моды извлекаются или скачиваются и проверяются — цель до этого не меняется:
     /// в архиве должен быть тот мод и та версия, что в описании пака, и файл — тот же, что был у автора пака.
     /// Не тот мод или испорченный вложенный файл — пункт пропускается. Файл с модбазы, перезалитый автором мода, —
     /// решает <paramref name="confirmChanged"/> (список «имя версия»; null или false — такие пункты пропускаются).
     /// Отчёт — по тому, что реально установлено.
     /// </summary>
-    public async Task<PackImportResult> ApplyAsync(PackFile pack, PackImportPlan plan, ResolvedProfile profile,
-        bool mirror, bool applyConfig, ModBackupStore backups, IProgress<string>? progress = null, CancellationToken ct = default,
-        Func<IReadOnlyList<string>, bool>? confirmChanged = null)
+    private async Task<PackImportResult> ApplyCoreAsync(PackFile pack, PackImportPlan plan, PackTarget target,
+        bool mirror, bool applyConfig, IProgress<string>? progress, CancellationToken ct,
+        Func<IReadOnlyList<string>, bool>? confirmChanged)
     {
         var done = new List<string>();
         var problems = new List<string>();
@@ -145,7 +246,7 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
 
         try
         {
-            // ---- 1. получить и проверить всё — профиль пока не трогаем
+            // ---- 1. получить и проверить всё — цель пока не трогаем
             var ready = new List<(PackItemPlan Item, string File, ModInfo Info)>();
             var changed = new List<(PackItemPlan Item, string File, ModInfo Info)>();
             foreach (var item in plan.Items.Where(i => i.Action is not (PackItemAction.Same or PackItemAction.Duplicate)))
@@ -195,12 +296,15 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
                 progress?.Report(Loc.T("pack.installing", info.Name, info.Version));
                 try
                 {
-                    var installPlan = ModInstaller.Plan(file, profile, ModUpdateService.ScanLocal(profile));
-                    ModInstaller.Apply(installPlan, backups);
-                    var old = installPlan.Replaces.FirstOrDefault()?.Info?.Version;
-                    done.Add(old is null ? $"{info.Name} {info.Version}" : $"{info.Name}: {old} → {info.Version}");
+                    done.Add(await target.Install(file, ct).ConfigureAwait(false));
+                    if (KeepInstalledIn is { } keep)
+                    {
+                        var dir = Directory.CreateDirectory(System.IO.Path.Combine(keep, info.ModId)).FullName;
+                        File.Copy(file, System.IO.Path.Combine(dir, System.IO.Path.GetFileName(file)), overwrite: true);
+                    }
                 }
-                catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException)
+                catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException
+                                               or HttpRequestException)
                 {
                     problems.Add($"{info.Name}: {ex.Message}");
                 }
@@ -209,20 +313,21 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
                 problems.Add(Loc.T("pack.duplicate", dup.Mod.Name, dup.Mod.Version));
 
             // включено/выключено — как в паке; при зеркалировании лишние выключаются
-            var fresh = ProfileResolver.Resolve(profile.Profile);
-            if (fresh.ConfigPath is not null)
+            var mods = await target.Scan(ct).ConfigureAwait(false);
+            if (mods is not null)
             {
-                var now = ModUpdateService.ScanLocal(fresh).Where(l => l.Info is not null)
+                var now = mods.Where(l => l.Info is not null)
                     .GroupBy(l => l.Info!.ModId, StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
                 // повторяющаяся запись не переопределяет первую
                 foreach (var m in plan.Manifest.Mods.DistinctBy(m => m.ModId, StringComparer.OrdinalIgnoreCase))
                     if (now.TryGetValue(m.ModId, out var local))
-                        ModConfigEditor.SetEnabled(fresh, local.Info!, m.Enabled);
+                        await target.SetEnabled(local, m.Enabled, ct).ConfigureAwait(false);
                 if (mirror)
                 {
                     foreach (var extra in plan.NotInPack)
-                        if (extra.Info is not null && ModConfigEditor.SetEnabled(fresh, extra.Info, enabled: false))
+                        if (extra.Info is not null && now.TryGetValue(extra.Info.ModId, out var current)
+                            && await target.SetEnabled(current, false, ct).ConfigureAwait(false))
                             done.Add(Loc.T("pack.disabledExtra", extra.Info.Name));
                 }
             }
@@ -231,10 +336,10 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
                 problems.Add(Loc.T("pack.noConfigForToggles"));
             }
 
-            if (applyConfig && plan.Manifest.IncludesModConfig && profile.Profile.DataDir is { } data)
+            if (applyConfig && plan.Manifest.IncludesModConfig)
             {
                 progress?.Report(Loc.T("pack.applyingConfig"));
-                ApplyModConfig(pack, System.IO.Path.Combine(data, "ModConfig"), backups);
+                problems.AddRange(await target.ApplyConfig(pack, ct).ConfigureAwait(false));
                 done.Add(Loc.T("pack.configApplied"));
             }
         }

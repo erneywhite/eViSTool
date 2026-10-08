@@ -202,6 +202,7 @@ public static partial class ModConfigs
         if (file.Kind == ModConfigKind.Json && JsonError(text) is { } error) throw new InvalidDataException(error);
         var bom = File.Exists(file.Path) && HasBom(file.Path);
         if (File.Exists(file.Path)) backups.Keep(file.Path, file.RelativePath);
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(file.Path)!); // файла (и папки) ещё может не быть
         var tmp = file.Path + ".evistool.tmp";
         File.WriteAllText(tmp, text, new UTF8Encoding(bom));
         File.Move(tmp, file.Path, overwrite: true);

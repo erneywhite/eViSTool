@@ -259,12 +259,13 @@
                                 <TextBlock Text="{local:Tr mods.addShort}" />
                             </StackPanel>
                         </Button>
+                        <!-- у удалённого сервера — только импорт: сборка пака читает файлы модов на месте -->
                         <Button Margin="8,0,0,0" Click="PackMenu_Click" ToolTip="{local:Tr pack.menuTip}"
-                                IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}"
-                                Visibility="{Binding IsLocalProfile, Converter={StaticResource BoolToVis}}">
+                                IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}">
                             <Button.ContextMenu>
                                 <ContextMenu>
-                                    <MenuItem Header="{local:Tr pack.export}" Command="{Binding ExportPackCommand}" />
+                                    <MenuItem Header="{local:Tr pack.export}" Command="{Binding ExportPackCommand}"
+                                              Visibility="{Binding IsLocalProfile, Converter={StaticResource BoolToVis}}" />
                                     <MenuItem Header="{local:Tr pack.import}" Command="{Binding ImportPackCommand}" />
                                 </ContextMenu>
                             </Button.ContextMenu>

@@ -469,6 +469,84 @@ public sealed class AgentTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task RemotePackImport_ThroughTheAgent()
+    {
+        var mods = Path.Combine(_profile.DataDir!, "Mods");
+        File.WriteAllText(Path.Combine(_profile.DataDir!, "serverconfig.json"),
+            "{ \"ModPaths\": [\"Mods\", " + Newtonsoft.Json.JsonConvert.ToString(mods) + "], \"WorldConfig\": { \"DisabledMods\": [] } }");
+        MakeModZip(mods, "carryon_1.0.0.zip", "CarryOn", "1.0.0");
+        MakeModZip(mods, "other_2.0.0.zip", "other", "2.0.0");
+
+        // пак: новая версия CarryOn, новый мод (выключенный) и настройки модов — текст и картинка
+        var src = Path.Combine(_tmp, "packsrc");
+        var carry = MakeModZip(src, "carryon_1.1.0.zip", "CarryOn", "1.1.0");
+        var fresh = MakeModZip(src, "fresh_1.0.0.zip", "fresh", "1.0.0");
+        var packPath = Path.Combine(_tmp, "test.evpack");
+        using (var zip = System.IO.Compression.ZipFile.Open(packPath, System.IO.Compression.ZipArchiveMode.Create))
+        {
+            System.IO.Compression.ZipFileExtensions.CreateEntryFromFile(zip, carry, eViSTool.Core.Packs.PackManifest.ModsFolder + "carryon_1.1.0.zip");
+            System.IO.Compression.ZipFileExtensions.CreateEntryFromFile(zip, fresh, eViSTool.Core.Packs.PackManifest.ModsFolder + "fresh_1.0.0.zip");
+            using (var w = new StreamWriter(zip.CreateEntry(eViSTool.Core.Packs.PackManifest.ConfigFolder + "CarryOnConfig.json").Open()))
+                w.Write("{ \"Speed\": 2.0 }");
+            using (var w = zip.CreateEntry(eViSTool.Core.Packs.PackManifest.ConfigFolder + "icon.png").Open()) w.Write([1, 2, 3]);
+            var manifest = new eViSTool.Core.Packs.PackManifest
+            {
+                Name = "remote", IncludesModConfig = true, Kind = ProfileKind.Server,
+                Mods =
+                [
+                    new() { ModId = "carryon", Name = "CarryOn", Version = "1.1.0", FileName = "carryon_1.1.0.zip", Bundled = true,
+                            Sha256 = eViSTool.Core.Packs.PackBuilder.Sha256Of(carry) },
+                    new() { ModId = "fresh", Name = "fresh", Version = "1.0.0", FileName = "fresh_1.0.0.zip", Bundled = true, Enabled = false,
+                            Sha256 = eViSTool.Core.Packs.PackBuilder.Sha256Of(fresh) },
+                ],
+            };
+            using var mw = new StreamWriter(zip.CreateEntry(eViSTool.Core.Packs.PackManifest.FileName).Open());
+            mw.Write(Newtonsoft.Json.JsonConvert.SerializeObject(manifest));
+        }
+
+        var remote = eViSTool.Core.Server.Remote.RemoteAccess.Enable(_profile.Id, AgentsDir);
+        string fingerprint;
+        using (var cert = eViSTool.Core.Server.Remote.RemoteAccess.EnsureCertificate(_profile.Id, AgentsDir))
+            fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
+        _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
+        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
+        var code = new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint);
+        var target = new ModTarget(new GameProfile { Id = "remote-pack", Name = "Remote", Kind = ProfileKind.Server }, code);
+        var appData = Path.Combine(Path.GetDirectoryName(AgentExe)!, "data");
+        try
+        {
+            using var pack = eViSTool.Core.Packs.PackFile.Open(packPath);
+            var (resolved, locals) = await ModTargets.ScanAsync(target);
+            var plan = eViSTool.Core.Packs.PackImporter.Plan(pack.Manifest, resolved, locals);
+            using var db = new eViSTool.Core.ModDb.ModDbClient();
+            var importer = new eViSTool.Core.Packs.PackImporter(db, new ModUpdater(db, Path.Combine(_tmp, "dl")));
+
+            var result = await importer.ApplyToRemoteAsync(pack, plan, target, mirror: true, applyConfig: true);
+
+            // моды доехали на сервер, старая версия — в хранилище там же
+            Assert.True(File.Exists(Path.Combine(mods, "carryon_1.1.0.zip")));
+            Assert.False(File.Exists(Path.Combine(mods, "carryon_1.0.0.zip")));
+            Assert.True(File.Exists(Path.Combine(mods, "fresh_1.0.0.zip")));
+            // включение — как в паке, лишний «other» при зеркалировании выключен
+            var list = await ModTargets.ScanAsync(target);
+            var disabled = list.Profile.DisabledMods;
+            Assert.Contains("fresh", disabled);
+            Assert.Contains("other", disabled);
+            Assert.DoesNotContain("CarryOn", disabled);
+            Assert.Contains(result.Done, d => d.Contains("other"));
+            // настройки: текст — на сервере, картинка — нет, о ней строка в отчёте
+            Assert.Equal("{ \"Speed\": 2.0 }", File.ReadAllText(Path.Combine(_profile.DataDir!, "ModConfig", "CarryOnConfig.json")));
+            Assert.False(File.Exists(Path.Combine(_profile.DataDir!, "ModConfig", "icon.png")));
+            Assert.Contains(result.Problems, p => p.Contains("icon.png"));
+        }
+        finally
+        {
+            try { Directory.Delete(Path.Combine(appData, "ModBackups", _profile.Id), recursive: true); } catch (IOException) { }
+            try { Directory.Delete(Path.Combine(appData, "ModConfigBackups", _profile.Id), recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
     public async Task RemoteModConfigs_ReadSaveUndoReset_ThroughTheAgent()
     {
         var mods = Path.Combine(_profile.DataDir!, "Mods");
