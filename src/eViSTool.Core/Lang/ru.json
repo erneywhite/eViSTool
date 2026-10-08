@@ -869,6 +869,7 @@
   "players.issuedBy": "выдал {0}",
   "players.kick": "Выгнать",
   "players.kickConfirm": "Выгнать {0} с сервера?",
+  "players.kickTip": "Только для игрока, который сейчас в игре.",
   "players.lastJoin": "заходил {0}",
   "players.listHint": "Все, кто заходил на сервер; недавние выше.",
   "players.listTitle": "Игроки",

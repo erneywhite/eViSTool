@@ -48,7 +48,16 @@ public sealed partial class PlayerRowViewModel : ObservableObject
     /// <summary>«Бан до 09.10.2026 17:54 · griefing (Console)».</summary>
     public string BanText => Player.Ban is not { } ban ? "" : ServerPlayersViewModel.BanLine(ban);
 
-    partial void OnIsOnlineChanged(bool value) => OnPropertyChanged(nameof(SeenText));
+    /// <summary>Выгнать можно того, кто сейчас в игре, и только командой работающего сервера.</summary>
+    public bool CanKick => IsOnline && _owner.CanCommand;
+
+    internal void OnOwnerModeChanged() => OnPropertyChanged(nameof(CanKick));
+
+    partial void OnIsOnlineChanged(bool value)
+    {
+        OnPropertyChanged(nameof(SeenText));
+        OnPropertyChanged(nameof(CanKick));
+    }
 
     partial void OnRoleChanged(ServerRole? oldValue, ServerRole? newValue)
     {
@@ -158,6 +167,7 @@ public sealed partial class ServerPlayersViewModel : ObservableObject
         OnPropertyChanged(nameof(CanEdit));
         OnPropertyChanged(nameof(CanCommand));
         OnPropertyChanged(nameof(ModeText));
+        foreach (var p in Players) p.OnOwnerModeChanged();
     }
 
     /// <summary>Состояние сервера сменилось (запущен, остановлен, связь) — способ правки другой.</summary>

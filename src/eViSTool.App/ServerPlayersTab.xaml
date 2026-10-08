@@ -139,19 +139,21 @@
                                             <Button Style="{StaticResource Action}" Content="{local:Tr players.charsel}" ToolTip="{local:Tr players.charselTip}"
                                                     Command="{Binding DataContext.AllowCharSelCommand, ElementName=PlayersList}" CommandParameter="{Binding}"
                                                     IsEnabled="{Binding DataContext.CanCommand, ElementName=PlayersList}" Margin="22,0,0,0" />
-                                            <Button Style="{StaticResource Action}" Content="{local:Tr players.kick}"
+                                            <Button Style="{StaticResource Action}" Content="{local:Tr players.kick}" ToolTip="{local:Tr players.kickTip}"
                                                     Command="{Binding DataContext.KickCommand, ElementName=PlayersList}" CommandParameter="{Binding}"
-                                                    Visibility="{Binding IsOnline, Converter={StaticResource BoolToVis}}"
-                                                    IsEnabled="{Binding DataContext.CanCommand, ElementName=PlayersList}" />
-                                            <Button Style="{StaticResource Action}" Content="{local:Tr players.ban}" Foreground="{StaticResource Forest.Danger}"
-                                                    ToolTip="{local:Tr players.banTip}"
-                                                    Command="{Binding DataContext.BanCommand, ElementName=PlayersList}" CommandParameter="{Binding}"
-                                                    Visibility="{Binding IsBanned, Converter={StaticResource InvertVis}}"
-                                                    IsEnabled="{Binding DataContext.CanCommand, ElementName=PlayersList}" />
-                                            <Button Style="{StaticResource Action}" Content="{local:Tr players.unban}"
-                                                    Command="{Binding DataContext.UnbanCommand, ElementName=PlayersList}" CommandParameter="{Binding}"
-                                                    Visibility="{Binding IsBanned, Converter={StaticResource BoolToVis}}"
-                                                    IsEnabled="{Binding DataContext.CanEdit, ElementName=PlayersList}" />
+                                                    IsEnabled="{Binding CanKick}" />
+                                            <!-- «Забанить…» и «Разбанить» в одной ячейке постоянной ширины, чтобы строки не съезжали -->
+                                            <Grid Width="78" Margin="14,0,0,0">
+                                                <Button Style="{StaticResource Action}" Content="{local:Tr players.ban}" Foreground="{StaticResource Forest.Danger}"
+                                                        ToolTip="{local:Tr players.banTip}" Margin="0" HorizontalAlignment="Left"
+                                                        Command="{Binding DataContext.BanCommand, ElementName=PlayersList}" CommandParameter="{Binding}"
+                                                        Visibility="{Binding IsBanned, Converter={StaticResource InvertVis}}"
+                                                        IsEnabled="{Binding DataContext.CanCommand, ElementName=PlayersList}" />
+                                                <Button Style="{StaticResource Action}" Content="{local:Tr players.unban}" Margin="0" HorizontalAlignment="Left"
+                                                        Command="{Binding DataContext.UnbanCommand, ElementName=PlayersList}" CommandParameter="{Binding}"
+                                                        Visibility="{Binding IsBanned, Converter={StaticResource BoolToVis}}"
+                                                        IsEnabled="{Binding DataContext.CanEdit, ElementName=PlayersList}" />
+                                            </Grid>
                                         </StackPanel>
                                         <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
                                             <StackPanel Orientation="Horizontal">

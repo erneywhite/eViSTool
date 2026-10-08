@@ -869,6 +869,7 @@
   "players.issuedBy": "by {0}",
   "players.kick": "Kick",
   "players.kickConfirm": "Kick {0} from the server?",
+  "players.kickTip": "Only for a player who is in game now.",
   "players.lastJoin": "last joined {0}",
   "players.listHint": "Everyone who has joined the server; recent first.",
   "players.listTitle": "Players",

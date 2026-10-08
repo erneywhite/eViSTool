@@ -146,6 +146,8 @@ that is already installed, eViSTool asks before replacing. **Delete** moves the 
 **Modpacks.** **Modpack → Create modpack…** saves your set as one `.evpack` file: either a list of ModDB mods
 (small, the mods are downloaded on import) or with the mod files inside, optionally with mod settings (`ModConfig`).
 **Import modpack…** shows what will be installed, updated or disabled before changing anything.
+Import works for a server on another computer too. Afterwards eViSTool offers to put the same mods into linked profiles,
+like **Also install into**.
 
 The list refreshes by itself when mods change outside the window — in another eViSTool window or by copying files by hand.
 
@@ -249,15 +251,30 @@ so changes can be saved only while it is stopped. A copy of the previous file st
   and the `ModData` folder) is packed with every backup and restored together with the world.
 - **Scheduled restarts** every N hours of uptime or at set times of day, with chat warnings
   (10 and 5 minutes before, then every minute) and, if you like, a fresh backup right before the restart.
+  With **Update mods on restart** on, the agent installs released mod updates while the server is stopped.
+  Pinned mods and skipped versions are left alone, and what was updated is written to the console.
 
 ![Schedule](docs/screenshots/schedule.png)
+
+**Players.** Everyone who has joined the server, with search and last join time; whoever is in game now has a dot.
+Here you set the role, whitelist, ban with duration and reason, **Kick** and **Class and look**: the player may change
+class and appearance once, and if they are in game, they get a chat message saying to type `.charsel`.
+At the top: a **Whitelist only** switch and adding by name (works for those who have never joined too);
+at the bottom: the full whitelist and bans.
+
+![Players](docs/screenshots/players.png)
+
+While the server runs, changes go to it as commands: you see them in the console, and the server's reply shows in the tab.
+On a stopped server eViSTool edits the server files. A new player can be added by name only while the server runs:
+only the server can look a player up by name. Since 1.20 a dedicated server lets in only whitelisted players by default,
+so you will most likely need to add your friends there.
 
 **Server mods** opens **My mods** for the server profile — the same table, catalog and updates as for the game.
 
 ## Remote management
 
 Manage a server on another computer — a home PC, a spare laptop, a rented machine — as if it were here:
-console, start and stop, configuration, schedule, backups and the server's mods. One string, the **connection code**,
+console, start and stop, configuration, schedule, backups, players and the server's mods. One string, the **connection code**,
 carries everything needed: address, port, key and the server's certificate. There is nothing to configure by hand.
 
 ![Remote access](docs/screenshots/remote.png)
@@ -282,8 +299,7 @@ Good to know:
   There is no service and no autostart.
 - Changes show up in both windows by themselves. A mod disabled from your PC appears disabled on the server computer
   within seconds, and the other way round. The same goes for the schedule and the configuration.
-- Mods are installed on the server over the connection: from a zip, from the catalog, as updates.
-  Modpacks are imported on the server computer itself.
+- Mods are installed on the server over the connection: from a zip, from the catalog, as updates and from modpacks.
 - Keep eViSTool updated on both computers. An agent of an older version is replaced by itself while the server is stopped;
   until then a note says so.
 
