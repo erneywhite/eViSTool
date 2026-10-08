@@ -58,6 +58,29 @@ public sealed record ServerAutomation
     /// <summary>Перед перезапуском по расписанию сделать резервную копию мира: перезапуск пройдёт неудачно — копия под рукой.</summary>
     public bool RestartBackup { get; init; } = true;
 
+    // ---- обновление модов при перезапуске
+
+    /// <summary>
+    /// При перезапуске по расписанию, пока сервер остановлен, поставить вышедшие обновления модов (под версию игры
+    /// сервера). По умолчанию выключено: кто-то держит набор модов неизменным нарочно.
+    /// </summary>
+    public bool RestartUpdateMods { get; init; }
+
+    /// <summary>
+    /// Пожелания к версиям модов из окна (закреплённые моды, пропущенные версии) и «предлагать пре-релизы» — агент
+    /// настроек окна не видит, поэтому окно кладёт их сюда, когда сохраняет расписание или меняет закрепления.
+    /// </summary>
+    [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public Dictionary<string, string> UpdatePinned { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+
+    [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public Dictionary<string, List<string>> UpdateBlocked { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public bool UpdateAllowUnstable { get; init; }
+
+    [JsonIgnore]
+    public Mods.ModPolicy UpdatePolicy => new(UpdatePinned, UpdateBlocked);
+
     /// <summary>Сколько ждать копию перед перезапуском; не успела — перезапуск идёт без неё.</summary>
     public static readonly TimeSpan RestartBackupWait = TimeSpan.FromMinutes(10);
 

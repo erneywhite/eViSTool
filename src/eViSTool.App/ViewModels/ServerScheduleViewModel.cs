@@ -52,6 +52,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     private bool _statusSeen; // первый статус после смены профиля — точка отсчёта для отметки изменения настроек
     private DateTime? _nextBackupAt;
     private bool _awaitingBackup; // копию запросили кнопкой, ждём сообщения агента о ней
+    private GameProfile? _profile;  // закрепления и пропуски версий — агенту для обновления модов при перезапуске
 
     public ServerScheduleViewModel(ServerViewModel server) => _server = server;
 
@@ -67,6 +68,9 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     [ObservableProperty] private string _restartTimesText = "05:00";
     [ObservableProperty] private string _restartWarnText = "10, 5, 4, 3, 2, 1";
     [ObservableProperty] private bool _restartBackup = true;
+
+    /// <summary>При перезапуске по расписанию ставить вышедшие обновления модов (пока сервер остановлен).</summary>
+    [ObservableProperty] private bool _restartUpdateMods;
     [ObservableProperty] private string _restartError = "";
     [ObservableProperty] private string _nextRestartText = "";
     private DateTime? _nextRestartAt;
@@ -95,6 +99,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     /// </summary>
     public void OnProfileSwitched(GameProfile? profile, Func<AgentClient?> remoteClient)
     {
+        _profile = profile;
         var key = profile is null ? null : profile.IsRemote ? "remote:" + profile.Id : profile.Id + "|" + profile.DataDir;
         if (key == _profileKey)
         {
@@ -145,6 +150,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
             _saved = settings;
             Apply(settings);
             _loaded = true;
+            SyncPolicy(); // закрепления меняли, пока агент о них не знал, — отдать ему свежие
             if (_active) await RefreshListAsync();
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or IOException or TaskCanceledException
@@ -173,6 +179,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
             RestartTimesText = string.Join(", ", settings.RestartTimes);
             RestartWarnText = string.Join(", ", settings.RestartWarnMinutes);
             RestartBackup = settings.RestartBackup;
+            RestartUpdateMods = settings.RestartUpdateMods;
             RestartError = "";
             IntervalError = KeepError = "";
         }
@@ -257,6 +264,27 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     partial void OnRestartTimesTextChanged(string value) => SaveSettings();
     partial void OnRestartWarnTextChanged(string value) => SaveSettings();
     partial void OnRestartBackupChanged(bool value) => SaveSettings();
+    partial void OnRestartUpdateModsChanged(bool value) => SaveSettings();
+
+    /// <summary>
+    /// Закреплённые моды, пропущенные версии и «предлагать пре-релизы» — в настройки агента: обновляя моды при перезапуске,
+    /// он должен их соблюдать, а настроек окна не видит. Вызывать, когда они поменялись (и после чтения настроек).
+    /// </summary>
+    public void SyncPolicy()
+    {
+        if (!_loaded || _data is not { } data) return;
+        var fresh = WithPolicy(_saved);
+        if (Same(fresh, _saved)) return;
+        _saved = fresh;
+        _ = SaveAsync(data, fresh);
+    }
+
+    private ServerAutomation WithPolicy(ServerAutomation a) => _profile is not { } p ? a : a with
+    {
+        UpdatePinned = new(p.PinnedMods, StringComparer.OrdinalIgnoreCase),
+        UpdateBlocked = p.BlockedVersions.ToDictionary(kv => kv.Key, kv => kv.Value.ToList(), StringComparer.OrdinalIgnoreCase),
+        UpdateAllowUnstable = _server.AllowUnstable,
+    };
 
     partial void OnRestartModeChanged(RestartMode value)
     {
@@ -301,7 +329,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         }
         if (!intervalOk || !keepOk || RestartError.Length > 0) return;
 
-        _saved = _saved with
+        _saved = WithPolicy(_saved) with
         {
             BackupEnabled = BackupEnabled,
             BackupIntervalHours = hours,
@@ -313,6 +341,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
             RestartTimes = times,
             RestartWarnMinutes = warns,
             RestartBackup = RestartBackup,
+            RestartUpdateMods = RestartUpdateMods,
         };
         _ = SaveAsync(data, _saved);
         UpdateTexts();

@@ -45,6 +45,9 @@ public sealed partial class ServerViewModel : ObservableObject
 
     /// <summary>Расписание: резервные копии (и рестарты) — третий вид раздела.</summary>
     public ServerScheduleViewModel Schedule { get; }
+
+    /// <summary>«Предлагать пре-релизы» — для обновления модов сервера при перезапуске.</summary>
+    internal bool AllowUnstable => _main.AllowUnstable;
     public ServerRemoteViewModel Remote { get; } = new();
 
     /// <summary>Какой вид раздела открыт. Консоль продолжает получать строки при любом.</summary>

@@ -534,6 +534,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         _settings.AllowUnstable = value;
         Save();
+        Server?.Schedule.SyncPolicy(); // агент обновляет моды сервера при перезапуске — с тем же правилом
         Mods.ReloadLocal();
     }
 
@@ -558,7 +559,13 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     /// <summary>Сохранить настройки (например, после закрепления версии мода).</summary>
-    public void SaveSettings() => Save();
+    /// <summary>Сохранить настройки (из «Моих модов»: закрепления, пропуски версий) — и отдать их агенту сервера:
+    /// он соблюдает их, обновляя моды при перезапуске (не поменялись — ничего не шлётся).</summary>
+    public void SaveSettings()
+    {
+        Save();
+        Server?.Schedule.SyncPolicy();
+    }
 
     private void Save()
     {

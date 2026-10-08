@@ -181,7 +181,36 @@ async Task RestartBySchedule()
     {
         // не дошло объявление — перезапуску это не мешает
     }
-    _ = host.RestartAsync();
+    _ = automation.RestartUpdateMods ? RestartWithModUpdatesAsync() : host.RestartAsync();
+}
+
+// Перезапуск с обновлением модов: остановить → поставить вышедшие обновления (сервер не держит файлы) → запустить.
+// Модбаза недоступна или что-то не встало — сервер всё равно поднимается, итог — в консоли.
+async Task RestartWithModUpdatesAsync()
+{
+    await host.StopAsync();
+    host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("autoupd.checking"));
+    try
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        using var db = new eViSTool.Core.ModDb.ModDbClient();
+        var result = await mods.UpdateAllAsync(automation.UpdatePolicy, automation.UpdateAllowUnstable,
+            new eViSTool.Core.Mods.ModUpdater(db), db, cts.Token);
+        foreach (var line in result.Updated)
+            host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("autoupd.updated", line));
+        foreach (var line in result.Skipped)
+            host.Console.Add(ConsoleLineKind.System, line);
+        foreach (var line in result.Failed)
+            host.Console.Add(ConsoleLineKind.Error, eViSTool.Core.Localization.Loc.T("autoupd.failed", line));
+        if (result.Updated.Count + result.Skipped.Count + result.Failed.Count == 0)
+            host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("autoupd.none"));
+    }
+    catch (Exception ex) when (ex is IOException or InvalidOperationException or HttpRequestException or TaskCanceledException
+                                   or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
+    {
+        host.Console.Add(ConsoleLineKind.Error, eViSTool.Core.Localization.Loc.T("autoupd.error", ex.Message));
+    }
+    await host.StartAsync();
 }
 
 host.Console.LineAdded += line =>
