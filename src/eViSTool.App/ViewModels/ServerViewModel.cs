@@ -14,7 +14,7 @@ using eViSTool.Core.Server.Remote;
 namespace eViSTool.App.ViewModels;
 
 /// <summary>Виды раздела «Сервер».</summary>
-public enum ServerTab { Console, Config, Schedule, Remote }
+public enum ServerTab { Console, Players, Config, Schedule, Remote }
 
 /// <summary>
 /// Вкладка «Сервер». Сервером владеет агент (отдельный процесс) — окно только показывает и командует,
@@ -29,6 +29,9 @@ public sealed partial class ServerViewModel : ObservableObject
 
     /// <summary>Связь с агентом удалённого сервера (null — профиль свой или связи нет): через неё вкладка модов работает с его модами.</summary>
     public AgentClient? RemoteClient => IsRemoteProfile ? _client : null;
+
+    /// <summary>Связь с агентом сервера профиля (своего или удалённого); null — агента нет.</summary>
+    internal AgentClient? Client => _client;
 
     /// <summary>Сервер запущен или запускается (по последнему статусу агента).</summary>
     public bool IsServerUp => AgentRunning && State != ServerState.Stopped;
@@ -50,10 +53,14 @@ public sealed partial class ServerViewModel : ObservableObject
     internal bool AllowUnstable => _main.AllowUnstable;
     public ServerRemoteViewModel Remote { get; } = new();
 
+    /// <summary>Игроки: роли, белый список, баны — второй вид раздела.</summary>
+    public ServerPlayersViewModel Players { get; }
+
     /// <summary>Какой вид раздела открыт. Консоль продолжает получать строки при любом.</summary>
     [ObservableProperty] private ServerTab _tab;
 
     public bool IsConsoleTab => Tab == ServerTab.Console;
+    public bool IsPlayersTab => Tab == ServerTab.Players;
     public bool IsConfigTab => Tab == ServerTab.Config;
     public bool IsScheduleTab => Tab == ServerTab.Schedule;
     public bool IsRemoteTab => Tab == ServerTab.Remote;
@@ -208,16 +215,19 @@ public sealed partial class ServerViewModel : ObservableObject
     {
         _main = main;
         Schedule = new ServerScheduleViewModel(this);
+        Players = new ServerPlayersViewModel(this);
     }
 
     partial void OnTabChanged(ServerTab value)
     {
         OnPropertyChanged(nameof(IsConsoleTab));
+        OnPropertyChanged(nameof(IsPlayersTab));
         OnPropertyChanged(nameof(IsConfigTab));
         OnPropertyChanged(nameof(IsScheduleTab));
         OnPropertyChanged(nameof(IsRemoteTab));
         Config.SetActive(value == ServerTab.Config);
         Schedule.SetActive(value == ServerTab.Schedule);
+        Players.SetActive(value == ServerTab.Players);
         if (value != ServerTab.Remote) Remote.Hide(); // ушли с вкладки — код подключения снова закрыт
     }
 
@@ -250,6 +260,7 @@ public sealed partial class ServerViewModel : ObservableObject
             _ => (Loc.T("server.stateStopped"), RowTone.Muted),
         };
         PushServerState();
+        Players?.OnServerStateChanged();
     }
 
     /// <summary>
@@ -270,6 +281,7 @@ public sealed partial class ServerViewModel : ObservableObject
         Config.OnLanguageChanged();
         Schedule.OnLanguageChanged();
         Remote.OnLanguageChanged();
+        Players.OnLanguageChanged();
     }
 
     /// <summary>Сменился профиль: отключиться от старого агента, подключиться к агенту нового (если он работает).</summary>
@@ -312,6 +324,7 @@ public sealed partial class ServerViewModel : ObservableObject
             _main.ActiveProfile?.Model.GameDir, IsRemoteProfile ? _main.ActiveProfile?.Model : null, () => _client);
         Schedule.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model : null, () => _client);
         Remote.OnProfileSwitched(local ? _main.ActiveProfile?.Model : null);
+        Players.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model : null);
         if (!IsServerProfile) return;
 
         _session = new CancellationTokenSource();
@@ -367,6 +380,7 @@ public sealed partial class ServerViewModel : ObservableObject
 
             _stateKnown = true;
             PushServerState();
+            Players.PollLocal(); // файлы игроков поменялись (сервер записал списки, правка в другом окне)
 
             try { await Task.Delay(1500, ct); } catch (TaskCanceledException) { return; }
         }
@@ -463,6 +477,7 @@ public sealed partial class ServerViewModel : ObservableObject
         ShowPlayers(s.Players, running: s.State == ServerState.Running);
         Schedule.ShowStatus(s);
         Remote.ShowStatus(s);
+        Players.ShowStatus(s);
         StateNote = s.RestartScheduledAt is { } at ? Loc.T("server.restartIn", Math.Max(0, (int)(at - DateTime.Now).TotalSeconds))
             : s.State == ServerState.Stopped && s.LastExitCode is { } code ? Loc.T("server.lastExit", code)
             : s.NextRestartAt is { } planned ? Loc.T("server.restartPlanned", planned.ToString("HH:mm"))
@@ -476,6 +491,7 @@ public sealed partial class ServerViewModel : ObservableObject
         ShowPlayers([], running: false);
         Schedule?.ShowStatus(null);
         Remote?.ShowStatus(null);
+        Players?.ShowStatus(null);
     }
 
     // ---------- игроки на сервере ----------
@@ -525,6 +541,7 @@ public sealed partial class ServerViewModel : ObservableObject
                 var first = Lines.Count == 0; // подхватили агента — сразу к последним строкам
                 foreach (var l in lines) Lines.Add(new ConsoleLineViewModel(l));
                 _lastSeq = lines[^1].Seq;
+                Players.OnConsoleLines(lines); // ответ сервера на команду вкладки «Игроки»
                 while (Lines.Count > MaxLines) Lines.RemoveAt(0);
                 LinesAppended?.Invoke(first);
             }

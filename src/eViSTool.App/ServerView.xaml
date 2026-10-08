@@ -93,6 +93,9 @@
                 <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr srvcfg.modeConsole}"
                              IsChecked="{Binding Tab, Converter={StaticResource EnumEq}, ConverterParameter=Console}"
                              AutomationProperties.AutomationId="SrvTabConsole" />
+                <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr players.tab}"
+                             IsChecked="{Binding Tab, Converter={StaticResource EnumEq}, ConverterParameter=Players}"
+                             AutomationProperties.AutomationId="SrvTabPlayers" />
                 <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15"
                              IsChecked="{Binding Tab, Converter={StaticResource EnumEq}, ConverterParameter=Config}"
                              AutomationProperties.Name="{local:Tr srvcfg.modeConfig}" AutomationProperties.AutomationId="SrvTabConfig">
@@ -187,6 +190,11 @@
             <!-- ===== конфигурация (вместо плиток и консоли) ===== -->
             <Grid Visibility="{Binding IsConfigTab, Converter={StaticResource BoolToVis}}">
                 <local:ServerConfigView DataContext="{Binding Config}" />
+            </Grid>
+
+            <!-- ===== игроки ===== -->
+            <Grid Visibility="{Binding IsPlayersTab, Converter={StaticResource BoolToVis}}">
+                <local:ServerPlayersTab DataContext="{Binding Players}" />
             </Grid>
 
             <!-- ===== удалённый доступ ===== -->
