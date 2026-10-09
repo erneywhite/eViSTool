@@ -280,16 +280,23 @@ public sealed class AgentCliTests : IAsyncLifetime
         using (var remote = AgentClient.ForRemote(code))
             Assert.Equal(client.Endpoint.Pid, (await remote.StatusAsync()).AgentPid);
 
-        // новый ключ: прежний код отказывают, новый — пускают
+        // новый ключ: прежний код отказывают, новый — пускают. Агент при этом перезапускает удалённый вход — на мгновение
+        // подключение отбивается («Connection refused»), окно в таком случае просто повторяет запрос; тест — тоже
         Assert.Equal(0, (await Cli("remote", "new-key")).Code);
         await Until(async () =>
         {
             using var old = AgentClient.ForRemote(code);
             try { await old.StatusAsync(); return false; }
             catch (InvalidOperationException ex) when (ex.Message.StartsWith("401")) { return true; }
+            catch (HttpRequestException) { return false; }
         });
-        using (var fresh = AgentClient.ForRemote(await CodeAsync()))
-            Assert.Equal(client.Endpoint.Pid, (await fresh.StatusAsync()).AgentPid);
+        var freshCode = await CodeAsync();
+        await Until(async () =>
+        {
+            using var fresh = AgentClient.ForRemote(freshCode);
+            try { return (await fresh.StatusAsync()).AgentPid == client.Endpoint.Pid; }
+            catch (HttpRequestException) { return false; }
+        });
 
         r = await Cli("remote", "disable");
         Assert.True(r.Code == 0, r.Out + r.Err);

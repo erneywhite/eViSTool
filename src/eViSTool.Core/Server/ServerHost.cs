@@ -142,6 +142,10 @@ public sealed class ServerHost : IAsyncDisposable
             ProcessStartInfo psi;
             try
             {
+                // тот же мир уже держит сервер, запущенный не нами (агент упал и оставил его, server.sh, другая программа) —
+                // второй сервер на те же файлы не запускаем; сторож при этой ошибке ждёт, пока мир освободится
+                if (Game.GameProcess.FindServers(null).FirstOrDefault(s => Game.GameProcess.SameDataPath(s.DataPath, _options.DataPath)) is { } foreign)
+                    throw new WorldBusyException(Loc.T("srv.foreignSameWorld", foreign.Pid));
                 CancelScheduledRestart();
                 if (!File.Exists(_options.ExePath))
                     throw new FileNotFoundException(Loc.T("srv.exeNotFound", _options.ExePath), _options.ExePath);

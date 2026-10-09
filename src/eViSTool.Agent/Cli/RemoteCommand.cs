@@ -73,7 +73,7 @@ internal static class RemoteCommand
         }
 
         if (AgentUser.AgentsDir(cli, write.Value) is not { } dir) return Commands.Failed;
-        var profile = string.IsNullOrWhiteSpace(cli.ProfileId) ? AgentArgs.DefaultProfile : cli.ProfileId;
+        var profile = cli.Profile; // ключ --profile, иначе agent.json, иначе «server» — как у самого агента
         try
         {
             return sub switch

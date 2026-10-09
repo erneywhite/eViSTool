@@ -76,6 +76,18 @@ var host = new ServerHost(new ServerHostOptions
     ExtraArgs = opts.ExtraArgs,
 }, new SharedConsoleCtrlC());
 
+// без окна (служба systemd, терминал) консоль сервера идёт ещё и в вывод агента — её видно в journalctl
+if (!cli.FromWindow)
+    host.Console.LineAdded += line =>
+    {
+        try
+        {
+            if (line.Kind == ConsoleLineKind.Error) Console.Error.WriteLine(line.Text);
+            else Console.Out.WriteLine(line.Kind == ConsoleLineKind.Input ? "> " + line.Text : line.Text);
+        }
+        catch (IOException) { } // вывод закрыт (агента отцепили от терминала) — консоль у окна от этого не страдает
+    };
+
 // кто на сервере — по строкам консоли; остановился или запускается заново — никого
 var players = new PlayerTracker();
 host.Console.LineAdded += line =>

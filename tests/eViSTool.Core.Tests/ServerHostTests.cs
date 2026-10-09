@@ -211,6 +211,39 @@ public sealed class ServerHostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Start_WhileAForeignServerHoldsTheSameWorld_IsRefused()
+    {
+        // «чужой» сервер на тот же мир: запущен мимо ServerHost (агент упал и оставил его, server.sh) — замка мира у него нет
+        var game = Directory.CreateDirectory(Path.Combine(_data, "game")).FullName;
+        var psi = ServerExecutable.StartInfo(FakeServer.InstallAs(game));
+        psi.ArgumentList.Add("--dataPath");
+        psi.ArgumentList.Add(_data);
+        psi.RedirectStandardInput = true;
+        psi.RedirectStandardOutput = true;
+        psi.UseShellExecute = false;
+        using var foreign = System.Diagnostics.Process.Start(psi)!;
+        try
+        {
+            var host = Host();
+            await Until(() => GameProcess.FindServers(null).Any(s => s.Pid == foreign.Id));
+            var ex = await Assert.ThrowsAsync<WorldBusyException>(host.StartAsync);
+            Assert.Contains(foreign.Id.ToString(), ex.Message);
+            Assert.Equal(ServerState.Stopped, host.State);
+            using (var probe = WorldLock.TryTake(_data, WorldLock.Copy)) Assert.NotNull(probe); // отказ не оставил мир занятым
+
+            foreign.Kill(entireProcessTree: true);
+            await foreign.WaitForExitAsync();
+            await host.StartAsync(); // чужой ушёл — запускается
+            await Until(() => host.State == ServerState.Running);
+            await host.StopAsync();
+        }
+        finally
+        {
+            if (!foreign.HasExited) foreign.Kill(entireProcessTree: true);
+        }
+    }
+
+    [Fact]
     public async Task RunningServer_HoldsTheWorld_UntilItExits()
     {
         var host = Host();

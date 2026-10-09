@@ -42,7 +42,7 @@ internal static class ControlCommand
         if (text.Length > 0 && !text.StartsWith('/')) text = "/" + text;
 
         if (AgentUser.AgentsDir(cli, write: false) is not { } dir) return Commands.Failed;
-        var profile = string.IsNullOrWhiteSpace(cli.ProfileId) ? AgentArgs.DefaultProfile : cli.ProfileId;
+        var profile = cli.Profile; // ключ --profile, иначе agent.json, иначе «server» — как у самого агента
         AgentClient? client;
         try
         {

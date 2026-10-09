@@ -120,7 +120,7 @@ internal static class ServiceCommand
         if (!CheckAccess(user, serverFile, dataDir, appDir, appData, agentExe)) return Commands.Failed;
         Warn(user, dataDir);
 
-        var profile = string.IsNullOrWhiteSpace(cli.ProfileId) ? AgentArgs.DefaultProfile : cli.ProfileId;
+        var profile = cli.Profile; // ключ --profile, иначе agent.json, иначе «server» — как у самого агента
         var agentsDir = cli.AgentsDir is { } dir ? Path.GetFullPath(dir) : Path.Combine(appData, "agents");
         var show = Show(unit);
         var mainPid = MainPid(show);
