@@ -1236,7 +1236,7 @@
   "remote.firewallFailed": "The firewall rule was not added.",
   "remote.firewallTip": "Adds an inbound rule for this port. Windows asks for administrator rights.",
   "remote.hide": "Hide",
-  "remote.hint": "Manage this server from another computer: console, start and stop, configuration, schedule, backups, players, announcements, notifications and the server’s mods. Works while eViSTool is open here or the server is running. The connection is encrypted and needs the connection code.",
+  "remote.hint": "Manage this server from another computer: console, start and stop, configuration, schedule, backups, players, statistics, announcements, notifications and the server’s mods. Works while eViSTool is open here or the server is running. The connection is encrypted and needs the connection code.",
   "remote.host": "Address of this computer",
   "remote.hostHint": "Goes into the connection code. Within your home network — its local address; from outside — your external IP or domain (and a port forwarded on the router).",
   "remote.listening": "▸ Remote access: accepting connections on port {0}",
