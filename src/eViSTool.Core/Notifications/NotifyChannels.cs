@@ -1,0 +1,91 @@
+using System.Security.Cryptography;
+using System.Text;
+using Newtonsoft.Json;
+
+namespace eViSTool.Core.Notifications;
+
+/// <summary>Куда слать оповещения.</summary>
+public enum NotifyKind { Telegram, Discord, Ntfy, Webhook }
+
+/// <summary>
+/// Канал оповещений (как в Uptime Kuma: настраивается один раз, потом включается у серверов). Секрет — токен бота,
+/// ссылка вебхука, тема ntfy — хранится зашифрованным (<see cref="NotifySecret"/>) и на экран не выводится.
+/// </summary>
+public sealed record NotifyChannel
+{
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
+    public string Name { get; init; } = "";
+    public NotifyKind Kind { get; init; }
+
+    /// <summary>Зашифрованный секрет: Telegram — токен бота, Discord и вебхук — адрес, ntfy — тема.</summary>
+    public string? SecretProtected { get; init; }
+
+    /// <summary>Telegram: ID чата (не секрет — без токена бота им не воспользоваться).</summary>
+    public string? ChatId { get; init; }
+
+    /// <summary>Подпись чата для людей: «@erney», «Наш сервер» — чтобы было видно, куда уходит.</summary>
+    public string? ChatTitle { get; init; }
+
+    [JsonIgnore] public string? Secret => NotifySecret.Unprotect(SecretProtected);
+    [JsonIgnore] public bool HasSecret => !string.IsNullOrEmpty(SecretProtected);
+}
+
+/// <summary>Сообщение оповещения: заголовок (что случилось) и подробности.</summary>
+public sealed record NotifyMessage(string Title, string Text);
+
+/// <summary>Каналы оповещений этого компьютера — файл в папке данных программы.</summary>
+public static class NotifyChannels
+{
+    public static string FileIn(string root) => Path.Combine(root, "notify-channels.json");
+
+    public static List<NotifyChannel> Load(string root)
+    {
+        try
+        {
+            var file = FileIn(root);
+            return File.Exists(file) ? JsonConvert.DeserializeObject<List<NotifyChannel>>(File.ReadAllText(file)) ?? [] : [];
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
+
+    public static void Save(string root, IEnumerable<NotifyChannel> channels)
+    {
+        var file = FileIn(root);
+        Directory.CreateDirectory(root);
+        var tmp = file + ".tmp";
+        File.WriteAllText(tmp, JsonConvert.SerializeObject(channels.ToList(), Formatting.Indented));
+        File.Move(tmp, file, overwrite: true);
+    }
+}
+
+/// <summary>
+/// Секреты оповещений зашифрованы средствами Windows (DPAPI, для текущего пользователя): скопированная или утёкшая папка
+/// данных их не раскроет. На другом компьютере (например, у агента сервера в виртуалке) секрет шифруется заново там.
+/// </summary>
+public static class NotifySecret
+{
+    private static readonly byte[] Entropy = "eViSTool notification secret"u8.ToArray();
+
+    public static string Protect(string secret)
+    {
+        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("DPAPI");
+        return Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(secret), Entropy, DataProtectionScope.CurrentUser));
+    }
+
+    /// <summary>null — не расшифровать (другой пользователь или компьютер) или пусто.</summary>
+    public static string? Unprotect(string? stored)
+    {
+        if (string.IsNullOrWhiteSpace(stored) || !OperatingSystem.IsWindows()) return null;
+        try
+        {
+            return Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(stored), Entropy, DataProtectionScope.CurrentUser));
+        }
+        catch (Exception ex) when (ex is CryptographicException or FormatException)
+        {
+            return null;
+        }
+    }
+}

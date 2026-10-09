@@ -107,6 +107,9 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Копии одиночных миров редактируемого профиля (только у игрового профиля).</summary>
     [ObservableProperty] private WorldCopiesViewModel? _worldCopies;
 
+    /// <summary>Каналы оповещений этого компьютера — карточка в «Настройках».</summary>
+    public NotifyChannelsViewModel Notify { get; } = new();
+
     partial void OnEditedProfileChanged(ProfileViewModel? value)
     {
         RefreshLinks();

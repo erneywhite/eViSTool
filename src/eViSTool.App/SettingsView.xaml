@@ -322,6 +322,64 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- каналы оповещений: настраиваются здесь один раз, у серверов включаются на вкладке «Оповещения» -->
+                    <Border Style="{StaticResource SettingsCard}" DataContext="{Binding Notify}">
+                        <StackPanel>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Command="{Binding AddTelegramCommand}" VerticalAlignment="Top" Margin="16,0,0,0"
+                                        AutomationProperties.AutomationId="NotifyAddTelegram">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Path Data="{StaticResource Icon.Plus}" Style="{StaticResource Forest.Icon}" Width="12" Height="12" Margin="0,0,7,0" />
+                                        <TextBlock Text="Telegram" />
+                                    </StackPanel>
+                                </Button>
+                                <StackPanel>
+                                    <TextBlock Text="{local:Tr notify.cardTitle}" Style="{StaticResource CardTitle}" />
+                                    <TextBlock Text="{local:Tr notify.cardHint}" Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </DockPanel>
+                            <TextBlock Text="{Binding StatusText}" FontSize="12" TextWrapping="Wrap" Margin="0,10,0,0"
+                                       Visibility="{Binding StatusText, Converter={StaticResource TextToVis}}" AutomationProperties.AutomationId="NotifyCardStatus">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource Forest.Accent}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding StatusIsError}" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource Forest.Danger}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{local:Tr notify.empty}" Style="{StaticResource Hint}" FontSize="12" Margin="0,12,0,0"
+                                       Visibility="{Binding HasChannels, Converter={StaticResource InvertVis}}" />
+                            <ItemsControl x:Name="NotifyList" ItemsSource="{Binding Channels}" Margin="0,6,0,0" Focusable="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Padding="0,9" Margin="0,4,0,0">
+                                            <DockPanel>
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Button Style="{StaticResource Forest.LinkButton}" Content="{local:Tr notify.test}" Margin="0,0,14,0"
+                                                            Command="{Binding DataContext.TestChannelCommand, ElementName=NotifyList}" CommandParameter="{Binding}" />
+                                                    <Button Style="{StaticResource Forest.LinkButton}" Content="{local:Tr notify.edit}" Margin="0,0,14,0"
+                                                            Command="{Binding DataContext.EditChannelCommand, ElementName=NotifyList}" CommandParameter="{Binding}" />
+                                                    <Button Style="{StaticResource Forest.LinkButton}" Content="{local:Tr notify.delete}" Foreground="{StaticResource Forest.Danger}"
+                                                            Command="{Binding DataContext.DeleteChannelCommand, ElementName=NotifyList}" CommandParameter="{Binding}" />
+                                                </StackPanel>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Details}" FontSize="11" Foreground="{StaticResource Forest.Muted}" Margin="0,2,0,0"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
                     <!-- где лежат данные программы -->
                     <Border Style="{StaticResource SettingsCard}">
                         <DockPanel>
