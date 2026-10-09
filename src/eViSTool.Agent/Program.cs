@@ -70,6 +70,49 @@ var automationStamp = File.Exists(automationFile) ? File.GetLastWriteTimeUtc(aut
 var announcements = ServerAnnouncements.Load(opts.ProfileId, opts.AgentsDir);
 var announcementsStamp = ServerAnnouncements.ChangedAt(opts.ProfileId, opts.AgentsDir);
 var announcer = new AnnouncementScheduler();
+
+// оповещения (вкладка «Оповещения»): настройки читаются при каждом событии, отправка — в фоне, сбой — строкой в консоль
+using var notifyHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+var notifier = new eViSTool.Core.Notifications.ServerNotifier(
+    () => eViSTool.Core.Notifications.ServerNotifySettings.Load(opts.ProfileId, opts.AgentsDir), notifyHttp,
+    (channel, error) => host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("notify.sendFailed", channel, error)));
+void Notify(eViSTool.Core.Notifications.NotifyEvent e, string title, string text = "") => notifier.Notify(e, title, text);
+
+// запуск и остановка; «дошёл ли до работы» — чтобы отличить падение при запуске от падения в работе
+var reachedRunning = false;
+host.StateChanged += state =>
+{
+    switch (state)
+    {
+        case ServerState.Starting:
+            reachedRunning = false;
+            break;
+        case ServerState.Running:
+            reachedRunning = true;
+            Notify(eViSTool.Core.Notifications.NotifyEvent.ServerStarted, eViSTool.Core.Localization.Loc.T("notify.ev.started"));
+            break;
+        case ServerState.Stopped when !host.LastExitOnItsOwn:
+            Notify(eViSTool.Core.Notifications.NotifyEvent.ServerStopped, eViSTool.Core.Localization.Loc.T("notify.ev.stopped"));
+            break;
+    }
+};
+
+// кто зашёл и вышел: разница составов (сервер останавливается — это не «все вышли»)
+var knownPlayers = new HashSet<string>(StringComparer.Ordinal);
+players.Changed += () =>
+{
+    var now = players.Players.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+    if (host.State == ServerState.Running)
+    {
+        foreach (var name in now.Except(knownPlayers))
+            Notify(eViSTool.Core.Notifications.NotifyEvent.PlayerJoined, eViSTool.Core.Localization.Loc.T("notify.ev.joined", name),
+                eViSTool.Core.Localization.Loc.T("notify.ev.online", now.Count));
+        foreach (var name in knownPlayers.Except(now))
+            Notify(eViSTool.Core.Notifications.NotifyEvent.PlayerLeft, eViSTool.Core.Localization.Loc.T("notify.ev.left", name),
+                eViSTool.Core.Localization.Loc.T("notify.ev.online", now.Count));
+    }
+    knownPlayers = now;
+};
 var backups = new BackupStore(opts.DataPath, opts.BackupName);
 var files = new ServerFiles(opts.ProfileId, opts.DataPath, opts.BackupName, opts.AgentsDir); // для окна на другой машине
 // команды сервера — из его ответа на /help (с командами модов); помним между запусками, чтобы подсказки были сразу
@@ -136,7 +179,7 @@ host.StateChanged += state =>
 host.StateChanged += state =>
 {
     if (state != ServerState.Stopped || !host.LastExitOnItsOwn) return;
-    var (startSeq, crashed) = (host.SessionStartSeq, host.LastExitCrashed);
+    var (startSeq, crashed, started) = (host.SessionStartSeq, host.LastExitCrashed, reachedRunning);
     _ = Task.Run(() =>
     {
         try
@@ -146,11 +189,21 @@ host.StateChanged += state =>
             string? report = null;
             if (CrashAnalyzer.CrashFilePath(lines) is { } path && File.Exists(path)) report = File.ReadAllText(path);
             var finding = CrashAnalyzer.AnalyzeServer(GameLog.Parse(lines), report, crashed, ModFingerprints.Build(mods.Locals()));
+            var cause = finding?.Culprit is { } c
+                ? eViSTool.Core.Localization.Loc.T("srv.crashCulprit", c.Mod?.Name ?? c.ModId, c.Version ?? "")
+                : eViSTool.Core.Localization.Loc.T("srv.crashNoCulprit");
+            // в оповещении — без ссылок на «строки выше»: консоли там не видно. Сторож поднимет сервер сам — так и скажем
+            var why = finding?.Culprit is { } culprit
+                ? eViSTool.Core.Localization.Loc.T("notify.ev.culprit", culprit.Mod?.Name ?? culprit.ModId, culprit.Version ?? "")
+                : eViSTool.Core.Localization.Loc.T("notify.ev.noCulprit");
+            var restart = host.RestartScheduledAt is { } at
+                ? eViSTool.Core.Localization.Loc.T("notify.ev.restartIn", Math.Max(1, (int)(at - DateTime.Now).TotalSeconds)) : "";
+            Notify(started ? eViSTool.Core.Notifications.NotifyEvent.ServerCrashed : eViSTool.Core.Notifications.NotifyEvent.StartFailed,
+                eViSTool.Core.Localization.Loc.T(started ? "notify.ev.crashed" : "notify.ev.startFailed"),
+                (why + "\n" + restart).Trim());
             if (finding is null) return;
             lastCrash = ServerCrashInfo.From(finding, DateTime.Now);
-            host.Console.Add(ConsoleLineKind.System, finding.Culprit is { } c
-                ? eViSTool.Core.Localization.Loc.T("srv.crashCulprit", c.Mod?.Name ?? c.ModId, c.Version ?? "")
-                : eViSTool.Core.Localization.Loc.T("srv.crashNoCulprit"));
+            host.Console.Add(ConsoleLineKind.System, cause);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { }
     });
@@ -160,6 +213,7 @@ scheduler.Seed(backups.List().FirstOrDefault(b => b.IsOwn)?.Time);
 string? pendingBackup = null; // имя копии, которую сервер делает по нашей просьбе
 var pendingSince = DateTime.MinValue; // когда попросили: сервер мог и не взяться — тогда отметка не должна висеть вечно
 var restarts = new RestartScheduler(); // перезапуски по расписанию с предупреждениями в чат
+DateTime? restartNotified = null; // о каком перезапуске уже оповестили
 DateTime? restartAfterBackup = null; // перезапуск ждёт копию мира — до этого срока
 
 // Копия мира на работающем сервере: её делает сам сервер, мы задаём имя «<профиль>-<время>.vcdbs»
@@ -209,6 +263,10 @@ async Task RestartWithModUpdatesAsync()
             host.Console.Add(ConsoleLineKind.Error, eViSTool.Core.Localization.Loc.T("autoupd.failed", line));
         if (result.Updated.Count + result.Skipped.Count + result.Failed.Count == 0)
             host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("autoupd.none"));
+        if (result.Updated.Count + result.Failed.Count > 0)
+            Notify(eViSTool.Core.Notifications.NotifyEvent.ModsUpdated, eViSTool.Core.Localization.Loc.T("notify.ev.modsUpdated"),
+                string.Join("\n", result.Updated.Select(l => "• " + l)
+                    .Concat(result.Failed.Select(l => "✗ " + eViSTool.Core.Localization.Loc.T("autoupd.failed", l)))));
     }
     catch (Exception ex) when (ex is IOException or InvalidOperationException or HttpRequestException or TaskCanceledException
                                    or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
@@ -243,6 +301,8 @@ host.Console.LineAdded += line =>
         if (file is null)
         {
             host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.notFound", requested ?? "?"));
+            Notify(eViSTool.Core.Notifications.NotifyEvent.BackupFailed, eViSTool.Core.Localization.Loc.T("notify.ev.backupFailed"),
+                eViSTool.Core.Localization.Loc.T("notify.ev.backupMissing", requested ?? "?"));
             return;
         }
         scheduler.MarkDone(DateTime.Now, players.Players.Count);
@@ -339,6 +399,7 @@ AgentStatus Status() => new()
     ModsChangedAt = mods.ChangedAt(),
     PlayersChangedAt = playerLists.ChangedAt(),
     AnnouncementsChangedAt = ServerAnnouncements.ChangedAt(opts.ProfileId, opts.AgentsDir),
+    NotifyChangedAt = eViSTool.Core.Notifications.ServerNotifySettings.ChangedAt(opts.ProfileId, opts.AgentsDir),
     CommandCount = commands.Count,
     RemoteError = remoteError,
 };
@@ -433,6 +494,16 @@ web.MapPut("/automation", async (HttpContext ctx) =>
     var settings = JsonConvert.DeserializeObject<ServerAutomation>(await reader.ReadToEndAsync());
     return settings is null ? Results.BadRequest() : Guard(() => { files.SaveAutomation(settings); return Status(); });
 });
+// оповещения: окну на другой машине — без секретов; от него — с секретами (внутри TLS), шифруем их здесь
+web.MapGet("/notify", () => Json(eViSTool.Core.Notifications.ServerNotifySettings.Load(opts.ProfileId, opts.AgentsDir).WithoutSecrets()));
+web.MapPut("/notify", async (HttpContext ctx) =>
+{
+    using var reader = new StreamReader(ctx.Request.Body);
+    var upload = JsonConvert.DeserializeObject<eViSTool.Core.Notifications.ServerNotifyUpload>(await reader.ReadToEndAsync());
+    return upload is null ? Results.BadRequest() : Guard(() => { upload.ToSettings().Save(opts.ProfileId, opts.AgentsDir); return Status(); });
+});
+web.MapPost("/notify/test", async () => Json(await notifier.TestAsync(
+    eViSTool.Core.Localization.Loc.T("notify.testTitle"), eViSTool.Core.Localization.Loc.T("notify.testFromServer", Environment.MachineName))));
 web.MapGet("/announcements", () => Json(ServerAnnouncements.Load(opts.ProfileId, opts.AgentsDir)));
 web.MapPut("/announcements", async (HttpContext ctx) =>
 {
@@ -672,6 +743,13 @@ try
                 if (!step.Restart)
                 {
                     host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.warn", step.MinutesLeft));
+                    // оповещение — одно на перезапуск, по первому предупреждению (дальше игроков предупреждают каждую минуту)
+                    if (RestartScheduler.NextAt(automation, host.State, host.StartedAt) is { } restartAt && restartAt != restartNotified)
+                    {
+                        restartNotified = restartAt;
+                        Notify(eViSTool.Core.Notifications.NotifyEvent.RestartSoon,
+                            eViSTool.Core.Localization.Loc.T("notify.ev.restartSoon", step.MinutesLeft), restartAt.ToString("HH:mm"));
+                    }
                     await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.Plural("restart.announce", step.MinutesLeft));
                 }
                 else if (!automation.RestartBackup)
@@ -711,6 +789,8 @@ try
             {
                 restartAfterBackup = null;
                 host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.backupFailed"));
+                Notify(eViSTool.Core.Notifications.NotifyEvent.BackupFailed, eViSTool.Core.Localization.Loc.T("notify.ev.backupFailed"),
+                    eViSTool.Core.Localization.Loc.T("notify.ev.backupBeforeRestart"));
                 await RestartBySchedule();
             }
         }

@@ -1,0 +1,109 @@
+<UserControl x:Class="eViSTool.App.ServerNotifyTab"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:eViSTool.App">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:InvertBoolToVisibilityConverter x:Key="InvertVis" />
+        <local:TextToVisibilityConverter x:Key="TextToVis" />
+
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,2,0,0" />
+        </Style>
+        <Style x:Key="NotifyCard" TargetType="Border" BasedOn="{StaticResource Forest.Card}">
+            <Setter Property="Padding" Value="20,16,20,18" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
+        <StackPanel Margin="0,0,14,0">
+            <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{StaticResource Forest.Accent}" TextWrapping="Wrap" Margin="2,0,0,10"
+                       Visibility="{Binding StatusText, Converter={StaticResource TextToVis}}" AutomationProperties.AutomationId="SrvNotifyStatus" />
+            <TextBlock Text="{Binding ErrorText}" FontSize="12" Foreground="{StaticResource Forest.Danger}" TextWrapping="Wrap" Margin="2,0,0,10"
+                       Visibility="{Binding ErrorText, Converter={StaticResource TextToVis}}" AutomationProperties.AutomationId="SrvNotifyError" />
+
+            <Border Style="{StaticResource NotifyCard}">
+                <StackPanel>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="{local:Tr srvnotify.test}" Command="{Binding TestCommand}" Padding="12,6" VerticalAlignment="Top"
+                                ToolTip="{local:Tr srvnotify.testTip}" ToolTipService.ShowOnDisabled="True" Margin="16,0,0,0"
+                                AutomationProperties.AutomationId="SrvNotifyTest" />
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr srvnotify.title}" Style="{StaticResource CardTitle}" />
+                            <TextBlock Text="{local:Tr srvnotify.hint}" Style="{StaticResource Hint}" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <!-- каналов ещё нет — куда их добавить -->
+                    <Border Visibility="{Binding HasChannels, Converter={StaticResource InvertVis}}" Margin="0,16,0,0" Padding="14,12" CornerRadius="8"
+                            Background="{StaticResource Forest.Raised}">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="{local:Tr srvnotify.openSettings}" Margin="16,0,0,0" Padding="12,6" VerticalAlignment="Center"
+                                    Command="{Binding DataContext.OpenSettingsCommand, RelativeSource={RelativeSource AncestorType=local:ServerView}}" />
+                            <TextBlock Text="{local:Tr srvnotify.noChannels}" FontSize="12" Foreground="{StaticResource Forest.Text}" TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                        </DockPanel>
+                    </Border>
+
+                    <!-- шапка: имена каналов над столбцами тумблеров -->
+                    <DockPanel Margin="0,16,0,0" Visibility="{Binding HasChannels, Converter={StaticResource BoolToVis}}">
+                        <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding ChannelNames}" Focusable="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" Width="120" TextAlignment="Center" FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{StaticResource Forest.Text}" TextTrimming="CharacterEllipsis" ToolTip="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{local:Tr srvnotify.event}" FontSize="12" Foreground="{StaticResource Forest.Muted}" />
+                    </DockPanel>
+
+                    <ItemsControl ItemsSource="{Binding Rows}" Focusable="False" Visibility="{Binding HasChannels, Converter={StaticResource BoolToVis}}"
+                                  IsEnabled="{Binding Loaded}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Padding="0,10" Margin="0,6,0,0">
+                                    <DockPanel>
+                                        <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Cells}" Focusable="False" VerticalAlignment="Center">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Width="120">
+                                                        <CheckBox Style="{StaticResource Forest.Switch}" IsChecked="{Binding IsOn}" HorizontalAlignment="Center"
+                                                                  ToolTip="{Binding ChannelName}" AutomationProperties.Name="{Binding ChannelName}" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <StackPanel Margin="0,0,16,0">
+                                            <TextBlock Text="{Binding Title}" FontSize="13" Foreground="{StaticResource Forest.Text}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Hint}" Style="{StaticResource Hint}" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

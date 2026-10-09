@@ -497,6 +497,32 @@ public sealed class AgentTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Notify_SavedThroughTheAgent_SecretEncryptedThere_ReturnedWithout()
+    {
+        _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
+        var channel = new Notifications.NotifyChannel
+        {
+            Id = "c1", Name = "tg", Kind = Notifications.NotifyKind.Telegram, ChatId = "1",
+            SecretProtected = Notifications.NotifySecret.Protect("123456789:ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"),
+        };
+        var settings = new Notifications.ServerNotifySettings
+        {
+            ServerName = "Srv", Channels = [channel], Routes = new() { [Notifications.NotifyEvent.ServerCrashed] = ["c1"] },
+        };
+
+        await _client.SaveNotifyAsync(settings.ToUpload());
+
+        var back = await _client.GetNotifyAsync();
+        Assert.True(back.IsOn(Notifications.NotifyEvent.ServerCrashed, "c1"));
+        Assert.Null(Assert.Single(back.Channels).SecretProtected); // секрет окну не отдаётся
+        Assert.NotNull((await _client.StatusAsync()).NotifyChangedAt);
+        // на машине агента секрет есть и зашифрован
+        var onDisk = Notifications.ServerNotifySettings.Load(_profile.Id, AgentsDir);
+        Assert.Equal("123456789:ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ", onDisk.Channels[0].Secret);
+        Assert.DoesNotContain("ZZZZZZZZ", File.ReadAllText(Notifications.ServerNotifySettings.FileFor(_profile.Id, AgentsDir)));
+    }
+
+    [Fact]
     public async Task Announcements_SavedThroughTheAgent_WithAChangeStamp()
     {
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);

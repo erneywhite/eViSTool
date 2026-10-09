@@ -122,6 +122,9 @@ public sealed record AgentStatus
     /// <summary>Когда менялись объявления по расписанию: окна перечитывают вкладку «Объявления».</summary>
     public DateTime? AnnouncementsChangedAt { get; init; }
 
+    /// <summary>Когда менялись оповещения сервера: окна перечитывают вкладку «Оповещения».</summary>
+    public DateTime? NotifyChangedAt { get; init; }
+
     /// <summary>Ближайший перезапуск по расписанию (null — расписание выключено или сервер не работает).</summary>
     public DateTime? NextRestartAt { get; init; }
 

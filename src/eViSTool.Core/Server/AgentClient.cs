@@ -96,6 +96,23 @@ public sealed class AgentClient : IDisposable
         await Read<AgentStatus>(resp, ct).ConfigureAwait(false);
     }
 
+    // ---- оповещения сервера (вкладка «Оповещения»): секреты каналов едут только сюда, обратно — без них
+
+    public Task<Notifications.ServerNotifySettings> GetNotifyAsync(CancellationToken ct = default) =>
+        Get<Notifications.ServerNotifySettings>("notify", ct);
+
+    public async Task SaveNotifyAsync(Notifications.ServerNotifyUpload settings, CancellationToken ct = default)
+    {
+        using var content = new StringContent(JsonConvert.SerializeObject(settings), Encoding.UTF8, "application/json");
+        using var cts = Timed(ct);
+        using var resp = await _http.PutAsync("notify", content, cts.Token).ConfigureAwait(false);
+        await Read<AgentStatus>(resp, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Проверочное с сервера во все его каналы; ответ — ошибки по каналам (пусто — всё ушло).</summary>
+    public async Task<IReadOnlyList<string>> TestNotifyAsync(CancellationToken ct = default) =>
+        await Post<List<string>>("notify/test", null, ct).ConfigureAwait(false);
+
     // ---- объявления по расписанию (вкладка «Объявления»)
 
     public Task<ServerAnnouncements> GetAnnouncementsAsync(CancellationToken ct = default) => Get<ServerAnnouncements>("announcements", ct);

@@ -117,6 +117,9 @@
                              Visibility="{Binding IsRemoteProfile, Converter={StaticResource InvertVis}}"
                              IsChecked="{Binding Tab, Converter={StaticResource EnumEq}, ConverterParameter=Remote}"
                              AutomationProperties.AutomationId="SrvTabRemote" />
+                <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr srvnotify.tab}"
+                             IsChecked="{Binding Tab, Converter={StaticResource EnumEq}, ConverterParameter=Notify}"
+                             AutomationProperties.AutomationId="SrvTabNotify" />
             </StackPanel>
 
             <!-- ===== показатели ===== -->
@@ -203,6 +206,11 @@
             <!-- ===== объявления ===== -->
             <Grid Visibility="{Binding IsAnnouncementsTab, Converter={StaticResource BoolToVis}}">
                 <local:ServerAnnouncementsTab DataContext="{Binding Announcements}" />
+            </Grid>
+
+            <!-- ===== оповещения ===== -->
+            <Grid Visibility="{Binding IsNotifyTab, Converter={StaticResource BoolToVis}}">
+                <local:ServerNotifyTab DataContext="{Binding Notify}" />
             </Grid>
 
             <!-- ===== удалённый доступ ===== -->
