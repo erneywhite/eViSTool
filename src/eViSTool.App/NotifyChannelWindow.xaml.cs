@@ -5,8 +5,12 @@ using eViSTool.Core.Notifications;
 
 namespace eViSTool.App;
 
+/// <summary>Тип канала в выпадающем списке окна.</summary>
+public sealed record NotifyKindItem(NotifyKind Kind, string Title);
+
 /// <summary>
-/// Канал Telegram: имя, токен бота, чат. Токен вводится в поле пароля и не показывается; у сохранённого канала поле
+/// Канал оповещений, как в Uptime Kuma: сверху тип, ниже — его поля. Пока есть Telegram: имя, токен бота, чат (личка,
+/// группа, канал) и, по желанию, тема форума. Токен вводится в поле пароля и не показывается; у сохранённого канала поле
 /// пустое — пустое и оставить, чтобы не менять. Чат находится сам: человек пишет боту — «Найти чат» его подставляет.
 /// </summary>
 public partial class NotifyChannelWindow : Window
@@ -20,11 +24,14 @@ public partial class NotifyChannelWindow : Window
     {
         _original = channel;
         InitializeComponent();
+        KindBox.ItemsSource = new[] { new NotifyKindItem(NotifyKind.Telegram, "Telegram") };
+        KindBox.SelectedIndex = 0;
         NameBox.Text = channel.Name;
+        TopicBox.Text = channel.TopicId?.ToString() ?? "";
         if (channel.HasSecret) TokenHint.Text = Loc.T("notify.tgTokenKept");
         if (channel.ChatId is { Length: > 0 } id)
         {
-            var chat = new TelegramChat(id, channel.ChatTitle is { Length: > 0 } t ? t : id);
+            var chat = new TelegramChat(id, channel.ChatTitle is { Length: > 0 } t ? t : id, channel.TopicId);
             ChatBox.ItemsSource = new[] { chat };
             ChatBox.SelectedItem = chat;
         }
@@ -35,6 +42,12 @@ public partial class NotifyChannelWindow : Window
     private string? Token => TokenBox.Password.Trim() is { Length: > 0 } typed ? typed : _original.Secret;
 
     private void TokenBox_PasswordChanged(object sender, RoutedEventArgs e) => Show("", error: false);
+
+    // выбрали найденный чат — его тема (или её отсутствие) в поле темы
+    private void ChatBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (ChatBox.SelectedItem is TelegramChat c) TopicBox.Text = c.TopicId?.ToString() ?? "";
+    }
 
     /// <summary>Выбранный в списке чат или ID, вписанный руками.</summary>
     private (string Id, string Title)? Chat =>
@@ -107,6 +120,16 @@ public partial class NotifyChannelWindow : Window
             Show(Loc.T("notify.tgNoChat"), error: true);
             return null;
         }
+        long? topic = null;
+        if (TopicBox.Text.Trim() is { Length: > 0 } topicText)
+        {
+            if (!long.TryParse(topicText, out var t) || t <= 0)
+            {
+                Show(Loc.T("notify.tgBadTopic"), error: true);
+                return null;
+            }
+            topic = t;
+        }
         return _original with
         {
             Name = NameBox.Text.Trim() is { Length: > 0 } name ? name : "Telegram",
@@ -114,6 +137,7 @@ public partial class NotifyChannelWindow : Window
             SecretProtected = TokenBox.Password.Trim().Length > 0 ? NotifySecret.Protect(token) : _original.SecretProtected,
             ChatId = chat.Id,
             ChatTitle = chat.Title,
+            TopicId = topic,
         };
     }
 

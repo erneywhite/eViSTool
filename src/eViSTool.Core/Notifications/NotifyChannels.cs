@@ -23,8 +23,11 @@ public sealed record NotifyChannel
     /// <summary>Telegram: ID чата (не секрет — без токена бота им не воспользоваться).</summary>
     public string? ChatId { get; init; }
 
-    /// <summary>Подпись чата для людей: «@erney», «Наш сервер» — чтобы было видно, куда уходит.</summary>
+    /// <summary>Подпись чата для людей: «@erney», «Наш сервер», «Наш сервер › Анонсы» — чтобы было видно, куда уходит.</summary>
     public string? ChatTitle { get; init; }
+
+    /// <summary>Telegram: тема форума (супергруппа с темами); null — общий чат.</summary>
+    public long? TopicId { get; init; }
 
     [JsonIgnore] public string? Secret => NotifySecret.Unprotect(SecretProtected);
     [JsonIgnore] public bool HasSecret => !string.IsNullOrEmpty(SecretProtected);

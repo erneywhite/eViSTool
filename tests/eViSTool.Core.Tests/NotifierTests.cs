@@ -96,6 +96,29 @@ public sealed class NotifierTests
     }
 
     [Fact]
+    public async Task Telegram_ForumTopics_AreFoundSeparately_AndSentTo()
+    {
+        var fake = new Fake(HttpStatusCode.OK, """
+            { "ok": true, "result": [
+              { "update_id": 1, "message": { "chat": { "id": -100333, "type": "supergroup", "title": "VS", "is_forum": true }, "text": "general" } },
+              { "update_id": 2, "message": { "chat": { "id": -100333, "type": "supergroup", "title": "VS", "is_forum": true },
+                  "message_thread_id": 7, "is_topic_message": true, "text": "here",
+                  "reply_to_message": { "message_id": 7, "forum_topic_created": { "name": "Анонсы" } } } },
+              { "update_id": 3, "channel_post": { "chat": { "id": -100444, "type": "channel", "title": "News" }, "text": "post" } }
+            ] }
+            """);
+        var notifier = new Notifier(new HttpClient(fake));
+
+        var chats = await notifier.FindTelegramChatsAsync(Token);
+        Assert.Equal(["News", "VS › Анонсы", "VS"], chats.Select(c => c.Title));
+        Assert.Equal(7, chats[1].TopicId);
+        Assert.Null(chats[2].TopicId);
+
+        await notifier.SendAsync(Telegram("-100333") with { TopicId = 7 }, new NotifyMessage("t", "x"));
+        Assert.Equal(7, fake.Sent!.Value<long>("message_thread_id"));
+    }
+
+    [Fact]
     public async Task Telegram_BadToken_IsRefusedWithoutARequest()
     {
         var fake = new Fake(HttpStatusCode.OK, "{}");

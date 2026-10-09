@@ -326,11 +326,11 @@
                     <Border Style="{StaticResource SettingsCard}" DataContext="{Binding Notify}">
                         <StackPanel>
                             <DockPanel>
-                                <Button DockPanel.Dock="Right" Command="{Binding AddTelegramCommand}" VerticalAlignment="Top" Margin="16,0,0,0"
-                                        AutomationProperties.AutomationId="NotifyAddTelegram">
+                                <Button DockPanel.Dock="Right" Command="{Binding AddChannelCommand}" VerticalAlignment="Top" Margin="16,0,0,0"
+                                        AutomationProperties.AutomationId="NotifyAddChannel">
                                     <StackPanel Orientation="Horizontal">
                                         <Path Data="{StaticResource Icon.Plus}" Style="{StaticResource Forest.Icon}" Width="12" Height="12" Margin="0,0,7,0" />
-                                        <TextBlock Text="Telegram" />
+                                        <TextBlock Text="{local:Tr notify.add}" />
                                     </StackPanel>
                                 </Button>
                                 <StackPanel>

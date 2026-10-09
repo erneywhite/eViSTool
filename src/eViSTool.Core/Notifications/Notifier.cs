@@ -6,8 +6,8 @@ using Newtonsoft.Json.Linq;
 
 namespace eViSTool.Core.Notifications;
 
-/// <summary>Чат Telegram, который нашёлся по последним сообщениям боту.</summary>
-public sealed record TelegramChat(string Id, string Title);
+/// <summary>Чат Telegram, который нашёлся по последним сообщениям боту: личка, группа, канал или тема форума.</summary>
+public sealed record TelegramChat(string Id, string Title, long? TopicId = null);
 
 /// <summary>
 /// Отправка оповещений. Ошибки — <see cref="NotifyException"/> с понятной причиной; секрет (токен, адрес вебхука)
@@ -25,12 +25,14 @@ public sealed class Notifier(HttpClient http)
             case NotifyKind.Telegram:
                 if (string.IsNullOrWhiteSpace(channel.ChatId)) throw new NotifyException(Loc.T("notify.tgNoChat"));
                 // без разметки: в именах модов и игроков бывают * и _, которые Markdown понял бы по-своему
-                await TelegramAsync(secret, "sendMessage", new JObject
+                var body = new JObject
                 {
                     ["chat_id"] = channel.ChatId,
                     ["text"] = message.Title + "\n" + message.Text,
                     ["disable_web_page_preview"] = true,
-                }, ct).ConfigureAwait(false);
+                };
+                if (channel.TopicId is { } topic) body["message_thread_id"] = topic; // тема форума
+                await TelegramAsync(secret, "sendMessage", body, ct).ConfigureAwait(false);
                 break;
             default:
                 throw new NotifyException(Loc.T("notify.kindLater"));
@@ -38,8 +40,8 @@ public sealed class Notifier(HttpClient http)
     }
 
     /// <summary>
-    /// Telegram: в каких чатах боту писали в последнее время (новые — первыми). Человек пишет боту «привет» — и чат
-    /// находится сам, без поиска его ID.
+    /// Telegram: в каких чатах боту писали в последнее время (новые — первыми): личка, группы, каналы, а в форумах —
+    /// каждая тема отдельно. Человек пишет боту «привет» (или в нужной теме) — и чат находится сам, без поиска его ID.
     /// </summary>
     public async Task<IReadOnlyList<TelegramChat>> FindTelegramChatsAsync(string token, CancellationToken ct = default)
     {
@@ -48,12 +50,19 @@ public sealed class Notifier(HttpClient http)
         var chats = new List<TelegramChat>();
         foreach (var update in (result as JArray ?? []).Reverse())
         {
-            var chat = (update["message"] ?? update["channel_post"] ?? update["my_chat_member"])?["chat"];
-            if (chat?["id"] is not { } id || chats.Any(c => c.Id == id.ToString())) continue;
+            var message = update["message"] ?? update["channel_post"] ?? update["my_chat_member"];
+            var chat = message?["chat"];
+            if (chat?["id"] is not { } id) continue;
+            // сообщение в теме форума: номер темы, а её имя — в служебном сообщении о создании темы, на которое оно «отвечает»
+            long? topic = message!.Value<bool?>("is_topic_message") == true ? message.Value<long?>("message_thread_id") : null;
+            if (chats.Any(c => c.Id == id.ToString() && c.TopicId == topic)) continue;
             var title = chat.Value<string>("title")
                         ?? (chat.Value<string>("username") is { } user ? "@" + user : null)
                         ?? string.Join(" ", new[] { chat.Value<string>("first_name"), chat.Value<string>("last_name") }.Where(s => !string.IsNullOrEmpty(s)));
-            chats.Add(new TelegramChat(id.ToString(), title.Length > 0 ? title : id.ToString()));
+            if (title.Length == 0) title = id.ToString();
+            if (topic is { } t)
+                title += " › " + (message["reply_to_message"]?["forum_topic_created"]?.Value<string>("name") ?? "#" + t);
+            chats.Add(new TelegramChat(id.ToString(), title, topic));
         }
         return chats;
     }

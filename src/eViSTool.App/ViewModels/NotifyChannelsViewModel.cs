@@ -50,8 +50,9 @@ public sealed partial class NotifyChannelsViewModel : ObservableObject
 
     private void Save() => NotifyChannels.Save(AppPaths.Root, Channels.Select(r => r.Channel));
 
+    /// <summary>Новый канал: тип выбирается в окне (пока — Telegram).</summary>
     [RelayCommand]
-    private void AddTelegram() => Edit(null, NotifyKind.Telegram);
+    private void AddChannel() => Edit(null, NotifyKind.Telegram);
 
     [RelayCommand]
     private void EditChannel(NotifyChannelRowViewModel? row)
