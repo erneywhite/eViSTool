@@ -1,0 +1,220 @@
+<Window x:Class="eViSTool.App.FindServerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:eViSTool.App"
+        Title="{local:Tr browse.title}" Icon="Assets/eViSTool.ico"
+        Width="980" Height="720" MinWidth="720" MinHeight="480" Background="{StaticResource Forest.Base}"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:InvertBoolToVisibilityConverter x:Key="InvertVis" />
+        <local:TextToVisibilityConverter x:Key="TextToVis" />
+        <local:InvertBoolConverter x:Key="InvertBool" />
+
+        <!-- чип-переключатель фильтра: как Forest.Chip, но для CheckBox -->
+        <Style x:Key="FilterChip" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border x:Name="Bd" CornerRadius="6" Padding="10,5" Background="Transparent" BorderThickness="1" BorderBrush="{StaticResource Forest.Line}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Forest.Raised}" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Forest.Accent}" />
+                                <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- строка сервера: имя и подробности — нажатие раскрывает описание и моды; справа игроки и кнопки -->
+        <DataTemplate x:Key="ServerRow">
+            <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Padding="4,10,4,10">
+                <StackPanel>
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <StackPanel Width="78" Margin="0,0,12,0" Visibility="{Binding HasPlayers, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{Binding PlayersText}" FontSize="13" Foreground="{StaticResource Forest.Text}" HorizontalAlignment="Right" />
+                                <TextBlock Text="{local:Tr browse.online}" FontSize="11" Foreground="{StaticResource Forest.Muted}" HorizontalAlignment="Right" />
+                            </StackPanel>
+                            <!-- общий список: «В избранное» (или «В избранном»); избранное: «Убрать» -->
+                            <Button Content="{local:Tr browse.addFavorite}" Click="AddFavorite_Click" Padding="11,5" MinHeight="0" Margin="0,0,8,0">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsFavoriteRow}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding InFavorites}" Value="True">
+                                                <Setter Property="IsEnabled" Value="False" />
+                                                <Setter Property="Content" Value="{local:Tr browse.inFavorites}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <Button Content="{local:Tr browse.removeFavorite}" Padding="11,5" MinHeight="0" Margin="0,0,8,0"
+                                    Visibility="{Binding IsFavoriteRow, Converter={StaticResource BoolToVis}}"
+                                    Command="{Binding DataContext.RemoveFavoriteCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding}" />
+                            <Button Content="{local:Tr browse.play}" Click="Play_Click" Style="{StaticResource Forest.PrimaryButton}" Padding="14,5" MinHeight="0" />
+                        </StackPanel>
+                        <Button Command="{Binding ToggleCommand}" Background="Transparent" BorderThickness="0" Cursor="Hand" HorizontalContentAlignment="Stretch"
+                                Padding="0" AutomationProperties.Name="{Binding Name}">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter />
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}"
+                                           TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                    <TextBlock Text="{Binding Details}" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextTrimming="CharacterEllipsis" />
+                                    <StackPanel Orientation="Horizontal" Margin="10,0,0,0" Visibility="{Binding HasPassword, Converter={StaticResource BoolToVis}}">
+                                        <Path Data="{StaticResource Icon.Lock}" Style="{StaticResource Forest.Icon}" Width="12" Height="12" Stroke="{StaticResource Forest.Muted}" />
+                                        <TextBlock Text="{local:Tr browse.password}" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="4,0,0,0" />
+                                    </StackPanel>
+                                    <TextBlock Text="{local:Tr browse.whitelist}" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="10,0,0,0"
+                                               Visibility="{Binding Whitelisted, Converter={StaticResource BoolToVis}}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Button>
+                    </DockPanel>
+
+                    <!-- раскрытая строка: описание и моды сервера -->
+                    <Border Margin="0,10,0,0" Padding="12,10" CornerRadius="8" Background="{StaticResource Forest.Surface}"
+                            Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding Description}" FontSize="12" Foreground="{StaticResource Forest.Text}" TextWrapping="Wrap" MaxHeight="160" />
+                            <TextBlock Text="{Binding ModsSummary}" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="0,8,0,4" TextWrapping="Wrap"
+                                       Visibility="{Binding ModsSummary, Converter={StaticResource TextToVis}}" />
+                            <ItemsControl ItemsSource="{Binding ModTags}" Focusable="False">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="5" Padding="7,2" Margin="0,3,5,0" Background="{StaticResource Forest.Raised}">
+                                            <TextBlock Text="{Binding}" FontSize="11" Foreground="{StaticResource Forest.Muted}" />
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </Window.Resources>
+
+    <DockPanel Margin="24,18,24,16">
+        <!-- вкладки -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
+            <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="BrowseTab" FontSize="15" Content="{Binding AllTabTitle}"
+                         IsChecked="{Binding IsAllTab, Mode=OneWay}" Checked="AllTab_Checked" AutomationProperties.AutomationId="BrowseTabAll" />
+            <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="BrowseTab" FontSize="15" Content="{Binding FavoritesTabTitle}"
+                         IsChecked="{Binding IsFavoritesTab}" AutomationProperties.AutomationId="BrowseTabFavorites" />
+        </StackPanel>
+
+        <!-- внизу: откуда список, сколько показано -->
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+            <TextBlock DockPanel.Dock="Right" Text="{Binding CountText}" FontSize="11" Foreground="{StaticResource Forest.Muted}"
+                       Visibility="{Binding IsAllTab, Converter={StaticResource BoolToVis}}" />
+            <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{StaticResource Forest.Muted}" TextTrimming="CharacterEllipsis" />
+        </DockPanel>
+
+        <TextBlock DockPanel.Dock="Top" Text="{Binding ErrorText}" FontSize="12" Foreground="{StaticResource Forest.Danger}" TextWrapping="Wrap" Margin="0,10,0,0"
+                   Visibility="{Binding ErrorText, Converter={StaticResource TextToVis}}" AutomationProperties.AutomationId="BrowseError" />
+
+        <!-- поиск и фильтры — только для общего списка -->
+        <StackPanel DockPanel.Dock="Top" Margin="0,14,0,0" Visibility="{Binding IsAllTab, Converter={StaticResource BoolToVis}}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Command="{Binding LoadCommand}" Margin="8,0,0,0" Padding="10,8" ToolTip="{local:Tr browse.refresh}"
+                        AutomationProperties.Name="{local:Tr browse.refresh}">
+                    <Path Data="{StaticResource Icon.Refresh}" Style="{StaticResource Forest.Icon}" Width="14" Height="14" />
+                </Button>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center">
+                    <RadioButton Style="{StaticResource Forest.Chip}" GroupName="BrowseSort" Content="{local:Tr browse.sortPlayers}"
+                                 IsChecked="{Binding ByName, Converter={StaticResource InvertBool}, Mode=OneWay}" Checked="SortPlayers_Checked" />
+                    <RadioButton Style="{StaticResource Forest.Chip}" GroupName="BrowseSort" Content="{local:Tr browse.sortName}" IsChecked="{Binding ByName}" />
+                </StackPanel>
+                <Grid>
+                    <TextBox x:Name="SearchBox" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged, Delay=200}" Padding="34,7,10,7"
+                             VerticalContentAlignment="Center" AutomationProperties.AutomationId="BrowseSearch" />
+                    <Path Data="{StaticResource Icon.Search}" Style="{StaticResource Forest.Icon}" Stroke="{StaticResource Forest.Muted}"
+                          Width="14" Height="14" HorizontalAlignment="Left" Margin="12,0,0,0" IsHitTestVisible="False" />
+                    <TextBlock Text="{local:Tr browse.search}" Foreground="{StaticResource Forest.Muted}" Margin="35,0,0,0" VerticalAlignment="Center"
+                               IsHitTestVisible="False">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Opacity" Value="0" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Search}" Value="">
+                                        <Setter Property="Opacity" Value="1" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+            </DockPanel>
+            <WrapPanel Margin="0,10,0,0">
+                <CheckBox Style="{StaticResource FilterChip}" Content="{Binding VersionChip}" IsChecked="{Binding MyVersion}" />
+                <CheckBox Style="{StaticResource FilterChip}" Content="{local:Tr browse.hasSlots}" IsChecked="{Binding HasSlots}" />
+                <CheckBox Style="{StaticResource FilterChip}" Content="{local:Tr browse.noPassword}" IsChecked="{Binding NoPassword}" />
+                <CheckBox Style="{StaticResource FilterChip}" Content="{local:Tr browse.noWhitelist}" IsChecked="{Binding NoWhitelist}" />
+                <CheckBox Style="{StaticResource FilterChip}" Content="{local:Tr browse.noModsChip}" IsChecked="{Binding NoMods}" />
+                <CheckBox Style="{StaticResource FilterChip}" Content="{local:Tr browse.withModsChip}" IsChecked="{Binding WithMods}" />
+            </WrapPanel>
+        </StackPanel>
+
+        <Grid Margin="0,6,0,0">
+            <!-- общий список: тысячи строк — с виртуализацией -->
+            <ListBox ItemsSource="{Binding View}" ItemTemplate="{StaticResource ServerRow}" Background="Transparent" BorderThickness="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.IsVirtualizing="True"
+                     VirtualizingPanel.ScrollUnit="Pixel" Visibility="{Binding IsAllTab, Converter={StaticResource BoolToVis}}"
+                     AutomationProperties.AutomationId="BrowseList">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="Focusable" Value="False" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <ContentPresenter />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+            </ListBox>
+            <TextBlock Text="{local:Tr browse.loadingShort}" FontSize="13" Foreground="{StaticResource Forest.Muted}" HorizontalAlignment="Center"
+                       VerticalAlignment="Center" Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}" />
+
+            <!-- избранное игры целиком -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding IsFavoritesTab, Converter={StaticResource BoolToVis}}">
+                <StackPanel>
+                    <TextBlock Text="{local:Tr browse.favoritesHint}" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap" Margin="0,8,0,8" />
+                    <ItemsControl ItemsSource="{Binding Favorites}" ItemTemplate="{StaticResource ServerRow}" Focusable="False" />
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </DockPanel>
+</Window>

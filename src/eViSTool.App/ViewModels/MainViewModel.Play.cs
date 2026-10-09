@@ -136,6 +136,16 @@ public sealed partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanPlayNow))]
     private Task PlayOn(PlayMenuItemViewModel? item) => item is null ? Task.CompletedTask : LaunchAsync(item.Target);
 
+    /// <summary>Из окна «Найти сервер»: сыграть на этом сервере (один раз).</summary>
+    public Task PlayOnTargetAsync(PlayTarget target) => CanPlayNow ? LaunchAsync(target) : Task.CompletedTask;
+
+    /// <summary>«Найти сервер…»: общий список серверов игры и избранное целиком.</summary>
+    public void OpenFindServer()
+    {
+        if (ActiveProfile is not { Kind: ProfileKind.Client } client) return;
+        new FindServerWindow(new FindServerViewModel(this, client)) { Owner = System.Windows.Application.Current.MainWindow }.Show();
+    }
+
     /// <summary>Булавка: сделать сервером по умолчанию (повторно — снять, тогда «без сервера»).</summary>
     [RelayCommand]
     private void PinPlayTarget(PlayMenuItemViewModel? item)

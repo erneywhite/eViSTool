@@ -232,6 +232,32 @@
                                                Visibility="{Binding PlayFavoritesMore, Converter={StaticResource TextToVis}}" />
                                 </StackPanel>
 
+                                <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Margin="6,6,6,2" />
+                                <!-- «Найти сервер…»: общий список и избранное целиком -->
+                                <Button Click="FindServer_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" HorizontalContentAlignment="Stretch"
+                                        AutomationProperties.AutomationId="PlayFindServer">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Bd" Background="Transparent" CornerRadius="7" Padding="12,8,8,8">
+                                                <ContentPresenter />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource Forest.Raised}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                    <DockPanel>
+                                        <Path DockPanel.Dock="Left" Data="{StaticResource Icon.Search}" Style="{StaticResource Forest.Icon}" Width="16" Height="16"
+                                              Margin="0,1,12,0" VerticalAlignment="Top" Stroke="{StaticResource Forest.Muted}" />
+                                        <StackPanel>
+                                            <TextBlock Text="{local:Tr play.findServer}" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" />
+                                            <TextBlock Text="{local:Tr play.findServerHint}" FontSize="11" Foreground="{StaticResource Forest.Muted}" Margin="0,1,0,0" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Button>
+
                                 <TextBlock Text="{local:Tr play.menuHint}" FontSize="11" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap"
                                            Margin="12,8,12,4" />
                             </StackPanel>
