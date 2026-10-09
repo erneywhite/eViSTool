@@ -269,12 +269,43 @@ On a stopped server eViSTool edits the server files. A new player can be added b
 only the server can look a player up by name. Since 1.20 a dedicated server lets in only whitelisted players by default,
 so you will most likely need to add your friends there.
 
+**Announcements.** Chat messages on a schedule: server rules, a Discord link, the restart time. Each has its own interval
+in minutes and a switch. The agent sends them, so the window can be closed. By default an empty server stays quiet, and a player
+who joins does not get a pile of queued messages. There is also **Say now** — a one-off message to everyone on the server.
+
+![Announcements](docs/screenshots/announcements.png)
+
+**Notifications.** The server reports events wherever you tell it to: crashed (with the mod to blame, if one is found, and
+whether the watchdog starts it again), failed to start, world backup failed, mods updated, started or stopped, restart soon,
+player joined or left. Channels are set up once in **Settings → Notifications → Add channel**, and on the server tab you turn
+them on with switches: rows are events, columns are channels. The agent sends them, so the window can be closed.
+**Send a test from the server** goes the same way as the real notifications.
+
+![Notifications](docs/screenshots/notify.png)
+
+Channel types:
+
+- **Telegram** — messages from your own bot. Create one with @BotFather (`/newbot`) and paste its token, then write anything
+  to the bot and press **Find chat**. A private chat, a group, a channel (the bot must be an admin) and a forum topic all work:
+  write to the bot in the topic you want and Find chat lists it separately.
+- **Discord** — cards with a colored stripe in a Discord channel. Channel settings → Integrations → Webhooks → Copy webhook URL.
+- **ntfy** — push notifications to your phone without an account. Install the ntfy app and subscribe to the topic eViSTool
+  suggests. Problems come with high priority. You can use your own ntfy server.
+- **Webhook** — an HTTP request with a JSON body to any address. Ready-made templates: Plain JSON, Slack and Home Assistant,
+  or write your own.
+
+![Notification channel](docs/screenshots/notify-channel.png)
+
+Tokens and webhook links are stored encrypted for your Windows account and are never shown. A message is made of parts:
+a color by importance (a circle in Telegram, a stripe in Discord, priority in ntfy), the server, the event and the details.
+They are written in the language of eViSTool on the computer that runs the server.
+
 **Server mods** opens **My mods** for the server profile — the same table, catalog and updates as for the game.
 
 ## Remote management
 
 Manage a server on another computer — a home PC, a spare laptop, a rented machine — as if it were here:
-console, start and stop, configuration, schedule, backups, players and the server's mods. One string, the **connection code**,
+console, start and stop, configuration, schedule, backups, players, announcements, notifications and the server's mods. One string, the **connection code**,
 carries everything needed: address, port, key and the server's certificate. There is nothing to configure by hand.
 
 ![Remote access](docs/screenshots/remote.png)
@@ -298,8 +329,10 @@ Good to know:
 - The server computer needs eViSTool open, or its server running: remote access lives as long as the agent does.
   There is no service and no autostart.
 - Changes show up in both windows by themselves. A mod disabled from your PC appears disabled on the server computer
-  within seconds, and the other way round. The same goes for the schedule and the configuration.
+  within seconds, and the other way round. The same goes for the schedule, configuration, players, announcements and notifications.
 - Mods are installed on the server over the connection: from a zip, from the catalog, as updates and from modpacks.
+- Notifications are sent by the agent on the server computer, so they arrive even when your PC is off. The channels you turn on
+  for the server are passed to it over the secure connection and encrypted again there; secrets are never sent back.
 - Keep eViSTool updated on both computers. An agent of an older version is replaced by itself while the server is stopped;
   until then a note says so.
 
