@@ -518,6 +518,7 @@ if (!OperatingSystem.IsWindows())
 
 // ---- обновление eViSTool на этом компьютере по просьбе окна с другого
 string? selfUpdate = null, selfUpdateError = null;
+var agentExitCode = 0; // 75 — обновился под systemd, служба поднимет новую версию
 
 async Task SelfUpdateAsync(eViSTool.Core.Versioning.ModVersion target)
 {
@@ -545,6 +546,19 @@ async Task SelfUpdateAsync(eViSTool.Core.Versioning.ModVersion target)
 
         selfUpdate = "install";
         eViSTool.Core.AppUpdate.AppUpdater.Install(zip, appDir);
+
+        // под systemd новую версию поднимает служба: своя дочерняя копия погибла бы вместе с этой. Выходим с кодом 75
+        // (в юните — «не сбой, перезапустить»), а что было с сервером, новая версия узнает из отметки
+        if (Environment.GetEnvironmentVariable(eViSTool.Core.Platform.SystemdUnit.ServiceVariable) is { Length: > 0 })
+        {
+            selfUpdate = "restart";
+            AgentProtocol.MarkAfterUpdate(opts.ProfileId, opts.AgentsDir, wasRunning);
+            host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("selfupd.restarting", target));
+            await Task.Delay(TimeSpan.FromSeconds(1)); // окно успеет увидеть «перезапуск»
+            agentExitCode = eViSTool.Core.Platform.SystemdUnit.SelfUpdateExitCode;
+            shutdown.Cancel();
+            return;
+        }
 
         // новая копия агента — с теми же параметрами; она дождётся, пока эта выйдет и освободит профиль (и порт удалённого доступа)
         selfUpdate = "restart";
@@ -966,7 +980,16 @@ if (opts.AfterUpdate)
 
 await ApplyRemoteAsync();
 
-if (opts.StartServer)
+// служба после самообновления: в юните --start, но остановленный до обновления сервер остаётся остановленным
+var startServer = opts.StartServer;
+if (AgentProtocol.TakeAfterUpdate(opts.ProfileId, opts.AgentsDir) is { } wasRunning)
+{
+    eViSTool.Core.AppUpdate.AppUpdater.CleanupOld(AppContext.BaseDirectory);
+    host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("selfupd.done", version));
+    startServer = wasRunning;
+}
+
+if (startServer)
 {
     try { await host.StartAsync(); }
     catch (Exception ex) when (ex is FileNotFoundException or InvalidOperationException or System.ComponentModel.Win32Exception)
@@ -1141,4 +1164,4 @@ finally
     try { File.Delete(stateFile); } catch (IOException) { }
 }
 GC.KeepAlive(signals); // подписки на сигналы живут, пока жив их объект
-return 0;
+return agentExitCode;

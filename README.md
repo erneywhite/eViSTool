@@ -373,7 +373,7 @@ Good to know:
 - Notifications are sent by the agent on the server computer, so they arrive even when your PC is off. The channels you turn on
   for the server are passed to it over the secure connection and encrypted again there; secrets are never sent back.
 - Keep eViSTool updated on both computers. If the server computer has an older version, the Server tab shows
-  **Update there**: eViSTool on that computer downloads your version from GitHub, installs it and restarts itself
+  **Update on the server**: eViSTool on that computer downloads your version from GitHub, installs it and restarts itself
   (a running server stops for about a minute and starts again). The button works from 0.8.2 on — before that version
   the server computer is updated by hand once.
 

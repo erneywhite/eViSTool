@@ -55,10 +55,17 @@ public sealed class AppUpdater
             _http.DefaultRequestHeaders.UserAgent.ParseAdd($"eViSTool (github: {Repo})"); // без User-Agent GitHub отвечает 403
     }
 
+    /// <summary>
+    /// Список релизов — API GitHub. Переменная EVISTOOL_RELEASES_URL подменяет адрес (такой же JSON со ссылками на архивы):
+    /// так «Обновить там» проверяется на своей машине без настоящего релиза.
+    /// </summary>
+    private static string ReleasesUrl =>
+        Environment.GetEnvironmentVariable("EVISTOOL_RELEASES_URL") is { Length: > 0 } url ? url : $"https://api.github.com/repos/{Repo}/releases?per_page=30";
+
     /// <summary>Новее ли что-то на GitHub. null — обновлений нет.</summary>
     public async Task<AppRelease?> FindUpdateAsync(ModVersion current, CancellationToken ct = default)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{Repo}/releases?per_page=30");
+        using var request = new HttpRequestMessage(HttpMethod.Get, ReleasesUrl);
         request.Headers.Accept.ParseAdd("application/vnd.github+json");
         using var response = await _http.SendAsync(request, ct).ConfigureAwait(false);
         // API без входа — 60 запросов в час на внешний адрес (у всех за одним роутером он общий): исчерпали — берём ленту
@@ -77,7 +84,7 @@ public sealed class AppUpdater
     public async Task<AppRelease?> FindReleaseAsync(ModVersion version, CancellationToken ct = default)
     {
         IReadOnlyList<AppRelease> releases;
-        using (var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{Repo}/releases?per_page=30"))
+        using (var request = new HttpRequestMessage(HttpMethod.Get, ReleasesUrl))
         {
             request.Headers.Accept.ParseAdd("application/vnd.github+json");
             using var response = await _http.SendAsync(request, ct).ConfigureAwait(false);

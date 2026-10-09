@@ -19,6 +19,33 @@ public static class AgentProtocol
     /// Агент прежней версии: eViSTool обновили, а он работает со старым файлом (обновление его не трогает, чтобы не
     /// уронить сервер). Новых функций он не знает.
     /// </summary>
+    /// <summary>
+    /// Отметка для новой версии агента, которую после самообновления поднимает systemd (в юните всегда --start): работал ли
+    /// сервер до обновления. Остановленный до обновления остаётся остановленным. Отметка одноразовая.
+    /// </summary>
+    public static string AfterUpdateFile(string profileId, string? agentsDir = null) =>
+        Path.Combine(agentsDir ?? DefaultAgentsDir, $"{profileId}.after-update");
+
+    public static void MarkAfterUpdate(string profileId, string? agentsDir, bool serverWasRunning) =>
+        File.WriteAllText(AfterUpdateFile(profileId, agentsDir), serverWasRunning ? "running" : "stopped");
+
+    /// <summary>Забрать отметку: true/false — работал ли сервер до обновления; null — отметки нет (обычный запуск).</summary>
+    public static bool? TakeAfterUpdate(string profileId, string? agentsDir)
+    {
+        var file = AfterUpdateFile(profileId, agentsDir);
+        try
+        {
+            if (!File.Exists(file)) return null;
+            var running = File.ReadAllText(file).Trim() == "running";
+            File.Delete(file);
+            return running;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
     public static bool IsOutdated(AgentStatus status) => status.AgentVersion.Length > 0 && status.AgentVersion != AppVersion;
 
     /// <summary>Файл с адресом работающего агента профиля.</summary>
