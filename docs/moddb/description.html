@@ -1,8 +1,6 @@
 <p><strong>This is the Windows version.</strong> Running your server on Linux? See <a href="https://mods.vintagestory.at/evistoollinux">eViSTool &mdash; Linux</a>.<br />
 <strong>Это версия для Windows.</strong> Сервер на Linux? Тебе на страницу <a href="https://mods.vintagestory.at/evistoollinux">eViSTool &mdash; Linux</a>.</p>
 
-<p><img src="https://raw.githubusercontent.com/erneywhite/eViSTool/main/docs/screenshots/mods.png" alt="My mods" width="100%" /></p>
-
 <p>I play Vintage Story with a lot of mods and run a small server for friends, and I got tired of checking every mod for updates by hand, copying zips around and connecting to the server just to restart it. So I made <strong>eViSTool</strong>. It's one window where you can keep your mods up to date, grab new ones from the ModDB and look after your dedicated server.</p>
 <p>It's free, open source and portable: unzip it anywhere and run it. Nothing gets installed, nothing runs in the background when you don't need it.</p>
 
@@ -11,8 +9,6 @@
 <p>It also warns you about the usual headaches before they bite: a missing or outdated dependency (one button fixes it), a duplicate mod, a version made for another game branch, a mod that needs a newer game than you have. And if you keep a separate mod set for a server, it tells you which mods are client-only and don't belong there.</p>
 <p>Want to share your setup with a friend? Save it as a modpack and send them one file.</p>
 <p>Before mods change, eViSTool quietly copies the single-player worlds you played since the last copy. If an update breaks a world, put the copy back with one button.</p>
-
-<p><img src="https://raw.githubusercontent.com/erneywhite/eViSTool/main/docs/screenshots/mod-settings.png" alt="Mod settings" width="100%" /></p>
 
 <h2>Mod settings without editing JSON by hand</h2>
 <p>The <strong>Mod settings</strong> tab lists the config files of your mods and opens them as a form: switches, number fields, lists. A typo can't break the file, every save keeps the previous version (one button brings it back), and <strong>Reset to defaults</strong> lets the mod create a fresh config. It works for your server on another PC too.</p>
@@ -25,13 +21,9 @@
 <p>Many mods have to be on both the server and your client. When you install one of those, eViSTool offers to put it into your other profiles as well, and each profile gets the right version for its game. Link the profiles once and it happens without asking.</p>
 <p>The arrow next to <strong>Play</strong> lets you start the game and join a server right away: your own servers, the game's favorites, or any server from the public list &mdash; with search, filters and a look at its mods before you join. Pin one and <strong>Play</strong> takes you straight there.</p>
 
-<p><img src="https://raw.githubusercontent.com/erneywhite/eViSTool/main/docs/screenshots/crash.png" alt="The server went down" width="100%" /></p>
-
 <h2>When something breaks</h2>
 <p>A crash to desktop, a world that throws you back to the main menu, a server that goes down in the middle of the night: eViSTool reads the logs and tells you which mod is most likely to blame. You don't have to scroll through a stack trace or turn mods off one by one. Disable the mod right from that window, or copy the report and send it to the mod's author. For servers, the alert reaches you whichever profile you have open, even when the server is on another PC.</p>
 <p>Some mods never crash anything, they just keep spamming errors while the game swallows them, and the log swells and the game stutters. eViSTool counts those errors during every session. If a mod gets noisy, a yellow <strong>!</strong> shows up next to the profile; click it to see which mods are noisy and how many errors each one threw.</p>
-
-<p><img src="https://raw.githubusercontent.com/erneywhite/eViSTool/main/docs/screenshots/server.png" alt="Server console" width="100%" /></p>
 
 <h2>Your dedicated server</h2>
 <p>Start, stop and restart it, watch the live console and type commands with hints &mdash; start typing <code>/</code> and eViSTool suggests the server's commands, including the ones added by mods, and Tab completes them.</p>
@@ -40,8 +32,6 @@
 <p>The <strong>Players</strong> tab shows everyone who has joined: change roles, manage the whitelist, ban with a duration and reason, kick, or let a player change class and appearance once &mdash; they get a chat message telling them to type <code>.charsel</code>.</p>
 <p><strong>Notifications</strong> tell you when something happens, even with the window closed: the server crashed (and which mod is to blame), a backup failed, mod updates are out, the disk is running low, the server can't keep up, a restart is coming, someone joined. They go to Telegram, Discord, ntfy push on your phone, or any webhook &mdash; you pick which events go where. The game chat can go to a Discord channel too, each message under the player's name. <strong>Announcements</strong> post your rules or Discord link to the chat on a schedule.</p>
 <p>Turn on <strong>Statistics</strong> and you'll see charts of who was online and how hard the server worked (memory and CPU), how long each player has played, and when it crashed &mdash; for the last day, week or 30 days. It's off by default and stays on the server's computer.</p>
-
-<p><img src="https://raw.githubusercontent.com/erneywhite/eViSTool/main/docs/screenshots/stats.png" alt="Server statistics" width="100%" /></p>
 
 <p>There's also a proper editor for <code>serverconfig.json</code>: world settings, roles and privileges with checkboxes instead of hand-editing JSON.</p>
 
