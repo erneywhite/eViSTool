@@ -298,6 +298,11 @@ public sealed class AgentTests : IAsyncLifetime
         Assert.Equal((true, 3, RestartMode.Daily), (saved.BackupEnabled, saved.BackupKeep, saved.RestartMode));
         Assert.True(ServerAutomation.Load(_profile.Id, AgentsDir).BackupEnabled);
 
+        // папка для копий проверяется на машине агента: годная — без ошибки, относительный путь — с ошибкой
+        Assert.Null(await data.CheckBackupDirAsync(Path.Combine(_profile.DataDir!, "MyBackups")));
+        Assert.True(Directory.Exists(Path.Combine(_profile.DataDir!, "MyBackups")));
+        Assert.NotNull(await data.CheckBackupDirAsync("relative"));
+
         // копия при остановленном сервере — делает агент
         var made = await data.CopyWorldAsync();
         Assert.StartsWith("Тест_мир-", made.Name);

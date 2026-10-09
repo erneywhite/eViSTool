@@ -884,8 +884,13 @@ web.MapPost("/fs/dirs", async (HttpContext ctx) =>
     var path = await ReadName(ctx);
     return Guard(() => FolderBrowser.List(path, opts.DataPath));
 });
+// тело блоком с return: лямбда-выражение из одного вызова подходит под RequestDelegate, и ответ выбрасывается — окно
+// получало пустой 200 и писало «empty response» (так было с 0.9.0: своя папка для копий через агента не сохранялась)
 web.MapPost("/backups/check-dir", async (HttpContext ctx) =>
-    Json(new BackupDirCheck(await Task.Run(async () => BackupStore.CheckDir(await ReadName(ctx))))));
+{
+    var dir = await ReadName(ctx);
+    return Json(new BackupDirCheck(await Task.Run(() => BackupStore.CheckDir(dir))));
+});
 web.MapPost("/backups/delete", async (HttpContext ctx) =>
     await ReadName(ctx) is { Length: > 0 } name ? Guard(() => { files.DeleteBackup(name); return Status(); }) : Results.BadRequest());
 // обновить eViSTool на этом компьютере до версии окна — кнопка «Обновить там» у окна на ДРУГОМ компьютере,
