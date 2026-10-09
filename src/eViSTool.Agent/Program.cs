@@ -785,8 +785,8 @@ web.MapPost("/backups/check-dir", async (HttpContext ctx) =>
     Json(new BackupDirCheck(await Task.Run(async () => BackupStore.CheckDir(await ReadName(ctx))))));
 web.MapPost("/backups/delete", async (HttpContext ctx) =>
     await ReadName(ctx) is { Length: > 0 } name ? Guard(() => { files.DeleteBackup(name); return Status(); }) : Results.BadRequest());
-if (isRemote) return;
-// обновить eViSTool на этом компьютере до версии окна (кнопка «Обновить там» у окна на другом компьютере)
+// обновить eViSTool на этом компьютере до версии окна — кнопка «Обновить там» у окна на ДРУГОМ компьютере,
+// поэтому точка есть и на удалённом входе (до 0.9.1 её там не было, и кнопка отвечала «не умеет обновляться»)
 web.MapPost("/self-update", async (HttpContext ctx) =>
 {
     if (await ReadBody<SelfUpdateRequest>(ctx) is not { } request
@@ -798,6 +798,7 @@ web.MapPost("/self-update", async (HttpContext ctx) =>
     _ = Task.Run(() => SelfUpdateAsync(target));
     return Json(Status());
 });
+if (isRemote) return;
 
 web.MapPost("/shutdown", () =>
 {
