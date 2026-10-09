@@ -12,7 +12,10 @@ public enum NotifyEvent
     ServerCrashed,
     StartFailed,
     BackupFailed,
+    LowDisk,
+    Overloaded,
     ModsUpdated,
+    ModUpdates,
     ServerStarted,
     ServerStopped,
     RestartSoon,
@@ -112,8 +115,8 @@ public sealed class ServerNotifier(Func<ServerNotifySettings> settings, HttpClie
     public static NotifySeverity SeverityOf(NotifyEvent e) => e switch
     {
         NotifyEvent.ServerCrashed or NotifyEvent.StartFailed or NotifyEvent.BackupFailed => NotifySeverity.Problem,
-        NotifyEvent.RestartSoon => NotifySeverity.Warning,
-        NotifyEvent.ModsUpdated => NotifySeverity.Info,
+        NotifyEvent.RestartSoon or NotifyEvent.LowDisk or NotifyEvent.Overloaded => NotifySeverity.Warning,
+        NotifyEvent.ModsUpdated or NotifyEvent.ModUpdates => NotifySeverity.Info,
         NotifyEvent.ServerStarted => NotifySeverity.Good,
         _ => NotifySeverity.Neutral,
     };

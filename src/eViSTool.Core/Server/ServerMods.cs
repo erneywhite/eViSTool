@@ -82,6 +82,23 @@ public sealed class ServerMods(string profileId, string gameDir, string dataDir)
     /// выключенными. Закреплённые моды и пропущенные версии не трогаются (<paramref name="policy"/>). Релиз, которому
     /// нужна игра новее, не ставится. Сбой одного мода не мешает остальным; модбаза недоступна — исключение, ничего не тронуто.
     /// </summary>
+    /// <summary>
+    /// Какие обновления модов вышли (без установки) — для оповещения «вышли обновления модов». Закрепления и пропущенные
+    /// версии соблюдаются так же, как при обновлении. Строки — «Название: 1.2.0 → 1.3.0».
+    /// </summary>
+    public async Task<IReadOnlyList<string>> AvailableUpdatesAsync(ModPolicy policy, bool allowUnstable, ModDb.ModDbClient db,
+        CancellationToken ct = default)
+    {
+        var resolved = Resolve();
+        var game = resolved.GameVersion ?? throw new InvalidOperationException(Loc.T("err.noGameVersion"));
+        var locals = ModUpdateService.ScanLocal(resolved);
+        var remote = await new ModUpdateService(db).FetchRemoteAsync(locals, ct: ct).ConfigureAwait(false);
+        return [.. UpdateChecker.Evaluate(locals, remote, game, allowUnstable, policy)
+            .Where(r => r.Status == ModStatus.UpdateAvailable && r.LatestCompatible is not null && r.Local.Info is not null)
+            .Select(r => $"{(string.IsNullOrWhiteSpace(r.Local.Info!.Name) ? r.Local.Info.ModId : r.Local.Info.Name)}: {r.Local.Info.Version} → {r.LatestCompatible!.ModVersion}")
+            .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)];
+    }
+
     public async Task<ModAutoUpdateResult> UpdateAllAsync(ModPolicy policy, bool allowUnstable, Mods.ModUpdater updater,
         ModDb.ModDbClient db, CancellationToken ct = default)
     {

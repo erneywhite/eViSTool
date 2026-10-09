@@ -105,6 +105,22 @@ host.StateChanged += state =>
     }
 };
 
+// «сервер не успевает»: много «Server overloaded» за короткое время — с подсказкой, памяти ли не хватает
+var overloads = new OverloadWatch();
+host.Console.LineAdded += line =>
+{
+    if (line.Kind != ConsoleLineKind.Output || overloads.Add(line.Text, DateTime.Now) is not { } count) return;
+    var details = new List<eViSTool.Core.Notifications.NotifyLine>
+    {
+        Line("◷", "notify.lbl.warnings", eViSTool.Core.Localization.Loc.T("notify.ev.overloadCount", count, (int)OverloadWatch.Window.TotalMinutes)),
+    };
+    if (SystemMemory.Status() is { } mem)
+        details.Add(SystemMemory.IsLow(mem)
+            ? Line("▣", "notify.lbl.memory", eViSTool.Core.Localization.Loc.T("notify.ev.memoryLow", mem.LoadPercent, mem.FreeMb))
+            : Line("⚑", "notify.lbl.hint", eViSTool.Core.Localization.Loc.T("notify.ev.overloadHint")));
+    Notify(eViSTool.Core.Notifications.NotifyEvent.Overloaded, eViSTool.Core.Localization.Loc.T("notify.ev.overloaded"), [.. details]);
+};
+
 // кто зашёл и вышел: разница составов (сервер останавливается — это не «все вышли»)
 var knownPlayers = new HashSet<string>(StringComparer.Ordinal);
 players.Changed += () =>
@@ -129,6 +145,36 @@ var commands = ServerCommands.Load(commandsFile).ToDictionary(c => c.Name, Strin
 var commandsDirty = false;
 var mods = new ServerMods(opts.ProfileId, Path.GetDirectoryName(Path.GetFullPath(opts.ExePath)) ?? "", opts.DataPath);
 var playerLists = new ServerPlayers(opts.DataPath); // вкладка «Игроки» окна на другой машине
+
+// оповещения о здоровье сервера: место на диске, обновления модов
+var lowDisk = new LowDiskWatch();
+var nextDiskCheck = DateTime.Now.AddMinutes(1);
+var nextModCheck = DateTime.Now.AddMinutes(10); // не сразу при запуске: агент мог подняться ради одной команды
+// какой список обновлений уже присылали — помним между запусками агента, чтобы не повторять одно и то же
+var modUpdatesFile = Path.Combine(opts.AgentsDir ?? AgentProtocol.DefaultAgentsDir, $"{opts.ProfileId}.modupdates.json");
+
+async Task CheckModUpdatesAsync()
+{
+    var settings = eViSTool.Core.Notifications.ServerNotifySettings.Load(opts.ProfileId, opts.AgentsDir);
+    if (!settings.ChannelsFor(eViSTool.Core.Notifications.NotifyEvent.ModUpdates).Any()) return;
+    try
+    {
+        using var db = new eViSTool.Core.ModDb.ModDbClient();
+        var list = await mods.AvailableUpdatesAsync(automation.UpdatePolicy, automation.UpdateAllowUnstable, db);
+        var seen = File.Exists(modUpdatesFile) ? JsonConvert.DeserializeObject<List<string>>(File.ReadAllText(modUpdatesFile)) ?? [] : [];
+        if (list.Count > 0 && !list.SequenceEqual(seen))
+            Notify(eViSTool.Core.Notifications.NotifyEvent.ModUpdates, eViSTool.Core.Localization.Loc.T("notify.ev.modUpdates", list.Count),
+                [.. list.Take(30).Select(l => new eViSTool.Core.Notifications.NotifyLine("• " + l)),
+                 .. list.Count > 30 ? [new eViSTool.Core.Notifications.NotifyLine(eViSTool.Core.Localization.Loc.T("notify.ev.andMore", list.Count - 30))] : Array.Empty<eViSTool.Core.Notifications.NotifyLine>(),
+                 Line("⚑", "notify.lbl.hint", eViSTool.Core.Localization.Loc.T(automation.RestartUpdateMods ? "notify.ev.modUpdatesAuto" : "notify.ev.modUpdatesHint"))]);
+        File.WriteAllText(modUpdatesFile, JsonConvert.SerializeObject(list));
+    }
+    catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or IOException or TaskCanceledException
+                                   or UnauthorizedAccessException or JsonException)
+    {
+        // модбаза недоступна — попробуем завтра; это не повод тревожить
+    }
+}
 // настройки модов (ModConfig) — для окна на другой машине; прежние версии хранятся здесь, рядом с файлами
 var modConfigs = new ModConfigService(opts.DataPath,
     new ModConfigBackups(Path.Combine(eViSTool.Core.AppPaths.ModConfigBackups, opts.ProfileId)), mods.Locals);
@@ -793,6 +839,23 @@ try
     while (!shutdown.IsCancellationRequested)
     {
         await Task.Delay(TimeSpan.FromSeconds(5), shutdown.Token).ContinueWith(_ => { });
+
+        // мало места на диске с данными сервера — раз в 10 минут
+        if (DateTime.Now >= nextDiskCheck)
+        {
+            nextDiskCheck = DateTime.Now.AddMinutes(10);
+            if (LowDiskWatch.FreeBytes(opts.DataPath) is { } free && lowDisk.Check(free))
+                Notify(eViSTool.Core.Notifications.NotifyEvent.LowDisk, eViSTool.Core.Localization.Loc.T("notify.ev.lowDisk"),
+                    Line("▣", "notify.lbl.disk", eViSTool.Core.Localization.Loc.T("notify.ev.diskFree",
+                        Path.GetPathRoot(Path.GetFullPath(opts.DataPath)) ?? opts.DataPath, eViSTool.Core.Localization.SizeText.Format(free))));
+        }
+
+        // вышли обновления модов — раз в сутки, и только если это оповещение кому-то включено
+        if (DateTime.Now >= nextModCheck)
+        {
+            nextModCheck = DateTime.Now.AddHours(24);
+            _ = Task.Run(CheckModUpdatesAsync);
+        }
 
         if (DateTime.Now >= nextErrorScan)
         {
