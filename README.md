@@ -27,6 +27,7 @@ eViSTool keeps your Vintage Story mods up to date, lets you browse and install m
 and runs your dedicated server from one window: console, players, configuration, backups, scheduled restarts,
 notifications and statistics.
 A server on another computer is managed the same way, with a single connection code.
+The server can run on Linux too: there eViSTool works as a service without a window, and you control it from the window on Windows.
 
 It is portable: unzip it anywhere and run. Nothing is installed into the system — no services, no autostart.
 
@@ -43,6 +44,7 @@ It is portable: unzip it anywhere and run. Nothing is installed into the system 
 - [Crashes and mod errors](#crashes-and-mod-errors)
 - [Dedicated server](#dedicated-server)
 - [Remote management](#remote-management)
+- [Server on Linux](#server-on-linux)
 - [Disk cleanup](#disk-cleanup)
 - [Updates, data and uninstalling](#updates-data-and-uninstalling)
 - [Troubleshooting](#troubleshooting)
@@ -52,6 +54,7 @@ It is portable: unzip it anywhere and run. Nothing is installed into the system 
 ## Getting started
 
 1. Download `eViSTool-<version>-win-x64.zip` from the [ModDB page](https://mods.vintagestory.at/evistool) or from [Releases](https://github.com/erneywhite/eViSTool/releases) — it is the same file.
+   For a server on Linux there is a separate archive, see [Server on Linux](#server-on-linux).
 2. Unzip it into any folder you like (not into the game folder) and run `eViSTool.exe`.
 3. eViSTool finds the game and your mods by itself and opens **My mods**.
    If the game is installed somewhere unusual, set its folder in **Settings**.
@@ -365,8 +368,8 @@ now work with the remote server.
 
 Good to know:
 
-- The server computer needs eViSTool open, or its server running: remote access lives as long as the agent does.
-  There is no service and no autostart.
+- A Windows server computer needs eViSTool open, or its server running: remote access lives as long as the agent does.
+  There is no service and no autostart there. On Linux the agent runs as a service and starts with the machine.
 - Changes show up in both windows by themselves. A mod disabled from your PC appears disabled on the server computer
   within seconds, and the other way round. The same goes for the schedule, configuration, players, statistics, announcements and notifications.
 - Mods are installed on the server over the connection: from a zip, from the catalog, as updates and from modpacks.
@@ -385,6 +388,40 @@ encrypted for your Windows account. If the code got into the wrong hands, **New 
 **Over the internet** you also need to forward the port on your router to the server computer.
 A VPN (Tailscale, ZeroTier, WireGuard and the like) is simpler and safer: use the VPN address of the server computer,
 and nothing is exposed to the internet.
+
+## Server on Linux
+
+Dedicated Vintage Story servers often live on Linux. eViSTool goes there next to the server: an agent without a window
+starts the server, brings it back after a crash, makes scheduled backups and restarts, sends notifications and records
+statistics. You control it from eViSTool on Windows with a connection code, like any remote server: console, mods,
+configuration, players, schedule — everything you have on Windows.
+
+In short, if the server is installed the official way, with `server.sh`:
+
+```sh
+sudo mkdir -p /home/vintagestory/evistool
+sudo tar -xzf eViSTool-<version>-linux-x64.tar.gz -C /home/vintagestory/evistool
+sudo chown -R vintagestory:vintagestory /home/vintagestory/evistool
+cd /home/vintagestory/evistool
+sudo -u vintagestory ./eViSTool.Agent setup                          # find the server
+sudo -u vintagestory ./eViSTool.Agent remote enable --host <address>  # turn on remote access
+sudo -u vintagestory ./eViSTool.Agent remote code                    # connection code for the Windows window
+sudo ./eViSTool.Agent service install                                # systemd service
+```
+
+Paste the code in the Windows window: **Settings → + Server → Server on another computer? → Connect by code…**.
+
+Good to know:
+
+- Put eViSTool in its own folder, not in the game folder: the game is updated with `rm -rf *`, and eViSTool would go
+  with it.
+- The `eViSTool-<version>-linux-x64.tar.gz` archive is in [Releases](https://github.com/erneywhite/eViSTool/releases).
+  The agent doesn't need .NET, it ships with its own runtime. Tested on Ubuntu Server 24.04.
+- The agent is updated with **Update on the server** from the Windows window; systemd starts the new version by itself.
+- Scheduled restart times follow the server machine's clock. If it runs in another time zone, the window tells you.
+
+The full guide, with day-to-day commands, logs and uninstalling, is in [eViSTool on a Linux server](docs/linux.md).
+Which files the agent keeps and what's in them: [Configuration files](docs/config.md).
 
 ## Disk cleanup
 
