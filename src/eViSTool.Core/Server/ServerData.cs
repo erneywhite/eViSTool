@@ -47,6 +47,11 @@ public interface IServerData
 
     /// <summary>Можно ли складывать копии в эту папку — проверяет машина с сервером; null — можно, иначе что не так.</summary>
     Task<string?> CheckBackupDirAsync(string? dir, CancellationToken ct = default);
+
+    /// <summary>Статистика за срок — итоги считает машина с сервером.</summary>
+    Task<StatsReport> LoadStatsAsync(StatsPeriod period, CancellationToken ct = default);
+    Task SetStatsEnabledAsync(bool enabled, CancellationToken ct = default);
+    Task ClearStatsAsync(CancellationToken ct = default);
 }
 
 /// <summary>
@@ -60,6 +65,8 @@ public sealed class ServerFiles(string profileId, string dataDir, string? backup
     public string BackupsDir => Store.Dir;
 
     private BackupStore Store => new(dataDir, backupPrefix, LoadAutomation().BackupDir);
+
+    public StatsStore Stats => new(StatsStore.DirFor(profileId, agentsDir));
 
     public ServerAutomation LoadAutomation() => ServerAutomation.Load(profileId, agentsDir);
     public void SaveAutomation(ServerAutomation settings) => settings.Save(profileId, agentsDir);
@@ -171,6 +178,9 @@ public sealed class LocalServerData(ServerFiles files, Func<AgentClient?>? agent
         agent?.Invoke() is { } client ? client.RestoreAsync(name, ct) : Task.Run(() => files.Restore(name, DateTime.Now), ct);
     public Task DeleteBackupAsync(string name, CancellationToken ct = default) => Task.Run(() => files.DeleteBackup(name), ct);
     public Task<string?> CheckBackupDirAsync(string? dir, CancellationToken ct = default) => Task.Run(() => BackupStore.CheckDir(dir), ct);
+    public Task<StatsReport> LoadStatsAsync(StatsPeriod period, CancellationToken ct = default) => Task.Run(() => files.Stats.Report(period, DateTime.Now), ct);
+    public Task SetStatsEnabledAsync(bool enabled, CancellationToken ct = default) => Task.Run(() => files.Stats.SetEnabled(enabled), ct);
+    public Task ClearStatsAsync(CancellationToken ct = default) => Task.Run(files.Stats.Clear, ct);
 }
 
 /// <summary>Сервер на другой машине: всё через его агента.</summary>
@@ -186,7 +196,13 @@ public sealed class RemoteServerData(Func<AgentClient?> client) : IServerData
     public Task<RestoreResult> RestoreAsync(string name, CancellationToken ct = default) => Client.RestoreAsync(name, ct);
     public Task DeleteBackupAsync(string name, CancellationToken ct = default) => Client.DeleteBackupAsync(name, ct);
     public Task<string?> CheckBackupDirAsync(string? dir, CancellationToken ct = default) => Client.CheckBackupDirAsync(dir, ct);
+    public Task<StatsReport> LoadStatsAsync(StatsPeriod period, CancellationToken ct = default) => Client.StatsAsync(period, ct);
+    public Task SetStatsEnabledAsync(bool enabled, CancellationToken ct = default) => Client.SetStatsEnabledAsync(enabled, ct);
+    public Task ClearStatsAsync(CancellationToken ct = default) => Client.ClearStatsAsync(ct);
 }
+
+/// <summary>Включить или выключить сбор статистики на машине с сервером.</summary>
+public sealed record StatsToggle(bool Enabled);
 
 public sealed record BackupNameRequest(string Name);
 

@@ -137,6 +137,30 @@ void ChatJoinLeave(string text)
         chatRelay.Post(new eViSTool.Core.Notifications.ChatPost(string.IsNullOrWhiteSpace(s.ServerName) ? "Vintage Story" : s.ServerName, text));
 }
 
+// статистика (если включена): раз в минуту — игроки, память, процессор; плюс входы, выходы, запуски и вылеты
+var stats = new StatsStore(StatsStore.DirFor(opts.ProfileId, opts.AgentsDir));
+var cpuMeter = new CpuMeter();
+var nextSample = DateTime.Now.AddMinutes(1);
+var nextStatsPrune = DateTime.Now.AddMinutes(2);
+void Stat(StatsEntry entry)
+{
+    try
+    {
+        if (stats.IsEnabled) stats.Append(entry);
+    }
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+    {
+        // не записалось — статистика не повод мешать серверу
+    }
+}
+host.StateChanged += state =>
+{
+    if (state == ServerState.Running) Stat(new StatsEntry(DateTime.Now, StatsKind.Up));
+    // сам остановился после запуска — упал (как и для оповещения «сервер упал»)
+    else if (state == ServerState.Stopped)
+        Stat(new StatsEntry(DateTime.Now, host.LastExitOnItsOwn && reachedRunning ? StatsKind.Crash : StatsKind.Down));
+};
+
 // кто зашёл и вышел: разница составов (сервер останавливается — это не «все вышли»)
 var knownPlayers = new HashSet<string>(StringComparer.Ordinal);
 players.Changed += () =>
@@ -144,6 +168,10 @@ players.Changed += () =>
     var now = players.Players.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
     if (host.State == ServerState.Running)
     {
+        foreach (var name in now.Except(knownPlayers))
+            Stat(new StatsEntry(DateTime.Now, StatsKind.Join, Name: name));
+        foreach (var name in knownPlayers.Except(now))
+            Stat(new StatsEntry(DateTime.Now, StatsKind.Leave, Name: name));
         foreach (var name in now.Except(knownPlayers))
             ChatJoinLeave(eViSTool.Core.Localization.Loc.T("chat.joined", name, now.Count));
         foreach (var name in knownPlayers.Except(now))
@@ -747,6 +775,12 @@ web.MapPost("/config/generate", async () =>
         return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
     }
 });
+web.MapGet("/stats", (HttpContext ctx) =>
+    Enum.TryParse<StatsPeriod>(ctx.Request.Query["period"].ToString(), out var period)
+        ? Guard(() => files.Stats.Report(period, DateTime.Now)) : Results.BadRequest());
+web.MapPost("/stats/enabled", async (HttpContext ctx) =>
+    await ReadBody<StatsToggle>(ctx) is { } toggle ? Guard(() => { files.Stats.SetEnabled(toggle.Enabled); return Status(); }) : Results.BadRequest());
+web.MapPost("/stats/clear", () => Guard(() => { files.Stats.Clear(); return Status(); }));
 web.MapPost("/backups/check-dir", async (HttpContext ctx) =>
     Json(new BackupDirCheck(await Task.Run(async () => BackupStore.CheckDir(await ReadName(ctx))))));
 web.MapPost("/backups/delete", async (HttpContext ctx) =>
@@ -880,6 +914,21 @@ try
     while (!shutdown.IsCancellationRequested)
     {
         await Task.Delay(TimeSpan.FromSeconds(5), shutdown.Token).ContinueWith(_ => { });
+
+        // статистика: замер раз в минуту, старые дни — раз в сутки
+        if (DateTime.Now >= nextSample)
+        {
+            var at = DateTime.Now;
+            nextSample = at.AddMinutes(1);
+            var cpu = cpuMeter.Next(host.State == ServerState.Running ? host.ProcessorTime : null, at);
+            if (host.State == ServerState.Running && cpu is { } load && host.MemoryMb is { } memory)
+                Stat(new StatsEntry(at, StatsKind.Sample, players.Players.Count, memory, Math.Round(load, 1)));
+        }
+        if (DateTime.Now >= nextStatsPrune)
+        {
+            nextStatsPrune = DateTime.Now.AddHours(24);
+            try { stats.Prune(DateTime.Now); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
 
         // мало места на диске с данными сервера — раз в 10 минут
         if (DateTime.Now >= nextDiskCheck)

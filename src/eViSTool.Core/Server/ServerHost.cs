@@ -102,6 +102,19 @@ public sealed class ServerHost : IAsyncDisposable
         }
     }
 
+    /// <summary>Сколько процессорного времени сервер израсходовал с запуска (для статистики); null — не работает.</summary>
+    public TimeSpan? ProcessorTime
+    {
+        get
+        {
+            try
+            {
+                return _process is { HasExited: false } p ? p.TotalProcessorTime : null;
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { return null; }
+        }
+    }
+
     private void SetState(ServerState state)
     {
         if (State == state) return;
