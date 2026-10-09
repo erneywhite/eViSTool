@@ -77,6 +77,21 @@ The active profile is chosen at the top of the window, and every page works with
 - **Server profile** — a dedicated server: the folder with `VintagestoryServer.exe` and the server data folder (`--dataPath`).
 - **Remote server** — a server on another computer, managed over the network (see [Remote management](#remote-management)).
 
+**Play straight on a server.** The arrow next to **Play** opens a menu: No server, your servers from eViSTool
+(on this computer or in a VM, with their state: running, how many online) and the game's favorites. A menu item starts the game
+and connects to the server right away, skipping the game's menu. The pin makes a server the default: the button then says, say,
+**Play · home**, and one click takes you straight there. The same is set in **Settings** for a client profile — **Server for the Play button**.
+
+![Play menu](docs/screenshots/play-menu.png)
+
+**Find a server…** in the same menu opens the public server list — the same one the game's own server browser shows (the address
+comes from its settings). Search, filters (your game version, free slots, no password, no whitelist, with or without mods) and sorting;
+clicking a server shows its description and mods, with how many of them you already have. From there you can play right away
+or add the server to the game's favorites. The **Favorites** tab has all of them: **Add server** by hand (name, address, password),
+**Edit** and **Remove**. Favorites change only while the game is closed: it rewrites them when it exits.
+
+![Find a server](docs/screenshots/find-server.png)
+
 Profiles are created in **Settings** with **+ Client** and **+ Server**, or copied from an existing one with **Clone…**.
 Client profiles show the icon of your installed game.
 
