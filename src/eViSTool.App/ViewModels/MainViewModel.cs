@@ -266,7 +266,7 @@ public sealed partial class MainViewModel : ObservableObject
                 try { using var proc = System.Diagnostics.Process.GetProcessById(activePids[0]); started = proc.StartTime.ToUniversalTime(); }
                 catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception) { }
                 var dataDir = string.IsNullOrWhiteSpace(active.DataDir) ? GameInstall.DefaultDataDir : active.DataDir;
-                _session = new Core.Diagnostics.GameSession(dataDir, started);
+                _session = new Core.Diagnostics.GameSession(dataDir, started, active.GameDir);
                 _sessionProfile = active;
             }
         }

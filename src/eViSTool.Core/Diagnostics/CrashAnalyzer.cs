@@ -34,14 +34,6 @@ public static partial class CrashAnalyzer
     private const string NormalLeave = "leave world button pressed";
     private const string TranslationPrefix = "Translation string format exception thrown for: ";
 
-    /// <summary>
-    /// Сервер выгнал или забанил игрока: это не вылет, даже если в логе есть ошибки модов (они могли случиться раньше,
-    /// например при входе). Причину игра пишет на языке игрока — тексты из её lang/en.json и ru.json:
-    /// «You've been kicked by {0}[, reason: {1}]», «You've been banned by {0}{1}» и «Вас выгнал {0}[, причина: {1}]»,
-    /// «Вы были забанены {0}{1}».
-    /// </summary>
-    [GeneratedRegex(@"^(?:You've been kicked by |You've been banned by |Вас выгнал |Вы были забанены )")]
-    private static partial Regex KickedOrBanned();
 
     [GeneratedRegex(@"Critical error occurred in the following mod: (?<id>[^@\s]+)(?:@(?<ver>\S+))?")]
     private static partial Regex CriticalMod();
@@ -85,8 +77,10 @@ public static partial class CrashAnalyzer
     /// <param name="client">Записи client-main.log за сессию игры.</param>
     /// <param name="crashReport">client-crash.log, если он появился за эту сессию.</param>
     /// <param name="server">Записи server-main.log за сессию (одиночная игра — встроенный сервер).</param>
+    /// <param name="kicks">Тексты «выгнали / забанили» на языке игры (по умолчанию — встроенные английский и русский).</param>
     /// <returns>null — ничего не случилось (обычный выход).</returns>
-    public static CrashFinding? Analyze(IReadOnlyList<LogEntry> client, string? crashReport, IReadOnlyList<LogEntry>? server, ModFingerprints mods)
+    public static CrashFinding? Analyze(IReadOnlyList<LogEntry> client, string? crashReport, IReadOnlyList<LogEntry>? server, ModFingerprints mods,
+        KickReasons? kicks = null)
     {
         var crashed = crashReport is not null || client.Any(e => e.Message.Contains("Exit reason: Game crashed", StringComparison.Ordinal));
         if (crashed) return FromCrash(client, crashReport, server, mods);
@@ -97,7 +91,8 @@ public static partial class CrashAnalyzer
         if (exit is null) return null;
         var reason = exit.Message.StartsWith(DisconnectedPrefix, StringComparison.Ordinal)
             ? exit.Message[DisconnectedPrefix.Length..] : exit.Message[MainMenuPrefix.Length..];
-        if (KickedOrBanned().IsMatch(reason)) return null; // выгнали или забанили — мир закрылся не из-за ошибки
+        // сервер выгнал или забанил — мир закрылся не из-за ошибки, даже если ошибки модов в логе были (например, при входе)
+        if ((kicks ?? KickReasons.BuiltIn).Matches(reason)) return null;
 
         // мир закрыт — ошибки ищем в логах обеих сторон; ошибок нет (сервер перезагрузили, кикнули) — это не вылет
         var errors = Errors(server ?? []).Concat(Errors(client)).ToList();

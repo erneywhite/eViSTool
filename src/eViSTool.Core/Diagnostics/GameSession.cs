@@ -21,11 +21,14 @@ public sealed class GameSession
     // каждый своим сборщиком: склеенные, записи спутались бы на стыке
     private readonly ModErrorCollector _clientErrors = new();
     private readonly ModErrorCollector _serverErrors = new();
+    private readonly KickReasons _kicks;
 
     /// <param name="dataDir">Папка данных профиля (там Logs).</param>
     /// <param name="startedUtc">Когда запущена игра: лог, начатый после этого, читается с начала, иначе — с текущего конца.</param>
-    public GameSession(string dataDir, DateTime startedUtc)
+    /// <param name="gameDir">Папка игры профиля: из её переводов — тексты «выгнали / забанили» на языке игрока.</param>
+    public GameSession(string dataDir, DateTime startedUtc, string? gameDir = null)
     {
+        _kicks = KickReasons.For(gameDir, dataDir);
         var logs = Path.Combine(dataDir, "Logs");
         _client = Tail(Path.Combine(logs, "client-main.log"), startedUtc);
         _server = Tail(Path.Combine(logs, "server-main.log"), startedUtc);
@@ -46,7 +49,7 @@ public sealed class GameSession
         var fresh = Read();
         if (!fresh.Any(l => l.Contains(DisconnectedMarker, StringComparison.Ordinal) || l.Contains(MainMenuMarker, StringComparison.Ordinal)))
             return null;
-        var finding = CrashAnalyzer.Analyze(GameLog.Parse(_clientLines), null, GameLog.Parse(_serverLines), mods());
+        var finding = CrashAnalyzer.Analyze(GameLog.Parse(_clientLines), null, GameLog.Parse(_serverLines), mods(), _kicks);
         // мир закрыт — разобрали; следующий мир той же игры начинаем с чистого листа
         _clientLines.Clear();
         _serverLines.Clear();
@@ -68,7 +71,7 @@ public sealed class GameSession
             try { report = File.ReadAllText(_crashFile); }
             catch (IOException) { }
         }
-        return CrashAnalyzer.Analyze(GameLog.Parse(_clientLines), report, GameLog.Parse(_serverLines), mods());
+        return CrashAnalyzer.Analyze(GameLog.Parse(_clientLines), report, GameLog.Parse(_serverLines), mods(), _kicks);
     }
 
     /// <summary>«Ошибки модов» за этот запуск: игра их проглотила, но они копятся (и бывают фризы).</summary>
