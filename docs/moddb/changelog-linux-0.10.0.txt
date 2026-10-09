@@ -1,0 +1,19 @@
+eViSTool 0.10.0: the first version for Linux.
+
+- The agent runs next to your Vintage Story server as a systemd service: starts the server with the machine, brings it back after a crash, makes scheduled backups and restarts, sends notifications and records statistics.
+- Control it from eViSTool 0.10.0 on Windows with a connection code.
+- Commands on the machine: setup, remote (enable, code, new-key, status), status, start, stop, restart, command, service install / uninstall / status.
+- Later updates come with the "Update on the server" button in the Windows app.
+
+Setup guide: https://github.com/erneywhite/eViSTool/blob/main/docs/linux.md
+
+---
+
+eViSTool 0.10.0: первая версия для Linux.
+
+- Агент работает рядом с сервером Vintage Story службой systemd: запускает сервер вместе с машиной, поднимает после падения, делает копии и перезапуски по расписанию, рассылает оповещения и пишет статистику.
+- Управляется из eViSTool 0.10.0 на Windows по коду подключения.
+- Команды на самой машине: setup, remote (enable, code, new-key, status), status, start, stop, restart, command, service install / uninstall / status.
+- Дальше обновляется кнопкой «Обновить на сервере» из программы на Windows.
+
+Инструкция: https://github.com/erneywhite/eViSTool/blob/main/docs/linux.ru.md

@@ -1,0 +1,33 @@
+eViSTool 0.10.0: your server can now run on Linux.
+
+Linux
+- The agent runs on a Linux server as a systemd service and is controlled from eViSTool on Windows with a connection code. Download and setup are on the eViSTool — Linux page.
+- For a Linux server the window shows "Linux" next to the server name, notes on the Schedule tab when the server's clock is in another time zone, and shows backup and statistics times in your own time zone.
+- Browse for the backup folder now works on the remote computer too: it lists that computer's folders.
+- "Update there" is now called "Update on the server" and works on Linux as well.
+
+Fixes
+- The mod to blame for a server crash wasn't found when the server stopped because of too many mod errors, and the server's mod error counter stayed empty. The real server console marks lines as "[Server Error]", and eViSTool didn't recognize that.
+- Statistics showed 0 minutes played for players who were already in the game when statistics were turned on or the agent restarted.
+- A custom backup folder couldn't be saved through the agent (the window said "empty response"). Broken since 0.9.0.
+- Two crashes close together no longer draw overlapping labels on the players chart.
+
+Update from About; a running server keeps running.
+
+---
+
+eViSTool 0.10.0: сервер теперь может стоять на Linux.
+
+Linux
+- Агент работает на Linux-сервере службой systemd, а управляешь им из eViSTool на Windows по коду подключения. Скачать и поставить его можно на странице eViSTool — Linux.
+- У сервера на Linux окно пишет «Linux» рядом с именем сервера, на вкладке «Расписание» предупреждает, если часы сервера идут в другом поясе, а время копий и статистики показывает по твоему поясу.
+- «Обзор» папки для копий работает и на удалённом компьютере: показывает папки того компьютера.
+- «Обновить там» теперь называется «Обновить на сервере» и работает и на Linux.
+
+Исправления
+- Если сервер останавливался из-за потока ошибок мода, виновник не находился, а счётчик ошибок модов сервера оставался пустым. Настоящая консоль сервера помечает строки как «[Server Error]», и eViSTool этого не узнавал.
+- Статистика показывала 0 минут игры тем, кто уже был в игре, когда включили сбор или перезапустился агент.
+- Свою папку для копий нельзя было сохранить через агента: окно писало «empty response». Так было с 0.9.0.
+- Два вылета подряд больше не рисуют на графике игроков подписи друг на друге.
+
+Обнови из «О программе», запущенный сервер не остановится.
