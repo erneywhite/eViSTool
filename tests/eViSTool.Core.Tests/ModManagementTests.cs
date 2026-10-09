@@ -181,9 +181,19 @@ public sealed class ModManagementTests : IDisposable
         var plan = ModInstaller.Plan(incoming, p, ModUpdateService.ScanLocal(p));
         Assert.Equal(2, plan.Replaces.Count);
 
-        // вторая копия занята (игра держит файл) — первая к этому моменту уже ушла в хранилище
-        using (new FileStream(plan.Replaces[1].Path, FileMode.Open, FileAccess.Read, FileShare.None))
-            Assert.ThrowsAny<IOException>(() => ModInstaller.Apply(plan, new ModBackupStore(Path.Combine(_root, "backups"))));
+        // вторая копия не уходит в хранилище — первая к этому моменту уже там. На Windows так бывает, когда игра держит
+        // файл; на Linux открытый файл переносу не мешает, и сбой делаем иначе: место в хранилище занято папкой
+        var backups = new ModBackupStore(Path.Combine(_root, "backups"));
+        if (OperatingSystem.IsWindows())
+        {
+            using (new FileStream(plan.Replaces[1].Path, FileMode.Open, FileAccess.Read, FileShare.None))
+                Assert.ThrowsAny<IOException>(() => ModInstaller.Apply(plan, backups));
+        }
+        else
+        {
+            Directory.CreateDirectory(Path.Combine(backups.DirFor("alpha"), plan.Replaces[1].FileName));
+            Assert.ThrowsAny<IOException>(() => ModInstaller.Apply(plan, backups));
+        }
 
         Assert.Equal(before.Keys.Order(), Directory.GetFiles(_mods).Select(Path.GetFileName).Order());
         foreach (var (name, bytes) in before) Assert.Equal(bytes, File.ReadAllBytes(Path.Combine(_mods, name!)));

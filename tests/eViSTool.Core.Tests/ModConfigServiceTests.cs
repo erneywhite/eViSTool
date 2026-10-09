@@ -26,12 +26,27 @@ public sealed class ModConfigServiceTests : IDisposable
     [InlineData("../secret.json")]
     [InlineData("..\\secret.json")]
     [InlineData("sub/../../secret.json")]
+    [InlineData("sub\\..\\..\\secret.json")]
     [InlineData("C:/Windows/win.ini")]
+    [InlineData("/etc/secret.json")]
     [InlineData("icon.png")]          // не текстовый файл
     public void PathsOutsideModConfig_AreRefused(string path)
     {
         Assert.Throws<InvalidOperationException>(() => _service.Read(path));
         Assert.Throws<InvalidOperationException>(() => _service.Save(new ModConfigSaveRequest(path, "{}", null)));
+    }
+
+    [Fact]
+    public void RoundaboutPath_KeepsVersionsInsideTheBackupFolder()
+    {
+        File.WriteAllText(Path.Combine(_cfg, "a.json"), """{ "v": 1 }""");
+
+        // путь кружной, но ведёт в ModConfig — файл тот же, и копии лежат при нём, а не «../../ModConfig» от хранилища
+        var c = _service.Save(new ModConfigSaveRequest("x/../../ModConfig/a.json", """{ "v": 2 }""", null)).Content!;
+
+        Assert.Equal("a.json", c.RelativePath);
+        Assert.Equal(1, _service.Read("a.json").Versions);
+        Assert.False(Directory.Exists(Path.Combine(_root, "ModConfig")));
     }
 
     [Fact]

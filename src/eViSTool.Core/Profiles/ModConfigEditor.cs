@@ -94,12 +94,27 @@ public static class ModConfigEditor
         return JObject.Load(reader);
     }
 
-    /// <summary>Резервная копия предыдущего состояния рядом (*.evistool.bak) и атомарная запись.</summary>
+    /// <summary>
+    /// Резервная копия предыдущего состояния рядом (*.evistool.bak) и атомарная запись. Переводы строк — как в прежнем
+    /// файле: конфиг с Windows на Linux (и наоборот) не перекраивается целиком; нового файла — как принято в системе.
+    /// </summary>
     internal static void Save(string path, JObject root)
     {
+        var newLine = File.Exists(path) ? NewLineOf(path) : null;
         if (File.Exists(path)) File.Copy(path, path + ".evistool.bak", overwrite: true);
         var tmp = path + ".evistool.tmp";
-        File.WriteAllText(tmp, root.ToString(Formatting.Indented), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        var text = new StringWriter(System.Globalization.CultureInfo.InvariantCulture) { NewLine = newLine ?? Environment.NewLine };
+        using (var writer = new JsonTextWriter(text) { Formatting = Formatting.Indented })
+            root.WriteTo(writer);
+        File.WriteAllText(tmp, text.ToString(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         File.Move(tmp, path, overwrite: true);
+    }
+
+    /// <summary>Перевод строки файла по первой строке: «\r\n» или «\n»; строк нет — null.</summary>
+    private static string? NewLineOf(string path)
+    {
+        var text = File.ReadAllText(path);
+        var at = text.IndexOf('\n');
+        return at < 0 ? null : at > 0 && text[at - 1] == '\r' ? "\r\n" : "\n";
     }
 }

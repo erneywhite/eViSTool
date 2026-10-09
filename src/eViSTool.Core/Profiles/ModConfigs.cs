@@ -244,8 +244,13 @@ public sealed class ModConfigBackups(string root, int keep = 5)
     public void Keep(string path, string relativePath)
     {
         var dir = Directory.CreateDirectory(DirFor(relativePath)).FullName;
-        var name = DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + System.IO.Path.GetExtension(path);
-        File.Copy(path, System.IO.Path.Combine(dir, name), overwrite: true);
+        // две записи в одну миллисекунду (на быстром диске так и бывает) не должны затирать друг друга:
+        // имя занято — следующая миллисекунда, порядок версий по имени сохраняется
+        var at = DateTime.Now;
+        string target;
+        while (File.Exists(target = System.IO.Path.Combine(dir, at.ToString("yyyyMMdd-HHmmss-fff") + System.IO.Path.GetExtension(path))))
+            at = at.AddMilliseconds(1);
+        File.Copy(path, target, overwrite: true);
         foreach (var old in Versions(relativePath).Skip(keep)) File.Delete(old);
     }
 
