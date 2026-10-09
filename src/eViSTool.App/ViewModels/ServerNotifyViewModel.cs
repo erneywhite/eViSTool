@@ -223,7 +223,7 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
             else if (_profile is { IsRemote: false } p)
                 // агент своего сервера не запущен — отправляем отсюда же: машина та же, каналы те же
                 errors = await new ServerNotifier(() => ServerNotifySettings.Load(p.Id), NotifyChannelsViewModel.Http, (_, _) => { })
-                    .TestAsync(Loc.T("notify.testTitle"), new NotifyLine("📡", Loc.T("notify.testFromServer", Environment.MachineName)));
+                    .TestAsync(Loc.T("notify.testTitle"), new NotifyLine("◇", Loc.T("notify.lbl.from"), Loc.T("notify.testFromServer", Environment.MachineName)));
             else throw new InvalidOperationException(Loc.T("server.stateOffline"));
             StatusText = errors.Count == 0 ? Loc.T("srvnotify.testSent") : "";
             ErrorText = string.Join(Environment.NewLine, errors);

@@ -42,7 +42,7 @@ public sealed class ServerNotifyTests
         var http = new Recorder();
         var notifier = new ServerNotifier(Settings, new HttpClient(http), (_, _) => { });
 
-        notifier.Notify(NotifyEvent.PlayerJoined, "Anna joined", new NotifyLine("👥", "Online: 1"));
+        notifier.Notify(NotifyEvent.PlayerJoined, "Anna joined", new NotifyLine("◦", "Online", "1"));
         notifier.Notify(NotifyEvent.ServerStopped, "Server stopped"); // ни в один канал не включено
         for (var i = 0; i < 50 && http.Urls.Count < 1; i++) await Task.Delay(20);
         await Task.Delay(100);
@@ -50,7 +50,7 @@ public sealed class ServerNotifyTests
         Assert.Single(http.Urls);
         Assert.Contains(TokenB, http.Urls[0]);
         var text = Newtonsoft.Json.Linq.JObject.Parse(http.Bodies[0]).Value<string>("text");
-        Assert.Equal("⚪ <b>Survival</b>\n<b>Anna joined</b>\n👥 Online: 1", text);
+        Assert.Equal("⚪ <b>Survival</b>\n<b>Anna joined</b>\n◦ <i>Online:</i> 1", text);
     }
 
     [Fact]

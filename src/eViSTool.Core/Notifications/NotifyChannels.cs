@@ -36,8 +36,14 @@ public sealed record NotifyChannel
 /// <summary>Насколько это важно — цвет оповещения: кружок в Telegram, полоса в Discord, приоритет в ntfy.</summary>
 public enum NotifySeverity { Problem, Warning, Info, Good, Neutral }
 
-/// <summary>Строка подробностей: значок (эмодзи, может быть пустым) и текст.</summary>
-public sealed record NotifyLine(string Icon, string Text);
+/// <summary>
+/// Строка подробностей: одноцветный символ из шрифта (⚑ ↻ ◷ ◦ ▣ — не эмодзи: Telegram их не подменяет), подпись
+/// («Мод», «Сторож») и текст. Символ и подпись могут быть пустыми — так пишутся пункты списка.
+/// </summary>
+public sealed record NotifyLine(string Icon, string? Label, string Text)
+{
+    public NotifyLine(string text) : this("", null, text) { }
+}
 
 /// <summary>
 /// Оповещение: цвет, сервер (если есть), что случилось и строки подробностей. Каждый канал показывает их по-своему;
@@ -58,7 +64,8 @@ public sealed record NotifyMessage(NotifySeverity Severity, string? Server, stri
     public string ToPlainText() => string.Join("\n",
         new[] { string.IsNullOrWhiteSpace(Server) ? null : $"{Dot} {Server}", string.IsNullOrWhiteSpace(Server) ? $"{Dot} {Title}" : Title }
             .Where(s => s is not null)
-            .Concat(Details.Select(d => d.Icon.Length > 0 ? $"{d.Icon} {d.Text}" : d.Text)));
+            .Concat(Details.Select(d => string.Join(" ", new[] { d.Icon, d.Label is { Length: > 0 } l ? l + ":" : "", d.Text }
+                .Where(s => s.Length > 0)))));
 }
 
 /// <summary>Каналы оповещений этого компьютера — файл в папке данных программы.</summary>

@@ -41,21 +41,21 @@ public sealed class NotifierTests
     {
         var fake = new Fake(HttpStatusCode.OK, """{ "ok": true, "result": {} }""");
         var message = new NotifyMessage(NotifySeverity.Problem, "Survival", "Server crashed",
-            [new NotifyLine("🧩", "mod_x*1.0 <beta> & co"), new NotifyLine("🔁", "again in 9 s")]);
+            [new NotifyLine("⚑", "Mod", "mod_x*1.0 <beta> & co"), new NotifyLine("↻", "Watchdog", "again in 9 s"), new NotifyLine("• list item")]);
         await new Notifier(new HttpClient(fake)).SendAsync(Telegram(), message);
 
         Assert.Equal($"https://api.telegram.org/bot{Token}/sendMessage", fake.Url);
         Assert.Equal("42", fake.Sent!.Value<string>("chat_id"));
         Assert.Equal("HTML", fake.Sent.Value<string>("parse_mode"));
         // * и _ остаются как есть, а < > & экранированы — разметку не ломают
-        Assert.Equal("🔴 <b>Survival</b>\n<b>Server crashed</b>\n🧩 mod_x*1.0 &lt;beta&gt; &amp; co\n🔁 again in 9 s",
+        Assert.Equal("🔴 <b>Survival</b>\n<b>Server crashed</b>\n⚑ <i>Mod:</i> mod_x*1.0 &lt;beta&gt; &amp; co\n↻ <i>Watchdog:</i> again in 9 s\n• list item",
             fake.Sent.Value<string>("text"));
     }
 
     [Fact]
     public void WithoutServer_TheDotGoesToTheTitle()
     {
-        Assert.Equal("🔵 <b>Test</b>\n💻 from PC", Notifier.TelegramHtml(new NotifyMessage(NotifySeverity.Info, null, "Test", [new NotifyLine("💻", "from PC")])));
+        Assert.Equal("🔵 <b>Test</b>\n◇ <i>From:</i> PC", Notifier.TelegramHtml(new NotifyMessage(NotifySeverity.Info, null, "Test", [new NotifyLine("◇", "From", "PC")])));
         Assert.Equal("🟢 Survival\nServer started", new NotifyMessage(NotifySeverity.Good, "Survival", "Server started", []).ToPlainText());
     }
 

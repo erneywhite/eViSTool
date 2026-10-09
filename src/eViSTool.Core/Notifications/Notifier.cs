@@ -40,7 +40,7 @@ public sealed class Notifier(HttpClient http)
         }
     }
 
-    /// <summary>«🔴 <b>Survival</b>» / «<b>Сервер упал</b>» / «🧩 Похоже, виноват мод…»; без сервера — кружок у события.</summary>
+    /// <summary>«🔴 <b>Survival</b>» / «<b>Сервер упал</b>» / «⚑ <i>Мод:</i> …»; без сервера — кружок у события.</summary>
     public static string TelegramHtml(NotifyMessage m)
     {
         static string E(string s) => System.Net.WebUtility.HtmlEncode(s);
@@ -51,7 +51,10 @@ public sealed class Notifier(HttpClient http)
             lines.Add($"{m.Dot} <b>{E(m.Server)}</b>");
             lines.Add($"<b>{E(m.Title)}</b>");
         }
-        lines.AddRange(m.Details.Select(d => d.Icon.Length > 0 ? $"{d.Icon} {E(d.Text)}" : E(d.Text)));
+        lines.AddRange(m.Details.Select(d => string.Join(" ", new[]
+        {
+            d.Icon, d.Label is { Length: > 0 } label ? $"<i>{E(label)}:</i>" : "", E(d.Text),
+        }.Where(s => s.Length > 0))));
         return string.Join("\n", lines);
     }
 

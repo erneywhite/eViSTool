@@ -78,7 +78,8 @@ var notifier = new eViSTool.Core.Notifications.ServerNotifier(
     (channel, error) => host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("notify.sendFailed", channel, error)));
 void Notify(eViSTool.Core.Notifications.NotifyEvent e, string title, params eViSTool.Core.Notifications.NotifyLine[] details) =>
     notifier.Notify(e, title, details);
-static eViSTool.Core.Notifications.NotifyLine Line(string icon, string text) => new(icon, text);
+static eViSTool.Core.Notifications.NotifyLine Line(string icon, string labelKey, string text) =>
+    new(icon, eViSTool.Core.Localization.Loc.T(labelKey), text);
 
 // запуск и остановка; «дошёл ли до работы» — чтобы отличить падение при запуске от падения в работе
 var reachedRunning = false;
@@ -108,10 +109,10 @@ players.Changed += () =>
     {
         foreach (var name in now.Except(knownPlayers))
             Notify(eViSTool.Core.Notifications.NotifyEvent.PlayerJoined, eViSTool.Core.Localization.Loc.T("notify.ev.joined", name),
-                Line("👥", eViSTool.Core.Localization.Loc.T("notify.ev.online", now.Count)));
+                Line("◦", "notify.lbl.online", now.Count.ToString()));
         foreach (var name in knownPlayers.Except(now))
             Notify(eViSTool.Core.Notifications.NotifyEvent.PlayerLeft, eViSTool.Core.Localization.Loc.T("notify.ev.left", name),
-                Line("👥", eViSTool.Core.Localization.Loc.T("notify.ev.online", now.Count)));
+                Line("◦", "notify.lbl.online", now.Count.ToString()));
     }
     knownPlayers = now;
 };
@@ -198,9 +199,10 @@ host.StateChanged += state =>
             var why = finding?.Culprit is { } culprit
                 ? eViSTool.Core.Localization.Loc.T("notify.ev.culprit", culprit.Mod?.Name ?? culprit.ModId, culprit.Version ?? "")
                 : eViSTool.Core.Localization.Loc.T("notify.ev.noCulprit");
-            var details = new List<eViSTool.Core.Notifications.NotifyLine> { Line(finding?.Culprit is null ? "❔" : "🧩", why) };
+            var details = new List<eViSTool.Core.Notifications.NotifyLine> { Line("⚑", "notify.lbl.mod", why) };
             if (host.RestartScheduledAt is { } at)
-                details.Add(Line("🔁", eViSTool.Core.Localization.Loc.T("notify.ev.restartIn", Math.Max(1, (int)(at - DateTime.Now).TotalSeconds))));
+                details.Add(Line("↻", "notify.lbl.watchdog",
+                    eViSTool.Core.Localization.Loc.T("notify.ev.restartIn", Math.Max(1, (int)(at - DateTime.Now).TotalSeconds))));
             Notify(started ? eViSTool.Core.Notifications.NotifyEvent.ServerCrashed : eViSTool.Core.Notifications.NotifyEvent.StartFailed,
                 started ? eViSTool.Core.Localization.Loc.T("notify.ev.crashed") : eViSTool.Core.Localization.Loc.T("notify.ev.startFailed"),
                 [.. details]);
@@ -270,8 +272,8 @@ async Task RestartWithModUpdatesAsync()
             // значок — у заголовка, сами моды — простым списком (значки на каждой строке рябили бы)
             Notify(eViSTool.Core.Notifications.NotifyEvent.ModsUpdated,
                 eViSTool.Core.Localization.Loc.T("notify.ev.modsUpdated", result.Updated.Count),
-                [.. result.Updated.Select(l => Line("", "• " + l)),
-                    .. result.Failed.Select(l => Line("", "✗ " + eViSTool.Core.Localization.Loc.T("autoupd.failed", l)))]);
+                [.. result.Updated.Select(l => new eViSTool.Core.Notifications.NotifyLine("• " + l)),
+                    .. result.Failed.Select(l => new eViSTool.Core.Notifications.NotifyLine("✗ " + eViSTool.Core.Localization.Loc.T("autoupd.failed", l)))]);
     }
     catch (Exception ex) when (ex is IOException or InvalidOperationException or HttpRequestException or TaskCanceledException
                                    or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
@@ -307,7 +309,7 @@ host.Console.LineAdded += line =>
         {
             host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.notFound", requested ?? "?"));
             Notify(eViSTool.Core.Notifications.NotifyEvent.BackupFailed, eViSTool.Core.Localization.Loc.T("notify.ev.backupFailed"),
-                Line("💾", eViSTool.Core.Localization.Loc.T("notify.ev.backupMissing", requested ?? "?")));
+                Line("▣", "notify.lbl.backup", eViSTool.Core.Localization.Loc.T("notify.ev.backupMissing", requested ?? "?")));
             return;
         }
         scheduler.MarkDone(DateTime.Now, players.Players.Count);
@@ -508,7 +510,7 @@ web.MapPut("/notify", async (HttpContext ctx) =>
     return upload is null ? Results.BadRequest() : Guard(() => { upload.ToSettings().Save(opts.ProfileId, opts.AgentsDir); return Status(); });
 });
 web.MapPost("/notify/test", async () => Json(await notifier.TestAsync(
-    eViSTool.Core.Localization.Loc.T("notify.testTitle"), Line("📡", eViSTool.Core.Localization.Loc.T("notify.testFromServer", Environment.MachineName)))));
+    eViSTool.Core.Localization.Loc.T("notify.testTitle"), Line("◇", "notify.lbl.from", eViSTool.Core.Localization.Loc.T("notify.testFromServer", Environment.MachineName)))));
 web.MapGet("/announcements", () => Json(ServerAnnouncements.Load(opts.ProfileId, opts.AgentsDir)));
 web.MapPut("/announcements", async (HttpContext ctx) =>
 {
@@ -754,8 +756,8 @@ try
                         restartNotified = restartAt;
                         Notify(eViSTool.Core.Notifications.NotifyEvent.RestartSoon,
                             eViSTool.Core.Localization.Loc.T("notify.ev.restartSoon", step.MinutesLeft),
-                            Line("🕐", eViSTool.Core.Localization.Loc.T("notify.ev.restartAt", restartAt.ToString("HH:mm"))),
-                            Line("👥", eViSTool.Core.Localization.Loc.T("notify.ev.online", players.Players.Count)));
+                            Line("◷", "notify.lbl.time", restartAt.ToString("HH:mm")),
+                            Line("◦", "notify.lbl.online", players.Players.Count.ToString()));
                     }
                     await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.Plural("restart.announce", step.MinutesLeft));
                 }
@@ -797,7 +799,7 @@ try
                 restartAfterBackup = null;
                 host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.backupFailed"));
                 Notify(eViSTool.Core.Notifications.NotifyEvent.BackupFailed, eViSTool.Core.Localization.Loc.T("notify.ev.backupFailed"),
-                    Line("💾", eViSTool.Core.Localization.Loc.T("notify.ev.backupBeforeRestart")));
+                    Line("▣", "notify.lbl.backup", eViSTool.Core.Localization.Loc.T("notify.ev.backupBeforeRestart")));
                 await RestartBySchedule();
             }
         }
