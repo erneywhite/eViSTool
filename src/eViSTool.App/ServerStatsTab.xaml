@@ -1,0 +1,218 @@
+<UserControl x:Class="eViSTool.App.ServerStatsTab"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:eViSTool.App">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:InvertBoolToVisibilityConverter x:Key="InvertVis" />
+        <local:TextToVisibilityConverter x:Key="TextToVis" />
+        <local:EnumEqualsConverter x:Key="EnumEq" />
+
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,2,0,0" />
+        </Style>
+        <Style x:Key="StatsCard" TargetType="Border" BasedOn="{StaticResource Forest.Card}">
+            <Setter Property="Padding" Value="20,16,20,18" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+        <Style x:Key="Tile" TargetType="Border" BasedOn="{StaticResource Forest.Card}">
+            <Setter Property="Padding" Value="16,12" />
+        </Style>
+        <Style x:Key="TileLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+        </Style>
+        <Style x:Key="TileValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style x:Key="TileNote" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+            <Setter Property="Margin" Value="0,2,0,0" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style x:Key="ColHead" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
+        <StackPanel Margin="0,0,14,0">
+            <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{StaticResource Forest.Danger}" TextWrapping="Wrap" Margin="2,0,0,10"
+                       Visibility="{Binding StatusText, Converter={StaticResource TextToVis}}" AutomationProperties.AutomationId="StatsStatus" />
+
+            <!-- ===== тумблер сбора ===== -->
+            <Border Style="{StaticResource StatsCard}">
+                <DockPanel>
+                    <CheckBox DockPanel.Dock="Right" Style="{StaticResource Forest.Switch}" IsChecked="{Binding Enabled}" IsEnabled="{Binding Loaded}"
+                              VerticalAlignment="Center" Margin="16,0,0,0"
+                              AutomationProperties.AutomationId="StatsEnabled" AutomationProperties.Name="{local:Tr stats.collect}" />
+                    <StackPanel>
+                        <TextBlock Text="{local:Tr stats.collect}" Style="{StaticResource CardTitle}" />
+                        <TextBlock Text="{local:Tr stats.collectHint}" Style="{StaticResource Hint}" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- ===== срок и плитки ===== -->
+            <DockPanel Margin="0,0,0,12" Visibility="{Binding HasData, Converter={StaticResource BoolToVis}}">
+                <Button DockPanel.Dock="Right" Content="{local:Tr stats.clear}" Command="{Binding ClearCommand}" Padding="12,6"
+                        AutomationProperties.AutomationId="StatsClear" />
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <RadioButton Style="{StaticResource Forest.Chip}" GroupName="StatsPeriod" Content="{local:Tr stats.day}"
+                                 IsChecked="{Binding Period, Converter={StaticResource EnumEq}, ConverterParameter=Day}" AutomationProperties.AutomationId="StatsDay" />
+                    <RadioButton Style="{StaticResource Forest.Chip}" GroupName="StatsPeriod" Content="{local:Tr stats.week}"
+                                 IsChecked="{Binding Period, Converter={StaticResource EnumEq}, ConverterParameter=Week}" AutomationProperties.AutomationId="StatsWeek" />
+                    <RadioButton Style="{StaticResource Forest.Chip}" GroupName="StatsPeriod" Content="{local:Tr stats.month}"
+                                 IsChecked="{Binding Period, Converter={StaticResource EnumEq}, ConverterParameter=Month}" AutomationProperties.AutomationId="StatsMonth" />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- пока собирать нечего: включено, но данных ещё нет -->
+            <Border Style="{StaticResource StatsCard}" Visibility="{Binding HasData, Converter={StaticResource InvertVis}}">
+                <TextBlock Text="{Binding EmptyText}" Style="{StaticResource Hint}" FontSize="12" Margin="0" />
+            </Border>
+
+            <StackPanel Visibility="{Binding HasData, Converter={StaticResource BoolToVis}}">
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition />
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource Tile}">
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr stats.played}" Style="{StaticResource TileLabel}" />
+                            <TextBlock Text="{Binding TotalPlayedText}" Style="{StaticResource TileValue}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="2" Style="{StaticResource Tile}">
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr stats.peak}" Style="{StaticResource TileLabel}" />
+                            <TextBlock Text="{Binding PeakText}" Style="{StaticResource TileValue}" />
+                            <TextBlock Text="{Binding PeakAtText}" Style="{StaticResource TileNote}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="4" Style="{StaticResource Tile}">
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr stats.uptime}" Style="{StaticResource TileLabel}" />
+                            <TextBlock Text="{Binding UptimeText}" Style="{StaticResource TileValue}" />
+                            <TextBlock Text="{Binding RestartsText}" Style="{StaticResource TileNote}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="6" Style="{StaticResource Tile}">
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr stats.crashes}" Style="{StaticResource TileLabel}" />
+                            <TextBlock Text="{Binding CrashesText}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource TileValue}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasCrashes}" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource Forest.Danger}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{Binding LastCrashText}" Style="{StaticResource TileNote}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- ===== графики ===== -->
+                <Border Style="{StaticResource StatsCard}">
+                    <StackPanel>
+                        <TextBlock Text="{local:Tr stats.chartPlayers}" Style="{StaticResource CardTitle}" />
+                        <local:StatsChart Report="{Binding Report}" Kind="Players" Height="150" Margin="0,10,0,0"
+                                          AutomationProperties.AutomationId="StatsChartPlayers" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource StatsCard}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{local:Tr stats.chartResources}" Style="{StaticResource CardTitle}" />
+                            <Rectangle Width="14" Height="2" Fill="{StaticResource Forest.Good}" Margin="16,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock Text="{local:Tr stats.memory}" FontSize="12" Foreground="{StaticResource Forest.Muted}" VerticalAlignment="Center" />
+                            <Rectangle Width="14" Height="2" Fill="{StaticResource Forest.Warn}" Margin="14,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock Text="{local:Tr stats.cpu}" FontSize="12" Foreground="{StaticResource Forest.Muted}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <local:StatsChart Report="{Binding Report}" Kind="Resources" Height="130" Margin="0,10,0,0"
+                                          AutomationProperties.AutomationId="StatsChartResources" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ===== игроки ===== -->
+                <Border Style="{StaticResource StatsCard}">
+                    <StackPanel>
+                        <TextBlock Text="{Binding PlayersTitle}" Style="{StaticResource CardTitle}" />
+                        <TextBlock Text="{local:Tr stats.noPlayers}" Style="{StaticResource Hint}" FontSize="12" Margin="0,8,0,0"
+                                   Visibility="{Binding HasPlayers, Converter={StaticResource InvertVis}}" />
+                        <Grid Margin="0,12,0,6" Visibility="{Binding HasPlayers, Converter={StaticResource BoolToVis}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="1.4*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{local:Tr stats.colPlayer}" Style="{StaticResource ColHead}" />
+                            <TextBlock Grid.Column="1" Text="{local:Tr stats.colPlayed}" Style="{StaticResource ColHead}" />
+                            <TextBlock Grid.Column="2" Text="{local:Tr stats.colSessions}" Style="{StaticResource ColHead}" />
+                            <TextBlock Grid.Column="3" Text="{local:Tr stats.colLast}" Style="{StaticResource ColHead}" />
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding Players}" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Padding="0,9">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="1.4*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{StaticResource Forest.Text}" VerticalAlignment="Center" />
+                                                <Border Width="{Binding BarWidth}" Height="5" CornerRadius="2.5" Background="{StaticResource Forest.Accent}"
+                                                        Margin="10,0,0,0" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{Binding PlayedText}" FontSize="13" Foreground="{StaticResource Forest.Text}" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Sessions}" FontSize="13" Foreground="{StaticResource Forest.Text}" />
+                                            <TextBlock Grid.Column="3" Text="{Binding LastSeenText}" FontSize="13">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Online}" Value="True">
+                                                                <Setter Property="Foreground" Value="{StaticResource Forest.Good}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

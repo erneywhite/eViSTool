@@ -96,6 +96,9 @@
                 <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr players.tab}"
                              IsChecked="{Binding Tab, Converter={StaticResource EnumEq}, ConverterParameter=Players}"
                              AutomationProperties.AutomationId="SrvTabPlayers" />
+                <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr stats.tab}"
+                             IsChecked="{Binding Tab, Converter={StaticResource EnumEq}, ConverterParameter=Stats}"
+                             AutomationProperties.AutomationId="SrvTabStats" />
                 <RadioButton Style="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr ann.tab}"
                              IsChecked="{Binding Tab, Converter={StaticResource EnumEq}, ConverterParameter=Announcements}"
                              AutomationProperties.AutomationId="SrvTabAnnouncements" />
@@ -211,6 +214,11 @@
             <!-- ===== игроки ===== -->
             <Grid Visibility="{Binding IsPlayersTab, Converter={StaticResource BoolToVis}}">
                 <local:ServerPlayersTab DataContext="{Binding Players}" />
+            </Grid>
+
+            <!-- ===== статистика ===== -->
+            <Grid Visibility="{Binding IsStatsTab, Converter={StaticResource BoolToVis}}">
+                <local:ServerStatsTab DataContext="{Binding Stats}" />
             </Grid>
 
             <!-- ===== объявления ===== -->

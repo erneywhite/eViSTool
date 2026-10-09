@@ -40,6 +40,9 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
 {
     private readonly ServerViewModel _server;
     private IServerData? _data;
+
+    /// <summary>Источник данных профиля (файлы или агент по сети) — им пользуется и вкладка «Статистика».</summary>
+    internal IServerData? Data => _data;
     private string? _profileKey;       // профиль и папка (или «удалённый»): сменились — всё читаем заново
     private string? _dataDir;          // только для сервера на этой машине: «Открыть папку»
     private ServerAutomation _saved = new();
