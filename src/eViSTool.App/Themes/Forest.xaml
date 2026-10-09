@@ -137,6 +137,9 @@
     <!-- ===== иконки навигации (контуры из макета, viewBox 24×24) ===== -->
     <Geometry x:Key="Icon.Mods">M3,3 H10 V10 H3 Z M14,3 H21 V10 H14 Z M3,14 H10 V21 H3 Z M14,14 H21 V21 H14 Z</Geometry>
     <Geometry x:Key="Icon.Catalog">M4,10 A6,6 0 1 1 16,10 A6,6 0 1 1 4,10 Z M15,15 L21,21</Geometry>
+    <Geometry x:Key="Icon.Check">M5,12.5 L10,17.5 L19.5,7</Geometry>
+    <Geometry x:Key="Icon.Star">M12,3.5 L14.6,8.9 L20.5,9.7 L16.2,13.8 L17.3,19.7 L12,16.9 L6.7,19.7 L7.8,13.8 L3.5,9.7 L9.4,8.9 Z</Geometry>
+    <Geometry x:Key="Icon.Lock">M6,11 H18 V20 H6 Z M8.5,11 V7.5 A3.5,3.5 0 0 1 15.5,7.5 V11</Geometry>
     <Geometry x:Key="Icon.ChevronDown">M6,9 L12,15 L18,9</Geometry>
     <Geometry x:Key="Icon.Pin">M9,4 H15 M10,4 V10 L7,14 H17 L14,10 V4 M12,14 V21</Geometry>
     <Geometry x:Key="Icon.Globe">M12,3 A9,9 0 1 0 12.01,3 Z M3,12 H21 M12,3 C8,7 8,17 12,21 M12,3 C16,7 16,17 12,21</Geometry>
@@ -246,6 +249,56 @@
         </Setter>
     </Style>
     <Style x:Key="AccentButtonStyle" TargetType="Button" BasedOn="{StaticResource Forest.PrimaryButton}" />
+
+    <!-- основная кнопка с выпадающей частью справа («Играть ▾»): правые углы прямые -->
+    <Style x:Key="Forest.SplitMain" TargetType="Button" BasedOn="{StaticResource Forest.PrimaryButton}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6,0,0,6" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#DFCB96" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#C8B177" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <!-- стрелка такой кнопки: левые углы прямые, слева тонкий разделитель -->
+    <Style x:Key="Forest.SplitArrow" TargetType="Button" BasedOn="{StaticResource Forest.PrimaryButton}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="0,6,6,0" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#DFCB96" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#C8B177" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 
     <Style x:Key="Forest.DangerButton" TargetType="Button" BasedOn="{StaticResource Forest.Button}">
         <Setter Property="Foreground" Value="{StaticResource Forest.Danger}" />

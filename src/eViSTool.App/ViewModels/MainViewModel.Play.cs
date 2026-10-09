@@ -27,6 +27,7 @@ public sealed partial class PlayMenuItemViewModel : ObservableObject
     public bool IsFavorite => Target?.Kind == PlayTargetKind.Favorite;
     public bool IsOwn => Target?.Kind == PlayTargetKind.OwnServer;
     public bool IsNone => Target is null;
+    public bool HasPassword => Target?.HasPassword == true;
 
     [ObservableProperty] private string _detail;
     [ObservableProperty] private bool _isDefault;
