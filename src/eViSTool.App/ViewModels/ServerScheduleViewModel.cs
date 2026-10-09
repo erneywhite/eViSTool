@@ -85,6 +85,19 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     /// <summary>При перезапуске по расписанию ставить вышедшие обновления модов (пока сервер остановлен).</summary>
     [ObservableProperty] private bool _restartUpdateMods;
     [ObservableProperty] private string _restartError = "";
+
+    /// <summary>Часы машины с сервером идут в другом поясе — время перезапусков задаётся по ним; пусто — пояс тот же.</summary>
+    [ObservableProperty] private string _serverTimeNote = "";
+
+    private static string ServerTimeNoteFor(int? serverMinutes)
+    {
+        if (serverMinutes is not { } server) return "";
+        var mine = (int)TimeZoneInfo.Local.GetUtcOffset(DateTime.Now).TotalMinutes;
+        return server == mine ? "" : Loc.T("sched.serverTime", Utc(server), Utc(mine));
+
+        static string Utc(int minutes) => minutes == 0 ? "UTC"
+            : $"UTC{(minutes > 0 ? "+" : "−")}{Math.Abs(minutes) / 60}" + (Math.Abs(minutes) % 60 is var m and > 0 ? $":{m:00}" : "");
+    }
     [ObservableProperty] private string _nextRestartText = "";
     private DateTime? _nextRestartAt;
 
@@ -257,6 +270,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
 
         _nextBackupAt = status?.NextBackupAt;
         _nextRestartAt = status?.NextRestartAt;
+        ServerTimeNote = ServerTimeNoteFor(status?.UtcOffsetMinutes);
         // агент сообщил о новой копии — список устарел
         if (status?.LastBackupAt is { } last && last != _lastSeenBackup)
         {
@@ -318,6 +332,16 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     [RelayCommand]
     private void BrowseBackupDir()
     {
+        // сервер на другом компьютере (в том числе Linux): папки показывает его агент — стандартный диалог видит только эту машину
+        if (_data is { IsRemote: true } remote)
+        {
+            var picker = new RemoteFolderWindow(remote, BackupDirText.Length > 0 ? BackupDirText : null, Loc.T("backupdir.pick"))
+            {
+                Owner = Application.Current.MainWindow,
+            };
+            if (picker.ShowDialog() == true && picker.Selected is { } chosen) BackupDirText = chosen;
+            return;
+        }
         var start = BackupDirText.Length > 0 && Directory.Exists(BackupDirText) ? BackupDirText : _dataDir;
         var dlg = new Microsoft.Win32.OpenFolderDialog { Title = Loc.T("backupdir.pick"), InitialDirectory = start };
         if (dlg.ShowDialog() == true) BackupDirText = dlg.FolderName;

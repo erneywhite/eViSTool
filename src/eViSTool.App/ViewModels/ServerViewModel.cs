@@ -85,6 +85,7 @@ public sealed partial class ServerViewModel : ObservableObject
     /// <summary>Сервер на другом компьютере: всё через агента по сети, своих папок у профиля нет.</summary>
     [ObservableProperty] private bool _isRemoteProfile;
     private string? _remoteGameVersion;
+    private string? _remoteOs; // система машины с сервером — в подзаголовке
     [ObservableProperty] private ServerState _state = ServerState.Stopped;
     [ObservableProperty] private bool _agentRunning;
     [ObservableProperty] private string _stateText = "";
@@ -97,9 +98,15 @@ public sealed partial class ServerViewModel : ObservableObject
     /// <summary>Под плиткой состояния: перезапуск через N с / код выхода.</summary>
     [ObservableProperty] private string _stateNote = "";
 
+    /// <summary>На машине с сервером eViSTool новее этого окна: обновлять надо здесь, а не там.</summary>
+    private static bool NewerAgent(AgentStatus s) =>
+        Core.Versioning.ModVersion.TryParse(s.AgentVersion, out var agent)
+        && Core.Versioning.ModVersion.TryParse(AgentProtocol.AppVersion, out var app) && agent.CompareTo(app) > 0;
+
     /// <summary>Подзаголовок: профиль и версия игры; путь к данным — в подсказке.</summary>
     public string HeaderSubtitle => _main.ActiveProfile is not { } p ? ""
-        : p.Model.IsRemote ? Loc.T("server.subtitleRemote", p.Name, RemoteSecret.Unprotect(p.Model.RemoteCode) is { } c ? $"{c.Host}:{c.Port}" : "?",
+        : p.Model.IsRemote ? Loc.T("server.subtitleRemote", p.Name,
+            (RemoteSecret.Unprotect(p.Model.RemoteCode) is { } c ? $"{c.Host}:{c.Port}" : "?") + (_remoteOs is { Length: > 0 } os ? " · " + os : ""),
             _remoteGameVersion ?? "?")
         : Loc.T("server.subtitle", p.Name, p.GameVersionText);
     public string DataDir => _main.ActiveProfile?.Model.DataDir ?? "";
@@ -342,6 +349,7 @@ public sealed partial class ServerViewModel : ObservableObject
         IsServerProfile = _main.ActiveProfile?.Kind == ProfileKind.Server;
         IsRemoteProfile = _main.ActiveProfile?.Model.IsRemote == true;
         _remoteGameVersion = null;
+        _remoteOs = null;
         // удалённый доступ настраивают на компьютере с сервером — у удалённого профиля этой вкладки нет
         if (IsRemoteProfile && Tab == ServerTab.Remote) Tab = ServerTab.Console;
         var local = IsServerProfile && !IsRemoteProfile;
@@ -497,12 +505,14 @@ public sealed partial class ServerViewModel : ObservableObject
             "restart" => Loc.T("selfupd.stateRestart"),
             "failed" => Loc.T("selfupd.stateFailed", s.SelfUpdateError ?? "?"),
             _ => !AgentProtocol.IsOutdated(s) ? ""
-                : IsRemoteProfile ? Loc.T(olderAgent ? "selfupd.outdated" : "server.agentOutdatedRemote", s.AgentVersion, AgentProtocol.AppVersion)
+                : IsRemoteProfile ? Loc.T(olderAgent ? "selfupd.outdated" : NewerAgent(s) ? "server.agentNewerRemote" : "server.agentOutdatedRemote",
+                    s.AgentVersion, AgentProtocol.AppVersion)
                 : Loc.T("server.agentOutdatedLocal", s.AgentVersion),
         };
-        if (IsRemoteProfile && s.GameVersion != _remoteGameVersion)
+        if (IsRemoteProfile && (s.GameVersion != _remoteGameVersion || s.Os != _remoteOs))
         {
             _remoteGameVersion = s.GameVersion;
+            _remoteOs = s.Os;
             if (_main.ActiveProfile is { } active) active.RemoteGameVersion = s.GameVersion;
             OnPropertyChanged(nameof(HeaderSubtitle));
         }

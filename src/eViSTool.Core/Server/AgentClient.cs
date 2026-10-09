@@ -136,6 +136,8 @@ public sealed class AgentClient : IDisposable
     public Task<StatsReport> StatsAsync(StatsPeriod period, CancellationToken ct = default) => Get<StatsReport>($"stats?period={period}", ct);
     public Task SetStatsEnabledAsync(bool enabled, CancellationToken ct = default) => Post<AgentStatus>("stats/enabled", new StatsToggle(enabled), ct);
     public Task ClearStatsAsync(CancellationToken ct = default) => Post<AgentStatus>("stats/clear", null, ct);
+    public Task<DirListing> ListDirsAsync(string? path, CancellationToken ct = default) =>
+        Post<DirListing>("fs/dirs", new BackupNameRequest(path ?? ""), ct);
     public async Task<string?> CheckBackupDirAsync(string? dir, CancellationToken ct = default) =>
         (await Post<BackupDirCheck>("backups/check-dir", new BackupNameRequest(dir ?? ""), ct).ConfigureAwait(false)).Error;
 

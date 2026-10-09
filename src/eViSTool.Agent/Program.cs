@@ -619,6 +619,8 @@ AgentStatus Status() => new()
     LastSeq = host.Console.LastSeq,
     AgentPid = Environment.ProcessId,
     AgentVersion = version,
+    Os = OperatingSystem.IsWindows() ? "Windows" : OperatingSystem.IsLinux() ? "Linux" : RuntimeInformation.OSDescription,
+    UtcOffsetMinutes = (int)TimeZoneInfo.Local.GetUtcOffset(DateTime.Now).TotalMinutes,
     Players = players.Players,
     LastBackupAt = scheduler.LastBackupAt,
     NextBackupAt = scheduler.NextAt(automation, host.State, host.StartedAt),
@@ -840,6 +842,12 @@ web.MapGet("/stats", (HttpContext ctx) =>
 web.MapPost("/stats/enabled", async (HttpContext ctx) =>
     await ReadBody<StatsToggle>(ctx) is { } toggle ? Guard(() => { files.Stats.SetEnabled(toggle.Enabled); return Status(); }) : Results.BadRequest());
 web.MapPost("/stats/clear", () => Guard(() => { files.Stats.Clear(); return Status(); }));
+// обзор папок для окна на другом компьютере (выбор папки для копий): только имена папок, начать — с данных сервера
+web.MapPost("/fs/dirs", async (HttpContext ctx) =>
+{
+    var path = await ReadName(ctx);
+    return Guard(() => FolderBrowser.List(path, opts.DataPath));
+});
 web.MapPost("/backups/check-dir", async (HttpContext ctx) =>
     Json(new BackupDirCheck(await Task.Run(async () => BackupStore.CheckDir(await ReadName(ctx))))));
 web.MapPost("/backups/delete", async (HttpContext ctx) =>

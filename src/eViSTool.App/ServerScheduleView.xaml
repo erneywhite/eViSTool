@@ -117,7 +117,7 @@
                                 <Button DockPanel.Dock="Right" Content="{local:Tr backupdir.default}" Command="{Binding DefaultBackupDirCommand}" Margin="8,0,0,0"
                                         Padding="12,6" AutomationProperties.AutomationId="SchedBackupDirDefault" />
                                 <Button DockPanel.Dock="Right" Content="{local:Tr common.browse}" Command="{Binding BrowseBackupDirCommand}" Margin="8,0,0,0"
-                                        Padding="12,6" Visibility="{Binding IsLocal, Converter={StaticResource BoolToVis}}"
+                                        Padding="12,6"
                                         AutomationProperties.AutomationId="SchedBackupDirBrowse" />
                                 <Grid>
                                     <TextBox x:Name="BackupDirBox" Text="{Binding BackupDirText, UpdateSourceTrigger=LostFocus}" VerticalContentAlignment="Center"
@@ -178,6 +178,9 @@
                             <StackPanel Margin="0,0,16,0">
                                 <TextBlock Text="{local:Tr sched.restartTimes}" Style="{StaticResource Label}" />
                                 <TextBlock Text="{local:Tr sched.restartTimesHint}" Style="{StaticResource Hint}" />
+                                <TextBlock Text="{Binding ServerTimeNote}" FontSize="12" Foreground="{StaticResource Forest.Warn}" TextWrapping="Wrap"
+                                           Margin="0,4,0,0" Visibility="{Binding ServerTimeNote, Converter={StaticResource TextToVis}}"
+                                           AutomationProperties.AutomationId="SchedServerTime" />
                             </StackPanel>
                         </DockPanel>
                     </Border>

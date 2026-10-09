@@ -111,7 +111,8 @@ public sealed class StatsStore(string dir)
     {
         if (!Directory.Exists(dir)) yield break;
         foreach (var path in Directory.EnumerateFiles(dir, "*" + Ext))
-            if (DateTime.TryParseExact(Path.GetFileNameWithoutExtension(path), DayFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+            // время в файлах — по часам этой машины; помечаем его местным, чтобы окно на другом компьютере перевело в своё
+            if (DateTime.TryParseExact(Path.GetFileNameWithoutExtension(path), DayFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var day))
                 yield return (day, path);
     }
 

@@ -104,6 +104,12 @@ public sealed record AgentStatus
     public int AgentPid { get; init; }
     public string AgentVersion { get; init; } = "";
 
+    /// <summary>Система машины с сервером: «Windows», «Linux»; пусто — агент старше 0.10.</summary>
+    public string Os { get; init; } = "";
+
+    /// <summary>Смещение её часового пояса от UTC в минутах: расписание перезапусков задаётся по её часам.</summary>
+    public int? UtcOffsetMinutes { get; init; }
+
     /// <summary>
     /// Обновление агента по просьбе окна на другом компьютере: «download», «stop», «install», «restart» — идёт;
     /// «failed» — не вышло (причина — в <see cref="SelfUpdateError"/>); null — не обновляется.

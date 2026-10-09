@@ -326,7 +326,7 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null, s
     {
         time = default;
         return Stamp().Match(name) is { Success: true } m
-               && DateTime.TryParseExact(m.Groups[1].Value, StampFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out time);
+               && DateTime.TryParseExact(m.Groups[1].Value, StampFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out time);
     }
 
     [GeneratedRegex(@"-(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})\.vcdbs$", RegexOptions.IgnoreCase)]

@@ -1,0 +1,49 @@
+<Window x:Class="eViSTool.App.RemoteFolderWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:eViSTool.App"
+        Title="{local:Tr rfolder.title}" Icon="Assets/eViSTool.ico"
+        Width="560" Height="520" MinWidth="420" MinHeight="360" Background="{StaticResource Forest.Base}"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="24,20,24,22">
+        <TextBlock DockPanel.Dock="Top" x:Name="Heading" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}"
+                   TextWrapping="Wrap" />
+        <TextBlock DockPanel.Dock="Top" Text="{local:Tr rfolder.hint}" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap"
+                   Margin="0,6,0,12" />
+
+        <!-- путь: можно вписать и нажать Enter; «Вверх»; диски — если их несколько (Windows) -->
+        <DockPanel DockPanel.Dock="Top">
+            <ComboBox x:Name="Roots" DockPanel.Dock="Right" Width="90" Margin="8,0,0,0" Style="{StaticResource Forest.ComboBox}"
+                      SelectionChanged="Roots_SelectionChanged" AutomationProperties.AutomationId="RemoteFolderRoots" />
+            <Button x:Name="Up" DockPanel.Dock="Right" Content="{local:Tr rfolder.up}" Click="Up_Click" Margin="8,0,0,0" Padding="12,6"
+                    AutomationProperties.AutomationId="RemoteFolderUp" />
+            <TextBox x:Name="PathBox" Padding="8,6" VerticalContentAlignment="Center" KeyDown="PathBox_KeyDown"
+                     AutomationProperties.AutomationId="RemoteFolderPath" AutomationProperties.Name="{local:Tr rfolder.title}" />
+        </DockPanel>
+
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,16,0,0">
+            <TextBlock x:Name="Error" FontSize="12" Foreground="{StaticResource Forest.Danger}" TextWrapping="Wrap" Margin="0,0,0,10"
+                       Visibility="Collapsed" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="Choose" Content="{local:Tr rfolder.choose}" IsDefault="True" Click="Choose_Click" Padding="18,8"
+                        Style="{StaticResource Forest.PrimaryButton}" AutomationProperties.AutomationId="RemoteFolderChoose" />
+                <Button Content="{local:Tr common.cancel}" IsCancel="True" Margin="8,0,0,0" Padding="16,8" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- подпапки: двойной щелчок или Enter — войти -->
+        <Border Margin="0,10,0,0" BorderBrush="{StaticResource Forest.Line}" BorderThickness="1" CornerRadius="6">
+            <ListBox x:Name="Dirs" BorderThickness="0" Background="Transparent" MouseDoubleClick="Dirs_MouseDoubleClick" KeyDown="Dirs_KeyDown"
+                     AutomationProperties.AutomationId="RemoteFolderDirs">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal" Margin="2,3">
+                            <Path Data="{StaticResource Icon.Folder}" Style="{StaticResource Forest.Icon}" Width="14" Height="14" Margin="0,0,8,0" />
+                            <TextBlock Text="{Binding}" FontSize="13" Foreground="{StaticResource Forest.Text}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Border>
+    </DockPanel>
+</Window>

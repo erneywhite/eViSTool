@@ -371,7 +371,8 @@ public sealed partial class MainViewModel : ObservableObject
     /// своей нет (удалённый профиль) — из любого другого профиля. null — игры нет нигде: показываются буквы «VS».
     /// </summary>
     public System.Windows.Media.ImageSource? GameIcon =>
-        global::eViSTool.App.GameIcon.From(new[] { ActiveProfile?.GameDir }.Concat(Profiles.Select(p => p.GameDir)));
+        global::eViSTool.App.GameIcon.From(new[] { ActiveProfile?.GameDir }.Concat(Profiles.Select(p => p.GameDir))
+            .Append(Core.Game.GameInstall.FindGameDir()));
 
     public bool HasGameIcon => GameIcon is not null;
 
