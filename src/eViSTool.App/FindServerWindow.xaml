@@ -65,6 +65,8 @@
                                     </Style>
                                 </Button.Style>
                             </Button>
+                            <Button Content="{local:Tr browse.editFavorite}" Click="EditFavorite_Click" Padding="11,5" MinHeight="0" Margin="0,0,8,0"
+                                    Visibility="{Binding IsFavoriteRow, Converter={StaticResource BoolToVis}}" />
                             <Button Content="{local:Tr browse.removeFavorite}" Padding="11,5" MinHeight="0" Margin="0,0,8,0"
                                     Visibility="{Binding IsFavoriteRow, Converter={StaticResource BoolToVis}}"
                                     Command="{Binding DataContext.RemoveFavoriteCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -211,7 +213,17 @@
             <!-- избранное игры целиком -->
             <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding IsFavoritesTab, Converter={StaticResource BoolToVis}}">
                 <StackPanel>
-                    <TextBlock Text="{local:Tr browse.favoritesHint}" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap" Margin="0,8,0,8" />
+                    <DockPanel Margin="0,10,0,8">
+                        <Button DockPanel.Dock="Right" Click="AddManual_Click" Padding="12,6" VerticalAlignment="Center" Margin="16,0,0,0"
+                                AutomationProperties.AutomationId="BrowseAddManual">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource Icon.Plus}" Style="{StaticResource Forest.Icon}" Width="12" Height="12" Margin="0,0,7,0" />
+                                <TextBlock Text="{local:Tr browse.favAddButton}" />
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Text="{local:Tr browse.favoritesHint}" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap"
+                                   VerticalAlignment="Center" />
+                    </DockPanel>
                     <ItemsControl ItemsSource="{Binding Favorites}" ItemTemplate="{StaticResource ServerRow}" Focusable="False" />
                 </StackPanel>
             </ScrollViewer>

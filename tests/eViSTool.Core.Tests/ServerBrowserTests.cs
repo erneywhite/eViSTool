@@ -60,6 +60,15 @@ public sealed class ServerBrowserTests : IDisposable
         Assert.Equal(["Oldwood"], PlayTargets.Favorites(_root).Select(f => f.Name));
         Assert.Equal("ru", JObject.Parse(File.ReadAllText(file))["stringSettings"]!.Value<string>("language"));
 
+        // изменить: на том же месте, новое имя, адрес и пароль
+        GameFavorites.Add(_root, "second", "9.9.9.9", null);
+        GameFavorites.Update(_root, "1.2.3.4:42420", "Oldwood EU", "1.2.3.5:42421", null);
+        Assert.Equal(["Oldwood EU", "second"], PlayTargets.Favorites(_root).Select(f => f.Name));
+        Assert.Equal("1.2.3.5:42421", PlayTargets.Favorites(_root)[0].Address);
+        Assert.False(PlayTargets.Favorites(_root)[0].HasPassword);
+        Assert.False(GameFavorites.IsValidAddress("1.2.3.4, 5"));
+        Assert.True(GameFavorites.IsValidAddress("play.example.org:42420"));
+
         GameFavorites.Add(_root, "a,b", "5.6.7.8", null);
         Assert.Equal("a b", PlayTargets.Favorites(_root).Last().Name); // запятая в имени сломала бы строку
     }

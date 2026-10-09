@@ -36,6 +36,19 @@ public partial class FindServerWindow : Window
         if (await _vm.PlayAsync(row, AskPassword)) Close();
     }
 
+    private (string Name, string Address, string? Password)? EditServer(Core.Game.PlayTarget? old)
+    {
+        var dlg = new FavoriteServerWindow(old) { Owner = this };
+        return dlg.ShowDialog() == true ? (dlg.ServerName, dlg.Address, dlg.Password) : null;
+    }
+
+    private void AddManual_Click(object sender, RoutedEventArgs e) => _vm.SaveFavorite(null, EditServer);
+
+    private void EditFavorite_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is ServerRowViewModel { Favorite: { } f }) _vm.SaveFavorite(f, EditServer);
+    }
+
     private void AddFavorite_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is ServerRowViewModel row) _vm.AddFavorite(row, AskPassword);

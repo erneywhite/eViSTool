@@ -1,0 +1,46 @@
+<Window x:Class="eViSTool.App.FavoriteServerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:eViSTool.App"
+        Title="{local:Tr browse.favTitle}" Icon="Assets/eViSTool.ico"
+        Width="460" SizeToContent="Height" ResizeMode="NoResize" Background="{StaticResource Forest.Base}"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <Window.Resources>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+            <Setter Property="Margin" Value="0,16,0,0" />
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource Forest.Muted}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,2,0,6" />
+        </Style>
+    </Window.Resources>
+    <StackPanel Margin="24,20,24,22">
+        <TextBlock x:Name="Heading" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" />
+
+        <TextBlock Text="{local:Tr browse.favName}" Style="{StaticResource Label}" />
+        <TextBox x:Name="NameBox" Margin="0,6,0,0" MaxLength="80" AutomationProperties.AutomationId="FavName"
+                 AutomationProperties.Name="{local:Tr browse.favName}" />
+
+        <TextBlock Text="{local:Tr browse.favAddress}" Style="{StaticResource Label}" />
+        <TextBlock Text="{local:Tr browse.favAddressHint}" Style="{StaticResource Hint}" />
+        <TextBox x:Name="AddressBox" FontFamily="Consolas" MaxLength="255" AutomationProperties.AutomationId="FavAddress"
+                 AutomationProperties.Name="{local:Tr browse.favAddress}" />
+
+        <TextBlock Text="{local:Tr browse.favPassword}" Style="{StaticResource Label}" />
+        <TextBlock Text="{local:Tr browse.favPasswordHint}" Style="{StaticResource Hint}" />
+        <PasswordBox x:Name="PasswordBox" Padding="8,6" AutomationProperties.AutomationId="FavPassword"
+                     AutomationProperties.Name="{local:Tr browse.favPassword}" />
+
+        <TextBlock x:Name="ErrorText" FontSize="12" Foreground="{StaticResource Forest.Danger}" TextWrapping="Wrap" Margin="0,12,0,0" Visibility="Collapsed" />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Content="{local:Tr common.save}" IsDefault="True" Click="Save_Click" Padding="18,8" Style="{StaticResource Forest.PrimaryButton}"
+                    AutomationProperties.AutomationId="FavSave" />
+            <Button Content="{local:Tr common.cancel}" IsCancel="True" Margin="8,0,0,0" Padding="16,8" />
+        </StackPanel>
+    </StackPanel>
+</Window>

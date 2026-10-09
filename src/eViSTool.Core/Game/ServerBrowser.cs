@@ -123,6 +123,26 @@ public static class GameFavorites
 
     public static void RemoveAddress(string? dataDir, string address) => Edit(dataDir, list => Remove(list, address));
 
+    /// <summary>Изменить запись (по прежнему адресу) — на том же месте в списке; прежней нет — добавить в конец.</summary>
+    public static void Update(string? dataDir, string oldAddress, string name, string address, string? password) =>
+        Edit(dataDir, list =>
+        {
+            var line = $"{name.Replace(',', ' ').Trim()},{address.Trim()},{password ?? ""}";
+            // новый адрес мог уже быть в списке отдельной записью — она теперь лишняя
+            if (!string.Equals(oldAddress.Trim(), address.Trim(), StringComparison.OrdinalIgnoreCase)) Remove(list, address);
+            var index = list.ToList().FindIndex(t => t.Type == JTokenType.String && PlayTargets.ParseFavorite(t.Value<string>()!) is { } f
+                                                 && string.Equals(f.Address, oldAddress.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (index >= 0) list[index] = line;
+            else list.Add(line);
+        });
+
+    /// <summary>Адрес похож на «хост» или «хост:порт» (без пробелов и запятых: запятая разделяет поля записи).</summary>
+    public static bool IsValidAddress(string address)
+    {
+        address = address.Trim();
+        return address.Length is > 0 and <= 255 && !address.Any(c => char.IsWhiteSpace(c) || c == ',');
+    }
+
     private static void Remove(JArray list, string address)
     {
         foreach (var t in list.Where(t => t.Type == JTokenType.String && PlayTargets.ParseFavorite(t.Value<string>()!) is { } f

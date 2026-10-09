@@ -243,6 +243,34 @@ public sealed partial class FindServerViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Добавить сервер вручную (old = null) или изменить запись избранного — как в меню игры: название, адрес, пароль.
+    /// edit получает прежнюю запись и возвращает новую (null — отмена).
+    /// </summary>
+    public void SaveFavorite(PlayTarget? old, Func<PlayTarget?, (string Name, string Address, string? Password)?> edit)
+    {
+        ErrorText = "";
+        if (GameRunning())
+        {
+            ErrorText = Loc.T("browse.closeGame");
+            return;
+        }
+        if (edit(old) is not { } server) return;
+        try
+        {
+            if (old is null) GameFavorites.Add(_client.DataDir, server.Name, server.Address, server.Password);
+            else GameFavorites.Update(_client.DataDir, old.Address, server.Name, server.Address, server.Password);
+            ReloadFavorites();
+            var inFavorites = PlayTargets.Favorites(_client.DataDir).Select(f => f.Address).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var r in All) r.InFavorites = inFavorites.Contains(r.Address);
+            StatusText = Loc.T("browse.added", server.Name);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Newtonsoft.Json.JsonException)
+        {
+            ErrorText = ex.Message;
+        }
+    }
+
     [RelayCommand]
     private void RemoveFavorite(ServerRowViewModel? row)
     {
