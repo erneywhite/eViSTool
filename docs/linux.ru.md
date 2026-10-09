@@ -41,7 +41,7 @@ sudo ./server.sh setup
 
 ### 1. Скачать и распаковать
 
-Архив `eViSTool-<версия>-linux-x64.tar.gz` лежит на странице
+Архив `eViSTool-<версия>-linux-x64.tar.gz` лежит на [странице модбазы](https://mods.vintagestory.at/evistoollinux) и на странице
 [Releases](https://github.com/erneywhite/eViSTool/releases). Внутри один исполняемый файл `eViSTool.Agent` и документы.
 
 ```sh

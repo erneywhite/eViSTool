@@ -11,7 +11,8 @@
 
 <p align="center">
   <a href="https://github.com/erneywhite/eViSTool/actions/workflows/build.yml"><img src="https://github.com/erneywhite/eViSTool/actions/workflows/build.yml/badge.svg" alt="Сборка"></a>
-  <a href="https://mods.vintagestory.at/evistool"><img src="https://img.shields.io/badge/ModDB-eViSTool-8a6d3b" alt="Страница на модбазе Vintage Story"></a>
+  <a href="https://mods.vintagestory.at/evistoolwin"><img src="https://img.shields.io/badge/ModDB-Windows-8a6d3b" alt="eViSTool для Windows на модбазе Vintage Story"></a>
+  <a href="https://mods.vintagestory.at/evistoollinux"><img src="https://img.shields.io/badge/ModDB-Linux-8a6d3b" alt="eViSTool для Linux на модбазе Vintage Story"></a>
   <a href="https://github.com/erneywhite/eViSTool/releases/latest"><img src="https://img.shields.io/badge/download-latest%20release-2ea44f" alt="Скачать последний релиз"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="Лицензия: GPL-3.0"></a>
   <a href="https://ko-fi.com/erneywhite"><img src="https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
@@ -55,7 +56,7 @@ eViSTool держит моды Vintage Story в актуальном состо�
 
 ## Начало работы
 
-1. Скачай `eViSTool-<версия>-win-x64.zip` [со страницы на модбазе](https://mods.vintagestory.at/evistool) или в [Releases](https://github.com/erneywhite/eViSTool/releases) — файл один и тот же.
+1. Скачай `eViSTool-<версия>-win-x64.zip` [со страницы на модбазе](https://mods.vintagestory.at/evistoolwin) или в [Releases](https://github.com/erneywhite/eViSTool/releases) — файл один и тот же.
    Для сервера на Linux есть отдельный архив, о нём — в разделе [«Сервер на Linux»](#сервер-на-linux).
 2. Распакуй в любую удобную папку (не в папку игры) и запусти `eViSTool.exe`.
 3. Игру и моды eViSTool найдёт сам и откроет **«Мои моды»**.
@@ -420,7 +421,7 @@ sudo ./eViSTool.Agent service install                              # служб�
 Что важно знать:
 
 - Ставь eViSTool в свою папку, не в папку игры: игру обновляют командой `rm -rf *`, и eViSTool пропал бы вместе с ней.
-- Архив `eViSTool-<версия>-linux-x64.tar.gz` лежит в [Releases](https://github.com/erneywhite/eViSTool/releases).
+- Архив `eViSTool-<версия>-linux-x64.tar.gz` лежит на [странице модбазы для Linux](https://mods.vintagestory.at/evistoollinux) и в [Releases](https://github.com/erneywhite/eViSTool/releases).
   Агенту .NET не нужен, он собран вместе со своей средой. Проверено на Ubuntu Server 24.04.
 - Обновляется агент кнопкой **«Обновить на сервере»** из окна на Windows, systemd сам поднимет новую версию.
 - Время перезапусков по расписанию задаётся по часам машины с сервером. Если они идут в другом поясе, окно об этом скажет.

@@ -43,7 +43,7 @@ settings in the `data` folder next to it, just like on Windows.
 
 ### 1. Download and unpack
 
-The `eViSTool-<version>-linux-x64.tar.gz` archive is on the
+The `eViSTool-<version>-linux-x64.tar.gz` archive is on the [ModDB page](https://mods.vintagestory.at/evistoollinux) and the
 [Releases](https://github.com/erneywhite/eViSTool/releases) page. Inside is a single executable, `eViSTool.Agent`,
 and the docs.
 
