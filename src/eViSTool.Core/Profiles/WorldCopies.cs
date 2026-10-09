@@ -82,9 +82,10 @@ public static class WorldCopies
                 var tmp = copy + ".new";
                 if (File.Exists(tmp)) File.Delete(tmp);
                 WorldDb.Snapshot(world, tmp);
-                // время копии = время мира, с которого она снята: так видно, менялся ли мир после неё
-                File.SetLastWriteTimeUtc(tmp, stamp);
                 File.SetCreationTimeUtc(tmp, DateTime.UtcNow);
+                // время копии = время мира, с которого она снята: так видно, менялся ли мир после неё. Ставится
+                // последним: на Linux времени создания у файла нет, и .NET записывает его во время изменения
+                File.SetLastWriteTimeUtc(tmp, stamp);
                 File.Move(tmp, copy, overwrite: true);
                 copied.Add(Path.GetFileNameWithoutExtension(name));
             }

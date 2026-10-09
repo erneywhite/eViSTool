@@ -43,16 +43,19 @@ public sealed class ProfileClonerTests : IDisposable
 
     private void WriteConfig(string file, string world, string worldName, string seed)
     {
-        var foreign = @"C:\Users\Administrator\AppData\Roaming\VintagestoryData";
+        // папка данных другого пользователя этой системы: на Linux путь «C:\…» не абсолютный, там чужой — «/home/…»
+        var foreign = OperatingSystem.IsWindows()
+            ? @"C:\Users\Administrator\AppData\Roaming\VintagestoryData"
+            : "/home/administrator/.config/VintagestoryData";
         File.WriteAllText(Path.Combine(_data, file), new JObject
         {
             ["ServerName"] = "Erney Server",
             ["Port"] = 42420,
-            ["ModPaths"] = new JArray("Mods", foreign + @"\Mods"),
+            ["ModPaths"] = new JArray("Mods", Path.Combine(foreign, "Mods")),
             ["WorldConfig"] = new JObject
             {
                 ["Seed"] = seed,
-                ["SaveFileLocation"] = foreign + $@"\Saves\{world}\default.vcdbs",
+                ["SaveFileLocation"] = Path.Combine(foreign, "Saves", world, "default.vcdbs"),
                 ["WorldName"] = worldName,
                 ["PlayStyle"] = "surviveandbuild",
             },

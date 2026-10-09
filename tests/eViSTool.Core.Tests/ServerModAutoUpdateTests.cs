@@ -23,9 +23,13 @@ public sealed class ServerModAutoUpdateTests : IDisposable
 
     public ServerModAutoUpdateTests()
     {
-        // «папка игры» — поддельный сервер: версия игры берётся из его exe
+        // «папка игры» — поддельный сервер: версия игры берётся из его exe (на Linux у сервера VintagestoryServer.dll,
+        // запускатель без расширения версии не несёт)
         _game = Directory.CreateDirectory(Path.Combine(_root, "game")).FullName;
-        File.Copy(Path.Combine(FakeBin, "FakeVsServer.exe"), Path.Combine(_game, "VintagestoryServer.exe"));
+        if (OperatingSystem.IsWindows())
+            File.Copy(Path.Combine(FakeBin, "FakeVsServer.exe"), Path.Combine(_game, "VintagestoryServer.exe"));
+        else
+            File.Copy(Path.Combine(FakeBin, "FakeVsServer.dll"), Path.Combine(_game, "VintagestoryServer.dll"));
         var game = GameInstall.DetectVersion(_game)!;
         _branch = $"{game.Major}.{game.Minor}";
         _data = Directory.CreateDirectory(Path.Combine(_root, "data")).FullName;

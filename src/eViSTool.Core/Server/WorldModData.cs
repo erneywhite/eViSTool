@@ -111,7 +111,7 @@ public static class WorldModData
         var top = name.Split('/', '\\')[0];
         var target = Path.GetFullPath(Path.Combine(root, name));
         var allowed = (top.Equals(SavesDir, StringComparison.OrdinalIgnoreCase) || top.Equals(ModDataDir, StringComparison.OrdinalIgnoreCase))
-                      && target.StartsWith(root, StringComparison.OrdinalIgnoreCase)
+                      && target.StartsWith(root, PathRules.Comparison) // на Linux «../DATA» — уже не папка данных
                       && !(top.Equals(SavesDir, StringComparison.OrdinalIgnoreCase) && IsWorldFile(Path.GetFileName(target))
                            && Path.GetDirectoryName(target)!.Equals(Path.Combine(root, SavesDir), StringComparison.OrdinalIgnoreCase));
         return allowed ? target : throw new InvalidDataException(Loc.T("backup.badModData", name));

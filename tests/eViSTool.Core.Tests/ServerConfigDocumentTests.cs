@@ -60,6 +60,25 @@ public sealed class ServerConfigDocumentTests : IDisposable
         Assert.False(doc.IsDirty);
     }
 
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Save_KeepsTheLineBreaksOfTheFile(string newLine)
+    {
+        // конфиг с Linux на Windows и наоборот: сохранение не перекраивает переводы строк во всём файле
+        var text = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestData", ConfigSamples.Real)).ReplaceLineEndings(newLine);
+        var doc = _samples.OpenText(text);
+        doc.Save();
+        Assert.Equal(text, File.ReadAllText(ConfigFile));
+
+        doc.Set("Port", 42421);
+        doc.Save();
+        var after = File.ReadAllText(ConfigFile);
+        Assert.Contains("  \"Port\": 42421," + newLine, after);
+        Assert.Equal(text.Split(newLine).Length, after.Split(newLine).Length);
+        Assert.Equal(text.Count(c => c == '\r'), after.Count(c => c == '\r'));
+    }
+
     [Fact]
     public void Save_AfterOneEdit_ChangesOnlyThatLine()
     {

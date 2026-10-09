@@ -67,7 +67,8 @@ internal sealed class ProfileContainer(string name, string fallbackFolder)
     {
         var container = For(dataDir);
         // имя папки — как название профиля (пробелы остаются); заменяем только то, что в имени файла недопустимо
-        var slug = string.Concat(profileName.Trim().Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)).Trim(' ', '_', '.');
+        // (по правилам Windows и на Linux — одно название даёт одну папку на обеих системах)
+        var slug = string.Concat(profileName.Trim().Select(c => PathRules.IsBadInFileName(c) ? '_' : c)).Trim(' ', '_', '.');
         if (slug.Length == 0) slug = fallbackFolder;
         var candidate = Path.Combine(container, slug);
         for (var n = 2; Directory.Exists(candidate) && Directory.EnumerateFileSystemEntries(candidate).Any(); n++)

@@ -44,12 +44,14 @@ public sealed class ModConfigService(string dataDir, ModConfigBackups backups, F
     public IReadOnlyList<ModConfigEntry> List() =>
         [.. ModConfigs.List(dataDir, mods()).Select(f => new ModConfigEntry(f.RelativePath, f.Kind, f.ModId, f.ModName, f.Size, f.ChangedUtc))];
 
-    /// <summary>Полный путь файла внутри ModConfig. Выход наружу («..», абсолютный путь) и не-текстовые файлы — отказ.</summary>
+    /// <summary>
+    /// Полный путь файла внутри ModConfig. Выход наружу («..», абсолютный путь, диск) и не-текстовые файлы — отказ.
+    /// Путь присылает и окно с другой машины: на агенте под Linux «..\x» и «C:/x» отсекаются так же, как на Windows.
+    /// </summary>
     public string FullPath(string relativePath)
     {
-        var root = Path.GetFullPath(Folder) + Path.DirectorySeparatorChar;
-        var full = Path.GetFullPath(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar)));
-        if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase) || ModConfigs.KindOf(full) is null)
+        var full = PathRules.Inside(Folder, relativePath);
+        if (full is null || ModConfigs.KindOf(full) is null)
             throw new InvalidOperationException(Loc.T("mcfg.badPath", relativePath));
         return full;
     }
@@ -57,7 +59,8 @@ public sealed class ModConfigService(string dataDir, ModConfigBackups backups, F
     private ModConfigFile File(string relativePath)
     {
         var full = FullPath(relativePath);
-        var rel = relativePath.Replace('\\', '/');
+        // по этому пути хранятся резервные копии — берём его от проверенного полного: «a/../b.json» → «b.json»
+        var rel = Path.GetRelativePath(Folder, full).Replace('\\', '/');
         return new ModConfigFile(full, rel, ModConfigs.KindOf(full)!.Value, null, null, 0, DateTime.MinValue);
     }
 

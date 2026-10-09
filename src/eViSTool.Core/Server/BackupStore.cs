@@ -111,11 +111,12 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null, s
 
     /// <summary>
     /// Имя профиля для имени файла: команда сервера /genbackup не принимает пробелы, а в имени файла нельзя ещё ряд знаков —
-    /// всё такое становится «_». Пустое имя — «world».
+    /// всё такое становится «_». Знаки — по правилам Windows и на Linux: копия переносится между машинами и в сетевые
+    /// папки, а окно и агент из одного названия получают одно имя. Пустое имя — «world».
     /// </summary>
     public static string Slug(string? profileName)
     {
-        var slug = string.Concat((profileName ?? "").Trim().Select(c => char.IsWhiteSpace(c) || System.IO.Path.GetInvalidFileNameChars().Contains(c) ? '_' : c))
+        var slug = string.Concat((profileName ?? "").Trim().Select(c => char.IsWhiteSpace(c) || PathRules.IsBadInFileName(c) ? '_' : c))
             .Trim('_', '.');
         return slug.Length == 0 ? "world" : slug;
     }
