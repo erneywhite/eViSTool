@@ -96,6 +96,18 @@ public sealed class AgentClient : IDisposable
         await Read<AgentStatus>(resp, ct).ConfigureAwait(false);
     }
 
+    // ---- объявления по расписанию (вкладка «Объявления»)
+
+    public Task<ServerAnnouncements> GetAnnouncementsAsync(CancellationToken ct = default) => Get<ServerAnnouncements>("announcements", ct);
+
+    public async Task SaveAnnouncementsAsync(ServerAnnouncements settings, CancellationToken ct = default)
+    {
+        using var content = new StringContent(JsonConvert.SerializeObject(settings), Encoding.UTF8, "application/json");
+        using var cts = Timed(ct);
+        using var resp = await _http.PutAsync("announcements", content, cts.Token).ConfigureAwait(false);
+        await Read<AgentStatus>(resp, ct).ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<BackupEntry>> BackupsAsync(CancellationToken ct = default) => await Get<List<BackupEntry>>("backups", ct).ConfigureAwait(false);
     public Task<BackupEntry> CopyWorldAsync(CancellationToken ct = default) => Post<BackupEntry>("backups/copy", null, ct);
     public Task<RestoreResult> RestoreAsync(string name, CancellationToken ct = default) => Post<RestoreResult>("backups/restore", new BackupNameRequest(name), ct);

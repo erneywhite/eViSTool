@@ -14,7 +14,7 @@ using eViSTool.Core.Server.Remote;
 namespace eViSTool.App.ViewModels;
 
 /// <summary>Виды раздела «Сервер».</summary>
-public enum ServerTab { Console, Players, Config, Schedule, Remote }
+public enum ServerTab { Console, Players, Announcements, Config, Schedule, Remote }
 
 /// <summary>
 /// Вкладка «Сервер». Сервером владеет агент (отдельный процесс) — окно только показывает и командует,
@@ -56,11 +56,15 @@ public sealed partial class ServerViewModel : ObservableObject
     /// <summary>Игроки: роли, белый список, баны — второй вид раздела.</summary>
     public ServerPlayersViewModel Players { get; }
 
+    /// <summary>Объявления в чат: по расписанию и «сказать сейчас».</summary>
+    public ServerAnnouncementsViewModel Announcements { get; }
+
     /// <summary>Какой вид раздела открыт. Консоль продолжает получать строки при любом.</summary>
     [ObservableProperty] private ServerTab _tab;
 
     public bool IsConsoleTab => Tab == ServerTab.Console;
     public bool IsPlayersTab => Tab == ServerTab.Players;
+    public bool IsAnnouncementsTab => Tab == ServerTab.Announcements;
     public bool IsConfigTab => Tab == ServerTab.Config;
     public bool IsScheduleTab => Tab == ServerTab.Schedule;
     public bool IsRemoteTab => Tab == ServerTab.Remote;
@@ -216,18 +220,21 @@ public sealed partial class ServerViewModel : ObservableObject
         _main = main;
         Schedule = new ServerScheduleViewModel(this);
         Players = new ServerPlayersViewModel(this);
+        Announcements = new ServerAnnouncementsViewModel(this);
     }
 
     partial void OnTabChanged(ServerTab value)
     {
         OnPropertyChanged(nameof(IsConsoleTab));
         OnPropertyChanged(nameof(IsPlayersTab));
+        OnPropertyChanged(nameof(IsAnnouncementsTab));
         OnPropertyChanged(nameof(IsConfigTab));
         OnPropertyChanged(nameof(IsScheduleTab));
         OnPropertyChanged(nameof(IsRemoteTab));
         Config.SetActive(value == ServerTab.Config);
         Schedule.SetActive(value == ServerTab.Schedule);
         Players.SetActive(value == ServerTab.Players);
+        Announcements.SetActive(value == ServerTab.Announcements);
         if (value != ServerTab.Remote) Remote.Hide(); // ушли с вкладки — код подключения снова закрыт
     }
 
@@ -261,6 +268,7 @@ public sealed partial class ServerViewModel : ObservableObject
         };
         PushServerState();
         Players?.OnServerStateChanged();
+        Announcements?.OnServerStateChanged();
     }
 
     /// <summary>
@@ -325,6 +333,7 @@ public sealed partial class ServerViewModel : ObservableObject
         Schedule.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model : null, () => _client);
         Remote.OnProfileSwitched(local ? _main.ActiveProfile?.Model : null);
         Players.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model : null);
+        Announcements.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model : null);
         if (!IsServerProfile) return;
 
         _session = new CancellationTokenSource();
@@ -381,6 +390,7 @@ public sealed partial class ServerViewModel : ObservableObject
             _stateKnown = true;
             PushServerState();
             Players.PollLocal(); // файлы игроков поменялись (сервер записал списки, правка в другом окне)
+            Announcements.PollLocal();
 
             try { await Task.Delay(1500, ct); } catch (TaskCanceledException) { return; }
         }
@@ -478,6 +488,7 @@ public sealed partial class ServerViewModel : ObservableObject
         Schedule.ShowStatus(s);
         Remote.ShowStatus(s);
         Players.ShowStatus(s);
+        Announcements.ShowStatus(s);
         StateNote = s.RestartScheduledAt is { } at ? Loc.T("server.restartIn", Math.Max(0, (int)(at - DateTime.Now).TotalSeconds))
             : s.State == ServerState.Stopped && s.LastExitCode is { } code ? Loc.T("server.lastExit", code)
             : s.NextRestartAt is { } planned ? Loc.T("server.restartPlanned", planned.ToString("HH:mm"))
@@ -492,6 +503,7 @@ public sealed partial class ServerViewModel : ObservableObject
         Schedule?.ShowStatus(null);
         Remote?.ShowStatus(null);
         Players?.ShowStatus(null);
+        Announcements?.ShowStatus(null);
     }
 
     // ---------- игроки на сервере ----------

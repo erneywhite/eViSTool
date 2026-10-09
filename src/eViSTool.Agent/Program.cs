@@ -66,6 +66,10 @@ host.StateChanged += state =>
 var automation = ServerAutomation.Load(opts.ProfileId, opts.AgentsDir);
 var automationFile = ServerAutomation.FileFor(opts.ProfileId, opts.AgentsDir);
 var automationStamp = File.Exists(automationFile) ? File.GetLastWriteTimeUtc(automationFile) : default;
+// объявления по расписанию — свой файл (вкладка «Объявления»), подхватываем правки так же
+var announcements = ServerAnnouncements.Load(opts.ProfileId, opts.AgentsDir);
+var announcementsStamp = ServerAnnouncements.ChangedAt(opts.ProfileId, opts.AgentsDir);
+var announcer = new AnnouncementScheduler();
 var backups = new BackupStore(opts.DataPath, opts.BackupName);
 var files = new ServerFiles(opts.ProfileId, opts.DataPath, opts.BackupName, opts.AgentsDir); // для окна на другой машине
 // команды сервера — из его ответа на /help (с командами модов); помним между запусками, чтобы подсказки были сразу
@@ -334,6 +338,7 @@ AgentStatus Status() => new()
     ConfigChangedAt = File.Exists(files.ConfigPath) ? File.GetLastWriteTimeUtc(files.ConfigPath) : null,
     ModsChangedAt = mods.ChangedAt(),
     PlayersChangedAt = playerLists.ChangedAt(),
+    AnnouncementsChangedAt = ServerAnnouncements.ChangedAt(opts.ProfileId, opts.AgentsDir),
     CommandCount = commands.Count,
     RemoteError = remoteError,
 };
@@ -427,6 +432,13 @@ web.MapPut("/automation", async (HttpContext ctx) =>
     using var reader = new StreamReader(ctx.Request.Body);
     var settings = JsonConvert.DeserializeObject<ServerAutomation>(await reader.ReadToEndAsync());
     return settings is null ? Results.BadRequest() : Guard(() => { files.SaveAutomation(settings); return Status(); });
+});
+web.MapGet("/announcements", () => Json(ServerAnnouncements.Load(opts.ProfileId, opts.AgentsDir)));
+web.MapPut("/announcements", async (HttpContext ctx) =>
+{
+    using var reader = new StreamReader(ctx.Request.Body);
+    var settings = JsonConvert.DeserializeObject<ServerAnnouncements>(await reader.ReadToEndAsync());
+    return settings is null ? Results.BadRequest() : Guard(() => { settings.Save(opts.ProfileId, opts.AgentsDir); return Status(); });
 });
 web.MapGet("/backups", () => Guard(files.ListBackups));
 web.MapPost("/backups/copy", () => WhenStopped(() => files.CopyWorld(DateTime.Now)));
@@ -637,6 +649,19 @@ try
         {
             automationStamp = stamp;
             automation = ServerAutomation.Load(opts.ProfileId, opts.AgentsDir);
+        }
+
+        // объявления по расписанию: правки подхватываем, в срок — /announce
+        var announcementsNow = ServerAnnouncements.ChangedAt(opts.ProfileId, opts.AgentsDir);
+        if (announcementsNow != announcementsStamp)
+        {
+            announcementsStamp = announcementsNow;
+            announcements = ServerAnnouncements.Load(opts.ProfileId, opts.AgentsDir);
+        }
+        if (announcer.Tick(announcements, DateTime.Now, host.State, host.StartedAt, players.Players.Count) is { } say)
+        {
+            try { await host.SendCommandAsync("/announce " + say); }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException) { host.Console.Add(ConsoleLineKind.System, ex.Message); }
         }
 
         // перезапуск по расписанию: сначала предупреждения игрокам, в срок — сам перезапуск

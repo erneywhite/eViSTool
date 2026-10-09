@@ -497,6 +497,23 @@ public sealed class AgentTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Announcements_SavedThroughTheAgent_WithAChangeStamp()
+    {
+        _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
+        Assert.Empty((await _client.GetAnnouncementsAsync()).Items);
+        Assert.Null((await _client.StatusAsync()).AnnouncementsChangedAt);
+
+        await _client.SaveAnnouncementsAsync(new ServerAnnouncements { OnlyWithPlayers = false, Items = [new Announcement("Привет", 15)] });
+
+        var back = await _client.GetAnnouncementsAsync();
+        Assert.False(back.OnlyWithPlayers);
+        Assert.Equal(new Announcement("Привет", 15), Assert.Single(back.Items));
+        Assert.NotNull((await _client.StatusAsync()).AnnouncementsChangedAt);
+        // файл — рядом с настройками расписания этого профиля, там его читает и окно на этой машине
+        Assert.Equal("Привет", ServerAnnouncements.Load(_profile.Id, AgentsDir).Items[0].Text);
+    }
+
+    [Fact]
     public async Task RemotePackImport_ThroughTheAgent()
     {
         var mods = Path.Combine(_profile.DataDir!, "Mods");
