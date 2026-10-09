@@ -19,23 +19,34 @@ using Newtonsoft.Json;
 // Окно eViSTool можно закрыть или уронить: сервер продолжит работать, сторож — сторожить.
 //
 //   eViSTool.Agent.exe --profile <id> --exe <VintagestoryServer.exe> --data <папка данных> [--arg <доп. аргумент>]…
-//   eViSTool.Agent [--game <папка игры>] [--data <папка данных>] [--profile <id>] [--start]   — без окна (Linux)
+//   eViSTool.Agent [--game <папка игры>] [--data <папка данных>] [--profile <id>] [--start|--no-start]   — без окна (Linux)
 //   eViSTool.Agent <команда> …   — setup, remote, status, start, stop, restart, command, service (см. Cli/Commands.cs)
 //
-// Без окна пути не передаёт никто: сервер ищет ServerLocator (рядом, в соседних папках, по server.sh), профиль — «server».
+// Без окна пути не передаёт никто: каждое значение — из ключа, без ключа — из data/agent.json (его пишет setup), а папки
+// сервера, которых нет и там, ищет ServerLocator (рядом, в соседних папках, по server.sh); профиль по умолчанию — «server».
 // Слушает только 127.0.0.1, каждый запрос — с ключом профиля. Адрес пишет в data/agents/<id>.json.
 
 var cli = AgentArgs.Parse(args);
-// язык сообщений: окно передаёт свой, без окна — язык системы (нет такого словаря — английский)
-eViSTool.Core.Localization.Loc.Instance.SetLanguage(cli.Language ?? System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
+cli.LoadConfig(); // data/agent.json — только без окна
+// язык сообщений: окно передаёт свой, без окна — из agent.json или язык системы (нет такого словаря — английский)
+eViSTool.Core.Localization.Loc.Instance.SetLanguage(cli.Language ?? cli.Config?.Language
+    ?? System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
 // команды (setup, remote, status…, service) — выполнить и выйти; без команды агент работает дальше
 if (Commands.Run(cli, args) is { } exitCode) return exitCode;
 
+// agent.json испорчен: сказать, где ошибка, и выйти, иначе агент молча взял бы другие папки
+if (cli.ConfigError is { } configError)
+{
+    Console.Error.WriteLine(configError);
+    return 2;
+}
 var tried = new List<string>();
 if (AgentOptions.From(cli, tried) is not { } opts)
 {
     Console.Error.WriteLine(eViSTool.Core.Localization.Loc.T("agent.notFound", string.Join(", ", tried)));
-    Console.Error.WriteLine(eViSTool.Core.Localization.Loc.T("agent.notFoundHint"));
+    Console.Error.WriteLine(cli.Config is { GameDir: not null } or { DataDir: not null }
+        ? eViSTool.Core.Localization.Loc.T("agent.notFoundConfig", cli.ConfigFile ?? "")
+        : eViSTool.Core.Localization.Loc.T("agent.notFoundHint"));
     return 2;
 }
 
@@ -48,8 +59,8 @@ if (profileLock is null)
     return 3;
 }
 if (opts.Located is { } located)
-    Console.WriteLine(located.Script is { } script
-        ? eViSTool.Core.Localization.Loc.T("agent.foundScript", located.GameDir, located.DataDir, script)
+    Console.WriteLine((located.Script ?? opts.ConfigFile) is { } source
+        ? eViSTool.Core.Localization.Loc.T("agent.foundScript", located.GameDir, located.DataDir, source)
         : eViSTool.Core.Localization.Loc.T("agent.found", located.GameDir, located.DataDir));
 
 // Ctrl+C, который мы шлём серверу через общую консоль, самого агента ронять не должен.
@@ -88,8 +99,13 @@ var announcer = new AnnouncementScheduler();
 
 // оповещения (вкладка «Оповещения»): настройки читаются при каждом событии, отправка — в фоне, сбой — строкой в консоль
 using var notifyHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
-var notifier = new eViSTool.Core.Notifications.ServerNotifier(
-    () => eViSTool.Core.Notifications.ServerNotifySettings.Load(opts.ProfileId, opts.AgentsDir), notifyHttp,
+// имя сервера в заголовках — то, что задало окно; не задало — без окна из agent.json или serverconfig.json
+eViSTool.Core.Notifications.ServerNotifySettings NotifySettings()
+{
+    var s = eViSTool.Core.Notifications.ServerNotifySettings.Load(opts.ProfileId, opts.AgentsDir);
+    return string.IsNullOrWhiteSpace(s.ServerName) && opts.ServerName is { } name ? s with { ServerName = name } : s;
+}
+var notifier = new eViSTool.Core.Notifications.ServerNotifier(NotifySettings, notifyHttp,
     (channel, error) => host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("notify.sendFailed", channel, error)));
 void Notify(eViSTool.Core.Notifications.NotifyEvent e, string title, params eViSTool.Core.Notifications.NotifyLine[] details) =>
     notifier.Notify(e, title, details);
@@ -142,7 +158,7 @@ host.Console.LineAdded += line =>
 };
 void ChatJoinLeave(string text)
 {
-    var s = eViSTool.Core.Notifications.ServerNotifySettings.Load(opts.ProfileId, opts.AgentsDir);
+    var s = NotifySettings();
     if (s.ChatChannel is not null && s.ChatJoins)
         chatRelay.Post(new eViSTool.Core.Notifications.ChatPost(string.IsNullOrWhiteSpace(s.ServerName) ? "Vintage Story" : s.ServerName, text));
 }
