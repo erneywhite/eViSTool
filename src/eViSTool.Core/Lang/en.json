@@ -1426,6 +1426,7 @@
   "sched.timesError": "Times as HH:MM, comma-separated — for example 05:00, 17:30.",
   "sched.today": "today {0}",
   "sched.total": "{0} files, {1}",
+  "sched.trashFailed": "Could not move {0} to the Trash: {1}",
   "sched.warnError": "Whole minutes from 1 to 180, comma-separated.",
   "selfupd.announce": "The server restarts for an update. Back in a minute!",
   "selfupd.busy": "An update is already in progress.",

@@ -43,4 +43,50 @@ public sealed class ServerHealthTests
         Assert.False(w.Check(7 * gb));       // освободилось с запасом
         Assert.True(w.Check(2 * gb));        // и снова кончилось — сообщаем
     }
+
+    [Fact]
+    public void LowDisk_LooksAtThePartitionThePathIsOn()
+    {
+        string[] mounts = ["/", "/var", "/var/vintagestory", "/dev/shm", "/home/"];
+        Assert.Equal("/var/vintagestory", LowDiskWatch.MountPointOf("/var/vintagestory/data/Saves", mounts));
+        Assert.Equal("/var/vintagestory", LowDiskWatch.MountPointOf("/var/vintagestory", mounts));
+        Assert.Equal("/var", LowDiskWatch.MountPointOf("/var/vintagestory2/data", mounts)); // не «/var/vintagestory»
+        Assert.Equal("/", LowDiskWatch.MountPointOf("/variable", mounts));
+        Assert.Equal("/home/", LowDiskWatch.MountPointOf("/home/vintagestory/server", mounts));
+        Assert.Null(LowDiskWatch.MountPointOf("/opt/x", ["/var"]));
+
+        // и на этой машине место узнаётся
+        Assert.True(LowDiskWatch.FreeBytes(Path.GetTempPath()) > 0);
+    }
+
+    // настоящий /proc/meminfo с виртуалки (4 ГБ, сервер VS не запущен)
+    private const string Meminfo = """
+        MemTotal:        4009848 kB
+        MemFree:         1399768 kB
+        MemAvailable:    3238348 kB
+        Buffers:           50712 kB
+        Cached:          2004552 kB
+        SwapCached:            0 kB
+        HugePages_Total:       0
+        Hugepagesize:       2048 kB
+        """;
+
+    [Fact]
+    public void Memory_OnLinux_FromMeminfo_AsOnWindows()
+    {
+        // занято = всё, кроме доступного (MemAvailable с кэшем файлов): (4009848 − 3238348) / 4009848 = 19 %
+        Assert.Equal((19, 3162L), SystemMemory.FromMeminfo(Meminfo));
+        // старое ядро без MemAvailable — свободное, буферы и кэш
+        var old = string.Join("\n", Meminfo.Split('\n').Where(l => !l.StartsWith("MemAvailable")));
+        Assert.Equal((13, 3374L), SystemMemory.FromMeminfo(old));
+
+        Assert.Equal((100, 0L), SystemMemory.FromMeminfo("MemTotal: 1000 kB\nMemAvailable: 0 kB"));
+        Assert.True(SystemMemory.IsLow(SystemMemory.FromMeminfo("MemTotal: 8388608 kB\nMemAvailable: 524288 kB")!.Value)); // 512 МБ свободно
+        Assert.Null(SystemMemory.FromMeminfo(""));
+        Assert.Null(SystemMemory.FromMeminfo("MemFree: 100 kB"));
+
+        // на этой машине — Windows или Linux — тоже узнаётся
+        if (OperatingSystem.IsWindows() || OperatingSystem.IsLinux())
+            Assert.InRange(SystemMemory.Status()!.Value.LoadPercent, 0, 100);
+    }
 }
