@@ -1,4 +1,4 @@
-# Сборка релиза eViSTool: dist\eViSTool-<версия>\ и zip рядом.
+# Сборка релиза eViSTool: dist\eViSTool-<версия>\ и zip рядом; для Linux — dist\eViSTool-<версия>-linux-x64\ и tar.gz.
 #
 #   pwsh build/publish.ps1                 — версия из Directory.Build.props
 #   pwsh build/publish.ps1 -Version 0.1.0-alpha.2
@@ -48,3 +48,47 @@ Compress-Archive -Path (Join-Path $out '*') -DestinationPath $zip
 $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText("$zip.sha256", "$hash  $(Split-Path $zip -Leaf)`n")
 Get-ChildItem $out, $zip, "$zip.sha256" | Select-Object Name, @{ n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
+
+# ---- Linux: только агент (окна там нет) — так же один файл с обрезанным рантаймом внутри, .NET на машине не нужен.
+# Архив — tar.gz, распаковывается в отдельную папку рядом с сервером (папку игры обновляют через rm -rf).
+$linuxOut = Join-Path $dist "$name-linux-x64"
+$tgz = Join-Path $dist "$name-linux-x64.tar.gz"
+Remove-Item -Recurse -Force $linuxOut, $tgz, "$tgz.sha256" -ErrorAction SilentlyContinue
+
+dotnet publish (Join-Path $root 'src/eViSTool.Agent') -c Release -r linux-x64 "-p:Version=$Version" `
+    '-p:PublishSingleFile=true' '-p:DebugType=None' '-p:DebugSymbols=false' '-p:IncludeNativeLibrariesForSelfExtract=true' `
+    --self-contained true '-p:EnableCompressionInSingleFile=true' `
+    '-p:PublishTrimmed=true' '-p:TrimMode=full' '-p:EnableTrimAnalyzer=false' -o $linuxOut
+if ($LASTEXITCODE) { throw "publish eViSTool.Agent linux-x64: $LASTEXITCODE" }
+
+Get-ChildItem $linuxOut -File | Where-Object { $_.Name -ne 'eViSTool.Agent' } | Remove-Item -Force
+Get-ChildItem $linuxOut -Directory | Remove-Item -Recurse -Force
+foreach ($doc in 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'README.md', 'README.ru.md') {
+    if (Test-Path (Join-Path $root $doc)) { Copy-Item (Join-Path $root $doc) $linuxOut }
+}
+
+# tar собираем сами (System.Formats.Tar из .NET, на котором работает pwsh), с правами Unix в каждой записи: агент —
+# rwxr-xr-x, остальное — rw-r--r--. У файлов на Windows этих прав нет, и ни Compress-Archive, ни tar.exe их не поставят,
+# а распаковать архив и получить «Permission denied» на первом же запуске — плохое начало
+$stream = [IO.File]::Create($tgz)
+try {
+    $gz = [IO.Compression.GZipStream]::new($stream, [IO.Compression.CompressionLevel]::Optimal, $true)
+    $tar = [Formats.Tar.TarWriter]::new($gz, [Formats.Tar.TarEntryFormat]::Ustar, $true)
+    foreach ($file in Get-ChildItem $linuxOut -File | Sort-Object Name) {
+        $entry = [Formats.Tar.UstarTarEntry]::new([Formats.Tar.TarEntryType]::RegularFile, $file.Name)
+        $entry.Mode = [IO.UnixFileMode][Convert]::ToInt32($(if ($file.Name -eq 'eViSTool.Agent') { '755' } else { '644' }), 8)
+        $entry.ModificationTime = [DateTimeOffset]$file.LastWriteTimeUtc
+        $data = $file.OpenRead()
+        try {
+            $entry.DataStream = $data
+            $tar.WriteEntry($entry)
+        }
+        finally { $data.Dispose() }
+    }
+    $tar.Dispose() # конец архива
+    $gz.Dispose()
+}
+finally { $stream.Dispose() }
+$hash = (Get-FileHash $tgz -Algorithm SHA256).Hash.ToLowerInvariant()
+[IO.File]::WriteAllText("$tgz.sha256", "$hash  $(Split-Path $tgz -Leaf)`n")
+Get-ChildItem $linuxOut, $tgz, "$tgz.sha256" | Select-Object Name, @{ n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize

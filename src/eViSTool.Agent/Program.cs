@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.InteropServices;
 using eViSTool.Core;
 using eViSTool.Core.Game;
 using eViSTool.Core.Diagnostics;
@@ -18,33 +19,45 @@ using Newtonsoft.Json;
 // Окно eViSTool можно закрыть или уронить: сервер продолжит работать, сторож — сторожить.
 //
 //   eViSTool.Agent.exe --profile <id> --exe <VintagestoryServer.exe> --data <папка данных> [--arg <доп. аргумент>]…
+//   eViSTool.Agent [--game <папка игры>] [--data <папка данных>] [--profile <id>] [--start]   — без окна (Linux)
 //
+// Без окна пути не передаёт никто: сервер ищет ServerLocator (рядом, в соседних папках, по server.sh), профиль — «server».
 // Слушает только 127.0.0.1, каждый запрос — с ключом профиля. Адрес пишет в data/agents/<id>.json.
 
-var opts = AgentOptions.Parse(args);
-if (opts is null)
+var cli = AgentArgs.Parse(args);
+// язык сообщений: окно передаёт свой, без окна — язык системы (нет такого словаря — английский)
+eViSTool.Core.Localization.Loc.Instance.SetLanguage(cli.Language ?? System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
+if (cli.Help || cli.Command is not null)
 {
-    Console.Error.WriteLine("usage: eViSTool.Agent --profile <id> --exe <server exe> --data <data dir> [--arg <extra>]...");
+    if (cli.Command is { } unknown) Console.Error.WriteLine(eViSTool.Core.Localization.Loc.T("agent.unknownCommand", unknown));
+    Console.Error.WriteLine(eViSTool.Core.Localization.Loc.T("agent.usage"));
+    return cli.Help && cli.Command is null ? 0 : 2;
+}
+
+var tried = new List<string>();
+if (AgentOptions.From(cli, tried) is not { } opts)
+{
+    Console.Error.WriteLine(eViSTool.Core.Localization.Loc.T("agent.notFound", string.Join(", ", tried)));
+    Console.Error.WriteLine(eViSTool.Core.Localization.Loc.T("agent.notFoundHint"));
     return 2;
 }
 
 // один агент на профиль; копия, запущенная после обновления, ждёт, пока прежняя освободит профиль и выйдет
-using var mutex = new Mutex(initiallyOwned: true, $"eViSTool.Agent.{opts.ProfileId}", out var createdNew);
-if (!createdNew && opts.AfterUpdate)
+using var profileLock = ProfileLock.Take(opts.ProfileId, opts.AgentsDir ?? AgentProtocol.DefaultAgentsDir,
+    opts.AfterUpdate ? TimeSpan.FromSeconds(90) : TimeSpan.Zero);
+if (profileLock is null)
 {
-    try { createdNew = mutex.WaitOne(TimeSpan.FromSeconds(90)); }
-    catch (AbandonedMutexException) { createdNew = true; } // прежняя вышла, не отпустив, — профиль наш
-}
-if (!createdNew)
-{
-    Console.Error.WriteLine("agent for this profile is already running");
+    Console.Error.WriteLine(eViSTool.Core.Localization.Loc.T("agent.alreadyRunning", opts.ProfileId));
     return 3;
 }
+if (opts.Located is { } located)
+    Console.WriteLine(located.Script is { } script
+        ? eViSTool.Core.Localization.Loc.T("agent.foundScript", located.GameDir, located.DataDir, script)
+        : eViSTool.Core.Localization.Loc.T("agent.found", located.GameDir, located.DataDir));
 
-eViSTool.Core.Localization.Loc.Instance.SetLanguage(opts.Language);
-
-// Ctrl+C, который мы шлём серверу через общую консоль, самого агента ронять не должен
-Console.CancelKeyPress += (_, e) => e.Cancel = true;
+// Ctrl+C, который мы шлём серверу через общую консоль, самого агента ронять не должен.
+// На Linux общей консоли нет: Ctrl+C и SIGTERM — просьба агенту выйти (ниже, рядом с shutdown)
+if (OperatingSystem.IsWindows()) Console.CancelKeyPress += (_, e) => e.Cancel = true;
 
 var key = AgentProtocol.GetOrCreateKey(opts.ProfileId, opts.AgentsDir);
 var version = typeof(AgentOptions).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "?";
@@ -467,6 +480,17 @@ static TimeSpan BackupWaitOf() => TimeSpan.FromMinutes(30);
 
 var shutdown = new CancellationTokenSource();
 
+// Linux: SIGTERM (kill, systemctl stop) и Ctrl+C в терминале — штатный выход, как /shutdown: сервер останавливается
+// с сохранением мира (finally в конце), файл адреса убирается. Без этого .NET завершил бы агента сразу, бросив сервер
+var signals = new List<PosixSignalRegistration>();
+if (!OperatingSystem.IsWindows())
+    foreach (var signal in new[] { PosixSignal.SIGTERM, PosixSignal.SIGINT })
+        signals.Add(PosixSignalRegistration.Create(signal, ctx =>
+        {
+            ctx.Cancel = true;
+            shutdown.Cancel();
+        }));
+
 // ---- обновление eViSTool на этом компьютере по просьбе окна с другого
 string? selfUpdate = null, selfUpdateError = null;
 
@@ -499,7 +523,7 @@ async Task SelfUpdateAsync(eViSTool.Core.Versioning.ModVersion target)
 
         // новая копия агента — с теми же параметрами; она дождётся, пока эта выйдет и освободит профиль (и порт удалённого доступа)
         selfUpdate = "restart";
-        var psi = new System.Diagnostics.ProcessStartInfo(Path.Combine(appDir, "eViSTool.Agent.exe"))
+        var psi = new System.Diagnostics.ProcessStartInfo(Path.Combine(appDir, AgentProtocol.ExeName))
         {
             UseShellExecute = false,
             CreateNoWindow = true,
@@ -588,6 +612,16 @@ AgentStatus Status() => new()
 
 IResult Json(object value) => Results.Text(JsonConvert.SerializeObject(value), "application/json");
 
+// Ошибка для окна — problem+json с понятным текстом в «detail». Пишем сами: Results.Problem сериализует через
+// System.Text.Json, а в обрезанном релизном агенте рефлексия для него выключена — вместо 409 с текстом уходил пустой 500,
+// и окно показывало «500 Internal Server Error» (так было и в релизах для Windows)
+static IResult Problem(string detail, int status = StatusCodes.Status409Conflict) => Results.Text(
+    new Newtonsoft.Json.Linq.JObject
+        {
+            ["title"] = Microsoft.AspNetCore.WebUtilities.ReasonPhrases.GetReasonPhrase(status), ["status"] = status, ["detail"] = detail,
+        }
+        .ToString(Formatting.None), "application/problem+json", System.Text.Encoding.UTF8, status);
+
 async Task<IResult> Run(Func<Task> action)
 {
     lastActivity = DateTime.Now;
@@ -598,7 +632,7 @@ async Task<IResult> Run(Func<Task> action)
     }
     catch (Exception ex) when (ex is InvalidOperationException or FileNotFoundException or IOException or System.ComponentModel.Win32Exception)
     {
-        return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
+        return Problem(ex.Message);
     }
 }
 
@@ -613,14 +647,14 @@ IResult Guard(Func<object> action)
     catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or JsonException
                                    or InvalidDataException)
     {
-        return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
+        return Problem(ex.Message);
     }
 }
 
 // файл мира трогаем только у полностью остановленного сервера
 IResult WhenStopped(Func<object> action) =>
     host.State != ServerState.Stopped
-        ? Results.Problem(eViSTool.Core.Localization.Loc.T("sched.needStopped"), statusCode: StatusCodes.Status409Conflict)
+        ? Problem(eViSTool.Core.Localization.Loc.T("sched.needStopped"))
         : Guard(action);
 
 async Task<T?> ReadBody<T>(HttpContext ctx) where T : class
@@ -764,7 +798,7 @@ web.MapPut("/config", async (HttpContext ctx) =>
 web.MapPost("/config/generate", async () =>
 {
     if (host.State != ServerState.Stopped)
-        return Results.Problem(eViSTool.Core.Localization.Loc.T("sched.needStopped"), statusCode: StatusCodes.Status409Conflict);
+        return Problem(eViSTool.Core.Localization.Loc.T("sched.needStopped"));
     try
     {
         await eViSTool.Core.Server.Config.ServerConfigGenerator.GenerateAsync(opts.ExePath, opts.DataPath);
@@ -772,7 +806,7 @@ web.MapPost("/config/generate", async () =>
     }
     catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
     {
-        return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
+        return Problem(ex.Message);
     }
 });
 web.MapGet("/stats", (HttpContext ctx) =>
@@ -791,8 +825,8 @@ web.MapPost("/self-update", async (HttpContext ctx) =>
 {
     if (await ReadBody<SelfUpdateRequest>(ctx) is not { } request
         || !eViSTool.Core.Versioning.ModVersion.TryParse(request.Version, out var target)) return Results.BadRequest();
-    if (request.Version == version) return Results.BadRequest(eViSTool.Core.Localization.Loc.T("selfupd.same"));
-    if (selfUpdate is not (null or "failed")) return Results.Conflict(eViSTool.Core.Localization.Loc.T("selfupd.busy"));
+    if (request.Version == version) return Problem(eViSTool.Core.Localization.Loc.T("selfupd.same"), StatusCodes.Status400BadRequest);
+    if (selfUpdate is not (null or "failed")) return Problem(eViSTool.Core.Localization.Loc.T("selfupd.busy"));
     selfUpdate = "download";
     selfUpdateError = null;
     _ = Task.Run(() => SelfUpdateAsync(target));
@@ -1073,35 +1107,5 @@ finally
     await app.StopAsync();
     try { File.Delete(stateFile); } catch (IOException) { }
 }
+GC.KeepAlive(signals); // подписки на сигналы живут, пока жив их объект
 return 0;
-
-internal sealed record AgentOptions(string ProfileId, string ExePath, string DataPath, IReadOnlyList<string> ExtraArgs, bool StartServer, TimeSpan IdleExit, string? AgentsDir, string? Language, string? BackupName, bool AfterUpdate = false)
-{
-    public static AgentOptions? Parse(string[] args)
-    {
-        string? profile = null, exe = null, data = null;
-        var extra = new List<string>();
-        var start = false;
-        var afterUpdate = false;
-        var idle = TimeSpan.FromMinutes(2);
-        string? agentsDir = null, lang = null, backupName = null;
-        for (var i = 0; i < args.Length; i++)
-        {
-            string Next() => i + 1 < args.Length ? args[++i] : "";
-            switch (args[i])
-            {
-                case "--profile": profile = Next(); break;
-                case "--exe": exe = Next(); break;
-                case "--data": data = Next(); break;
-                case "--arg": extra.Add(Next()); break;
-                case "--start": start = true; break;
-                case "--after-update": afterUpdate = true; break;
-                case "--idle-exit": idle = TimeSpan.FromSeconds(int.Parse(Next())); break;
-                case "--agents-dir": agentsDir = Next(); break;
-                case "--lang": lang = Next(); break;
-                case "--backup-name": backupName = Next(); break;
-            }
-        }
-        return profile is null || exe is null || data is null ? null : new AgentOptions(profile, exe, data, extra, start, idle, agentsDir, lang, string.IsNullOrWhiteSpace(backupName) ? null : backupName, afterUpdate);
-    }
-}

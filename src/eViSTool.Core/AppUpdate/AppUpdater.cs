@@ -39,8 +39,12 @@ public sealed record AppRelease
 public sealed class AppUpdater
 {
     public const string Repo = "erneywhite/eViSTool";
-    public const string AssetSuffix = "-win-x64.zip";
-    public const string MainExe = "eViSTool.exe";
+
+    /// <summary>Архив релиза для этой системы: на Windows — zip с окном и агентом, на Linux — tar.gz с одним агентом.</summary>
+    public static string AssetSuffix { get; } = OperatingSystem.IsWindows() ? "-win-x64.zip" : "-linux-x64.tar.gz";
+
+    /// <summary>Главная программа в архиве — по ней узнаём архив eViSTool. На Linux окна нет, главная там — агент.</summary>
+    public static string MainExe { get; } = OperatingSystem.IsWindows() ? "eViSTool.exe" : Server.AgentProtocol.ExeName;
 
     private readonly HttpClient _http;
 
@@ -225,12 +229,22 @@ public sealed class AppUpdater
     /// <summary>
     /// Поставить скачанный архив в папку программы: каждый файл архива встаёт на место прежнего, прежний переименовывается
     /// в «*.old». Папку data не трогаем — её в архиве нет. Если что-то пошло не так — всё возвращается как было.
+    /// Архив — zip (Windows) или tar.gz (Linux: права файлов, в том числе «исполняемый», берутся из архива).
     /// </summary>
     public static void Install(string zipPath, string appDir)
     {
         var staging = Path.Combine(appDir, ".update");
         if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
-        ZipFile.ExtractToDirectory(zipPath, staging);
+        if (zipPath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
+        {
+            Directory.CreateDirectory(staging);
+            using var gz = new GZipStream(File.OpenRead(zipPath), CompressionMode.Decompress);
+            System.Formats.Tar.TarFile.ExtractToDirectory(gz, staging, overwriteFiles: false);
+        }
+        else
+        {
+            ZipFile.ExtractToDirectory(zipPath, staging);
+        }
         try
         {
             // архив мог быть собран с папкой внутри

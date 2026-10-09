@@ -2,16 +2,18 @@ namespace eViSTool.Core;
 
 /// <summary>
 /// Где eViSTool хранит свои данные. Программа портабельная: всё лежит в папке data рядом с exe.
-/// Если туда писать нельзя (например, exe в Program Files) — %LOCALAPPDATA%\eViSTool.
+/// Если туда писать нельзя (например, exe в Program Files) — %LOCALAPPDATA%\eViSTool
+/// (на Linux — ~/.local/share/eViSTool или $XDG_DATA_HOME/eViSTool).
 /// </summary>
 public static class AppPaths
 {
-    private static readonly Lazy<string> _root = new(Resolve);
+    private static readonly Lazy<string> _root = new(() => Resolve(AppContext.BaseDirectory, FallbackRoot));
 
     public static string Root => _root.Value;
 
     /// <summary>Данные рядом с exe (true) или в профиле пользователя (false).</summary>
-    public static bool IsPortable => Root.StartsWith(AppContext.BaseDirectory, StringComparison.OrdinalIgnoreCase);
+    public static bool IsPortable => Root.StartsWith(AppContext.BaseDirectory,
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     public static string SettingsFile => Path.Combine(Root, "settings.json");
     public static string ModBackups => Path.Combine(Root, "ModBackups");
@@ -28,13 +30,40 @@ public static class AppPaths
     public static string LegacyLocalRoot => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "eViSTool");
 
-    private static string Resolve()
+    /// <summary>
+    /// Запасная папка данных, когда рядом с программой писать нельзя. На Windows — %LOCALAPPDATA%\eViSTool.
+    /// На Linux — $XDG_DATA_HOME/eViSTool или ~/.local/share/eViSTool: у системного пользователя (vintagestory) этих
+    /// папок обычно ещё нет, а без DoNotVerify .NET вернул бы пустую строку — и данные легли бы в текущую папку.
+    /// </summary>
+    public static string FallbackRoot => OperatingSystem.IsWindows()
+        ? LegacyLocalRoot
+        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.DoNotVerify)
+            is { Length: > 0 } local ? local : Path.GetTempPath(), "eViSTool");
+
+    /// <summary>Папка данных: data рядом с программой (baseDir), если туда можно писать, иначе запасная.</summary>
+    public static string Resolve(string baseDir, string fallback)
     {
-        var portable = Path.Combine(AppContext.BaseDirectory, "data");
+        var portable = Path.Combine(baseDir, "data");
         if (CanWrite(portable)) return portable;
 
-        Directory.CreateDirectory(LegacyLocalRoot);
-        return LegacyLocalRoot;
+        CreatePrivateDirectory(fallback);
+        return fallback;
+    }
+
+    /// <summary>
+    /// Создать папку данных. На Linux — только для себя (rwx------): в ней ключи агента и секреты оповещений, а папка
+    /// с eViSTool на сервере лежит там, куда заглянет любой пользователь машины. Уже существующую не трогаем — права
+    /// на неё выбирал человек.
+    /// </summary>
+    private static void CreatePrivateDirectory(string dir)
+    {
+        if (OperatingSystem.IsWindows() || Directory.Exists(dir))
+        {
+            Directory.CreateDirectory(dir);
+            return;
+        }
+        if (Path.GetDirectoryName(Path.GetFullPath(dir)) is { Length: > 0 } parent) Directory.CreateDirectory(parent);
+        Directory.CreateDirectory(dir, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
     }
 
     private static void CopyDir(string from, string to)
@@ -54,7 +83,7 @@ public static class AppPaths
     {
         try
         {
-            Directory.CreateDirectory(dir);
+            CreatePrivateDirectory(dir);
             var probe = Path.Combine(dir, $".write-test-{Guid.NewGuid():N}");
             File.WriteAllText(probe, "");
             File.Delete(probe);

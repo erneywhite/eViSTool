@@ -5,13 +5,13 @@ using eViSTool.Core.Server;
 
 namespace eViSTool.Core.Tests;
 
-/// <summary>Настоящий eViSTool.Agent.exe + поддельный сервер, управление по HTTP — как из окна.</summary>
+/// <summary>Настоящий eViSTool.Agent + поддельный сервер, управление по HTTP — как из окна.</summary>
 public sealed class AgentTests : IAsyncLifetime
 {
     private static readonly string Root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
     // EVISTOOL_TEST_AGENT — проверить те же сценарии на релизном (обрезанном) агенте из build/publish.ps1
     private static readonly string AgentExe = Environment.GetEnvironmentVariable("EVISTOOL_TEST_AGENT")
-        ?? Path.Combine(Root, "src", "eViSTool.Agent", "bin", "Debug", "net10.0", "eViSTool.Agent.exe");
+        ?? Path.Combine(Root, "src", "eViSTool.Agent", "bin", "Debug", "net10.0", AgentProtocol.ExeName); // на Linux — без .exe
     private static readonly string FakeBin = Path.Combine(Root, "tests", "FakeVsServer", "bin", "Debug", "net10.0");
 
     private readonly string _tmp = Path.Combine(Path.GetTempPath(), "evistool-agent-" + Guid.NewGuid().ToString("N"));
