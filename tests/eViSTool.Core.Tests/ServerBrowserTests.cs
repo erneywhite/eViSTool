@@ -22,7 +22,7 @@ public sealed class ServerBrowserTests : IDisposable
             { "status": "ok", "data": [
               { "serverName": "Whispers of Oldwood", "serverIP": "1.2.3.4:42420", "playstyle": { "id": "x", "langCode": "preset-surviveandbuild" },
                 "mods": [ { "id": "buffberries", "version": "1.1.0" } ], "maxPlayers": "123", "players": 25, "gameVersion": "1.22.7",
-                "hasPassword": false, "whitelisted": true, "gameDescription": "Discord: <a href=\"https://x\">Here</a><br>Rules &amp; lore" },
+                "hasPassword": false, "whitelisted": true, "gameDescription": "Discord: <a href=\"https://x\">Here</a><br>Rules &amp; lore<br>  <br><br><br>Season 3" },
               { "serverName": "no address" }
             ] }
             """);
@@ -34,7 +34,7 @@ public sealed class ServerBrowserTests : IDisposable
         Assert.Equal(123, s.MaxPlayers); // мастер-сервер отдаёт его строкой
         Assert.True(s.HasSlots);
         Assert.True(s.Whitelisted);
-        Assert.Equal("Discord: Here\nRules & lore", s.Description);
+        Assert.Equal("Discord: Here\nRules & lore\n\nSeason 3", s.Description); // пустые строки подряд — одна
     }
 
     [Fact]

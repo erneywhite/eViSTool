@@ -86,8 +86,16 @@ public static partial class ServerBrowser
     };
 
     /// <summary>Описания бывают с разметкой (&lt;a&gt;, &lt;font&gt;, &lt;br&gt;) — показываем текстом.</summary>
-    public static string Plain(string s) =>
-        WebUtility.HtmlDecode(Tags().Replace(Breaks().Replace(s, "\n"), "")).Replace("\r", "");
+    public static string Plain(string s)
+    {
+        var text = WebUtility.HtmlDecode(Tags().Replace(Breaks().Replace(s, "\n"), "")).Replace("\r", "");
+        // строки без хвостовых пробелов, подряд не больше одной пустой
+        text = string.Join("\n", text.Split('\n').Select(l => l.TrimEnd()));
+        return BlankLines().Replace(text, "\n\n");
+    }
+
+    [GeneratedRegex(@"\n{3,}")]
+    private static partial Regex BlankLines();
 
     [GeneratedRegex(@"<br\s*/?>", RegexOptions.IgnoreCase)]
     private static partial Regex Breaks();
