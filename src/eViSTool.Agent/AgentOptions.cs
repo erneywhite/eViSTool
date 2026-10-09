@@ -20,7 +20,7 @@ internal sealed class AgentArgs
     public string? BackupName { get; private set; }
     public bool Help { get; private set; }
 
-    /// <summary>Первое слово без «-» — команда. Своих команд у агента пока нет (setup, service… — впереди).</summary>
+    /// <summary>Первое слово без «-» — команда (setup, remote, status…, service — см. Cli/Commands.cs).</summary>
     public string? Command { get; private set; }
 
     public static AgentArgs Parse(string[] args)

@@ -20,6 +20,7 @@ using Newtonsoft.Json;
 //
 //   eViSTool.Agent.exe --profile <id> --exe <VintagestoryServer.exe> --data <папка данных> [--arg <доп. аргумент>]…
 //   eViSTool.Agent [--game <папка игры>] [--data <папка данных>] [--profile <id>] [--start]   — без окна (Linux)
+//   eViSTool.Agent <команда> …   — setup, remote, status, start, stop, restart, command, service (см. Cli/Commands.cs)
 //
 // Без окна пути не передаёт никто: сервер ищет ServerLocator (рядом, в соседних папках, по server.sh), профиль — «server».
 // Слушает только 127.0.0.1, каждый запрос — с ключом профиля. Адрес пишет в data/agents/<id>.json.
@@ -27,12 +28,8 @@ using Newtonsoft.Json;
 var cli = AgentArgs.Parse(args);
 // язык сообщений: окно передаёт свой, без окна — язык системы (нет такого словаря — английский)
 eViSTool.Core.Localization.Loc.Instance.SetLanguage(cli.Language ?? System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
-if (cli.Help || cli.Command is not null)
-{
-    if (cli.Command is { } unknown) Console.Error.WriteLine(eViSTool.Core.Localization.Loc.T("agent.unknownCommand", unknown));
-    Console.Error.WriteLine(eViSTool.Core.Localization.Loc.T("agent.usage"));
-    return cli.Help && cli.Command is null ? 0 : 2;
-}
+// команды (setup, remote, status…, service) — выполнить и выйти; без команды агент работает дальше
+if (Commands.Run(cli, args) is { } exitCode) return exitCode;
 
 var tried = new List<string>();
 if (AgentOptions.From(cli, tried) is not { } opts)

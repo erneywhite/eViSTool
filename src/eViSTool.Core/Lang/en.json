@@ -30,7 +30,7 @@
   "agent.notFound": "Vintage Story server not found. Checked: {0}",
   "agent.notFoundHint": "Tell the agent where it is: eViSTool.Agent --game <server folder> [--data <data folder>]",
   "agent.unknownCommand": "Unknown command: {0}",
-  "agent.usage": "Usage: eViSTool.Agent [--game <server folder>] [--data <data folder>] [--profile <id>] [--start]\nWithout keys the agent looks for the server itself: in its own folder, in the folders next to it and through server.sh.",
+  "agent.usage": "Usage: eViSTool.Agent [command] [options]\n\nWithout a command the agent runs and looks after the server.\n  --game <folder>    server folder (found by itself next to eViSTool or through server.sh)\n  --data <folder>    server data folder\n  --start            start the server together with the agent\n\nCommands:\n  setup                                  find the server, remember its folders, check permissions\n  remote enable|disable|code|host <address>|new-key|status\n                                         remote access for eViSTool on Windows\n  status                                 server state\n  start | stop | restart                 control the server through the running agent\n  command \"/text\"                        send a command to the server\n  service install|uninstall|status       systemd service (Linux, as root)\n  help                                   this text",
   "also.allThere": "{0} · everything is already there",
   "also.already": "{0} · {1} already installed",
   "also.checking": "Checking the other profiles…",

@@ -119,9 +119,9 @@ public sealed class StandaloneAgentTests : IDisposable
     [Fact]
     public async Task UnknownCommand_IsRefused_HelpIsShown()
     {
-        var (code, text) = await Run("setup", "--lang", "en");
+        var (code, text) = await Run("frobnicate", "--lang", "en");
         Assert.True(code == 2, text);
-        Assert.Contains("Unknown command: setup", text);
+        Assert.Contains("Unknown command: frobnicate", text);
 
         (code, text) = await Run("--help", "--lang", "en");
         Assert.True(code == 0, text);
