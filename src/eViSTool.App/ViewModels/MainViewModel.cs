@@ -112,6 +112,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     partial void OnEditedProfileChanged(ProfileViewModel? value)
     {
+        NotifyEditedDefaultServer();
         RefreshLinks();
         CleanupDiskCommand.NotifyCanExecuteChanged();
         WorldCopies = value?.Model.Kind == ProfileKind.Client ? new WorldCopiesViewModel(value.Model) : null;
@@ -153,7 +154,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty] private bool _isLaunching;
 
-    public string PlayText => Loc.T(IsGameRunning ? "play.running" : IsLaunching ? "play.starting" : "play.button");
+    public string PlayText => IsGameRunning ? Loc.T("play.running") : IsLaunching ? Loc.T("play.starting") : Loc.T("play.button") + PlaySuffix;
 
     /// <summary>Игра этого профиля запущена (нами или как угодно ещё: ярлык, лаунчер) — второй экземпляр не даём.</summary>
     [ObservableProperty] private bool _isGameRunning;
@@ -162,6 +163,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(PlayText));
         PlayCommand.NotifyCanExecuteChanged();
+        PlayOnCommand.NotifyCanExecuteChanged();
     }
 
     private bool CanPlayNow => !IsGameRunning && !IsLaunching;
@@ -361,6 +363,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(PlayText));
         PlayCommand.NotifyCanExecuteChanged();
+        PlayOnCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
@@ -382,8 +385,11 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(PlayTip));
     }
 
+    /// <summary>«Играть»: с сервером по умолчанию, если он выбран у профиля, иначе просто игра.</summary>
     [RelayCommand(CanExecute = nameof(CanPlayNow))]
-    private async Task Play()
+    private Task Play() => LaunchAsync(DefaultPlayTarget);
+
+    private async Task LaunchAsync(PlayTarget? server)
     {
         if (ActiveProfile is not { Kind: ProfileKind.Client } profile) return;
         var owner = System.Windows.Application.Current.MainWindow!;
@@ -398,7 +404,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         try
         {
-            GameLauncher.Launch(profile.Model);
+            GameLauncher.Launch(profile.Model, server);
         }
         catch (Exception ex) when (ex is FileNotFoundException or InvalidOperationException or System.ComponentModel.Win32Exception)
         {

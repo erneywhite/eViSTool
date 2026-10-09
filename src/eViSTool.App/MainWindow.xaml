@@ -13,6 +13,7 @@
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:TextToVisibilityConverter x:Key="TextToVis" />
         <local:InvertBoolToVisibilityConverter x:Key="InvBoolToVis" />
     </Window.Resources>
 
@@ -124,12 +125,97 @@
             <Border DockPanel.Dock="Top" Height="60" BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,0,0,1">
                 <DockPanel Margin="24,0,20,0">
                     <!-- игра с активным клиентским профилем: его папка данных, его моды -->
+                    <!-- «Играть ▾»: большая часть — с сервером по умолчанию (или без сервера), стрелка — меню серверов -->
+                    <Button x:Name="PlayMenuButton" DockPanel.Dock="Right" Style="{StaticResource Forest.PrimaryButton}" Click="PlayMenu_Click"
+                            VerticalAlignment="Center" Margin="2,0,0,0" Padding="9,8" ToolTip="{local:Tr play.menuTip}"
+                            Visibility="{Binding CanPlay, Converter={StaticResource BoolToVis}}" AutomationProperties.AutomationId="PlayMenuButton"
+                            AutomationProperties.Name="{local:Tr play.menuTip}">
+                        <Path Data="{StaticResource Icon.ChevronDown}" Style="{StaticResource Forest.Icon}" Width="12" Height="12" />
+                    </Button>
+                    <Popup x:Name="PlayMenu" DockPanel.Dock="Right" PlacementTarget="{Binding ElementName=PlayMenuButton}" Placement="Bottom"
+                           HorizontalOffset="-300" VerticalOffset="6" StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                        <Border Width="340" Background="{StaticResource Forest.Surface}" BorderBrush="{StaticResource Forest.Line}" BorderThickness="1"
+                                CornerRadius="10" Padding="6">
+                            <Border.Resources>
+                                    <DataTemplate x:Key="PlayMenuItem">
+                                        <DockPanel Margin="0,1">
+                                            <!-- булавка: сервер по умолчанию (повторно — снять) -->
+                                            <ToggleButton DockPanel.Dock="Right" IsChecked="{Binding IsDefault, Mode=OneWay}" Margin="6,0,8,0" Padding="7"
+                                                          VerticalAlignment="Center" Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                                          ToolTip="{local:Tr play.pinTip}" AutomationProperties.Name="{local:Tr play.pinTip}"
+                                                          Click="PlayMenuPin_Click">
+                                                <ToggleButton.Template>
+                                                    <ControlTemplate TargetType="ToggleButton">
+                                                        <Border x:Name="Bd" Background="Transparent" CornerRadius="5" Padding="{TemplateBinding Padding}">
+                                                            <Path x:Name="Ic" Data="{StaticResource Icon.Pin}" Style="{StaticResource Forest.Icon}" Width="14" Height="14"
+                                                                  Stroke="{StaticResource Forest.Muted}" />
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Forest.Raised}" />
+                                                            </Trigger>
+                                                            <Trigger Property="IsChecked" Value="True">
+                                                                <Setter TargetName="Ic" Property="Stroke" Value="{StaticResource Forest.Accent}" />
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </ToggleButton.Template>
+                                            </ToggleButton>
+                                            <Button Click="PlayMenuItem_Click" Background="Transparent" BorderThickness="0" Padding="12,6" Cursor="Hand"
+                                                    HorizontalContentAlignment="Stretch" AutomationProperties.Name="{Binding Name}">
+                                                <Button.Template>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border x:Name="Bd" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                                            <ContentPresenter />
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Forest.Raised}" />
+                                                            </Trigger>
+                                                            <Trigger Property="IsEnabled" Value="False">
+                                                                <Setter TargetName="Bd" Property="Opacity" Value="0.5" />
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Button.Template>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{StaticResource Forest.Text}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Detail}" FontSize="11" Foreground="{StaticResource Forest.Muted}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding VersionNote}" FontSize="11" Foreground="{StaticResource Forest.Warn}" TextWrapping="Wrap"
+                                                               Visibility="{Binding VersionNote, Converter={StaticResource TextToVis}}" />
+                                                </StackPanel>
+                                            </Button>
+                                        </DockPanel>
+                                    </DataTemplate>
+                            </Border.Resources>
+                            <StackPanel>
+                                <ContentControl Content="{Binding PlayNoServer}" ContentTemplate="{StaticResource PlayMenuItem}" Focusable="False" />
+
+                                <StackPanel Visibility="{Binding HasPlayOwnServers, Converter={StaticResource BoolToVis}}">
+                                    <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Margin="6,6,6,0" />
+                                    <TextBlock Text="{local:Tr play.ownServers}" FontSize="11" Foreground="{StaticResource Forest.Muted}" Margin="12,8,0,2" />
+                                    <ItemsControl ItemsSource="{Binding PlayOwnServers}" ItemTemplate="{StaticResource PlayMenuItem}" Focusable="False" />
+                                </StackPanel>
+
+                                <StackPanel Visibility="{Binding HasPlayFavorites, Converter={StaticResource BoolToVis}}">
+                                    <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Margin="6,6,6,0" />
+                                    <TextBlock Text="{local:Tr play.favorites}" FontSize="11" Foreground="{StaticResource Forest.Muted}" Margin="12,8,0,2" />
+                                    <ItemsControl ItemsSource="{Binding PlayFavorites}" ItemTemplate="{StaticResource PlayMenuItem}" Focusable="False" />
+                                    <TextBlock Text="{Binding PlayFavoritesMore}" FontSize="11" Foreground="{StaticResource Forest.Muted}" Margin="12,2,0,4"
+                                               Visibility="{Binding PlayFavoritesMore, Converter={StaticResource TextToVis}}" />
+                                </StackPanel>
+
+                                <TextBlock Text="{local:Tr play.menuHint}" FontSize="11" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap"
+                                           Margin="12,8,12,4" />
+                            </StackPanel>
+                        </Border>
+                    </Popup>
                     <Button DockPanel.Dock="Right" Style="{StaticResource Forest.PrimaryButton}" Command="{Binding PlayCommand}"
                             VerticalAlignment="Center" Margin="12,0,0,0" ToolTip="{Binding PlayTip}" ToolTipService.ShowOnDisabled="True"
                             Visibility="{Binding CanPlay, Converter={StaticResource BoolToVis}}" AutomationProperties.AutomationId="PlayButton">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource Icon.Play}" Style="{StaticResource Forest.Icon}" Width="13" Height="13" Margin="0,0,8,0" />
-                            <TextBlock Text="{Binding PlayText}" />
+                            <TextBlock Text="{Binding PlayText}" MaxWidth="260" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                     </Button>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">

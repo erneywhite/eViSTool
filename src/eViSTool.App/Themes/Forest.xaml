@@ -137,6 +137,9 @@
     <!-- ===== иконки навигации (контуры из макета, viewBox 24×24) ===== -->
     <Geometry x:Key="Icon.Mods">M3,3 H10 V10 H3 Z M14,3 H21 V10 H14 Z M3,14 H10 V21 H3 Z M14,14 H21 V21 H14 Z</Geometry>
     <Geometry x:Key="Icon.Catalog">M4,10 A6,6 0 1 1 16,10 A6,6 0 1 1 4,10 Z M15,15 L21,21</Geometry>
+    <Geometry x:Key="Icon.ChevronDown">M6,9 L12,15 L18,9</Geometry>
+    <Geometry x:Key="Icon.Pin">M9,4 H15 M10,4 V10 L7,14 H17 L14,10 V4 M12,14 V21</Geometry>
+    <Geometry x:Key="Icon.Globe">M12,3 A9,9 0 1 0 12.01,3 Z M3,12 H21 M12,3 C8,7 8,17 12,21 M12,3 C16,7 16,17 12,21</Geometry>
     <Geometry x:Key="Icon.Server">M3,3 H21 V10 H3 Z M3,14 H21 V21 H3 Z M6,7 H8 M6,18 H8</Geometry>
     <Geometry x:Key="Icon.Settings">M3,7 H6 M12,7 H21 M3,17 H13 M19,17 H21 M6,7 A3,3 0 1 1 12,7 A3,3 0 1 1 6,7 Z M13,17 A3,3 0 1 1 19,17 A3,3 0 1 1 13,17 Z</Geometry>
     <!-- файл настроек мода: лист с загнутым углом и строками -->

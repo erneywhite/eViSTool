@@ -122,6 +122,9 @@ public sealed record AgentStatus
     /// <summary>Когда менялись объявления по расписанию: окна перечитывают вкладку «Объявления».</summary>
     public DateTime? AnnouncementsChangedAt { get; init; }
 
+    /// <summary>Порт игры (Port в serverconfig.json): клиент на другом компьютере подключается по нему.</summary>
+    public int? GamePort { get; init; }
+
     /// <summary>Когда менялись оповещения сервера: окна перечитывают вкладку «Оповещения».</summary>
     public DateTime? NotifyChangedAt { get; init; }
 

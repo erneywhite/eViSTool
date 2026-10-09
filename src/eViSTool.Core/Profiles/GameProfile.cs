@@ -49,6 +49,12 @@ public sealed class GameProfile
     /// </summary>
     public List<string> LinkedProfiles { get; set; } = [];
 
+    /// <summary>
+    /// Клиентский профиль: к какому серверу подключаться по кнопке «Играть» (<see cref="Game.PlayTarget.Key"/>);
+    /// null — просто запустить игру.
+    /// </summary>
+    public string? DefaultServer { get; set; }
+
     public bool IsLinkedTo(GameProfile other) =>
         LinkedProfiles.Contains(other.Id, StringComparer.Ordinal) || other.LinkedProfiles.Contains(Id, StringComparer.Ordinal);
 

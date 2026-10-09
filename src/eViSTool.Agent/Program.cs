@@ -407,6 +407,7 @@ AgentStatus Status() => new()
     PlayersChangedAt = playerLists.ChangedAt(),
     AnnouncementsChangedAt = ServerAnnouncements.ChangedAt(opts.ProfileId, opts.AgentsDir),
     NotifyChangedAt = eViSTool.Core.Notifications.ServerNotifySettings.ChangedAt(opts.ProfileId, opts.AgentsDir),
+    GamePort = eViSTool.Core.Game.PlayTargets.GamePortOf(opts.DataPath),
     CommandCount = commands.Count,
     RemoteError = remoteError,
 };
