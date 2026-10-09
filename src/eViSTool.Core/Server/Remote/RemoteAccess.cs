@@ -58,7 +58,17 @@ public static class RemoteAccess
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var tmp = path + ".tmp";
         File.WriteAllText(tmp, JsonConvert.SerializeObject(settings, Formatting.Indented));
+        OwnerOnly(tmp);
         File.Move(tmp, path, overwrite: true);
+    }
+
+    /// <summary>
+    /// На Linux ключ удалённого доступа и сертификат — только владельцу (rw-------), как ключ профиля: папку data
+    /// может создать и сам человек, с правами, открытыми всем пользователям машины.
+    /// </summary>
+    private static void OwnerOnly(string path)
+    {
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
     }
 
     /// <summary>Включить: при первом включении — случайный свободный порт, ключ и сертификат; дальше они те же.</summary>
@@ -132,6 +142,7 @@ public static class RemoteAccess
         using var created = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(20));
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllBytes(path, created.Export(X509ContentType.Pfx));
+        OwnerOnly(path);
         return X509CertificateLoader.LoadPkcs12FromFile(path, null);
     }
 
