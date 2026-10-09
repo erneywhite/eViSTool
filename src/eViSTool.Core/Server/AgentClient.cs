@@ -133,6 +133,8 @@ public sealed class AgentClient : IDisposable
     public Task<BackupEntry> CopyWorldAsync(CancellationToken ct = default) => Post<BackupEntry>("backups/copy", null, ct);
     public Task<RestoreResult> RestoreAsync(string name, CancellationToken ct = default) => Post<RestoreResult>("backups/restore", new BackupNameRequest(name), ct);
     public Task DeleteBackupAsync(string name, CancellationToken ct = default) => Post<AgentStatus>("backups/delete", new BackupNameRequest(name), ct);
+    public async Task<string?> CheckBackupDirAsync(string? dir, CancellationToken ct = default) =>
+        (await Post<BackupDirCheck>("backups/check-dir", new BackupNameRequest(dir ?? ""), ct).ConfigureAwait(false)).Error;
 
     // ---- serverconfig.json удалённого сервера
 

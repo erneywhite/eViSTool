@@ -21,15 +21,93 @@ public sealed record BackupFile(string Path, string Name, DateTime Time, long Si
 }
 
 /// <summary>
-/// Папка Backups серверного профиля. Копии называются «&lt;профиль&gt;-ГГГГ-ММ-ДД_ЧЧ-ММ-СС.vcdbs»: по имени видно, чей это мир,
+/// Копии мира серверного профиля. Копии называются «&lt;профиль&gt;-ГГГГ-ММ-ДД_ЧЧ-ММ-СС.vcdbs»: по имени видно, чей это мир,
 /// даже если файл унесли в другую папку. Без имени профиля (prefix = null) «своей» считается любая копия с отметкой времени.
+/// Сервер пишет копии в Backups своей папки данных (<see cref="ServerDir"/>); если выбрана своя папка (<paramref name="backupDir"/>),
+/// готовые копии переносятся туда (<see cref="Relocate"/>). Список, ротация и восстановление видят обе папки: копия, которую
+/// не удалось перенести (сетевая папка недоступна), не теряется.
 /// </summary>
-public sealed partial class BackupStore(string dataDir, string? prefix = null)
+public sealed partial class BackupStore(string dataDir, string? prefix = null, string? backupDir = null)
 {
     private const string Extension = ".vcdbs";
+    private const string PartSuffix = ".part";
     private const string StampFormat = "yyyy-MM-dd_HH-mm-ss";
 
-    public string Dir { get; } = Path.Combine(dataDir, "Backups");
+    /// <summary>Backups в папке данных сервера: сюда копию пишет сам сервер (/genbackup).</summary>
+    public string ServerDir { get; } = Path.Combine(dataDir, "Backups");
+
+    /// <summary>Где копии хранятся: выбранная папка или <see cref="ServerDir"/>.</summary>
+    public string Dir { get; } = string.IsNullOrWhiteSpace(backupDir) ? Path.Combine(dataDir, "Backups") : backupDir.Trim();
+
+    /// <summary>Выбрана своя папка, отличная от Backups сервера.</summary>
+    public bool IsElsewhere => !SamePath(Dir, ServerDir);
+
+    private static bool SamePath(string a, string b) =>
+        string.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(a)), Path.TrimEndingDirectorySeparator(Path.GetFullPath(b)),
+            StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Можно ли складывать копии в эту папку: путь полный (диск или сетевая папка), папка создаётся, в неё пишется.
+    /// null — можно, иначе — что не так, своими словами.
+    /// </summary>
+    public static string? CheckDir(string? dir)
+    {
+        dir = dir?.Trim();
+        if (string.IsNullOrEmpty(dir)) return null; // по умолчанию — Backups сервера
+        if (!Path.IsPathFullyQualified(dir) || dir.IndexOfAny(Path.GetInvalidPathChars()) >= 0) return Loc.T("backupdir.notFull");
+        try
+        {
+            Directory.CreateDirectory(dir);
+            var probe = Path.Combine(dir, $".evistool-{Guid.NewGuid():N}.tmp");
+            File.WriteAllText(probe, "ok");
+            File.Delete(probe);
+            return null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
+        {
+            return ex is UnauthorizedAccessException ? Loc.T("backupdir.denied") : Loc.T("backupdir.unreachable", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Перенести готовую копию (и архив данных модов рядом) из Backups сервера в выбранную папку. Сначала файл целиком
+    /// пишется под временным именем, потом переименовывается и только тогда удаляется исходный: оборвётся связь посреди —
+    /// копия остаётся на сервере. Своя папка не выбрана или копия уже там — возвращается как есть.
+    /// </summary>
+    public BackupFile Relocate(BackupFile backup)
+    {
+        if (!IsElsewhere || !SamePath(Path.GetDirectoryName(backup.Path)!, ServerDir)) return backup;
+        Directory.CreateDirectory(Dir);
+        var target = Path.Combine(Dir, backup.Name);
+        var archive = WorldModData.ArchiveFor(backup.Path);
+        if (File.Exists(archive)) MoveSafely(archive, WorldModData.ArchiveFor(target));
+        MoveSafely(backup.Path, target);
+        return backup with { Path = target };
+    }
+
+    /// <summary>
+    /// Свои копии, застрявшие в Backups сервера (выбранная папка была недоступна), — перенести. Возвращает, сколько
+    /// перенесли; не вышло — исключение, остальное остаётся на месте.
+    /// </summary>
+    public int RelocateLeftovers()
+    {
+        if (!IsElsewhere) return 0;
+        var moved = 0;
+        foreach (var b in ListIn(ServerDir).Where(b => b.IsOwn))
+        {
+            Relocate(b);
+            moved++;
+        }
+        return moved;
+    }
+
+    private static void MoveSafely(string from, string to)
+    {
+        var part = to + PartSuffix;
+        File.Copy(from, part, overwrite: true);
+        File.Move(part, to, overwrite: true);
+        File.Delete(from);
+    }
 
     /// <summary>
     /// Имя профиля для имени файла: команда сервера /genbackup не принимает пробелы, а в имени файла нельзя ещё ряд знаков —
@@ -45,16 +123,33 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
     /// <summary>Имя файла для копии, сделанной сейчас.</summary>
     public string NameFor(DateTime now) => $"{prefix ?? "world"}-{now.ToString(StampFormat, CultureInfo.InvariantCulture)}{Extension}";
 
-    /// <summary>Копии, новые сверху.</summary>
+    /// <summary>Копии, новые сверху: из выбранной папки и из Backups сервера (одноимённая — та, что в выбранной).</summary>
     public IReadOnlyList<BackupFile> List()
     {
-        if (!Directory.Exists(Dir)) return [];
-        return new DirectoryInfo(Dir).EnumerateFiles("*" + Extension)
-            .Select(f => TryStamp(f.Name, out var time)
-                ? new BackupFile(f.FullName, f.Name, time, f.Length) { IsStamped = true, IsOwn = IsOwnName(f.Name), ModDataSize = ModDataSizeOf(f.FullName) }
-                : new BackupFile(f.FullName, f.Name, f.LastWriteTime, f.Length) { ModDataSize = ModDataSizeOf(f.FullName) })
-            .OrderByDescending(b => b.Time)
-            .ToList();
+        var all = ListIn(Dir);
+        if (IsElsewhere)
+        {
+            var names = all.Select(b => b.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            all = [.. all, .. ListIn(ServerDir).Where(b => !names.Contains(b.Name))];
+        }
+        return all.OrderByDescending(b => b.Time).ToList();
+    }
+
+    private List<BackupFile> ListIn(string dir)
+    {
+        try
+        {
+            if (!Directory.Exists(dir)) return [];
+            return new DirectoryInfo(dir).EnumerateFiles("*" + Extension)
+                .Select(f => TryStamp(f.Name, out var time)
+                    ? new BackupFile(f.FullName, f.Name, time, f.Length) { IsStamped = true, IsOwn = IsOwnName(f.Name), ModDataSize = ModDataSizeOf(f.FullName) }
+                    : new BackupFile(f.FullName, f.Name, f.LastWriteTime, f.Length) { ModDataSize = ModDataSizeOf(f.FullName) })
+                .ToList();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return []; // сетевая папка недоступна — показываем то, что есть на сервере
+        }
     }
 
     /// <summary>
@@ -89,9 +184,18 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
     public BackupFile CopySave(string saveFile, DateTime now)
     {
         if (!File.Exists(saveFile)) throw new FileNotFoundException(Loc.T("backup.noSave", saveFile), saveFile);
-        Directory.CreateDirectory(Dir);
+        var dir = Dir;
+        try
+        {
+            Directory.CreateDirectory(dir);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            dir = ServerDir; // выбранная папка недоступна — копия всё равно нужна; перенесётся потом
+            Directory.CreateDirectory(dir);
+        }
         var name = NameFor(now);
-        var target = Path.Combine(Dir, name);
+        var target = Path.Combine(dir, name);
         // после нештатной остановки часть мира — в журнале -wal: копия получает его внутрь, одним файлом
         WorldDb.Snapshot(saveFile, target);
         var made = new BackupFile(target, name, now, new FileInfo(target).Length) { IsStamped = true, IsOwn = true };
@@ -128,7 +232,7 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
 
         BackupFile? safety = null;
         var safetyName = $"{prefix ?? "world"}-{BeforeRestore}-{now.ToString(StampFormat, CultureInfo.InvariantCulture)}{Extension}";
-        var safetyPath = Path.Combine(Dir, safetyName);
+        var safetyPath = Path.Combine(ServerDir, safetyName); // рядом с миром: быстрее и не зависит от сети
         var modArchive = WorldModData.ArchiveFor(backup.Path);
         var withMods = File.Exists(modArchive);
         try
@@ -136,7 +240,7 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null)
             if (withMods) WorldModData.Pack(dataDir, WorldModData.ArchiveFor(safetyPath)); // текущие данные модов — в сторону
             if (File.Exists(saveFile))
             {
-                Directory.CreateDirectory(Dir);
+                Directory.CreateDirectory(ServerDir);
                 WorldDb.Snapshot(saveFile, safetyPath); // прежний мир вместе с его журналом — одним цельным файлом
                 safety = new BackupFile(safetyPath, safetyName, now, new FileInfo(safetyPath).Length) { IsStamped = true };
             }

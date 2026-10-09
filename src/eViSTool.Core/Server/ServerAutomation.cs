@@ -35,6 +35,12 @@ public sealed record ServerAutomation
     /// <summary>Сообщать игрокам в чат, когда копия готова (имя, размер, время).</summary>
     public bool BackupAnnounce { get; init; } = true;
 
+    /// <summary>
+    /// Куда складывать копии (в том числе сетевая папка «\\nas\share»); null — как раньше, Backups в папке данных
+    /// сервера. Сервер всё равно пишет копию в Backups — агент переносит её сюда, когда она готова.
+    /// </summary>
+    public string? BackupDir { get; init; }
+
     /// <summary>Интервал в допустимых пределах (не чаще раза в 5 минут).</summary>
     [JsonIgnore]
     public TimeSpan BackupInterval => TimeSpan.FromHours(Math.Clamp(BackupIntervalHours, 5.0 / 60, 24 * 30));

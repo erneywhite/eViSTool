@@ -6,6 +6,7 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <local:InvertBoolToVisibilityConverter x:Key="InvertVis" />
         <local:TextToVisibilityConverter x:Key="TextToVis" />
+        <local:TextToVisibilityConverter x:Key="TextToVisInvert" Invert="True" />
         <local:EnumEqualsConverter x:Key="EnumEq" />
 
         <Style x:Key="CardTitle" TargetType="TextBlock">
@@ -105,6 +106,36 @@
                                 <TextBlock Text="{local:Tr sched.announceHint}" Style="{StaticResource Hint}" />
                             </StackPanel>
                         </DockPanel>
+                    </Border>
+
+                    <!-- папка для копий: своя (в том числе сетевая) или Backups сервера -->
+                    <Border Style="{StaticResource Row}">
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr backupdir.title}" Style="{StaticResource Label}" />
+                            <TextBlock Text="{local:Tr backupdir.hint}" Style="{StaticResource Hint}" />
+                            <DockPanel Margin="0,10,0,0">
+                                <Button DockPanel.Dock="Right" Content="{local:Tr backupdir.default}" Command="{Binding DefaultBackupDirCommand}" Margin="8,0,0,0"
+                                        Padding="12,6" AutomationProperties.AutomationId="SchedBackupDirDefault" />
+                                <Button DockPanel.Dock="Right" Content="{local:Tr common.browse}" Command="{Binding BrowseBackupDirCommand}" Margin="8,0,0,0"
+                                        Padding="12,6" Visibility="{Binding IsLocal, Converter={StaticResource BoolToVis}}"
+                                        AutomationProperties.AutomationId="SchedBackupDirBrowse" />
+                                <Grid>
+                                    <TextBox x:Name="BackupDirBox" Text="{Binding BackupDirText, UpdateSourceTrigger=LostFocus}" VerticalContentAlignment="Center"
+                                             KeyDown="BackupDirBox_KeyDown"
+                                             AutomationProperties.AutomationId="SchedBackupDir" AutomationProperties.Name="{local:Tr backupdir.title}" />
+                                    <!-- пусто — подсказкой видно, где копии лежат по умолчанию -->
+                                    <TextBlock Text="{Binding BackupDirDefault}" IsHitTestVisible="False" Margin="8,0" VerticalAlignment="Center" FontSize="12"
+                                               Foreground="{StaticResource Forest.Muted}" TextTrimming="CharacterEllipsis"
+                                               Visibility="{Binding Text, ElementName=BackupDirBox, Converter={StaticResource TextToVisInvert}}" />
+                                </Grid>
+                            </DockPanel>
+                            <TextBlock Text="{local:Tr backupdir.checking}" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="0,6,0,0"
+                                       Visibility="{Binding BackupDirChecking, Converter={StaticResource BoolToVis}}" />
+                            <TextBlock Text="{Binding BackupDirError}" FontSize="12" Foreground="{StaticResource Forest.Danger}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                       Visibility="{Binding BackupDirError, Converter={StaticResource TextToVis}}" AutomationProperties.AutomationId="SchedBackupDirError" />
+                            <TextBlock Text="{Binding BackupDirOk}" FontSize="12" Foreground="{StaticResource Forest.Accent}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                       Visibility="{Binding BackupDirOk, Converter={StaticResource TextToVis}}" />
+                        </StackPanel>
                     </Border>
                 </StackPanel>
             </Border>

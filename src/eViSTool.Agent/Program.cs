@@ -157,7 +157,8 @@ players.Changed += () =>
     }
     knownPlayers = now;
 };
-var backups = new BackupStore(opts.DataPath, opts.BackupName);
+// папка для копий берётся из расписания — её могут поменять, пока агент работает
+BackupStore Backups() => new(opts.DataPath, opts.BackupName, automation.BackupDir);
 var files = new ServerFiles(opts.ProfileId, opts.DataPath, opts.BackupName, opts.AgentsDir); // для окна на другой машине
 // команды сервера — из его ответа на /help (с командами модов); помним между запусками, чтобы подсказки были сразу
 var commandsFile = ServerCommands.FileFor(opts.ProfileId, opts.AgentsDir);
@@ -285,7 +286,7 @@ host.StateChanged += state =>
     });
 };
 var scheduler = new BackupScheduler();
-scheduler.Seed(backups.List().FirstOrDefault(b => b.IsOwn)?.Time);
+scheduler.Seed(Backups().List().FirstOrDefault(b => b.IsOwn)?.Time);
 string? pendingBackup = null; // имя копии, которую сервер делает по нашей просьбе
 var pendingSince = DateTime.MinValue; // когда попросили: сервер мог и не взяться — тогда отметка не должна висеть вечно
 var restarts = new RestartScheduler(); // перезапуски по расписанию с предупреждениями в чат
@@ -297,7 +298,7 @@ DateTime? restartAfterBackup = null; // перезапуск ждёт копию
 async Task RequestBackup()
 {
     var now = DateTime.Now;
-    var name = backups.NameFor(now);
+    var name = Backups().NameFor(now);
     pendingBackup = name;
     pendingSince = now;
     scheduler.MarkDone(now, players.Players.Count); // чтобы следующий тик расписания не запустил копию повторно
@@ -371,6 +372,7 @@ host.Console.LineAdded += line =>
     // сервер взялся за копию (по расписанию, по кнопке или по команде из консоли). Конец копии узнаём по файлу,
     // а не по строке «Backup complete!»: её сервер пишет на своём языке, и на русском сервере она не находилась
     if (line.Kind != ConsoleLineKind.Output || !BackupStore.IsBackupCommand(line.Text, out var requested)) return;
+    var backups = Backups();
     var before = backups.List().Select(b => b.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
     _ = Task.Run(async () =>
     {
@@ -395,6 +397,23 @@ host.Console.LineAdded += line =>
                 // мир сохранил сервер; данные модов рядом с миром (Saves/XLeveling, ModData) упаковываем сами — сразу после
                 if (backups.PackModData(file) is > 0 and var modSize)
                     host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.modData", eViSTool.Core.Localization.SizeText.Format(modSize)));
+                // своя папка для копий: перенести туда (и то, что застряло раньше); недоступна — копия остаётся на сервере
+                if (backups.IsElsewhere)
+                    try
+                    {
+                        file = await Task.Run(() => backups.Relocate(file));
+                        host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backupdir.moved", backups.Dir));
+                        if (await Task.Run(backups.RelocateLeftovers) is > 0 and var leftovers)
+                            host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backupdir.leftovers", leftovers));
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        var why = ex is UnauthorizedAccessException ? eViSTool.Core.Localization.Loc.T("backupdir.denied") : ex.Message;
+                        host.Console.Add(ConsoleLineKind.Error, eViSTool.Core.Localization.Loc.T("backupdir.moveFailed", why));
+                        Notify(eViSTool.Core.Notifications.NotifyEvent.BackupFailed, eViSTool.Core.Localization.Loc.T("notify.ev.backupStuck"),
+                            Line("▣", "notify.lbl.backup", file.Name),
+                            Line("⚑", "notify.lbl.reason", eViSTool.Core.Localization.Loc.T("notify.ev.backupStuckWhy", backups.Dir, why)));
+                    }
                 // игрокам — в чат: что копия есть, как называется и сколько весит
                 if (settings.BackupAnnounce && host.State == ServerState.Running)
                     await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.T("backup.announce", file.Name, size, file.Time.ToString("dd.MM.yyyy HH:mm")));
@@ -728,6 +747,8 @@ web.MapPost("/config/generate", async () =>
         return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
     }
 });
+web.MapPost("/backups/check-dir", async (HttpContext ctx) =>
+    Json(new BackupDirCheck(await Task.Run(async () => BackupStore.CheckDir(await ReadName(ctx))))));
 web.MapPost("/backups/delete", async (HttpContext ctx) =>
     await ReadName(ctx) is { Length: > 0 } name ? Guard(() => { files.DeleteBackup(name); return Status(); }) : Results.BadRequest());
 if (isRemote) return;

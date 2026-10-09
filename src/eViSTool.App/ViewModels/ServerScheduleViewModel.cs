@@ -62,6 +62,16 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     [ObservableProperty] private bool _onlyWhenPlayed = true;
     [ObservableProperty] private bool _announce = true;
 
+    // папка для копий: пусто — Backups в папке данных сервера
+    [ObservableProperty] private string _backupDirText = "";
+    [ObservableProperty] private string _backupDirError = "";
+    [ObservableProperty] private string _backupDirOk = "";
+    [ObservableProperty] private bool _backupDirChecking;
+    private int _backupDirCheck; // какая проверка последняя: ответ на прежнюю не должен перебить свежую
+
+    /// <summary>Где копии сейчас, если своя папка не выбрана.</summary>
+    public string BackupDirDefault => _dataDir is { } d ? Path.Combine(d, "Backups") : Loc.T("backupdir.defaultRemote");
+
     // перезапуски по расписанию
     [ObservableProperty] private RestartMode _restartMode;
     [ObservableProperty] private string _restartIntervalText = "12";
@@ -114,6 +124,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
             : profile.IsRemote ? new RemoteServerData(remoteClient)
             : profile.DataDir is { } data ? Local(profile, data, remoteClient) : null;
         IsLocal = _data is LocalServerData;
+        OnPropertyChanged(nameof(BackupDirDefault));
         _lastSeenBackup = null;
         _seenAutomationChange = null;
         _statusSeen = false;
@@ -174,6 +185,8 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
             KeepText = settings.BackupKeep.ToString();
             OnlyWhenPlayed = settings.BackupOnlyWhenPlayed;
             Announce = settings.BackupAnnounce;
+            BackupDirText = settings.BackupDir ?? "";
+            BackupDirError = BackupDirOk = "";
             RestartMode = settings.RestartMode;
             RestartIntervalText = settings.RestartIntervalHours.ToString("0.##", CultureInfo.CurrentCulture);
             RestartTimesText = string.Join(", ", settings.RestartTimes);
@@ -260,6 +273,55 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     partial void OnKeepTextChanged(string value) => SaveSettings();
     partial void OnOnlyWhenPlayedChanged(bool value) => SaveSettings();
     partial void OnAnnounceChanged(bool value) => SaveSettings();
+
+    partial void OnBackupDirTextChanged(string value)
+    {
+        if (_loading || !_loaded || _data is not { } data) return;
+        _ = ApplyBackupDirAsync(data, value.Trim());
+    }
+
+    /// <summary>
+    /// Новую папку сначала проверяет машина с сервером (там её и будут открывать): создаётся ли, пишется ли.
+    /// Годится — сохраняем, нет — оставляем прежнюю и говорим, что не так.
+    /// </summary>
+    private async Task ApplyBackupDirAsync(IServerData data, string dir)
+    {
+        var check = ++_backupDirCheck;
+        BackupDirError = BackupDirOk = "";
+        if (string.Equals(dir, _saved.BackupDir ?? "", StringComparison.OrdinalIgnoreCase)) return;
+        BackupDirChecking = true;
+        string? error;
+        try
+        {
+            error = await data.CheckBackupDirAsync(dir.Length > 0 ? dir : null);
+        }
+        catch (Exception ex) when (ex is IOException or HttpRequestException or InvalidOperationException or TaskCanceledException)
+        {
+            error = data.IsRemote ? RemoteSecret.Describe(ex) : ex.Message;
+        }
+        if (check != _backupDirCheck) return;
+        BackupDirChecking = false;
+        if (error is not null)
+        {
+            BackupDirError = error;
+            return;
+        }
+        _saved = _saved with { BackupDir = dir.Length > 0 ? dir : null };
+        await SaveAsync(data, _saved);
+        BackupDirOk = Loc.T(dir.Length > 0 ? "backupdir.saved" : "backupdir.savedDefault");
+        await RefreshListAsync();
+    }
+
+    [RelayCommand]
+    private void BrowseBackupDir()
+    {
+        var start = BackupDirText.Length > 0 && Directory.Exists(BackupDirText) ? BackupDirText : _dataDir;
+        var dlg = new Microsoft.Win32.OpenFolderDialog { Title = Loc.T("backupdir.pick"), InitialDirectory = start };
+        if (dlg.ShowDialog() == true) BackupDirText = dlg.FolderName;
+    }
+
+    [RelayCommand]
+    private void DefaultBackupDir() => BackupDirText = "";
     partial void OnRestartIntervalTextChanged(string value) => SaveSettings();
     partial void OnRestartTimesTextChanged(string value) => SaveSettings();
     partial void OnRestartWarnTextChanged(string value) => SaveSettings();

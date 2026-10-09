@@ -44,6 +44,9 @@ public interface IServerData
 
     /// <summary>Удалить копию — в Корзину той машины, где она лежит.</summary>
     Task DeleteBackupAsync(string name, CancellationToken ct = default);
+
+    /// <summary>Можно ли складывать копии в эту папку — проверяет машина с сервером; null — можно, иначе что не так.</summary>
+    Task<string?> CheckBackupDirAsync(string? dir, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -53,9 +56,10 @@ public interface IServerData
 public sealed class ServerFiles(string profileId, string dataDir, string? backupPrefix, string? agentsDir = null)
 {
     public string DataDir => dataDir;
-    public string BackupsDir => new BackupStore(dataDir).Dir;
+    /// <summary>Где лежат копии: выбранная папка или Backups сервера.</summary>
+    public string BackupsDir => Store.Dir;
 
-    private BackupStore Store => new(dataDir, backupPrefix);
+    private BackupStore Store => new(dataDir, backupPrefix, LoadAutomation().BackupDir);
 
     public ServerAutomation LoadAutomation() => ServerAutomation.Load(profileId, agentsDir);
     public void SaveAutomation(ServerAutomation settings) => settings.Save(profileId, agentsDir);
@@ -166,6 +170,7 @@ public sealed class LocalServerData(ServerFiles files, Func<AgentClient?>? agent
     public Task<RestoreResult> RestoreAsync(string name, CancellationToken ct = default) =>
         agent?.Invoke() is { } client ? client.RestoreAsync(name, ct) : Task.Run(() => files.Restore(name, DateTime.Now), ct);
     public Task DeleteBackupAsync(string name, CancellationToken ct = default) => Task.Run(() => files.DeleteBackup(name), ct);
+    public Task<string?> CheckBackupDirAsync(string? dir, CancellationToken ct = default) => Task.Run(() => BackupStore.CheckDir(dir), ct);
 }
 
 /// <summary>Сервер на другой машине: всё через его агента.</summary>
@@ -180,9 +185,13 @@ public sealed class RemoteServerData(Func<AgentClient?> client) : IServerData
     public Task<BackupEntry> CopyWorldAsync(CancellationToken ct = default) => Client.CopyWorldAsync(ct);
     public Task<RestoreResult> RestoreAsync(string name, CancellationToken ct = default) => Client.RestoreAsync(name, ct);
     public Task DeleteBackupAsync(string name, CancellationToken ct = default) => Client.DeleteBackupAsync(name, ct);
+    public Task<string?> CheckBackupDirAsync(string? dir, CancellationToken ct = default) => Client.CheckBackupDirAsync(dir, ct);
 }
 
 public sealed record BackupNameRequest(string Name);
+
+/// <summary>Ответ агента на проверку папки для копий: null — можно складывать.</summary>
+public sealed record BackupDirCheck(string? Error);
 
 /// <summary>serverconfig.json удалённого сервера: текст и отметка версии (время записи и длина) — по ней агент узнаёт,
 /// не поменялся ли файл с тех пор, как окно его читало.</summary>

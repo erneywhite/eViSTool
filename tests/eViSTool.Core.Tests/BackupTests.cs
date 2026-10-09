@@ -1,4 +1,4 @@
-using eViSTool.Core.Server;
+﻿using eViSTool.Core.Server;
 
 namespace eViSTool.Core.Tests;
 
@@ -15,6 +15,82 @@ public sealed class BackupTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, text);
         return path;
+    }
+
+    // ---------- своя папка для копий ----------
+
+    [Fact]
+    public void Relocate_MovesCopyAndModData_ListSeesBothFolders()
+    {
+        var nas = Path.Combine(_data, "nas", "vs");
+        var made = Backup("srv-2026-09-30_12-00-00.vcdbs", "world");
+        File.WriteAllText(WorldModData.ArchiveFor(made), "mods");
+        Backup("srv-2026-09-29_12-00-00.vcdbs"); // застряла: папка была недоступна
+        var store = new BackupStore(_data, "srv", nas);
+        Assert.True(store.IsElsewhere);
+
+        var moved = store.Relocate(store.Find("srv-2026-09-30_12-00-00.vcdbs")!);
+
+        Assert.Equal(Path.Combine(nas, "srv-2026-09-30_12-00-00.vcdbs"), moved.Path);
+        Assert.Equal("world", File.ReadAllText(moved.Path));
+        Assert.Equal("mods", File.ReadAllText(WorldModData.ArchiveFor(moved.Path)));
+        Assert.False(File.Exists(made));
+        Assert.False(File.Exists(WorldModData.ArchiveFor(made)));
+        Assert.Empty(Directory.GetFiles(nas, "*.part"));
+        Assert.Equal(2, store.List().Count); // и в своей папке, и застрявшая на сервере
+
+        Assert.Equal(1, store.RelocateLeftovers());
+        Assert.Equal(2, Directory.GetFiles(nas, "*.vcdbs").Length);
+        Assert.Single(store.Prune(1)); // ротация видит перенесённые
+    }
+
+    [Fact]
+    public void Relocate_DefaultFolder_LeavesCopyInPlace()
+    {
+        var made = Backup("srv-2026-09-30_12-00-00.vcdbs");
+        var store = new BackupStore(_data, "srv", Path.Combine(_data, "Backups") + Path.DirectorySeparatorChar);
+        Assert.False(store.IsElsewhere);
+        Assert.Equal(made, store.Relocate(store.List()[0]).Path);
+        Assert.False(new BackupStore(_data, "srv", "  ").IsElsewhere);
+    }
+
+    [Fact]
+    public void Relocate_UnreachableFolder_Throws_AndCopyStays()
+    {
+        var made = Backup("srv-2026-09-30_12-00-00.vcdbs");
+        File.WriteAllText(Path.Combine(_data, "blocker"), "файл вместо папки");
+        var store = new BackupStore(_data, "srv", Path.Combine(_data, "blocker", "sub"));
+        Assert.ThrowsAny<IOException>(() => store.Relocate(store.List()[0]));
+        Assert.True(File.Exists(made));
+        Assert.Single(store.List());
+    }
+
+    [Fact]
+    public void CopySave_WritesStraightToChosenFolder()
+    {
+        var save = Path.Combine(_data, "Saves", "world.vcdbs");
+        Directory.CreateDirectory(Path.GetDirectoryName(save)!);
+        File.WriteAllText(save, "world"); // без журнала SQLite копия — просто файл
+        var nas = Path.Combine(_data, "nas");
+        var made = new BackupStore(_data, "srv", nas).CopySave(save, T0);
+        Assert.Equal(nas, Path.GetDirectoryName(made.Path));
+    }
+
+    [Theory]
+    [InlineData(@"relative\dir")]
+    [InlineData("D:")]
+    public void CheckDir_NeedsFullPath(string dir) => Assert.NotNull(BackupStore.CheckDir(dir));
+
+    [Fact]
+    public void CheckDir_CreatesAndWrites()
+    {
+        var dir = Path.Combine(_data, "new", "backups");
+        Assert.Null(BackupStore.CheckDir(dir));
+        Assert.True(Directory.Exists(dir));
+        Assert.Empty(Directory.GetFiles(dir));
+        Assert.Null(BackupStore.CheckDir(""));
+        File.WriteAllText(Path.Combine(_data, "file"), "");
+        Assert.NotNull(BackupStore.CheckDir(Path.Combine(_data, "file")));
     }
 
     // ---------- хранилище ----------

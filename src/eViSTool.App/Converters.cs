@@ -104,8 +104,11 @@ public sealed class EnumToVisibilityConverter : IValueConverter
 /// <summary>Пустая строка или null — скрыто.</summary>
 public sealed class TextToVisibilityConverter : IValueConverter
 {
+    /// <summary>Наоборот: видно, когда текста нет (подсказка в пустом поле).</summary>
+    public bool Invert { get; set; }
+
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
-        value is string { Length: > 0 } ? Visibility.Visible : Visibility.Collapsed;
+        value is string { Length: > 0 } != Invert ? Visibility.Visible : Visibility.Collapsed;
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         throw new NotSupportedException();
