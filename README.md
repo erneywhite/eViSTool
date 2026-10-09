@@ -24,7 +24,8 @@
 ![My mods](docs/screenshots/mods.png)
 
 eViSTool keeps your Vintage Story mods up to date, lets you browse and install mods from the ModDB,
-and runs your dedicated server — console, players, configuration, backups and scheduled restarts — from one window.
+and runs your dedicated server from one window: console, players, configuration, backups, scheduled restarts,
+notifications and statistics.
 A server on another computer is managed the same way, with a single connection code.
 
 It is portable: unzip it anywhere and run. Nothing is installed into the system — no services, no autostart.
@@ -264,6 +265,11 @@ so changes can be saved only while it is stopped. A copy of the previous file st
   so a restore can be undone.
   Data that mods keep next to the world rather than in it (for example `Saves/XLeveling` with skill progress,
   and the `ModData` folder) is packed with every backup and restored together with the world.
+  Backups can go to another folder, including a network one (`\\nas\share`): the **Backup folder** row, **Browse…**
+  or a typed path. The server still writes the copy into its own `Backups`, and the agent moves it to the chosen folder.
+  If the folder is unreachable, the copy stays on the server, you get a notification, and next time it moves along with
+  the new one. The list, rotation and restore see both folders. The agent opens a network folder as the Windows user
+  it runs as; write access is checked as soon as you pick the folder.
 - **Scheduled restarts** every N hours of uptime or at set times of day, with chat warnings
   (10 and 5 minutes before, then every minute) and, if you like, a fresh backup right before the restart.
   With **Update mods on restart** on, the agent installs released mod updates while the server is stopped.
@@ -284,6 +290,14 @@ On a stopped server eViSTool edits the server files. A new player can be added b
 only the server can look a player up by name. Since 1.20 a dedicated server lets in only whitelisted players by default,
 so you will most likely need to add your friends there.
 
+**Statistics.** Turned on with the **Collect statistics** switch, off by default. Once a minute the agent records how many
+players are online and how much memory and CPU the server uses, plus joins and leaves, starts and crashes. It is kept for
+30 days on the server computer, about a megabyte a month. The tab shows totals for a day, a week or 30 days: time played
+by everyone, peak online, how long the server was running, crashes. Below are charts of online players and server load
+(hover to see exact values) and a players table: how long each played, how many sessions, and when they were last seen.
+
+![Statistics](docs/screenshots/stats.png)
+
 **Announcements.** Chat messages on a schedule: server rules, a Discord link, the restart time. Each has its own interval
 in minutes and a switch. The agent sends them, so the window can be closed. By default an empty server stays quiet, and a player
 who joins does not get a pile of queued messages. There is also **Say now** — a one-off message to everyone on the server.
@@ -291,10 +305,15 @@ who joins does not get a pile of queued messages. There is also **Say now** — 
 ![Announcements](docs/screenshots/announcements.png)
 
 **Notifications.** The server reports events wherever you tell it to: crashed (with the mod to blame, if one is found, and
-whether the watchdog starts it again), failed to start, world backup failed, mods updated, started or stopped, restart soon,
-player joined or left. Channels are set up once in **Settings → Notifications → Add channel**, and on the server tab you turn
+whether the watchdog starts it again), failed to start, world backup failed, mods updated, mod updates available,
+low disk space, server can't keep up, started or stopped, restart soon, player joined or left. Channels are set up once in **Settings → Notifications → Add channel**, and on the server tab you turn
 them on with switches: rows are events, columns are channels. The agent sends them, so the window can be closed.
 **Send a test from the server** goes the same way as the real notifications.
+
+A few events in more detail. The agent checks for mod updates once a day and sends the list; the same list is not sent
+twice. Low disk space fires when less than 5 GB is left on the disk with the server data. Server can't keep up means
+the server wrote `Server overloaded` many times within 10 minutes; the notification says whether the computer is short
+of memory.
 
 ![Notifications](docs/screenshots/notify.png)
 
@@ -315,12 +334,17 @@ Tokens and webhook links are stored encrypted for your Windows account and are n
 a color by importance (a circle in Telegram, a stripe in Discord, priority in ntfy), the server, the event and the details.
 They are written in the language of eViSTool on the computer that runs the server.
 
+**Game chat in Discord.** On the same Notifications tab you can pick a Discord channel for the chat. Players' messages
+from the general chat go there, each under the player's name, and several messages in a row from one player arrive as one.
+Optionally, joins and leaves go there too. It works one way only, from the game to Discord. Mentions like `@everyone`
+typed in the game do not ping anyone in Discord.
+
 **Server mods** opens **My mods** for the server profile — the same table, catalog and updates as for the game.
 
 ## Remote management
 
 Manage a server on another computer — a home PC, a spare laptop, a rented machine — as if it were here:
-console, start and stop, configuration, schedule, backups, players, announcements, notifications and the server's mods. One string, the **connection code**,
+console, start and stop, configuration, schedule, backups, players, statistics, announcements, notifications and the server's mods. One string, the **connection code**,
 carries everything needed: address, port, key and the server's certificate. There is nothing to configure by hand.
 
 ![Remote access](docs/screenshots/remote.png)
@@ -344,7 +368,7 @@ Good to know:
 - The server computer needs eViSTool open, or its server running: remote access lives as long as the agent does.
   There is no service and no autostart.
 - Changes show up in both windows by themselves. A mod disabled from your PC appears disabled on the server computer
-  within seconds, and the other way round. The same goes for the schedule, configuration, players, announcements and notifications.
+  within seconds, and the other way round. The same goes for the schedule, configuration, players, statistics, announcements and notifications.
 - Mods are installed on the server over the connection: from a zip, from the catalog, as updates and from modpacks.
 - Notifications are sent by the agent on the server computer, so they arrive even when your PC is off. The channels you turn on
   for the server are passed to it over the secure connection and encrypted again there; secrets are never sent back.
@@ -388,7 +412,7 @@ Move the program folder, and everything moves with it. (If eViSTool cannot write
 it uses `%LOCALAPPDATA%\eViSTool` instead.)
 
 **What eViSTool changes:** only mod folders, the game and server settings files (keeping a `.evistool.bak` copy of the previous state),
-backups in the `Backups` folder of server profiles, and the data folders of profiles it created.
+backups in the `Backups` folder of server profiles (or in the chosen backup folder), and the data folders of profiles it created.
 Deleted mods, backups and profile folders go to the Recycle Bin.
 
 **To uninstall,** stop your servers, close eViSTool and delete its folder.
