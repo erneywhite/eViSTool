@@ -204,6 +204,10 @@ public sealed partial class ServerViewModel : ObservableObject
     /// <summary>Агент старее программы: удалённый — «обнови там», свой при работающем сервере — «обновится после остановки».</summary>
     [ObservableProperty] private string _agentNote = "";
 
+    /// <summary>Удалённый агент старее окна и не обновляется прямо сейчас — можно обновить его отсюда.</summary>
+    [ObservableProperty] private bool _canUpdateRemoteAgent;
+    private bool _remoteServerUp;
+
     /// <summary>Сервер из папки игры профиля, запущенный не нашим агентом (например, ViSST).</summary>
     [ObservableProperty] private int? _foreignPid;
 
@@ -470,9 +474,24 @@ public sealed partial class ServerViewModel : ObservableObject
             Config.ShowRemoteStatus(s);
             _main.Mods.OnRemoteStatus(s);
         }
-        AgentNote = !AgentProtocol.IsOutdated(s) ? ""
-            : IsRemoteProfile ? Loc.T("server.agentOutdatedRemote", s.AgentVersion, AgentProtocol.AppVersion)
-            : Loc.T("server.agentOutdatedLocal", s.AgentVersion);
+        // удалённый агент обновляется по нашей просьбе — ход обновления вместо надписи о старой версии
+        var olderAgent = IsRemoteProfile && AgentProtocol.IsOutdated(s)
+                         && Core.Versioning.ModVersion.TryParse(s.AgentVersion, out var agentVersion)
+                         && Core.Versioning.ModVersion.TryParse(AgentProtocol.AppVersion, out var appVersion)
+                         && agentVersion.CompareTo(appVersion) < 0;
+        _remoteServerUp = s.State != ServerState.Stopped;
+        CanUpdateRemoteAgent = olderAgent && s.SelfUpdate is null or "failed";
+        AgentNote = s.SelfUpdate switch
+        {
+            "download" => Loc.T("selfupd.stateDownload", AgentProtocol.AppVersion),
+            "stop" => Loc.T("selfupd.stateStop"),
+            "install" => Loc.T("selfupd.stateInstall"),
+            "restart" => Loc.T("selfupd.stateRestart"),
+            "failed" => Loc.T("selfupd.stateFailed", s.SelfUpdateError ?? "?"),
+            _ => !AgentProtocol.IsOutdated(s) ? ""
+                : IsRemoteProfile ? Loc.T(olderAgent ? "selfupd.outdated" : "server.agentOutdatedRemote", s.AgentVersion, AgentProtocol.AppVersion)
+                : Loc.T("server.agentOutdatedLocal", s.AgentVersion),
+        };
         if (IsRemoteProfile && s.GameVersion != _remoteGameVersion)
         {
             _remoteGameVersion = s.GameVersion;
@@ -611,6 +630,28 @@ public sealed partial class ServerViewModel : ObservableObject
             else Attach(client, _session!.Token);
         }
         if (_client is not null) Apply(await _client.StatusAsync());
+    });
+
+    /// <summary>
+    /// «Обновить там»: агент на другом компьютере скачает версию окна с GitHub, поставит её и перезапустится сам
+    /// (работающий сервер — остановит и запустит снова; спрашиваем, игроков отключит на минуту).
+    /// </summary>
+    [RelayCommand]
+    private Task UpdateRemoteAgent() => Do(async () =>
+    {
+        if (_client is not { } client) return;
+        var question = _remoteServerUp ? Loc.T("selfupd.confirmRunning", AgentProtocol.AppVersion) : Loc.T("selfupd.confirm", AgentProtocol.AppVersion);
+        if (MessageBox.Show(Application.Current.MainWindow, question, "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+        try
+        {
+            Apply(await client.SelfUpdateAsync(AgentProtocol.AppVersion));
+        }
+        catch (InvalidOperationException ex) when (ex.Message.StartsWith("404"))
+        {
+            // агент из версии без самообновления — его один раз обновляют руками
+            throw new InvalidOperationException(Loc.T("selfupd.tooOld"));
+        }
     });
 
     [RelayCommand]

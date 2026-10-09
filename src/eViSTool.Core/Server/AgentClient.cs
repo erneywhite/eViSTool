@@ -96,6 +96,10 @@ public sealed class AgentClient : IDisposable
         await Read<AgentStatus>(resp, ct).ConfigureAwait(false);
     }
 
+    /// <summary>Обновить eViSTool на компьютере агента до этой версии (работающий сервер он остановит и запустит снова).</summary>
+    public Task<AgentStatus> SelfUpdateAsync(string version, CancellationToken ct = default) =>
+        Post<AgentStatus>("self-update", new SelfUpdateRequest(version), ct);
+
     // ---- оповещения сервера (вкладка «Оповещения»): секреты каналов едут только сюда, обратно — без них
 
     public Task<Notifications.ServerNotifySettings> GetNotifyAsync(CancellationToken ct = default) =>

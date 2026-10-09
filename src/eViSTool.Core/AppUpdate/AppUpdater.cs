@@ -66,6 +66,39 @@ public sealed class AppUpdater
         return PickUpdate(ParseReleases(await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false)), current);
     }
 
+    /// <summary>
+    /// Релиз ровно этой версии — агент на другом компьютере обновляется до версии окна, а не до самой свежей.
+    /// null — такого релиза на GitHub нет (например, окно собрано из исходников).
+    /// </summary>
+    public async Task<AppRelease?> FindReleaseAsync(ModVersion version, CancellationToken ct = default)
+    {
+        IReadOnlyList<AppRelease> releases;
+        using (var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{Repo}/releases?per_page=30"))
+        {
+            request.Headers.Accept.ParseAdd("application/vnd.github+json");
+            using var response = await _http.SendAsync(request, ct).ConfigureAwait(false);
+            if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests)
+                releases = await FeedReleasesAsync(ct).ConfigureAwait(false);
+            else if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException(Loc.T("update.httpFailed", (int)response.StatusCode));
+            else
+                releases = ParseReleases(await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
+        }
+        return releases.FirstOrDefault(r => r.Version.ToString() == version.ToString());
+    }
+
+    /// <summary>
+    /// Параметры для новой копии агента после обновления: прежние, без «--start» и «--after-update», плюс «--after-update»
+    /// (новая копия подождёт, пока прежняя освободит профиль) и «--start», если сервер работал.
+    /// </summary>
+    public static IReadOnlyList<string> RelaunchArgs(IEnumerable<string> current, bool startServer)
+    {
+        var args = current.Where(a => a is not ("--start" or "--after-update")).ToList();
+        args.Add("--after-update");
+        if (startServer) args.Add("--start");
+        return args;
+    }
+
     /// <summary>Релизы из ленты github.com (Atom): версии и ссылки. Архив и его контрольная сумма — по прямым ссылкам.</summary>
     public async Task<IReadOnlyList<AppRelease>> FeedReleasesAsync(CancellationToken ct = default)
     {

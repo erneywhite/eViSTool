@@ -188,8 +188,18 @@
             <!-- ===== ошибка последнего действия ===== -->
             <TextBlock DockPanel.Dock="Top" Text="{Binding ErrorText}" Foreground="{StaticResource Forest.Danger}" TextWrapping="Wrap" Margin="0,12,0,0"
                        Visibility="{Binding ErrorText, Converter={StaticResource TextToVis}}" />
-            <TextBlock DockPanel.Dock="Top" Text="{Binding AgentNote}" Foreground="{StaticResource Forest.Warn}" TextWrapping="Wrap" Margin="0,12,0,0"
-                       Visibility="{Binding AgentNote, Converter={StaticResource TextToVis}}" AutomationProperties.AutomationId="AgentNote" />
+            <!-- агент старее окна: у удалённого — кнопка «Обновить там», ход обновления — в той же строке -->
+            <DockPanel DockPanel.Dock="Top" Margin="0,12,0,0" Visibility="{Binding AgentNote, Converter={StaticResource TextToVis}}">
+                <Button DockPanel.Dock="Right" Command="{Binding UpdateRemoteAgentCommand}" Margin="16,0,0,0" Padding="12,6" VerticalAlignment="Center"
+                        Visibility="{Binding CanUpdateRemoteAgent, Converter={StaticResource BoolToVis}}" AutomationProperties.AutomationId="UpdateRemoteAgent">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource Icon.Download}" Style="{StaticResource Forest.Icon}" Width="13" Height="13" Margin="0,0,7,0" />
+                        <TextBlock Text="{local:Tr selfupd.button}" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Text="{Binding AgentNote}" Foreground="{StaticResource Forest.Warn}" TextWrapping="Wrap" VerticalAlignment="Center"
+                           AutomationProperties.AutomationId="AgentNote" />
+            </DockPanel>
 
             <!-- остаток места: консоль или редактор конфигурации -->
             <Grid>

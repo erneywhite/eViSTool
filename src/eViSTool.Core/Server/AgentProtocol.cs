@@ -79,6 +79,9 @@ public sealed record ServerCrashInfo
     };
 }
 
+/// <summary>Просьба окна обновить агента (и eViSTool на его компьютере) до версии окна.</summary>
+public sealed record SelfUpdateRequest(string Version);
+
 public sealed record AgentStatus
 {
     /// <summary>Последнее падение сервера, разобранное агентом (null — не падал с запуска агента).</summary>
@@ -96,6 +99,13 @@ public sealed record AgentStatus
     public long LastSeq { get; init; }
     public int AgentPid { get; init; }
     public string AgentVersion { get; init; } = "";
+
+    /// <summary>
+    /// Обновление агента по просьбе окна на другом компьютере: «download», «stop», «install», «restart» — идёт;
+    /// «failed» — не вышло (причина — в <see cref="SelfUpdateError"/>); null — не обновляется.
+    /// </summary>
+    public string? SelfUpdate { get; init; }
+    public string? SelfUpdateError { get; init; }
 
     /// <summary>Версия игры сервера (по его exe) — удалённому профилю её больше неоткуда взять.</summary>
     public string? GameVersion { get; init; }

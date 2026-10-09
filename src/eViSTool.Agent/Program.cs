@@ -28,8 +28,13 @@ if (opts is null)
     return 2;
 }
 
-// один агент на профиль
+// один агент на профиль; копия, запущенная после обновления, ждёт, пока прежняя освободит профиль и выйдет
 using var mutex = new Mutex(initiallyOwned: true, $"eViSTool.Agent.{opts.ProfileId}", out var createdNew);
+if (!createdNew && opts.AfterUpdate)
+{
+    try { createdNew = mutex.WaitOne(TimeSpan.FromSeconds(90)); }
+    catch (AbandonedMutexException) { createdNew = true; } // прежняя вышла, не отпустив, — профиль наш
+}
 if (!createdNew)
 {
     Console.Error.WriteLine("agent for this profile is already running");
@@ -348,6 +353,60 @@ host.Console.LineAdded += line =>
 static TimeSpan BackupWaitOf() => TimeSpan.FromMinutes(30);
 
 var shutdown = new CancellationTokenSource();
+
+// ---- обновление eViSTool на этом компьютере по просьбе окна с другого
+string? selfUpdate = null, selfUpdateError = null;
+
+async Task SelfUpdateAsync(eViSTool.Core.Versioning.ModVersion target)
+{
+    var appDir = AppContext.BaseDirectory;
+    try
+    {
+        host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("selfupd.started", version, target));
+        using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+        var updater = new eViSTool.Core.AppUpdate.AppUpdater(http);
+        var release = await updater.FindReleaseAsync(target)
+                      ?? throw new InvalidOperationException(eViSTool.Core.Localization.Loc.T("selfupd.noRelease", target));
+        // архив с проверкой отпечатка — тем же путём, что и самообновление окна
+        var zip = await updater.DownloadAsync(release, Path.Combine(Path.GetTempPath(), "eViSTool-update"));
+
+        // работающий сервер держит консоль агента — останавливаем (мир сохранится) и потом запускаем снова
+        var wasRunning = host.State != ServerState.Stopped;
+        if (wasRunning)
+        {
+            selfUpdate = "stop";
+            try { await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.T("selfupd.announce")); }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException) { }
+            await Task.Delay(TimeSpan.FromSeconds(3));
+            await host.StopAsync();
+        }
+
+        selfUpdate = "install";
+        eViSTool.Core.AppUpdate.AppUpdater.Install(zip, appDir);
+
+        // новая копия агента — с теми же параметрами; она дождётся, пока эта выйдет и освободит профиль (и порт удалённого доступа)
+        selfUpdate = "restart";
+        var psi = new System.Diagnostics.ProcessStartInfo(Path.Combine(appDir, "eViSTool.Agent.exe"))
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = appDir,
+        };
+        foreach (var a in eViSTool.Core.AppUpdate.AppUpdater.RelaunchArgs(Environment.GetCommandLineArgs().Skip(1), wasRunning))
+            psi.ArgumentList.Add(a);
+        using (System.Diagnostics.Process.Start(psi)) { }
+        host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("selfupd.restarting", target));
+        await Task.Delay(TimeSpan.FromSeconds(1)); // окно успеет увидеть «перезапуск»
+        shutdown.Cancel();
+    }
+    catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or IOException or UnauthorizedAccessException
+                                   or TaskCanceledException or System.ComponentModel.Win32Exception or InvalidDataException)
+    {
+        selfUpdate = "failed";
+        selfUpdateError = ex.Message;
+        host.Console.Add(ConsoleLineKind.Error, eViSTool.Core.Localization.Loc.T("selfupd.failed", ex.Message));
+    }
+}
 var lastActivity = DateTime.Now;
 
 // удалённый доступ: второй вход — из сети, по TLS и со своим ключом; включается и выключается файлом настроек
@@ -385,6 +444,8 @@ var gameVersion = GameInstall.DetectVersion(Path.GetDirectoryName(Path.GetFullPa
 AgentStatus Status() => new()
 {
     LastCrash = lastCrash,
+    SelfUpdate = selfUpdate,
+    SelfUpdateError = selfUpdateError,
     ModErrors = modErrors,
     GameVersion = gameVersion,
     State = host.State,
@@ -604,6 +665,19 @@ web.MapPost("/config/generate", async () =>
 web.MapPost("/backups/delete", async (HttpContext ctx) =>
     await ReadName(ctx) is { Length: > 0 } name ? Guard(() => { files.DeleteBackup(name); return Status(); }) : Results.BadRequest());
 if (isRemote) return;
+// обновить eViSTool на этом компьютере до версии окна (кнопка «Обновить там» у окна на другом компьютере)
+web.MapPost("/self-update", async (HttpContext ctx) =>
+{
+    if (await ReadBody<SelfUpdateRequest>(ctx) is not { } request
+        || !eViSTool.Core.Versioning.ModVersion.TryParse(request.Version, out var target)) return Results.BadRequest();
+    if (request.Version == version) return Results.BadRequest(eViSTool.Core.Localization.Loc.T("selfupd.same"));
+    if (selfUpdate is not (null or "failed")) return Results.Conflict(eViSTool.Core.Localization.Loc.T("selfupd.busy"));
+    selfUpdate = "download";
+    selfUpdateError = null;
+    _ = Task.Run(() => SelfUpdateAsync(target));
+    return Json(Status());
+});
+
 web.MapPost("/shutdown", () =>
 {
     shutdown.Cancel(); // сервер остановим при выходе (finally ниже)
@@ -695,6 +769,11 @@ var stateFile = AgentProtocol.StateFile(opts.ProfileId, opts.AgentsDir);
 Directory.CreateDirectory(Path.GetDirectoryName(stateFile)!);
 File.WriteAllText(stateFile, JsonConvert.SerializeObject(new AgentEndpoint(Environment.ProcessId, port, DateTime.Now, version)));
 Console.WriteLine($"eViSTool.Agent {version}: profile {opts.ProfileId}, http://127.0.0.1:{port}");
+if (opts.AfterUpdate)
+{
+    eViSTool.Core.AppUpdate.AppUpdater.CleanupOld(AppContext.BaseDirectory); // прежние exe и dll, переименованные при установке
+    host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("selfupd.done", version));
+}
 
 await ApplyRemoteAsync();
 
@@ -842,13 +921,14 @@ finally
 }
 return 0;
 
-internal sealed record AgentOptions(string ProfileId, string ExePath, string DataPath, IReadOnlyList<string> ExtraArgs, bool StartServer, TimeSpan IdleExit, string? AgentsDir, string? Language, string? BackupName)
+internal sealed record AgentOptions(string ProfileId, string ExePath, string DataPath, IReadOnlyList<string> ExtraArgs, bool StartServer, TimeSpan IdleExit, string? AgentsDir, string? Language, string? BackupName, bool AfterUpdate = false)
 {
     public static AgentOptions? Parse(string[] args)
     {
         string? profile = null, exe = null, data = null;
         var extra = new List<string>();
         var start = false;
+        var afterUpdate = false;
         var idle = TimeSpan.FromMinutes(2);
         string? agentsDir = null, lang = null, backupName = null;
         for (var i = 0; i < args.Length; i++)
@@ -861,12 +941,13 @@ internal sealed record AgentOptions(string ProfileId, string ExePath, string Dat
                 case "--data": data = Next(); break;
                 case "--arg": extra.Add(Next()); break;
                 case "--start": start = true; break;
+                case "--after-update": afterUpdate = true; break;
                 case "--idle-exit": idle = TimeSpan.FromSeconds(int.Parse(Next())); break;
                 case "--agents-dir": agentsDir = Next(); break;
                 case "--lang": lang = Next(); break;
                 case "--backup-name": backupName = Next(); break;
             }
         }
-        return profile is null || exe is null || data is null ? null : new AgentOptions(profile, exe, data, extra, start, idle, agentsDir, lang, string.IsNullOrWhiteSpace(backupName) ? null : backupName);
+        return profile is null || exe is null || data is null ? null : new AgentOptions(profile, exe, data, extra, start, idle, agentsDir, lang, string.IsNullOrWhiteSpace(backupName) ? null : backupName, afterUpdate);
     }
 }

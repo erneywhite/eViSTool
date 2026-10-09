@@ -497,6 +497,17 @@ public sealed class AgentTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SelfUpdate_ToTheSameVersion_IsRefused_AndNothingStarts()
+    {
+        _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
+        var version = (await _client.StatusAsync()).AgentVersion;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _client.SelfUpdateAsync(version));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _client.SelfUpdateAsync("not a version"));
+        Assert.Null((await _client.StatusAsync()).SelfUpdate);
+    }
+
+    [Fact]
     public async Task Notify_SavedThroughTheAgent_SecretEncryptedThere_ReturnedWithout()
     {
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);

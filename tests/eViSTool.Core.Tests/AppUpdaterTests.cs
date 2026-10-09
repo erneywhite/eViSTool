@@ -200,4 +200,15 @@ public sealed class AppUpdaterTests : IDisposable
         badSum = true;
         await Assert.ThrowsAsync<InvalidOperationException>(() => updater.DownloadAsync(found, downloads));
     }
+
+    [Fact]
+    public void RelaunchArgs_KeepTheOptions_WaitForThePreviousCopy_AndStartTheServerIfItRan()
+    {
+        string[] before = ["--profile", "p1", "--exe", "s.exe", "--data", "d", "--start", "--lang", "ru"];
+
+        Assert.Equal(["--profile", "p1", "--exe", "s.exe", "--data", "d", "--lang", "ru", "--after-update"],
+            AppUpdater.RelaunchArgs(before, startServer: false));
+        Assert.Equal(["--profile", "p1", "--exe", "s.exe", "--data", "d", "--lang", "ru", "--after-update", "--start"],
+            AppUpdater.RelaunchArgs([.. before, "--after-update"], startServer: true));
+    }
 }
