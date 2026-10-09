@@ -7,6 +7,8 @@ namespace eViSTool.Core.Server;
 /// Общая консоль с сервером. Процесс без окна наследует консоль родителя; если она в UTF-8,
 /// сервер (он на .NET) тоже пишет в UTF-8 — иначе кириллица из логов VS превращается в «????».
 /// Через неё же Ctrl+C для мягкой остановки: событие получают все процессы консоли, себя мы исключаем.
+/// Всё это только про Windows: на Linux консоли нет, методы ничего не делают (HasConsole — false), сервер пишет
+/// в канал в UTF-8, а мягкая остановка там — SIGTERM (<see cref="SoftStop"/>).
 /// </summary>
 public static partial class ConsoleInterop
 {
@@ -98,8 +100,11 @@ public static partial class ConsoleInterop
     private static partial bool SetConsoleCtrlHandler(IntPtr handler, [MarshalAs(UnmanagedType.Bool)] bool add);
 }
 
-/// <summary>Ctrl+C через общую консоль (работает, когда сервер запущен в консоли агента).</summary>
+/// <summary>
+/// Мягкая остановка своего сервера: на Windows — Ctrl+C через общую консоль (работает, когда сервер запущен в консоли
+/// агента), на Linux — SIGTERM серверу по PID.
+/// </summary>
 public sealed class SharedConsoleCtrlC : ICtrlCSender
 {
-    public bool SendCtrlC(int pid) => ConsoleInterop.SendCtrlCToConsole();
+    public bool SendCtrlC(int pid) => SoftStop.Child(pid);
 }

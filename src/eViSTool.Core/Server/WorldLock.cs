@@ -11,10 +11,15 @@ public sealed class WorldBusyException(string message) : InvalidOperationExcepti
 /// операции. Проверка «свободно» и бронь — одно действие, поэтому сервер не стартует посреди восстановления
 /// (в том числе по сторожу), а восстановление не начнётся на запускающемся сервере. Процесс умер — замок отпущен.
 /// В файле записано, кто держит: «server», «restore»… — чтобы отказ был понятным.
+/// На Linux .NET запирает файлы через flock, и FileShare.Read там — общая блокировка, которую получил бы и второй
+/// «держатель». Поэтому там замок открывается монопольно (FileShare.None), а кто держит — пишется в соседний файл:
+/// монопольно открытый замок другим не прочитать.
 /// </summary>
 public sealed class WorldLock : IDisposable
 {
     public const string FileName = ".evistool-world.lock";
+    /// <summary>Кто держит мир — только на Linux, см. описание класса.</summary>
+    public const string HolderFileName = ".evistool-world.holder";
     public const string Server = "server";
     public const string Restore = "restore";
     public const string Copy = "copy";
@@ -26,6 +31,9 @@ public sealed class WorldLock : IDisposable
 
     public static string PathFor(string dataDir) => System.IO.Path.Combine(dataDir, FileName);
 
+    private static string HolderPathFor(string dataDir) =>
+        OperatingSystem.IsWindows() ? PathFor(dataDir) : System.IO.Path.Combine(dataDir, HolderFileName);
+
     /// <summary>Занять мир. Уже занят — null.</summary>
     public static WorldLock? TryTake(string dataDir, string holder)
     {
@@ -34,8 +42,10 @@ public sealed class WorldLock : IDisposable
         FileStream file;
         try
         {
-            // другим можно только прочитать, кто держит; второй «держатель» (запись) получит отказ
-            file = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
+            // другим можно только прочитать, кто держит; второй «держатель» (запись) получит отказ.
+            // На Linux — монопольно: иначе flock общий и отказа не будет
+            var share = OperatingSystem.IsWindows() ? FileShare.Read : FileShare.None;
+            file = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, share);
         }
         catch (IOException)
         {
@@ -48,6 +58,7 @@ public sealed class WorldLock : IDisposable
             var bytes = System.Text.Encoding.UTF8.GetBytes(holder);
             file.Write(bytes);
             file.Flush();
+            if (!OperatingSystem.IsWindows()) File.WriteAllBytes(HolderPathFor(dataDir), bytes);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -65,7 +76,7 @@ public sealed class WorldLock : IDisposable
     {
         try
         {
-            using var file = new FileStream(PathFor(dataDir), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var file = new FileStream(HolderPathFor(dataDir), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             using var reader = new StreamReader(file);
             return reader.ReadToEnd().Trim() is { Length: > 0 } text ? text : null;
         }

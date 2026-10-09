@@ -5,6 +5,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- версия как у настоящего сервера 1.22.7: FileVersion из трёх чисел, AssemblyVersion из четырёх, без InformationalVersion
+         (на Linux версию игры читаем из метаданных dll, и там это разные строки) -->
+    <AssemblyVersion>1.22.7.0</AssemblyVersion>
+    <FileVersion>1.22.7</FileVersion>
+    <GenerateAssemblyInformationalVersionAttribute>false</GenerateAssemblyInformationalVersionAttribute>
   </PropertyGroup>
 
 </Project>

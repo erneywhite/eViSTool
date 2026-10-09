@@ -22,7 +22,7 @@ public static class ProfileResolver
         var version = string.IsNullOrWhiteSpace(profile.GameDir) ? null : GameInstall.DetectVersion(profile.GameDir);
         if (version is null)
             warnings.Add(Loc.T("profile.gameNotFound",
-                          profile.Kind == ProfileKind.Server ? "VintagestoryServer.exe" : "Vintagestory.exe"));
+                          profile.Kind == ProfileKind.Server ? ServerExecutable.FileName : GameLauncher.ClientExeName));
 
         if (string.IsNullOrWhiteSpace(profile.DataDir) || !Directory.Exists(profile.DataDir))
         {
@@ -142,7 +142,7 @@ public static class ProfileResolver
         gameDir ??= GameInstall.FindGameDir();
         var serverOnly = LooksLikeServerData(GameInstall.DefaultDataDir)
                          || (!string.IsNullOrWhiteSpace(gameDir) && !File.Exists(Path.Combine(gameDir, "Vintagestory.exe"))
-                             && File.Exists(Path.Combine(gameDir, "VintagestoryServer.exe")));
+                             && File.Exists(ServerExecutable.PathIn(gameDir)));
         return serverOnly
             ? new GameProfile { Name = Loc.T("profile.defaultServerName"), Kind = ProfileKind.Server, GameDir = gameDir, DataDir = GameInstall.DefaultDataDir }
             : DefaultClient(gameDir);

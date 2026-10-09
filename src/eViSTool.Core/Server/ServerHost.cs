@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using eViSTool.Core.Game;
 using eViSTool.Core.Localization;
 
 namespace eViSTool.Core.Server;
@@ -14,6 +15,7 @@ public enum ServerState
 
 public sealed record ServerHostOptions
 {
+    /// <summary>Файл сервера: VintagestoryServer.exe на Windows, VintagestoryServer.dll на Linux (см. ServerExecutable).</summary>
     public required string ExePath { get; init; }
     public required string DataPath { get; init; }
     /// <summary>Дополнительные аргументы (например, --addModPath для мира).</summary>
@@ -21,7 +23,7 @@ public sealed record ServerHostOptions
 
     /// <summary>Сколько ждать после /stop (большой мир сохраняется долго — ViSST ждал 20 с, и в этом была беда).</summary>
     public TimeSpan StopTimeout { get; init; } = TimeSpan.FromMinutes(3);
-    /// <summary>Сколько ждать после Ctrl+C, прежде чем убивать.</summary>
+    /// <summary>Сколько ждать после Ctrl+C (на Linux — SIGTERM), прежде чем убивать.</summary>
     public TimeSpan CtrlCTimeout { get; init; } = TimeSpan.FromMinutes(1);
 
     /// <summary>Сторож: поднимать сервер, если он упал сам.</summary>
@@ -34,7 +36,10 @@ public sealed record ServerHostOptions
     public Encoding? OutputEncoding { get; init; }
 }
 
-/// <summary>Отправка Ctrl+C процессу (мягкая остановка VS). Реализация — в агенте (нужен отдельный процесс).</summary>
+/// <summary>
+/// Мягкая остановка VS вторым шагом, если /stop не помог: на Windows — Ctrl+C (нужна общая с сервером консоль, она есть
+/// у агента), на Linux — SIGTERM. Реализация — SharedConsoleCtrlC.
+/// </summary>
 public interface ICtrlCSender
 {
     bool SendCtrlC(int pid);
@@ -43,7 +48,7 @@ public interface ICtrlCSender
 /// <summary>
 /// Владеет процессом VintagestoryServer: запуск, консоль, корректная остановка, сторож.
 /// Остановка ждёт реального завершения процесса, а не фиксированное время:
-/// /stop → ждём → Ctrl+C → ждём → только потом kill.
+/// /stop → ждём → Ctrl+C (на Linux SIGTERM) → ждём → только потом kill.
 /// </summary>
 public sealed class ServerHost : IAsyncDisposable
 {
@@ -134,11 +139,14 @@ public sealed class ServerHost : IAsyncDisposable
             // До отмены ожидающего перезапуска: сторож, упёршийся в занятый мир, должен продолжить ждать
             var world = WorldLock.TryTake(_options.DataPath, WorldLock.Server)
                         ?? throw new WorldBusyException(WorldLock.BusyMessage(_options.DataPath));
+            ProcessStartInfo psi;
             try
             {
                 CancelScheduledRestart();
                 if (!File.Exists(_options.ExePath))
                     throw new FileNotFoundException(Loc.T("srv.exeNotFound", _options.ExePath), _options.ExePath);
+                // .dll (Linux) — через dotnet; нет нужного .NET или файл битый — понятная ошибка, а не падение за падением
+                psi = ServerExecutable.StartInfo(_options.ExePath);
                 // восстановление мира оборвалось посреди подмены — сервер не должен стартовать на половине старого и нового
                 if (WorldRestore.Recover(_options.DataPath)) Sys(Loc.T("backup.recovered"));
             }
@@ -149,22 +157,18 @@ public sealed class ServerHost : IAsyncDisposable
             }
             _world = world;
 
-            // есть своя консоль (агент) — делим её с сервером в UTF-8; нет — отдельная скрытая консоль в OEM-кодировке
+            // Windows: есть своя консоль (агент) — делим её с сервером в UTF-8; нет — отдельная скрытая консоль в
+            // OEM-кодировке. Linux: консоли нет, сервер пишет в канал в UTF-8
             var shareConsole = ConsoleInterop.TryUseUtf8();
             if (shareConsole) ConsoleInterop.EnableCtrlCForChildren();
             var encoding = _options.OutputEncoding ?? (shareConsole ? new UTF8Encoding(false) : DetectConsoleEncoding());
-            var psi = new ProcessStartInfo(_options.ExePath)
-            {
-                WorkingDirectory = Path.GetDirectoryName(_options.ExePath)!,
-                UseShellExecute = false,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,   // и читаем его тоже: непрочитанный stderr рано или поздно вешает сервер
-                CreateNoWindow = !shareConsole,
-                StandardOutputEncoding = encoding,
-                StandardErrorEncoding = encoding,
-                StandardInputEncoding = encoding,
-            };
+            psi.RedirectStandardInput = true;
+            psi.RedirectStandardOutput = true;
+            psi.RedirectStandardError = true;   // и читаем его тоже: непрочитанный stderr рано или поздно вешает сервер
+            psi.CreateNoWindow = !shareConsole;
+            psi.StandardOutputEncoding = encoding;
+            psi.StandardErrorEncoding = encoding;
+            psi.StandardInputEncoding = encoding;
             psi.ArgumentList.Add("--dataPath");
             psi.ArgumentList.Add(_options.DataPath);
             foreach (var a in _options.ExtraArgs) psi.ArgumentList.Add(a);
@@ -342,7 +346,7 @@ public sealed class ServerHost : IAsyncDisposable
         await stdin.WriteLineAsync(command).ConfigureAwait(false);
     }
 
-    /// <summary>Корректная остановка: /stop, ждём реального завершения; не вышел — Ctrl+C; не помогло — kill.</summary>
+    /// <summary>Корректная остановка: /stop, ждём реального завершения; не вышел — Ctrl+C (Linux — SIGTERM); не помогло — kill.</summary>
     public async Task StopAsync(CancellationToken ct = default)
     {
         Task exited;
@@ -365,7 +369,8 @@ public sealed class ServerHost : IAsyncDisposable
 
         if (_ctrlC is not null)
         {
-            Sys(Loc.T("srv.stopTimeoutCtrlC", (int)_options.StopTimeout.TotalSeconds));
+            var waited = (int)_options.StopTimeout.TotalSeconds;
+            Sys(OperatingSystem.IsWindows() ? Loc.T("srv.stopTimeoutCtrlC", waited) : Loc.T("srv.stopTimeoutSigterm", waited));
             _ctrlC.SendCtrlC(pid);
             if (await WaitAsync(exited, _options.CtrlCTimeout, ct).ConfigureAwait(false)) return;
         }
@@ -404,9 +409,11 @@ public sealed class ServerHost : IAsyncDisposable
     /// <summary>
     /// Сервер без окна получает скрытую консоль с кодовой страницей OEM (на русской Windows — 866),
     /// и .NET внутри него пишет вывод в ней. Читаем в той же кодировке, иначе кириллица превратится в кракозябры.
+    /// На Linux консоли нет, .NET пишет в канал в UTF-8 (OEMCodePage там берётся из языка системы и к выводу отношения не имеет).
     /// </summary>
     public static Encoding DetectConsoleEncoding()
     {
+        if (!OperatingSystem.IsWindows()) return new UTF8Encoding(false);
         try
         {
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);

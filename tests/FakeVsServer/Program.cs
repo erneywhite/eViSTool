@@ -13,6 +13,9 @@ using System.Runtime.InteropServices;
 //   /modnoise Ns N   — N «тихих» ошибок мода (стек Ns), сервер работает дальше
 //   прочее           — «Handling Console Command …»
 // Аргументы: --dataPath <путь> (обязателен, как у нас), --slowstart <мс>
+// Ctrl+C (Windows) и SIGTERM (Linux) — мягкая остановка с кодом 0, как у настоящего (1.22.7 на SIGTERM пишет ту же строку
+// «Server termination event SIGTERM received» и выходит с 0).
+// На Windows его запускают как FakeVsServer.exe, на Linux — «dotnet FakeVsServer.dll», как настоящий сервер.
 
 var slowStart = 200;
 var dataPath = ".";
@@ -28,12 +31,14 @@ var stopping = new ManualResetEventSlim();
 void Log(string level, string text) => Console.WriteLine($"{DateTime.Now:d.M.yyyy HH:mm:ss} [{level}] {text}");
 
 // Ctrl+C / SIGTERM — мягкая остановка, как у настоящего сервера
-using var sigint = PosixSignalRegistration.Create(PosixSignal.SIGINT, ctx =>
+void Terminate(PosixSignalContext ctx)
 {
     ctx.Cancel = true;
     Log("Notification", $"Server termination event {ctx.Signal} received. Shutting down server");
     stopping.Set();
-});
+}
+using var sigint = PosixSignalRegistration.Create(PosixSignal.SIGINT, Terminate);
+using var sigterm = PosixSignalRegistration.Create(PosixSignal.SIGTERM, Terminate);
 
 Log("Notification", "Server logger started.");
 Log("Notification", "Game Version: v1.22.7 (Stable)");

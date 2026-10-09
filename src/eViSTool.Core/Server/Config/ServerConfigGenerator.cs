@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using eViSTool.Core.Game;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;
 using Newtonsoft.Json.Linq;
@@ -24,14 +25,10 @@ public static class ServerConfigGenerator
         if (!File.Exists(serverExe)) throw new FileNotFoundException(Loc.T("srv.exeNotFound", serverExe), serverExe);
 
         Directory.CreateDirectory(dataDir);
-        var psi = new ProcessStartInfo(serverExe)
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            WorkingDirectory = Path.GetDirectoryName(serverExe)!,
-        };
+        var psi = ServerExecutable.StartInfo(serverExe); // на Linux — dotnet VintagestoryServer.dll
+        psi.CreateNoWindow = true;
+        psi.RedirectStandardOutput = true;
+        psi.RedirectStandardError = true;
         psi.ArgumentList.Add("--dataPath");
         psi.ArgumentList.Add(dataDir);
         // пустой набор правок: нужен только побочный эффект — «создать конфиг, если его нет»
