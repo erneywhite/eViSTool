@@ -1,4 +1,5 @@
-# Сборка релиза eViSTool: dist\eViSTool-<версия>\ и zip рядом; для Linux — dist\eViSTool-<версия>-linux-x64\ и tar.gz.
+# Сборка релиза eViSTool: dist\eViSTool-<версия>\ и zip рядом; для Linux — dist\eViSTool-<версия>-linux-x64\, tar.gz
+# (GitHub и самообновление) и zip с теми же правами (ModDB принимает только zip).
 #
 #   pwsh build/publish.ps1                 — версия из Directory.Build.props
 #   pwsh build/publish.ps1 -Version 0.1.0-alpha.2
@@ -53,7 +54,8 @@ Get-ChildItem $out, $zip, "$zip.sha256" | Select-Object Name, @{ n = 'MB'; e = {
 # Архив — tar.gz, распаковывается в отдельную папку рядом с сервером (папку игры обновляют через rm -rf).
 $linuxOut = Join-Path $dist "$name-linux-x64"
 $tgz = Join-Path $dist "$name-linux-x64.tar.gz"
-Remove-Item -Recurse -Force $linuxOut, $tgz, "$tgz.sha256" -ErrorAction SilentlyContinue
+$lzip = Join-Path $dist "$name-linux-x64.zip"
+Remove-Item -Recurse -Force $linuxOut, $tgz, "$tgz.sha256", $lzip, "$lzip.sha256" -ErrorAction SilentlyContinue
 
 dotnet publish (Join-Path $root 'src/eViSTool.Agent') -c Release -r linux-x64 "-p:Version=$Version" `
     '-p:PublishSingleFile=true' '-p:DebugType=None' '-p:DebugSymbols=false' '-p:IncludeNativeLibrariesForSelfExtract=true' `
@@ -91,4 +93,31 @@ try {
 finally { $stream.Dispose() }
 $hash = (Get-FileHash $tgz -Algorithm SHA256).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText("$tgz.sha256", "$hash  $(Split-Path $tgz -Leaf)`n")
-Get-ChildItem $linuxOut, $tgz, "$tgz.sha256" | Select-Object Name, @{ n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
+
+# zip для ModDB: те же файлы и права Unix в каждой записи. .NET пишет права (ExternalAttributes), но помечает архив как
+# созданный на Windows, и unzip их тогда не читает — агент распакуется без «исполняемый». Поэтому после записи в
+# оглавлении у каждой записи ставим «создан на Unix» (старший байт «version made by» = 3)
+$archive = [IO.Compression.ZipFile]::Open($lzip, [IO.Compression.ZipArchiveMode]::Create)
+try {
+    foreach ($file in Get-ChildItem $linuxOut -File | Sort-Object Name) {
+        $mode = if ($file.Name -eq 'eViSTool.Agent') { 0x81ED } else { 0x81A4 } # обычный файл, 755 / 644
+        $entry = [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $file.FullName, $file.Name, [IO.Compression.CompressionLevel]::Optimal)
+        $entry.ExternalAttributes = $mode -shl 16
+    }
+}
+finally { $archive.Dispose() }
+$bytes = [IO.File]::ReadAllBytes($lzip)
+$eocd = $bytes.Length - 22
+while ($eocd -ge 0 -and [BitConverter]::ToUInt32($bytes, $eocd) -ne 0x06054b50) { $eocd-- }
+if ($eocd -lt 0) { throw "zip без конца оглавления: $lzip" }
+$count = [BitConverter]::ToUInt16($bytes, $eocd + 10)
+$at = [BitConverter]::ToUInt32($bytes, $eocd + 16)
+for ($i = 0; $i -lt $count; $i++) {
+    if ([BitConverter]::ToUInt32($bytes, $at) -ne 0x02014b50) { throw "оглавление zip не там, где ждали: $lzip" }
+    $bytes[$at + 5] = 3
+    $at += 46 + [BitConverter]::ToUInt16($bytes, $at + 28) + [BitConverter]::ToUInt16($bytes, $at + 30) + [BitConverter]::ToUInt16($bytes, $at + 32)
+}
+[IO.File]::WriteAllBytes($lzip, $bytes)
+$hash = (Get-FileHash $lzip -Algorithm SHA256).Hash.ToLowerInvariant()
+[IO.File]::WriteAllText("$lzip.sha256", "$hash  $(Split-Path $lzip -Leaf)`n")
+Get-ChildItem $linuxOut, $tgz, "$tgz.sha256", $lzip, "$lzip.sha256" | Select-Object Name, @{ n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize

@@ -421,7 +421,7 @@ sudo ./eViSTool.Agent service install                              # служб�
 Что важно знать:
 
 - Ставь eViSTool в свою папку, не в папку игры: игру обновляют командой `rm -rf *`, и eViSTool пропал бы вместе с ней.
-- Архив `eViSTool-<версия>-linux-x64.tar.gz` лежит на [странице модбазы для Linux](https://mods.vintagestory.at/evistoollinux) и в [Releases](https://github.com/erneywhite/eViSTool/releases).
+- Архив `eViSTool-<версия>-linux-x64.tar.gz` лежит в [Releases](https://github.com/erneywhite/eViSTool/releases), те же файлы в zip — там же и на [странице модбазы для Linux](https://mods.vintagestory.at/evistoollinux) (распаковка: `sudo unzip … -d /home/vintagestory/evistool`).
   Агенту .NET не нужен, он собран вместе со своей средой. Проверено на Ubuntu Server 24.04.
 - Обновляется агент кнопкой **«Обновить на сервере»** из окна на Windows, systemd сам поднимет новую версию.
 - Время перезапусков по расписанию задаётся по часам машины с сервером. Если они идут в другом поясе, окно об этом скажет.

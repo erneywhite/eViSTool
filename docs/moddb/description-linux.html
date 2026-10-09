@@ -15,9 +15,10 @@
 <p>From your Windows PC you get everything the Windows app has for a server: the live console with command hints, the config editor, players and whitelist, mods (from the catalog, zips, modpacks), mod settings as a form, and <strong>Update on the server</strong>, which updates the agent on Linux to your version in one click.</p>
 
 <h2>Getting started</h2>
-<p>If your server is installed the official way, with <code>server.sh</code>, unpack the archive below into its own folder (not into the game folder: the game is updated with <code>rm -rf *</code>) and run:</p>
-<pre><code>sudo mkdir -p /home/vintagestory/evistool
-sudo tar -xzf eViSTool-&lt;version&gt;-linux-x64.tar.gz -C /home/vintagestory/evistool
+<p>If your server is installed the official way, with <code>server.sh</code>, unpack the zip below into its own folder (not into the game folder: the game is updated with <code>rm -rf *</code>) and run:</p>
+<pre><code>sudo apt install unzip
+sudo mkdir -p /home/vintagestory/evistool
+sudo unzip eViSTool-&lt;version&gt;-linux-x64.zip -d /home/vintagestory/evistool
 sudo chown -R vintagestory:vintagestory /home/vintagestory/evistool
 cd /home/vintagestory/evistool
 sudo -u vintagestory ./eViSTool.Agent setup
@@ -25,7 +26,7 @@ sudo -u vintagestory ./eViSTool.Agent remote enable --host &lt;address of this m
 sudo -u vintagestory ./eViSTool.Agent remote code
 sudo ./eViSTool.Agent service install</code></pre>
 <p>Then paste the code into eViSTool on Windows: <em>Settings &rarr; + Server &rarr; Server on another computer? &rarr; Connect by code&hellip;</em></p>
-<p>You'll need Linux x64 with systemd (tested on Ubuntu Server 24.04) and .NET 10 for the game server itself. The agent doesn't need .NET, it ships with its own runtime. The step-by-step guide, with ports, day-to-day commands, logs and uninstalling, is <a href="https://github.com/erneywhite/eViSTool/blob/main/docs/linux.md">on GitHub</a>.</p>
+<p>The same files are on <a href="https://github.com/erneywhite/eViSTool/releases/latest">GitHub</a> as a tar.gz, if you prefer that. You'll need Linux x64 with systemd (tested on Ubuntu Server 24.04) and .NET 10 for the game server itself. The agent doesn't need .NET, it ships with its own runtime. The step-by-step guide, with ports, day-to-day commands, logs and uninstalling, is <a href="https://github.com/erneywhite/eViSTool/blob/main/docs/linux.md">on GitHub</a>.</p>
 
 <h2>Links</h2>
 <ul>
@@ -48,4 +49,4 @@ sudo ./eViSTool.Agent service install</code></pre>
 <li>Объявления в чат по расписанию и статистика: онлайн, память и процессор, кто сколько наиграл.</li>
 </ul>
 <p>С Windows доступно всё, что есть для сервера в программе: консоль с подсказками, редактор конфига, игроки и белый список, моды (из каталога, zip, модпаки), настройки модов формой и кнопка «Обновить на сервере», которая обновит агент на Linux до твоей версии.</p>
-<p>Установка &mdash; командами выше, если сервер поставлен через <code>server.sh</code>. Подробная инструкция &mdash; <a href="https://github.com/erneywhite/eViSTool/blob/main/docs/linux.ru.md">на GitHub по-русски</a>.</p>
+<p>Установка &mdash; командами выше, если сервер поставлен через <code>server.sh</code>. Те же файлы в tar.gz лежат <a href="https://github.com/erneywhite/eViSTool/releases/latest">на GitHub</a>. Подробная инструкция &mdash; <a href="https://github.com/erneywhite/eViSTool/blob/main/docs/linux.ru.md">на GitHub по-русски</a>.</p>

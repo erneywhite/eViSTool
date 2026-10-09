@@ -53,6 +53,10 @@ sudo chown -R vintagestory:vintagestory /home/vintagestory/evistool
 cd /home/vintagestory/evistool
 ```
 
+Те же файлы есть и в `eViSTool-<версия>-linux-x64.zip` (на ModDB лежит только он). Распаковывается он через `unzip`
+(`sudo apt install unzip`), агент остаётся исполняемым:
+`sudo unzip eViSTool-0.10.0-linux-x64.zip -d /home/vintagestory/evistool`, дальше тот же `chown`.
+
 `chown` обязателен. Агент работает от пользователя `vintagestory`, владельца данных сервера, и пишет в свою папку
 настройки, ключи и при обновлении новые файлы.
 

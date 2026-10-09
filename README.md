@@ -416,7 +416,7 @@ Good to know:
 
 - Put eViSTool in its own folder, not in the game folder: the game is updated with `rm -rf *`, and eViSTool would go
   with it.
-- The `eViSTool-<version>-linux-x64.tar.gz` archive is on the [ModDB page for Linux](https://mods.vintagestory.at/evistoollinux) and in [Releases](https://github.com/erneywhite/eViSTool/releases).
+- The `eViSTool-<version>-linux-x64.tar.gz` archive is in [Releases](https://github.com/erneywhite/eViSTool/releases); the same files as a zip are there and on the [ModDB page for Linux](https://mods.vintagestory.at/evistoollinux) (unpack with `sudo unzip … -d /home/vintagestory/evistool`).
   The agent doesn't need .NET, it ships with its own runtime. Tested on Ubuntu Server 24.04.
 - The agent is updated with **Update on the server** from the Windows window; systemd starts the new version by itself.
 - Scheduled restart times follow the server machine's clock. If it runs in another time zone, the window tells you.
