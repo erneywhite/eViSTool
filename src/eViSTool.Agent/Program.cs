@@ -121,6 +121,22 @@ host.Console.LineAdded += line =>
     Notify(eViSTool.Core.Notifications.NotifyEvent.Overloaded, eViSTool.Core.Localization.Loc.T("notify.ev.overloaded"), [.. details]);
 };
 
+// чат игры → Discord: общий чат игроков, по желанию — входы и выходы; настройки читаются на каждое сообщение
+var chatRelay = new eViSTool.Core.Notifications.ChatRelay(
+    () => eViSTool.Core.Notifications.ServerNotifySettings.Load(opts.ProfileId, opts.AgentsDir).ChatChannel, notifyHttp,
+    error => host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("chat.consoleFailed", error)));
+host.Console.LineAdded += line =>
+{
+    if (line.Kind != ConsoleLineKind.Output || eViSTool.Core.Notifications.ChatBridge.Parse(line.Text) is not { } post) return;
+    if (eViSTool.Core.Notifications.ServerNotifySettings.Load(opts.ProfileId, opts.AgentsDir).ChatChannel is not null) chatRelay.Post(post);
+};
+void ChatJoinLeave(string text)
+{
+    var s = eViSTool.Core.Notifications.ServerNotifySettings.Load(opts.ProfileId, opts.AgentsDir);
+    if (s.ChatChannel is not null && s.ChatJoins)
+        chatRelay.Post(new eViSTool.Core.Notifications.ChatPost(string.IsNullOrWhiteSpace(s.ServerName) ? "Vintage Story" : s.ServerName, text));
+}
+
 // кто зашёл и вышел: разница составов (сервер останавливается — это не «все вышли»)
 var knownPlayers = new HashSet<string>(StringComparer.Ordinal);
 players.Changed += () =>
@@ -128,6 +144,10 @@ players.Changed += () =>
     var now = players.Players.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
     if (host.State == ServerState.Running)
     {
+        foreach (var name in now.Except(knownPlayers))
+            ChatJoinLeave(eViSTool.Core.Localization.Loc.T("chat.joined", name, now.Count));
+        foreach (var name in knownPlayers.Except(now))
+            ChatJoinLeave(eViSTool.Core.Localization.Loc.T("chat.left", name, now.Count));
         foreach (var name in now.Except(knownPlayers))
             Notify(eViSTool.Core.Notifications.NotifyEvent.PlayerJoined, eViSTool.Core.Localization.Loc.T("notify.ev.joined", name),
                 Line("◦", "notify.lbl.online", now.Count.ToString()));

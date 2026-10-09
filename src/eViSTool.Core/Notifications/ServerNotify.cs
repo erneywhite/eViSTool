@@ -38,6 +38,14 @@ public sealed record ServerNotifySettings
     /// <summary>Событие → ID каналов.</summary>
     public Dictionary<NotifyEvent, List<string>> Routes { get; init; } = [];
 
+    /// <summary>Чат игры → этот канал Discord (ID из <see cref="Channels"/>); null — выключено.</summary>
+    public string? ChatChannelId { get; init; }
+
+    /// <summary>В тот же канал — кто зашёл и вышел.</summary>
+    public bool ChatJoins { get; init; } = true;
+
+    public NotifyChannel? ChatChannel => ChatChannelId is { } id ? Channels.FirstOrDefault(c => c.Id == id && c.Kind == NotifyKind.Discord) : null;
+
     public IEnumerable<NotifyChannel> ChannelsFor(NotifyEvent e) =>
         Routes.TryGetValue(e, out var ids) ? Channels.Where(c => ids.Contains(c.Id)) : [];
 
@@ -82,6 +90,8 @@ public sealed record ServerNotifySettings
     {
         ServerName = ServerName,
         Routes = Routes,
+        ChatChannelId = ChatChannelId,
+        ChatJoins = ChatJoins,
         Channels = [.. Channels.Select(c => new NotifyChannelUpload(c with { SecretProtected = null }, c.Secret))],
     };
 }
@@ -94,6 +104,8 @@ public sealed record ServerNotifyUpload
 {
     public string? ServerName { get; init; }
     public Dictionary<NotifyEvent, List<string>> Routes { get; init; } = [];
+    public string? ChatChannelId { get; init; }
+    public bool ChatJoins { get; init; } = true;
     public List<NotifyChannelUpload> Channels { get; init; } = [];
 
     /// <summary>На машине агента: секреты шифруются для её пользователя.</summary>
@@ -101,6 +113,8 @@ public sealed record ServerNotifyUpload
     {
         ServerName = ServerName,
         Routes = Routes,
+        ChatChannelId = ChatChannelId,
+        ChatJoins = ChatJoins,
         Channels = [.. Channels.Select(c => c.Channel with { SecretProtected = c.Secret is { Length: > 0 } s ? NotifySecret.Protect(s) : null })],
     };
 }

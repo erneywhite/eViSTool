@@ -58,6 +58,25 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
     public bool HasChannels => ChannelNames.Count > 0;
 
     [ObservableProperty] private bool _loaded;
+
+    // ---- чат игры в Discord: канал из «Настроек» (только Discord) и входы-выходы
+
+    /// <summary>Вариант выбора канала для чата: ID ("" — выключено) и имя.</summary>
+    public sealed record ChatChannelOption(string Id, string Title);
+
+    public ObservableCollection<ChatChannelOption> ChatChannels { get; } = [];
+    [ObservableProperty] private string _chatChannelId = "";
+    [ObservableProperty] private bool _chatJoins = true;
+    public bool ChatOn => ChatChannelId.Length > 0;
+    public bool HasDiscordChannels => ChatChannels.Count > 1;
+
+    partial void OnChatChannelIdChanged(string value)
+    {
+        OnPropertyChanged(nameof(ChatOn));
+        Changed();
+    }
+
+    partial void OnChatJoinsChanged(bool value) => Changed();
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private string _errorText = "";
     [ObservableProperty] private bool _isTesting;
@@ -131,7 +150,7 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
             Loaded = true;
             ErrorText = "";
             // поправленные в «Настройках» каналы (новый токен, другой чат) — до сервера
-            if (resync && settings.Routes.Values.Any(v => v.Count > 0)) await SaveAsync(quiet: true);
+            if (resync && (settings.Routes.Values.Any(v => v.Count > 0) || settings.ChatChannelId is not null)) await SaveAsync(quiet: true);
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or IOException or TaskCanceledException
                                        or UnauthorizedAccessException or JsonException)
@@ -150,6 +169,12 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
         {
             ChannelNames.Clear();
             foreach (var c in _channels) ChannelNames.Add(c.Name);
+            ChatChannels.Clear();
+            ChatChannels.Add(new ChatChannelOption("", Loc.T("chat.off")));
+            foreach (var c in _channels.Where(c => c.Kind == NotifyKind.Discord)) ChatChannels.Add(new ChatChannelOption(c.Id, c.Name));
+            ChatChannelId = settings.ChatChannelId is { } chat && _channels.Any(c => c.Id == chat && c.Kind == NotifyKind.Discord) ? chat : "";
+            ChatJoins = settings.ChatJoins;
+            OnPropertyChanged(nameof(HasDiscordChannels));
             Rows.Clear();
             foreach (var e in Events)
                 Rows.Add(new NotifyEventRowViewModel(e, Title(e), Hint(e),
@@ -171,9 +196,12 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
     {
         var routes = Rows.ToDictionary(r => r.Event, r => r.Cells.Where(c => c.IsOn).Select(c => c.ChannelId).ToList());
         var used = routes.Values.SelectMany(v => v).ToHashSet();
+        if (ChatChannelId.Length > 0) used.Add(ChatChannelId);
         return new ServerNotifySettings
         {
             ServerName = _profile?.Name,
+            ChatChannelId = ChatChannelId.Length > 0 ? ChatChannelId : null,
+            ChatJoins = ChatJoins,
             Routes = routes.Where(kv => kv.Value.Count > 0).ToDictionary(kv => kv.Key, kv => kv.Value),
             Channels = [.. _channels.Where(c => used.Contains(c.Id))],
         };

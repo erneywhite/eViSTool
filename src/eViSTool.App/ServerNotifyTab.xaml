@@ -31,6 +31,27 @@
             <TextBlock Text="{Binding ErrorText}" FontSize="12" Foreground="{StaticResource Forest.Danger}" TextWrapping="Wrap" Margin="2,0,0,10"
                        Visibility="{Binding ErrorText, Converter={StaticResource TextToVis}}" AutomationProperties.AutomationId="SrvNotifyError" />
 
+            <!-- чат игры → Discord -->
+            <Border Style="{StaticResource NotifyCard}">
+                <StackPanel>
+                    <TextBlock Text="{local:Tr chat.title}" Style="{StaticResource CardTitle}" />
+                    <TextBlock Text="{local:Tr chat.hint}" Style="{StaticResource Hint}" />
+                    <DockPanel Margin="0,12,0,0" Visibility="{Binding HasDiscordChannels, Converter={StaticResource BoolToVis}}">
+                        <ComboBox DockPanel.Dock="Right" Width="240" Style="{StaticResource Forest.ComboBox}" ItemsSource="{Binding ChatChannels}"
+                                  DisplayMemberPath="Title" SelectedValuePath="Id" SelectedValue="{Binding ChatChannelId}" IsEnabled="{Binding Loaded}"
+                                  AutomationProperties.AutomationId="ChatChannel" AutomationProperties.Name="{local:Tr chat.channel}" />
+                        <TextBlock Text="{local:Tr chat.channel}" FontSize="13" Foreground="{StaticResource Forest.Text}" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <DockPanel Margin="0,12,0,0" Visibility="{Binding ChatOn, Converter={StaticResource BoolToVis}}">
+                        <CheckBox DockPanel.Dock="Right" Style="{StaticResource Forest.Switch}" IsChecked="{Binding ChatJoins}" VerticalAlignment="Center"
+                                  AutomationProperties.AutomationId="ChatJoins" AutomationProperties.Name="{local:Tr chat.joins}" />
+                        <TextBlock Text="{local:Tr chat.joins}" FontSize="13" Foreground="{StaticResource Forest.Text}" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <TextBlock Text="{local:Tr chat.noDiscord}" Style="{StaticResource Hint}" FontSize="12" Margin="0,10,0,0"
+                               Visibility="{Binding HasDiscordChannels, Converter={StaticResource InvertVis}}" />
+                </StackPanel>
+            </Border>
+
             <Border Style="{StaticResource NotifyCard}">
                 <StackPanel>
                     <DockPanel>
