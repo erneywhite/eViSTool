@@ -89,6 +89,9 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     /// <summary>Часы машины с сервером идут в другом поясе — время перезапусков задаётся по ним; пусто — пояс тот же.</summary>
     [ObservableProperty] private string _serverTimeNote = "";
 
+    /// <summary>Подсказка к папке для копий: пример сетевой папки — под систему машины с сервером.</summary>
+    [ObservableProperty] private string _backupDirHint = Loc.T("backupdir.hint");
+
     private static string ServerTimeNoteFor(int? serverMinutes)
     {
         if (serverMinutes is not { } server) return "";
@@ -271,6 +274,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         _nextBackupAt = status?.NextBackupAt;
         _nextRestartAt = status?.NextRestartAt;
         ServerTimeNote = ServerTimeNoteFor(status?.UtcOffsetMinutes);
+        BackupDirHint = Loc.T(status?.Os == "Linux" ? "backupdir.hintLinux" : "backupdir.hint");
         // агент сообщил о новой копии — список устарел
         if (status?.LastBackupAt is { } last && last != _lastSeenBackup)
         {

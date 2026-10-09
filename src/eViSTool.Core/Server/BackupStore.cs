@@ -54,7 +54,7 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null, s
     {
         dir = dir?.Trim();
         if (string.IsNullOrEmpty(dir)) return null; // по умолчанию — Backups сервера
-        if (!Path.IsPathFullyQualified(dir) || dir.IndexOfAny(Path.GetInvalidPathChars()) >= 0) return Loc.T("backupdir.notFull");
+        if (!Path.IsPathFullyQualified(dir) || dir.IndexOfAny(Path.GetInvalidPathChars()) >= 0) return Loc.T(OperatingSystem.IsWindows() ? "backupdir.notFull" : "backupdir.notFullLinux");
         try
         {
             Directory.CreateDirectory(dir);

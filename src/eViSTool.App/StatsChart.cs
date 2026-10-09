@@ -160,7 +160,8 @@ public sealed class StatsChart : FrameworkElement
         // ---- вылеты
         var danger = Res("Forest.Danger", Brushes.IndianRed);
         var crashPen = new Pen(danger, 1.5) { DashStyle = new DashStyle([2, 2], 0) };
-        foreach (var crash in r.Crashes)
+        var lastLabel = Rect.Empty; // вылеты почти подряд: подписи наползали друг на друга, вторую не рисуем — хватает черты
+        foreach (var crash in r.Crashes.OrderBy(c => c))
         {
             var x = Math.Round(Xt(crash)) + 0.5;
             if (x < Left || x > Left + w) continue;
@@ -169,7 +170,11 @@ public sealed class StatsChart : FrameworkElement
             if (Kind == StatsChartKind.Players)
             {
                 var label = Format(Loc.T("stats.crashMark"), danger, 11);
-                dc.DrawText(label, new Point(x + 4 + label.Width > Left + w ? x - 4 - label.Width : x + 4, Top));
+                var at = new Point(x + 4 + label.Width > Left + w ? x - 4 - label.Width : x + 4, Top);
+                var box = new Rect(at.X - 4, at.Y, label.Width + 8, label.Height);
+                if (lastLabel.IntersectsWith(box)) continue;
+                dc.DrawText(label, at);
+                lastLabel = box;
             }
         }
 
