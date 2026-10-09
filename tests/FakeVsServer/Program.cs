@@ -28,7 +28,8 @@ for (var i = 0; i < args.Length - 1; i++)
 var hang = false;
 var stopping = new ManualResetEventSlim();
 
-void Log(string level, string text) => Console.WriteLine($"{DateTime.Now:d.M.yyyy HH:mm:ss} [{level}] {text}");
+// в консоли настоящий сервер пишет уровень с приставкой — «[Server Error]», «[Server Event]» (в файлах логов — без неё)
+void Log(string level, string text) => Console.WriteLine($"{DateTime.Now:d.M.yyyy HH:mm:ss} [Server {level}] {text}");
 
 // Ctrl+C / SIGTERM — мягкая остановка, как у настоящего сервера
 void Terminate(PosixSignalContext ctx)

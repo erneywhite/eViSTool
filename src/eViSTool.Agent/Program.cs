@@ -180,11 +180,33 @@ var stats = new StatsStore(StatsStore.DirFor(opts.ProfileId, opts.AgentsDir));
 var cpuMeter = new CpuMeter();
 var nextSample = DateTime.Now.AddMinutes(1);
 var nextStatsPrune = DateTime.Now.AddMinutes(2);
+// кто в игре по записям статистики: сбор включили (или агент перезапустился), когда игроки уже были на сервере, —
+// их вход в записи не попал, и без входа сеанс не засчитался бы. Замер раз в минуту дописывает недостающие входы
+var statsOnline = new HashSet<string>(StringComparer.Ordinal);
 void Stat(StatsEntry entry)
 {
+    // зовут из разных потоков: смена игроков, смена состояния сервера, замер в главном цикле
+    lock (statsOnline)
     try
     {
-        if (stats.IsEnabled) stats.Append(entry);
+        if (!stats.IsEnabled)
+        {
+            statsOnline.Clear(); // сбор выключен — после включения входы запишутся заново
+            return;
+        }
+        switch (entry.Kind)
+        {
+            case StatsKind.Join when entry.Name is { } joined:
+                if (!statsOnline.Add(joined)) return; // уже записан замером
+                break;
+            case StatsKind.Leave when entry.Name is { } left:
+                statsOnline.Remove(left);
+                break;
+            case StatsKind.Up or StatsKind.Down or StatsKind.Crash:
+                statsOnline.Clear();
+                break;
+        }
+        stats.Append(entry);
     }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
     {
@@ -1013,7 +1035,10 @@ try
             nextSample = at.AddMinutes(1);
             var cpu = cpuMeter.Next(host.State == ServerState.Running ? host.ProcessorTime : null, at);
             if (host.State == ServerState.Running && cpu is { } load && host.MemoryMb is { } memory)
+            {
+                foreach (var p in players.Players) Stat(new StatsEntry(at, StatsKind.Join, Name: p.Name)); // известных пропустит
                 Stat(new StatsEntry(at, StatsKind.Sample, players.Players.Count, memory, Math.Round(load, 1)));
+            }
         }
         if (DateTime.Now >= nextStatsPrune)
         {

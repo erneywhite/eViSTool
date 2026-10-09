@@ -14,11 +14,12 @@ public sealed record LogEntry(string Time, string Level, string Message, IReadOn
 /// <summary>
 /// Разбор логов Vintage Story (client-main.log, server-main.log, client-crash.log). Дата — в формате системы игрока
 /// (у русской Windows «7.10.2026 00:18:55», у английской «10/7/2026 12:18:55 AM»), поэтому запись узнаём по уровню
-/// в квадратных скобках после даты и времени.
+/// в квадратных скобках после даты и времени. В консоли выделенного сервера (её читает агент) у уровня есть
+/// приставка — «[Server Error]», «[Server Notification]», — в его файлах логов её нет.
 /// </summary>
 public static partial class GameLog
 {
-    [GeneratedRegex(@"^(?<time>\S+ \d{1,2}:\d{2}:\d{2}(?: [AP]M)?) \[(?<level>[A-Za-z]+)\] (?<msg>.*)$")]
+    [GeneratedRegex(@"^(?<time>\S+ \d{1,2}:\d{2}:\d{2}(?: [AP]M)?) \[(?:Server )?(?<level>[A-Za-z]+)\] (?<msg>.*)$")]
     private static partial Regex EntryLine();
 
     // «   at A.B.C(x)»; лог иногда склеивает два стека в одну строку — «…(x)   at D.E(y)»

@@ -64,7 +64,7 @@ public sealed class ServerHostTests : IAsyncLifetime
         var lines = host.Console.GetSince(0);
         Assert.Contains(lines, l => l.Kind == ConsoleLineKind.Input && l.Text == "/time");
         Assert.Contains(lines, l => l.Text.Contains("Неповрежденный мир")); // кириллица не побилась
-        Assert.Contains(lines, l => l.Level == "Notification");
+        Assert.Contains(lines, l => l.Level == "Server Notification"); // так уровень пишет консоль настоящего сервера
     }
 
     [Fact]
