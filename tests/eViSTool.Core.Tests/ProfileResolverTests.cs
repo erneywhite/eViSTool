@@ -91,6 +91,18 @@ public sealed class ProfileResolverTests : IDisposable
     }
 
     [Fact]
+    public void ServerFile_IsTheOneOfThisPlatform()
+    {
+        // в папке игры нет сервера — предупреждение называет файл этой платформы (Windows — exe, Linux — dll)
+        var r = ProfileResolver.Resolve(new GameProfile { Kind = ProfileKind.Server, GameDir = _game, DataDir = _data });
+        Assert.Contains(r.Warnings, w => w.Contains(Game.ServerExecutable.FileName));
+
+        // только сервер, без клиента — первый профиль серверный
+        File.WriteAllText(Game.ServerExecutable.PathIn(_game), "");
+        Assert.Equal(ProfileKind.Server, ProfileResolver.DefaultProfile(_game).Kind);
+    }
+
+    [Fact]
     public void MissingConfigStillGivesDefaultModsDir()
     {
         var r = ProfileResolver.Resolve(new GameProfile { Kind = ProfileKind.Server, GameDir = _game, DataDir = _data });

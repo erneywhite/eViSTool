@@ -244,8 +244,8 @@ public sealed class AgentClient : IDisposable
 /// <summary>Запуск агента для серверного профиля (или подключение к уже работающему).</summary>
 public static class AgentLauncher
 {
-    public static string ServerExe(GameProfile profile) =>
-        Path.Combine(profile.GameDir ?? "", "VintagestoryServer.exe");
+    /// <summary>Файл сервера в папке игры профиля (на Windows — exe, на Linux — dll, см. ServerExecutable).</summary>
+    public static string ServerExe(GameProfile profile) => Game.ServerExecutable.PathIn(profile.GameDir);
 
     /// <summary>Агент профиля: работающий — подключиться, нет — запустить (с --start сразу запустит и сервер).</summary>
     public static async Task<AgentClient> EnsureRunningAsync(GameProfile profile, bool startServer,

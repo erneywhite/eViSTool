@@ -3,17 +3,21 @@ using System.Runtime.InteropServices;
 namespace eViSTool.Core.Game;
 
 /// <summary>
-/// Командная строка чужого процесса (Windows 8.1+, без WMI): по ней отличаем копии игры с разными папками данных
-/// (<c>--dataPath</c>), запущенные из одной папки игры.
+/// Командная строка чужого процесса: по ней отличаем копии игры с разными папками данных (<c>--dataPath</c>), запущенные
+/// из одной папки игры. Windows 8.1+ — через ntdll, без WMI; Linux — из /proc/&lt;pid&gt;/cmdline.
 /// </summary>
 public static class ProcessCommandLine
 {
     private const int ProcessCommandLineInformation = 60;
     private const uint QueryLimitedInformation = 0x1000;
 
-    /// <summary>Командная строка процесса; null — не узнать (нет прав, процесс уже завершился).</summary>
+    /// <summary>
+    /// Командная строка процесса одной строкой; null — не узнать (нет прав, процесс уже завершился). На Linux склеена из
+    /// аргументов, с кавычками вокруг тех, где есть пробелы, — её разбирает тот же <see cref="Split"/>.
+    /// </summary>
     public static string? Get(int pid)
     {
+        if (OperatingSystem.IsLinux()) return GetArgs(pid) is { } args ? Join(args) : null;
         if (!OperatingSystem.IsWindows()) return null;
         var handle = OpenProcess(QueryLimitedInformation, false, pid);
         if (handle == IntPtr.Zero) return null;
@@ -41,15 +45,62 @@ public static class ProcessCommandLine
         }
     }
 
-    /// <summary>Значение параметра (<c>--dataPath "C:\x y"</c>) из командной строки; null — параметра нет.</summary>
-    public static string? Argument(string commandLine, string name)
+    /// <summary>
+    /// Аргументы процесса по отдельности, первый — сама программа; null — не узнать. На Linux — ровно как их передали
+    /// (cmdline хранит их через \0), на Windows — разбор командной строки.
+    /// </summary>
+    public static IReadOnlyList<string>? GetArgs(int pid)
     {
-        var args = Split(commandLine);
-        var i = args.FindIndex(a => string.Equals(a, name, StringComparison.OrdinalIgnoreCase));
-        if (i >= 0) return i + 1 < args.Count ? args[i + 1] : "";
+        if (!OperatingSystem.IsLinux()) return Get(pid) is { } cmd ? Split(cmd) : null;
+        try
+        {
+            return ParseProcCmdline(File.ReadAllBytes($"/proc/{pid}/cmdline"));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null; // процесса уже нет (или /proc от нас закрыт)
+        }
+    }
+
+    /// <summary>Содержимое /proc/&lt;pid&gt;/cmdline: аргументы в UTF-8, каждый заканчивается \0. Пустое — у потоков ядра и зомби.</summary>
+    public static List<string> ParseProcCmdline(ReadOnlySpan<byte> raw)
+    {
+        if (raw.Length > 0 && raw[^1] == 0) raw = raw[..^1];
+        return raw.Length == 0 ? [] : [.. System.Text.Encoding.UTF8.GetString(raw).Split('\0')];
+    }
+
+    /// <summary>Рабочая папка процесса (Linux, /proc/&lt;pid&gt;/cwd); null — не узнать: Windows, чужой пользователь, процесса нет.</summary>
+    public static string? WorkingDirectory(int pid)
+    {
+        if (!OperatingSystem.IsLinux()) return null;
+        try
+        {
+            return new DirectoryInfo($"/proc/{pid}/cwd").LinkTarget;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Значение параметра (<c>--dataPath "C:\x y"</c>) из командной строки; null — параметра нет.</summary>
+    public static string? Argument(string commandLine, string name) => Argument(Split(commandLine), name);
+
+    /// <summary>Значение параметра из готового списка аргументов; null — параметра нет.</summary>
+    public static string? Argument(IReadOnlyList<string> args, string name)
+    {
+        for (var i = 0; i < args.Count; i++)
+            if (string.Equals(args[i], name, StringComparison.OrdinalIgnoreCase))
+                return i + 1 < args.Count ? args[i + 1] : "";
         // и в виде --dataPath=C:\x
         return args.FirstOrDefault(a => a.StartsWith(name + "=", StringComparison.OrdinalIgnoreCase))?[(name.Length + 1)..];
     }
+
+    /// <summary>Склеить аргументы в строку, которую <see cref="Split"/> разберёт обратно.</summary>
+    private static string Join(IEnumerable<string> args) =>
+        string.Join(' ', args.Select(a => a.Length > 0 && !a.Any(c => char.IsWhiteSpace(c) || c == '"')
+            ? a
+            : "\"" + a.Replace("\"", "\\\"") + "\""));
 
     /// <summary>Разбор как у Windows: пробелы делят, кавычки склеивают, \" — кавычка внутри.</summary>
     public static List<string> Split(string commandLine)

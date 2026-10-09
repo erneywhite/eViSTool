@@ -1,12 +1,12 @@
+using eViSTool.Core.Game;
 using eViSTool.Core.Server;
 
 namespace eViSTool.Core.Tests;
 
 public sealed class ServerHostTests : IAsyncLifetime
 {
-    // поддельный сервер собирается вместе с тестами (ProjectReference без ссылки на сборку)
-    private static readonly string FakeExe = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
-        "..", "..", "..", "..", "FakeVsServer", "bin", "Debug", "net10.0", "FakeVsServer.exe"));
+    // поддельный сервер: на Windows FakeVsServer.exe, на Linux FakeVsServer.dll — её ServerHost запускает через dotnet
+    private static readonly string FakeExe = FakeServer.ServerFile;
 
     private readonly string _data = Path.Combine(Path.GetTempPath(), "evistool-srv-" + Guid.NewGuid().ToString("N"));
     private ServerHost? _host;
@@ -113,7 +113,9 @@ public sealed class ServerHostTests : IAsyncLifetime
     [Fact]
     public async Task CtrlCStopsServerThatIgnoresStop()
     {
-        if (!Server.ConsoleInterop.HasConsole) return; // без консоли Ctrl+C некуда слать (так бывает только в окне eViSTool)
+        // на Windows — Ctrl+C через общую консоль: без консоли его некуда слать (так бывает только в окне eViSTool);
+        // на Linux — SIGTERM серверу
+        if (OperatingSystem.IsWindows() && !Server.ConsoleInterop.HasConsole) return;
         var host = _host = new ServerHost(new ServerHostOptions
         {
             ExePath = FakeExe, DataPath = _data, StopTimeout = TimeSpan.FromMilliseconds(800),
@@ -123,7 +125,7 @@ public sealed class ServerHostTests : IAsyncLifetime
         await host.SendCommandAsync("/hang");
 
         await host.StopAsync();
-        Assert.Equal(0, host.LastExitCode); // мягкая остановка по Ctrl+C, а не kill
+        Assert.Equal(0, host.LastExitCode); // мягкая остановка по Ctrl+C (SIGTERM), а не kill
         Assert.Contains(host.Console.GetSince(0), l => l.Text.Contains("termination event"));
     }
 
@@ -153,7 +155,7 @@ public sealed class ServerHostTests : IAsyncLifetime
     public async Task BrokenExe_FailsCleanly_AndAFixedOneStartsWithoutANewHost()
     {
         var game = Directory.CreateDirectory(Path.Combine(_data, "game")).FullName;
-        var exe = Path.Combine(game, "VintagestoryServer.exe");
+        var exe = ServerExecutable.PathIn(game); // на Linux — dll: битую сборку ServerHost не отдаёт dotnet, а отказывает сразу
         await File.WriteAllTextAsync(exe, "это не программа");
         var host = Host(o => o with { ExePath = exe });
 
@@ -166,9 +168,7 @@ public sealed class ServerHostTests : IAsyncLifetime
         }
 
         // исправили: на место — настоящий (поддельный) сервер; тот же хост запускает его
-        var fakeBin = Path.GetDirectoryName(FakeExe)!;
-        foreach (var f in Directory.GetFiles(fakeBin)) File.Copy(f, Path.Combine(game, Path.GetFileName(f)), overwrite: true);
-        File.Copy(FakeExe, exe, overwrite: true);
+        Assert.Equal(exe, FakeServer.InstallAs(game));
 
         await host.StartAsync();
         await Until(() => host.State == ServerState.Running);
@@ -181,7 +181,7 @@ public sealed class ServerHostTests : IAsyncLifetime
     [Fact]
     public async Task MissingExe_IsReported_AndNothingIsLeftBusy()
     {
-        var host = Host(o => o with { ExePath = Path.Combine(_data, "нет-такого", "VintagestoryServer.exe") });
+        var host = Host(o => o with { ExePath = ServerExecutable.PathIn(Path.Combine(_data, "нет-такого")) });
 
         for (var attempt = 0; attempt < 2; attempt++)
         {
