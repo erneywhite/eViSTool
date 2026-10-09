@@ -53,10 +53,28 @@ public sealed class LowDiskWatch
     {
         try
         {
-            var root = Path.GetPathRoot(Path.GetFullPath(dir));
+            var full = Path.GetFullPath(dir);
+            // на Linux корень пути всегда «/», а данные часто на своём разделе (/var, /home, отдельный диск)
+            var root = OperatingSystem.IsWindows()
+                ? Path.GetPathRoot(full)
+                : MountPointOf(full, DriveInfo.GetDrives().Select(d => d.RootDirectory.FullName));
             return root is null ? null : new DriveInfo(root).AvailableFreeSpace;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return null; }
+    }
+
+    /// <summary>Раздел, на котором лежит путь: точка монтирования с самым длинным совпадающим началом; null — ни одной.</summary>
+    public static string? MountPointOf(string fullPath, IEnumerable<string> mountPoints) =>
+        mountPoints
+            .Where(m => IsUnder(fullPath, m))
+            .MaxBy(m => Path.TrimEndingDirectorySeparator(m).Length);
+
+    // «/var» — начало «/var/lib», но не «/variable»
+    private static bool IsUnder(string path, string mount)
+    {
+        var m = Path.TrimEndingDirectorySeparator(mount);
+        if (m.Length == 0 || m == "/") return path.StartsWith('/');
+        return path.StartsWith(m, StringComparison.Ordinal) && (path.Length == m.Length || path[m.Length] == '/');
     }
 }
 
@@ -84,9 +102,43 @@ public static partial class SystemMemory
     /// <summary>(занято %, свободно МБ); не узнать — null.</summary>
     public static (int LoadPercent, long FreeMb)? Status()
     {
+        if (OperatingSystem.IsLinux())
+        {
+            try
+            {
+                return FromMeminfo(File.ReadAllText("/proc/meminfo"));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
+        }
         if (!OperatingSystem.IsWindows()) return null;
         var s = new MemoryStatusEx { Length = (uint)Marshal.SizeOf<MemoryStatusEx>() };
         return GlobalMemoryStatusEx(ref s) ? ((int)s.MemoryLoad, (long)(s.AvailPhys / (1024 * 1024))) : null;
+    }
+
+    /// <summary>
+    /// Разбор /proc/meminfo. «Свободно» — MemAvailable: сколько можно отдать программам, не вытесняя их в подкачку
+    /// (кэш файлов сюда входит), — то же, что «доступно» у Windows. Старые ядра (до 3.14) его не пишут — тогда
+    /// MemFree + Buffers + Cached. null — нет MemTotal.
+    /// </summary>
+    public static (int LoadPercent, long FreeMb)? FromMeminfo(string text)
+    {
+        var kb = new Dictionary<string, long>(StringComparer.Ordinal);
+        foreach (var line in text.Split('\n'))
+        {
+            // «MemAvailable:    3238348 kB»
+            var colon = line.IndexOf(':');
+            if (colon <= 0) continue;
+            var value = line[(colon + 1)..].Trim();
+            if (value.EndsWith(" kB", StringComparison.Ordinal)) value = value[..^3].TrimEnd();
+            if (long.TryParse(value, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n))
+                kb[line[..colon]] = n;
+        }
+        if (!kb.TryGetValue("MemTotal", out var total) || total <= 0) return null;
+        var available = kb.TryGetValue("MemAvailable", out var a)
+            ? a
+            : kb.GetValueOrDefault("MemFree") + kb.GetValueOrDefault("Buffers") + kb.GetValueOrDefault("Cached");
+        available = Math.Clamp(available, 0, total);
+        return ((int)((total - available) * 100 / total), available / 1024);
     }
 
     /// <summary>Памяти мало: занято больше 90% или свободно меньше 1 ГБ.</summary>

@@ -219,11 +219,27 @@ public sealed record ConfigSaveRequest(string Text, string ExpectedStamp, bool F
 /// <summary>Conflict — файл на сервере уже другой (ничего не записано), File — каким он стал.</summary>
 public sealed record ConfigSaveResult(bool Conflict, RemoteConfigFile File);
 
-/// <summary>Удаление в Корзину без диалогов: агент работает без окна, и вопрос на экране повесил бы запрос.</summary>
+/// <summary>
+/// Удаление в Корзину без диалогов: агент работает без окна, и вопрос на экране повесил бы запрос. На Linux — корзина
+/// freedesktop.org в домашней папке пользователя (<see cref="Platform.FreedesktopTrash"/>), удалённое так же можно вернуть.
+/// </summary>
 public static class RecycleBin
 {
     public static void Send(string path)
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            try
+            {
+                Platform.FreedesktopTrash.Send(path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                throw new IOException(Loc.T("sched.trashFailed", path, ex.Message), ex);
+            }
+            return;
+        }
+
         var op = new ShFileOpStruct
         {
             wFunc = 3, // FO_DELETE

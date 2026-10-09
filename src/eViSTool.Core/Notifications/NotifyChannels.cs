@@ -1,5 +1,4 @@
-using System.Security.Cryptography;
-using System.Text;
+using eViSTool.Core.Platform;
 using Newtonsoft.Json;
 
 namespace eViSTool.Core.Notifications;
@@ -103,30 +102,16 @@ public static class NotifyChannels
 }
 
 /// <summary>
-/// Секреты оповещений зашифрованы средствами Windows (DPAPI, для текущего пользователя): скопированная или утёкшая папка
-/// данных их не раскроет. На другом компьютере (например, у агента сервера в виртуалке) секрет шифруется заново там.
+/// Секреты оповещений зашифрованы для текущего пользователя (<see cref="SecretProtector"/>: DPAPI на Windows, ключ
+/// пользователя на Linux): скопированная или утёкшая папка данных их не раскроет. На другом компьютере (например, у
+/// агента сервера в виртуалке) секрет шифруется заново там.
 /// </summary>
 public static class NotifySecret
 {
     private static readonly byte[] Entropy = "eViSTool notification secret"u8.ToArray();
 
-    public static string Protect(string secret)
-    {
-        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("DPAPI");
-        return Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(secret), Entropy, DataProtectionScope.CurrentUser));
-    }
+    public static string Protect(string secret) => SecretProtector.Protect(secret, Entropy);
 
     /// <summary>null — не расшифровать (другой пользователь или компьютер) или пусто.</summary>
-    public static string? Unprotect(string? stored)
-    {
-        if (string.IsNullOrWhiteSpace(stored) || !OperatingSystem.IsWindows()) return null;
-        try
-        {
-            return Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(stored), Entropy, DataProtectionScope.CurrentUser));
-        }
-        catch (Exception ex) when (ex is CryptographicException or FormatException)
-        {
-            return null;
-        }
-    }
+    public static string? Unprotect(string? stored) => SecretProtector.Unprotect(stored, Entropy);
 }
