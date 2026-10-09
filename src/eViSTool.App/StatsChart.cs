@@ -264,7 +264,7 @@ public sealed class StatsChart : FrameworkElement
 
     private static IEnumerable<(DateTime, string)> TimeLabels(StatsReport r)
     {
-        var c = CultureInfo.CurrentUICulture;
+        var c = Loc.Culture;
         switch (r.Period)
         {
             case StatsPeriod.Day:
@@ -284,12 +284,12 @@ public sealed class StatsChart : FrameworkElement
 
     private static string TimeRange(DateTime t, TimeSpan step)
     {
-        var c = CultureInfo.CurrentUICulture;
+        var c = Loc.Culture;
         return $"{t.ToString("ddd dd.MM, HH:mm", c)}–{(t + step).ToString("HH:mm", c)}";
     }
 
     private FormattedText Format(string text, Brush brush, double size) =>
-        new(text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+        new(text, Loc.Culture, FlowDirection.LeftToRight,
             new Typeface(TextElementFont(), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal), size, brush,
             VisualTreeHelper.GetDpi(this).PixelsPerDip);
 

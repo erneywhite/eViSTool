@@ -159,7 +159,7 @@ public sealed partial class ServerStatsViewModel : ObservableObject
         }
         Report = r;
         HasData = r?.HasData ?? false;
-        var c = CultureInfo.CurrentUICulture;
+        var c = Loc.Culture;
         TotalPlayedText = r is null ? "—" : Duration(r.TotalPlayed);
         PeakText = r is { PeakAt: not null } ? r.PeakPlayers.ToString(c) : "—";
         PeakAtText = r?.PeakAt is { } at ? When(at) : "";
@@ -203,9 +203,9 @@ public sealed partial class ServerStatsViewModel : ObservableObject
     /// <summary>«сегодня, 21:14», «вчера, 23:48», «чт 08.10, 21:14».</summary>
     public static string When(DateTime t)
     {
-        var time = t.ToString("HH:mm", CultureInfo.CurrentUICulture);
+        var time = t.ToString("HH:mm", Loc.Culture);
         if (t.Date == DateTime.Today) return Loc.T("stats.today", time);
         if (t.Date == DateTime.Today.AddDays(-1)) return Loc.T("stats.yesterday", time);
-        return t.ToString("ddd dd.MM, ", CultureInfo.CurrentUICulture) + time;
+        return t.ToString("ddd dd.MM, ", Loc.Culture) + time;
     }
 }

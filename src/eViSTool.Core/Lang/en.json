@@ -1358,7 +1358,7 @@
   "scan.readFailed": "Could not read: {0}",
   "sched.announce": "Announce a finished backup in chat",
   "sched.announceHint": "Players see the file name, size and time of the backup.",
-  "sched.backupsHint": "The server itself makes the copy (the /genbackup command) and puts it into the Backups folder of the profile as “profile-time.vcdbs”. The schedule is run by the eViSTool agent — it works with this window closed too.",
+  "sched.backupsHint": "The server itself makes the copy (the /genbackup command) and puts it into the Backups folder of the profile as “profile-time.vcdbs”; if a backup folder is chosen below, the copy is then moved there. The schedule is run by the eViSTool agent, so it works with this window closed too.",
   "sched.backupsTitle": "World backups",
   "sched.delete": "Delete",
   "sched.deleteAsk": "Move the backup «{0}» to the Recycle Bin?",

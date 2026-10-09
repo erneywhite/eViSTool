@@ -44,6 +44,7 @@ public sealed record ServerNotifySettings
     /// <summary>В тот же канал — кто зашёл и вышел.</summary>
     public bool ChatJoins { get; init; } = true;
 
+    [JsonIgnore]
     public NotifyChannel? ChatChannel => ChatChannelId is { } id ? Channels.FirstOrDefault(c => c.Id == id && c.Kind == NotifyKind.Discord) : null;
 
     public IEnumerable<NotifyChannel> ChannelsFor(NotifyEvent e) =>

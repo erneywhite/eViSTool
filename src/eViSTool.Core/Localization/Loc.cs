@@ -24,6 +24,9 @@ public sealed class Loc : INotifyPropertyChanged
 
     public string Language { get; private set; } = DefaultLanguage;
 
+    /// <summary>Культура языка eViSTool (не системы): названия дней и месяцев в интерфейсе — на том же языке, что и текст.</summary>
+    public static CultureInfo Culture => CultureInfo.GetCultureInfo(Instance.Language);
+
     private Loc()
     {
         _fallback = Load(DefaultLanguage);
