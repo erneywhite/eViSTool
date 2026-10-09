@@ -24,7 +24,10 @@ public sealed class AppUpdaterTests : IDisposable
 
     private static ModVersion V(string text) => ModVersion.ParseOrNull(text)!;
 
-    private const string Releases = """
+    // архивы — под эту систему: на Linux программа ищет «…-linux-x64.tar.gz»
+    private static string Releases => ReleasesJson.Replace("-win-x64.zip", AppUpdater.AssetSuffix);
+
+    private const string ReleasesJson = """
     [
       { "tag_name": "v0.2.0", "draft": true, "prerelease": false, "assets": [ { "name": "eViSTool-0.2.0-win-x64.zip", "browser_download_url": "u", "digest": "sha256:AA" } ] },
       { "tag_name": "v0.1.0", "prerelease": false, "html_url": "https://github.com/x/releases/v0.1.0", "body": "notes",
@@ -80,6 +83,7 @@ public sealed class AppUpdaterTests : IDisposable
     [Fact]
     public void Install_SwapsFiles_KeepsData_AndLeavesOldForCleanup()
     {
+        if (!OperatingSystem.IsWindows()) return; // zip с eViSTool.exe — архив для Windows; для Linux — tar.gz (ниже)
         AppUpdater.Install(Zip(new() { ["eViSTool.exe"] = "new app", ["eViSTool.Agent.exe"] = "new agent", ["README.md"] = "readme" }), _app);
 
         Assert.Equal("new app", File.ReadAllText(Path.Combine(_app, "eViSTool.exe")));
@@ -96,6 +100,7 @@ public sealed class AppUpdaterTests : IDisposable
     [Fact]
     public void Install_AcceptsArchiveWithAFolderInside()
     {
+        if (!OperatingSystem.IsWindows()) return; // zip с eViSTool.exe — архив для Windows
         AppUpdater.Install(Zip(new() { ["eViSTool-0.2.0/eViSTool.exe"] = "new app" }), _app);
         Assert.Equal("new app", File.ReadAllText(Path.Combine(_app, "eViSTool.exe")));
         Assert.Equal("old agent", File.ReadAllText(Path.Combine(_app, "eViSTool.Agent.exe")));
@@ -104,6 +109,7 @@ public sealed class AppUpdaterTests : IDisposable
     [Fact]
     public void Install_RefusesForeignArchive_AndRollsBackOnFailure()
     {
+        if (!OperatingSystem.IsWindows()) return; // zip с eViSTool.exe — архив для Windows
         Assert.Throws<InvalidOperationException>(() => AppUpdater.Install(Zip(new() { ["other.exe"] = "x" }), _app));
         Assert.Equal("old app", File.ReadAllText(Path.Combine(_app, "eViSTool.exe")));
 
@@ -115,6 +121,41 @@ public sealed class AppUpdaterTests : IDisposable
         Assert.Equal("old agent", File.ReadAllText(Path.Combine(_app, "eViSTool.Agent.exe")));
         Assert.Empty(Directory.GetFiles(_app, "*.old"));
         Assert.False(Directory.Exists(Path.Combine(_app, ".update")));
+    }
+
+    private string TarGz(params (string Name, string Content, UnixFileMode Mode)[] files)
+    {
+        var path = Path.Combine(_root, Guid.NewGuid().ToString("N") + ".tar.gz");
+        using (var gz = new GZipStream(File.Create(path), CompressionLevel.Fastest))
+        using (var tar = new System.Formats.Tar.TarWriter(gz, System.Formats.Tar.TarEntryFormat.Ustar))
+            foreach (var (name, content, mode) in files)
+                tar.WriteEntry(new System.Formats.Tar.UstarTarEntry(System.Formats.Tar.TarEntryType.RegularFile, name)
+                {
+                    Mode = mode,
+                    DataStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content)),
+                });
+        return path;
+    }
+
+    [Fact]
+    public void Install_FromTarGz_KeepsTheExecutableBit()
+    {
+        // архив для Linux: права файлов приходят из него, агент остаётся исполняемым
+        const UnixFileMode exec = (UnixFileMode)0b111_101_101, plain = (UnixFileMode)0b110_100_100; // 0755 и 0644
+        AppUpdater.Install(TarGz((AppUpdater.MainExe, "new main", exec), ("README.md", "readme", plain)), _app);
+
+        Assert.Equal("new main", File.ReadAllText(Path.Combine(_app, AppUpdater.MainExe)));
+        Assert.Equal("readme", File.ReadAllText(Path.Combine(_app, "README.md")));
+        Assert.Equal("my settings", File.ReadAllText(Path.Combine(_app, "data", "settings.json")));
+        Assert.False(Directory.Exists(Path.Combine(_app, ".update")));
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Equal(exec, File.GetUnixFileMode(Path.Combine(_app, AppUpdater.MainExe)) & exec);
+            Assert.False(File.GetUnixFileMode(Path.Combine(_app, "README.md")).HasFlag(UnixFileMode.UserExecute));
+        }
+
+        // чужой tar.gz не ставится
+        Assert.Throws<InvalidOperationException>(() => AppUpdater.Install(TarGz(("other", "x", exec)), _app));
     }
 
     private sealed class FakeHandler(byte[] body) : HttpMessageHandler
@@ -165,8 +206,8 @@ public sealed class AppUpdaterTests : IDisposable
         var alpha = list[0];
         Assert.True(alpha.Prerelease);
         Assert.False(list[1].Prerelease);
-        Assert.Equal("eViSTool-0.1.0-alpha.9-win-x64.zip", alpha.AssetName);
-        Assert.Equal("https://github.com/erneywhite/eViSTool/releases/download/v0.1.0-alpha.9/eViSTool-0.1.0-alpha.9-win-x64.zip", alpha.AssetUrl);
+        Assert.Equal($"eViSTool-0.1.0-alpha.9{AppUpdater.AssetSuffix}", alpha.AssetName);
+        Assert.Equal($"https://github.com/erneywhite/eViSTool/releases/download/v0.1.0-alpha.9/eViSTool-0.1.0-alpha.9{AppUpdater.AssetSuffix}", alpha.AssetUrl);
         Assert.Equal(alpha.AssetUrl + ".sha256", alpha.ChecksumUrl);
         Assert.Null(alpha.Sha256);
     }

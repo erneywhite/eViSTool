@@ -4,7 +4,9 @@ namespace eViSTool.Core.Server;
 public static class AgentProtocol
 {
     public const string KeyHeader = "X-eViSTool-Key";
-    public const string ExeName = "eViSTool.Agent.exe";
+
+    /// <summary>Файл агента: на Linux исполняемые файлы без расширения.</summary>
+    public static string ExeName { get; } = OperatingSystem.IsWindows() ? "eViSTool.Agent.exe" : "eViSTool.Agent";
 
     public static string DefaultAgentsDir => Path.Combine(AppPaths.Root, "agents");
 
@@ -37,6 +39,8 @@ public static class AgentProtocol
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var key = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24)).ToLowerInvariant();
         File.WriteAllText(path, key);
+        // на Linux ключ — только владельцу (rw-------): с ним любой пользователь машины управлял бы сервером через агента
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
         return key;
     }
 }
