@@ -29,21 +29,34 @@ public sealed class NotifierTests
             throw new HttpRequestException("No such host: " + request.RequestUri);
     }
 
+    private static NotifyMessage Msg(string title = "t") => new(NotifySeverity.Info, null, title, []);
+
     private static NotifyChannel Telegram(string? chat = "42") => new()
     {
         Name = "tg", Kind = NotifyKind.Telegram, SecretProtected = NotifySecret.Protect(Token), ChatId = chat,
     };
 
     [Fact]
-    public async Task Telegram_SendsPlainTextToTheChat()
+    public async Task Telegram_ServerEventDetails_ColoredAndBold()
     {
         var fake = new Fake(HttpStatusCode.OK, """{ "ok": true, "result": {} }""");
-        await new Notifier(new HttpClient(fake)).SendAsync(Telegram(), new NotifyMessage("Server crashed", "mod_x*1.0"));
+        var message = new NotifyMessage(NotifySeverity.Problem, "Survival", "Server crashed",
+            [new NotifyLine("🧩", "mod_x*1.0 <beta> & co"), new NotifyLine("🔁", "again in 9 s")]);
+        await new Notifier(new HttpClient(fake)).SendAsync(Telegram(), message);
 
         Assert.Equal($"https://api.telegram.org/bot{Token}/sendMessage", fake.Url);
         Assert.Equal("42", fake.Sent!.Value<string>("chat_id"));
-        Assert.Equal("Server crashed\nmod_x*1.0", fake.Sent.Value<string>("text"));
-        Assert.Null(fake.Sent["parse_mode"]); // без разметки: * и _ в именах модов не ломают сообщение
+        Assert.Equal("HTML", fake.Sent.Value<string>("parse_mode"));
+        // * и _ остаются как есть, а < > & экранированы — разметку не ломают
+        Assert.Equal("🔴 <b>Survival</b>\n<b>Server crashed</b>\n🧩 mod_x*1.0 &lt;beta&gt; &amp; co\n🔁 again in 9 s",
+            fake.Sent.Value<string>("text"));
+    }
+
+    [Fact]
+    public void WithoutServer_TheDotGoesToTheTitle()
+    {
+        Assert.Equal("🔵 <b>Test</b>\n💻 from PC", Notifier.TelegramHtml(new NotifyMessage(NotifySeverity.Info, null, "Test", [new NotifyLine("💻", "from PC")])));
+        Assert.Equal("🟢 Survival\nServer started", new NotifyMessage(NotifySeverity.Good, "Survival", "Server started", []).ToPlainText());
     }
 
     [Theory]
@@ -52,7 +65,7 @@ public sealed class NotifierTests
     public async Task Telegram_Errors_AreExplained_WithoutTheToken(HttpStatusCode code, string body)
     {
         var ex = await Assert.ThrowsAsync<NotifyException>(() =>
-            new Notifier(new HttpClient(new Fake(code, body))).SendAsync(Telegram(), new NotifyMessage("t", "x")));
+            new Notifier(new HttpClient(new Fake(code, body))).SendAsync(Telegram(), Msg()));
 
         Assert.DoesNotContain(Token, ex.Message);
         Assert.DoesNotContain("AAHdqTcv", ex.Message);
@@ -62,7 +75,7 @@ public sealed class NotifierTests
     public async Task Telegram_NetworkError_DoesNotLeakTheTokenFromTheUrl()
     {
         var ex = await Assert.ThrowsAsync<NotifyException>(() =>
-            new Notifier(new HttpClient(new Down())).SendAsync(Telegram(), new NotifyMessage("t", "x")));
+            new Notifier(new HttpClient(new Down())).SendAsync(Telegram(), Msg()));
 
         Assert.DoesNotContain("AAHdqTcv", ex.Message);
         Assert.Contains("api.telegram.org", ex.Message);
@@ -72,7 +85,7 @@ public sealed class NotifierTests
     public async Task Telegram_NoChat_IsRefusedBeforeSending()
     {
         var fake = new Fake(HttpStatusCode.OK, """{ "ok": true }""");
-        await Assert.ThrowsAsync<NotifyException>(() => new Notifier(new HttpClient(fake)).SendAsync(Telegram(chat: null), new NotifyMessage("t", "x")));
+        await Assert.ThrowsAsync<NotifyException>(() => new Notifier(new HttpClient(fake)).SendAsync(Telegram(chat: null), Msg()));
         Assert.Null(fake.Url);
     }
 
@@ -114,7 +127,7 @@ public sealed class NotifierTests
         Assert.Equal(7, chats[1].TopicId);
         Assert.Null(chats[2].TopicId);
 
-        await notifier.SendAsync(Telegram("-100333") with { TopicId = 7 }, new NotifyMessage("t", "x"));
+        await notifier.SendAsync(Telegram("-100333") with { TopicId = 7 }, Msg());
         Assert.Equal(7, fake.Sent!.Value<long>("message_thread_id"));
     }
 

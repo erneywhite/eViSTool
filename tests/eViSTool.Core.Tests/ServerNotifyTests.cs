@@ -42,21 +42,22 @@ public sealed class ServerNotifyTests
         var http = new Recorder();
         var notifier = new ServerNotifier(Settings, new HttpClient(http), (_, _) => { });
 
-        notifier.Notify(NotifyEvent.PlayerJoined, "Anna joined", "Online: 1");
-        notifier.Notify(NotifyEvent.ServerStopped, "server stopped", ""); // ни в один канал не включено
+        notifier.Notify(NotifyEvent.PlayerJoined, "Anna joined", new NotifyLine("👥", "Online: 1"));
+        notifier.Notify(NotifyEvent.ServerStopped, "Server stopped"); // ни в один канал не включено
         for (var i = 0; i < 50 && http.Urls.Count < 1; i++) await Task.Delay(20);
         await Task.Delay(100);
 
         Assert.Single(http.Urls);
         Assert.Contains(TokenB, http.Urls[0]);
-        Assert.Contains("Survival: Anna joined", http.Bodies[0]);
+        var text = Newtonsoft.Json.Linq.JObject.Parse(http.Bodies[0]).Value<string>("text");
+        Assert.Equal("⚪ <b>Survival</b>\n<b>Anna joined</b>\n👥 Online: 1", text);
     }
 
     [Fact]
     public async Task Test_GoesToEveryChannelInUse()
     {
         var http = new Recorder();
-        var errors = await new ServerNotifier(Settings, new HttpClient(http), (_, _) => { }).TestAsync("t", "x");
+        var errors = await new ServerNotifier(Settings, new HttpClient(http), (_, _) => { }).TestAsync("t");
 
         Assert.Empty(errors);
         Assert.Equal(2, http.Urls.Count);
@@ -68,7 +69,7 @@ public sealed class ServerNotifyTests
         var reported = new List<string>();
         var broken = Settings() with { Channels = [Channel("a", TokenA) with { ChatId = null }] };
         var errors = await new ServerNotifier(() => broken, new HttpClient(new Recorder()), (name, error) => reported.Add(name + ": " + error))
-            .TestAsync("t", "x");
+            .TestAsync("t");
 
         Assert.Single(errors);
         Assert.Single(reported);

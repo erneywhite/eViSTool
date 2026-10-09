@@ -33,8 +33,33 @@ public sealed record NotifyChannel
     [JsonIgnore] public bool HasSecret => !string.IsNullOrEmpty(SecretProtected);
 }
 
-/// <summary>Сообщение оповещения: заголовок (что случилось) и подробности.</summary>
-public sealed record NotifyMessage(string Title, string Text);
+/// <summary>Насколько это важно — цвет оповещения: кружок в Telegram, полоса в Discord, приоритет в ntfy.</summary>
+public enum NotifySeverity { Problem, Warning, Info, Good, Neutral }
+
+/// <summary>Строка подробностей: значок (эмодзи, может быть пустым) и текст.</summary>
+public sealed record NotifyLine(string Icon, string Text);
+
+/// <summary>
+/// Оповещение: цвет, сервер (если есть), что случилось и строки подробностей. Каждый канал показывает их по-своему;
+/// в Telegram — «🔴 Survival» / «Сервер упал» жирным / подробности со значками.
+/// </summary>
+public sealed record NotifyMessage(NotifySeverity Severity, string? Server, string Title, IReadOnlyList<NotifyLine> Details)
+{
+    public string Dot => Severity switch
+    {
+        NotifySeverity.Problem => "🔴",
+        NotifySeverity.Warning => "🟡",
+        NotifySeverity.Info => "🔵",
+        NotifySeverity.Good => "🟢",
+        _ => "⚪",
+    };
+
+    /// <summary>Простым текстом — для каналов без разметки.</summary>
+    public string ToPlainText() => string.Join("\n",
+        new[] { string.IsNullOrWhiteSpace(Server) ? null : $"{Dot} {Server}", string.IsNullOrWhiteSpace(Server) ? $"{Dot} {Title}" : Title }
+            .Where(s => s is not null)
+            .Concat(Details.Select(d => d.Icon.Length > 0 ? $"{d.Icon} {d.Text}" : d.Text)));
+}
 
 /// <summary>Каналы оповещений этого компьютера — файл в папке данных программы.</summary>
 public static class NotifyChannels

@@ -24,11 +24,12 @@ public sealed class Notifier(HttpClient http)
         {
             case NotifyKind.Telegram:
                 if (string.IsNullOrWhiteSpace(channel.ChatId)) throw new NotifyException(Loc.T("notify.tgNoChat"));
-                // без разметки: в именах модов и игроков бывают * и _, которые Markdown понял бы по-своему
+                // разметка HTML (а не Markdown): в именах модов и игроков бывают * и _, а в HTML экранировать надо только < > &
                 var body = new JObject
                 {
                     ["chat_id"] = channel.ChatId,
-                    ["text"] = message.Title + "\n" + message.Text,
+                    ["text"] = TelegramHtml(message),
+                    ["parse_mode"] = "HTML",
                     ["disable_web_page_preview"] = true,
                 };
                 if (channel.TopicId is { } topic) body["message_thread_id"] = topic; // тема форума
@@ -37,6 +38,21 @@ public sealed class Notifier(HttpClient http)
             default:
                 throw new NotifyException(Loc.T("notify.kindLater"));
         }
+    }
+
+    /// <summary>«🔴 <b>Survival</b>» / «<b>Сервер упал</b>» / «🧩 Похоже, виноват мод…»; без сервера — кружок у события.</summary>
+    public static string TelegramHtml(NotifyMessage m)
+    {
+        static string E(string s) => System.Net.WebUtility.HtmlEncode(s);
+        var lines = new List<string>();
+        if (string.IsNullOrWhiteSpace(m.Server)) lines.Add($"{m.Dot} <b>{E(m.Title)}</b>");
+        else
+        {
+            lines.Add($"{m.Dot} <b>{E(m.Server)}</b>");
+            lines.Add($"<b>{E(m.Title)}</b>");
+        }
+        lines.AddRange(m.Details.Select(d => d.Icon.Length > 0 ? $"{d.Icon} {E(d.Text)}" : E(d.Text)));
+        return string.Join("\n", lines);
     }
 
     /// <summary>

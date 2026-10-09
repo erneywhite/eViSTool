@@ -108,25 +108,33 @@ public sealed record ServerNotifyUpload
 /// </summary>
 public sealed class ServerNotifier(Func<ServerNotifySettings> settings, HttpClient http, Action<string, string> report)
 {
+    /// <summary>Цвет события: проблемы — красные, «скоро перезапуск» — жёлтый, моды — синие, запуск — зелёный.</summary>
+    public static NotifySeverity SeverityOf(NotifyEvent e) => e switch
+    {
+        NotifyEvent.ServerCrashed or NotifyEvent.StartFailed or NotifyEvent.BackupFailed => NotifySeverity.Problem,
+        NotifyEvent.RestartSoon => NotifySeverity.Warning,
+        NotifyEvent.ModsUpdated => NotifySeverity.Info,
+        NotifyEvent.ServerStarted => NotifySeverity.Good,
+        _ => NotifySeverity.Neutral,
+    };
+
     /// <summary>Сообщить о событии; ничего не ждёт.</summary>
-    public void Notify(NotifyEvent e, string title, string text) => _ = SendAsync(settings().ChannelsFor(e).ToList(), title, text);
+    public void Notify(NotifyEvent e, string title, params NotifyLine[] details) =>
+        _ = SendAsync(settings().ChannelsFor(e).ToList(), SeverityOf(e), title, details);
 
     /// <summary>Проверочное во все каналы, включённые хоть для одного события.</summary>
-    public Task<IReadOnlyList<string>> TestAsync(string title, string text)
+    public Task<IReadOnlyList<string>> TestAsync(string title, params NotifyLine[] details)
     {
         var s = settings();
         var ids = s.Routes.Values.SelectMany(v => v).ToHashSet();
-        return SendAsync([.. s.Channels.Where(c => ids.Contains(c.Id))], title, text);
+        return SendAsync([.. s.Channels.Where(c => ids.Contains(c.Id))], NotifySeverity.Info, title, details);
     }
 
-    private static string Capitalize(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
-
     /// <summary>Возвращает ошибки по каналам («Telegram: …»); пусто — всё ушло.</summary>
-    private async Task<IReadOnlyList<string>> SendAsync(IReadOnlyList<NotifyChannel> channels, string title, string text)
+    private async Task<IReadOnlyList<string>> SendAsync(IReadOnlyList<NotifyChannel> channels, NotifySeverity severity, string title,
+        IReadOnlyList<NotifyLine> details)
     {
-        // «Survival: сервер упал»; без имени — «Сервер упал»
-        var name = settings().ServerName;
-        var message = new NotifyMessage(string.IsNullOrWhiteSpace(name) ? Capitalize(title) : $"{name}: {title}", text);
+        var message = new NotifyMessage(severity, settings().ServerName, title, details);
         var errors = new List<string>();
         foreach (var channel in channels)
         {

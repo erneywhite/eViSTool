@@ -114,7 +114,8 @@ public sealed partial class NotifyChannelsViewModel : ObservableObject
         }
     }
 
-    internal static NotifyMessage TestMessage() => new(Loc.T("notify.testTitle"), Loc.T("notify.testText", Environment.MachineName));
+    internal static NotifyMessage TestMessage() =>
+        new(NotifySeverity.Info, null, Loc.T("notify.testTitle"), [new NotifyLine("💻", Loc.T("notify.testText", Environment.MachineName))]);
 
     private void Show(string text, bool error)
     {
