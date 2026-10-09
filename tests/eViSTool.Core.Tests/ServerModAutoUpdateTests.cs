@@ -12,8 +12,6 @@ namespace eViSTool.Core.Tests;
 /// <summary>Обновление модов сервера перед перезапуском по расписанию — против поддельной модбазы.</summary>
 public sealed class ServerModAutoUpdateTests : IDisposable
 {
-    private static readonly string Root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
-    private static readonly string FakeBin = Path.Combine(Root, "tests", "FakeVsServer", "bin", "Debug", "net10.0");
 
     private readonly string _root = Path.Combine(Path.GetTempPath(), "evistool-autoupd-" + Guid.NewGuid().ToString("N"));
     private readonly string _game;
@@ -23,13 +21,9 @@ public sealed class ServerModAutoUpdateTests : IDisposable
 
     public ServerModAutoUpdateTests()
     {
-        // «папка игры» — поддельный сервер: версия игры берётся из его exe (на Linux у сервера VintagestoryServer.dll,
-        // запускатель без расширения версии не несёт)
+        // «папка игры» — поддельный сервер под именем настоящего: версия игры берётся из его файла
         _game = Directory.CreateDirectory(Path.Combine(_root, "game")).FullName;
-        if (OperatingSystem.IsWindows())
-            File.Copy(Path.Combine(FakeBin, "FakeVsServer.exe"), Path.Combine(_game, "VintagestoryServer.exe"));
-        else
-            File.Copy(Path.Combine(FakeBin, "FakeVsServer.dll"), Path.Combine(_game, "VintagestoryServer.dll"));
+        FakeServer.InstallAs(_game);
         var game = GameInstall.DetectVersion(_game)!;
         _branch = $"{game.Major}.{game.Minor}";
         _data = Directory.CreateDirectory(Path.Combine(_root, "data")).FullName;

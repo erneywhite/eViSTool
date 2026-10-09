@@ -12,7 +12,6 @@ public sealed class AgentTests : IAsyncLifetime
     // EVISTOOL_TEST_AGENT — проверить те же сценарии на релизном (обрезанном) агенте из build/publish.ps1
     private static readonly string AgentExe = Environment.GetEnvironmentVariable("EVISTOOL_TEST_AGENT")
         ?? Path.Combine(Root, "src", "eViSTool.Agent", "bin", "Debug", "net10.0", AgentProtocol.ExeName); // на Linux — без .exe
-    private static readonly string FakeBin = Path.Combine(Root, "tests", "FakeVsServer", "bin", "Debug", "net10.0");
 
     private readonly string _tmp = Path.Combine(Path.GetTempPath(), "evistool-agent-" + Guid.NewGuid().ToString("N"));
     private string AgentsDir => Path.Combine(_tmp, "agents");
@@ -21,10 +20,9 @@ public sealed class AgentTests : IAsyncLifetime
 
     public Task InitializeAsync()
     {
-        // «папка игры»: поддельный сервер под именем VintagestoryServer.exe (apphost сам найдёт FakeVsServer.dll)
+        // «папка игры»: поддельный сервер под именем настоящего (на Windows — exe, на Linux — dll через dotnet)
         var game = Directory.CreateDirectory(Path.Combine(_tmp, "game")).FullName;
-        foreach (var f in Directory.GetFiles(FakeBin)) File.Copy(f, Path.Combine(game, Path.GetFileName(f)));
-        File.Copy(Path.Combine(FakeBin, "FakeVsServer.exe"), Path.Combine(game, "VintagestoryServer.exe"));
+        FakeServer.InstallAs(game);
         var data = Directory.CreateDirectory(Path.Combine(_tmp, "data")).FullName;
         _profile = new GameProfile { Name = "Тест мир", Kind = ProfileKind.Server, GameDir = game, DataDir = data };
         return Task.CompletedTask;
