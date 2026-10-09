@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:eViSTool.App"
         Title="{local:Tr notify.windowTitle}" Icon="Assets/eViSTool.ico"
-        Width="520" SizeToContent="Height" ResizeMode="NoResize" Background="{StaticResource Forest.Base}"
+        Width="560" SizeToContent="Height" ResizeMode="NoResize" Background="{StaticResource Forest.Base}"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <Window.Resources>
         <Style x:Key="Label" TargetType="TextBlock">
@@ -25,32 +25,78 @@
         <!-- тип канала, как в Uptime Kuma: поля ниже — под выбранный тип -->
         <TextBlock Text="{local:Tr notify.kind}" Style="{StaticResource Label}" />
         <ComboBox x:Name="KindBox" Style="{StaticResource Forest.ComboBox}" Margin="0,6,0,0" DisplayMemberPath="Title"
+                  SelectionChanged="KindBox_SelectionChanged"
                   AutomationProperties.AutomationId="NotifyKind" AutomationProperties.Name="{local:Tr notify.kind}" />
-        <TextBlock Text="{local:Tr notify.tgIntro}" Style="{StaticResource Hint}" FontSize="12" Margin="0,8,0,0" />
+        <TextBlock x:Name="IntroText" Style="{StaticResource Hint}" FontSize="12" Margin="0,8,0,0" />
 
         <TextBlock Text="{local:Tr notify.name}" Style="{StaticResource Label}" />
         <TextBox x:Name="NameBox" Margin="0,6,0,0" MaxLength="60" AutomationProperties.AutomationId="NotifyName"
                  AutomationProperties.Name="{local:Tr notify.name}" />
 
-        <TextBlock Text="{local:Tr notify.tgToken}" Style="{StaticResource Label}" />
-        <TextBlock x:Name="TokenHint" Text="{local:Tr notify.tgTokenHint}" Style="{StaticResource Hint}" />
-        <PasswordBox x:Name="TokenBox" Padding="8,6" PasswordChanged="TokenBox_PasswordChanged"
-                     AutomationProperties.AutomationId="NotifyToken" AutomationProperties.Name="{local:Tr notify.tgToken}" />
+        <!-- ===== Telegram ===== -->
+        <StackPanel x:Name="TelegramPanel">
+            <TextBlock Text="{local:Tr notify.tgToken}" Style="{StaticResource Label}" />
+            <TextBlock x:Name="TokenHint" Text="{local:Tr notify.tgTokenHint}" Style="{StaticResource Hint}" />
+            <PasswordBox x:Name="TokenBox" Padding="8,6" PasswordChanged="Secret_Changed"
+                         AutomationProperties.AutomationId="NotifyToken" AutomationProperties.Name="{local:Tr notify.tgToken}" />
 
-        <TextBlock Text="{local:Tr notify.tgChat}" Style="{StaticResource Label}" />
-        <TextBlock Text="{local:Tr notify.tgChatHint}" Style="{StaticResource Hint}" />
-        <DockPanel>
-            <Button x:Name="FindButton" DockPanel.Dock="Right" Content="{local:Tr notify.tgFind}" Click="Find_Click" Margin="8,0,0,0" Padding="12,6"
-                    AutomationProperties.AutomationId="NotifyFindChat" />
-            <ComboBox x:Name="ChatBox" IsEditable="True" Style="{StaticResource Forest.ComboBox}" DisplayMemberPath="Title"
-                      SelectionChanged="ChatBox_SelectionChanged"
-                      AutomationProperties.AutomationId="NotifyChat" AutomationProperties.Name="{local:Tr notify.tgChat}" />
-        </DockPanel>
+            <TextBlock Text="{local:Tr notify.tgChat}" Style="{StaticResource Label}" />
+            <TextBlock Text="{local:Tr notify.tgChatHint}" Style="{StaticResource Hint}" />
+            <DockPanel>
+                <Button x:Name="FindButton" DockPanel.Dock="Right" Content="{local:Tr notify.tgFind}" Click="Find_Click" Margin="8,0,0,0" Padding="12,6"
+                        AutomationProperties.AutomationId="NotifyFindChat" />
+                <ComboBox x:Name="ChatBox" IsEditable="True" Style="{StaticResource Forest.ComboBox}" DisplayMemberPath="Title"
+                          SelectionChanged="ChatBox_SelectionChanged"
+                          AutomationProperties.AutomationId="NotifyChat" AutomationProperties.Name="{local:Tr notify.tgChat}" />
+            </DockPanel>
 
-        <TextBlock Text="{local:Tr notify.tgTopic}" Style="{StaticResource Label}" />
-        <TextBlock Text="{local:Tr notify.tgTopicHint}" Style="{StaticResource Hint}" />
-        <TextBox x:Name="TopicBox" Width="160" HorizontalAlignment="Left" MaxLength="12"
-                 AutomationProperties.AutomationId="NotifyTopic" AutomationProperties.Name="{local:Tr notify.tgTopic}" />
+            <TextBlock Text="{local:Tr notify.tgTopic}" Style="{StaticResource Label}" />
+            <TextBlock Text="{local:Tr notify.tgTopicHint}" Style="{StaticResource Hint}" />
+            <TextBox x:Name="TopicBox" Width="160" HorizontalAlignment="Left" MaxLength="12"
+                     AutomationProperties.AutomationId="NotifyTopic" AutomationProperties.Name="{local:Tr notify.tgTopic}" />
+        </StackPanel>
+
+        <!-- ===== Discord ===== -->
+        <StackPanel x:Name="DiscordPanel" Visibility="Collapsed">
+            <TextBlock Text="{local:Tr notify.dcUrl}" Style="{StaticResource Label}" />
+            <TextBlock x:Name="DiscordHint" Text="{local:Tr notify.dcUrlHint}" Style="{StaticResource Hint}" />
+            <PasswordBox x:Name="DiscordBox" Padding="8,6" PasswordChanged="Secret_Changed"
+                         AutomationProperties.AutomationId="NotifyDiscordUrl" AutomationProperties.Name="{local:Tr notify.dcUrl}" />
+        </StackPanel>
+
+        <!-- ===== ntfy ===== -->
+        <StackPanel x:Name="NtfyPanel" Visibility="Collapsed">
+            <TextBlock Text="{local:Tr notify.ntfyTopic}" Style="{StaticResource Label}" />
+            <TextBlock Text="{local:Tr notify.ntfyTopicHint}" Style="{StaticResource Hint}" />
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="{local:Tr notify.ntfyNewTopic}" Click="NewTopic_Click" Margin="8,0,0,0" Padding="12,6"
+                        AutomationProperties.AutomationId="NotifyNtfyNewTopic" />
+                <TextBox x:Name="NtfyTopicBox" FontFamily="Consolas" MaxLength="64" VerticalContentAlignment="Center"
+                         AutomationProperties.AutomationId="NotifyNtfyTopic" AutomationProperties.Name="{local:Tr notify.ntfyTopic}" />
+            </DockPanel>
+
+            <TextBlock Text="{local:Tr notify.ntfyServer}" Style="{StaticResource Label}" />
+            <TextBlock Text="{local:Tr notify.ntfyServerHint}" Style="{StaticResource Hint}" />
+            <TextBox x:Name="NtfyServerBox" MaxLength="200" AutomationProperties.AutomationId="NotifyNtfyServer"
+                     AutomationProperties.Name="{local:Tr notify.ntfyServer}" />
+        </StackPanel>
+
+        <!-- ===== свой вебхук ===== -->
+        <StackPanel x:Name="WebhookPanel" Visibility="Collapsed">
+            <TextBlock Text="{local:Tr notify.whUrl}" Style="{StaticResource Label}" />
+            <TextBlock x:Name="WebhookHint" Text="{local:Tr notify.whUrlHint}" Style="{StaticResource Hint}" />
+            <PasswordBox x:Name="WebhookBox" Padding="8,6" PasswordChanged="Secret_Changed"
+                         AutomationProperties.AutomationId="NotifyWebhookUrl" AutomationProperties.Name="{local:Tr notify.whUrl}" />
+
+            <TextBlock Text="{local:Tr notify.whTemplate}" Style="{StaticResource Label}" />
+            <TextBlock Text="{local:Tr notify.whTemplateHint}" Style="{StaticResource Hint}" />
+            <ComboBox x:Name="PresetBox" Style="{StaticResource Forest.ComboBox}" Width="240" HorizontalAlignment="Left" DisplayMemberPath="Title"
+                      SelectionChanged="PresetBox_SelectionChanged" Margin="0,0,0,8"
+                      AutomationProperties.AutomationId="NotifyWebhookPreset" AutomationProperties.Name="{local:Tr notify.whTemplate}" />
+            <TextBox x:Name="TemplateBox" FontFamily="Consolas" FontSize="12" Height="150" AcceptsReturn="True" TextWrapping="NoWrap"
+                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" VerticalContentAlignment="Top"
+                     AutomationProperties.AutomationId="NotifyWebhookTemplate" AutomationProperties.Name="{local:Tr notify.whTemplate}" />
+        </StackPanel>
 
         <TextBlock x:Name="StatusText" FontSize="12" TextWrapping="Wrap" Margin="0,14,0,0" Visibility="Collapsed"
                    AutomationProperties.AutomationId="NotifyStatus" />

@@ -13,7 +13,7 @@ public sealed record TelegramChat(string Id, string Title, long? TopicId = null)
 /// Отправка оповещений. Ошибки — <see cref="NotifyException"/> с понятной причиной; секрет (токен, адрес вебхука)
 /// в тексте ошибки не появляется никогда.
 /// </summary>
-public sealed class Notifier(HttpClient http)
+public sealed partial class Notifier(HttpClient http)
 {
     private const string TelegramApi = "https://api.telegram.org/bot";
 
@@ -34,6 +34,15 @@ public sealed class Notifier(HttpClient http)
                 };
                 if (channel.TopicId is { } topic) body["message_thread_id"] = topic; // тема форума
                 await TelegramAsync(secret, "sendMessage", body, ct).ConfigureAwait(false);
+                break;
+            case NotifyKind.Discord:
+                await DiscordAsync(secret, message, ct).ConfigureAwait(false);
+                break;
+            case NotifyKind.Ntfy:
+                await NtfyAsync(channel.Url, secret, message, ct).ConfigureAwait(false);
+                break;
+            case NotifyKind.Webhook:
+                await WebhookAsync(secret, channel.Template, message, ct).ConfigureAwait(false);
                 break;
             default:
                 throw new NotifyException(Loc.T("notify.kindLater"));

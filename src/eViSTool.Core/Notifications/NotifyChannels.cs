@@ -29,6 +29,12 @@ public sealed record NotifyChannel
     /// <summary>Telegram: тема форума (супергруппа с темами); null — общий чат.</summary>
     public long? TopicId { get; init; }
 
+    /// <summary>ntfy: свой сервер (пусто — ntfy.sh).</summary>
+    public string? Url { get; init; }
+
+    /// <summary>Вебхук: шаблон тела запроса с подстановками {server}, {title}, {details}, {text}, {severity}, {color}, {time}.</summary>
+    public string? Template { get; init; }
+
     [JsonIgnore] public string? Secret => NotifySecret.Unprotect(SecretProtected);
     [JsonIgnore] public bool HasSecret => !string.IsNullOrEmpty(SecretProtected);
 }

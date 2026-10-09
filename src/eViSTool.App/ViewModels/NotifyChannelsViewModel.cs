@@ -16,12 +16,14 @@ public sealed class NotifyChannelRowViewModel(NotifyChannel channel)
     public NotifyChannel Channel { get; } = channel;
     public string Name => Channel.Name;
 
-    /// <summary>«Telegram · @erney» — без секретов.</summary>
-    public string Details => Channel.Kind switch
+    /// <summary>«Telegram · @erney», «ntfy · evistool-…», «Вебхук · hooks.example.org» — без секретов.</summary>
+    public string Details => (Channel.Kind switch
     {
-        NotifyKind.Telegram => "Telegram" + (Channel.ChatTitle is { Length: > 0 } t ? " · " + t : ""),
-        _ => Channel.Kind.ToString(),
-    };
+        NotifyKind.Telegram => "Telegram",
+        NotifyKind.Discord => "Discord",
+        NotifyKind.Ntfy => "ntfy",
+        _ => Loc.T("notify.whKind"),
+    }) + (Channel.ChatTitle is { Length: > 0 } t ? " · " + t : "");
 }
 
 /// <summary>
@@ -50,7 +52,7 @@ public sealed partial class NotifyChannelsViewModel : ObservableObject
 
     private void Save() => NotifyChannels.Save(AppPaths.Root, Channels.Select(r => r.Channel));
 
-    /// <summary>Новый канал: тип выбирается в окне (пока — Telegram).</summary>
+    /// <summary>Новый канал: тип выбирается в окне.</summary>
     [RelayCommand]
     private void AddChannel() => Edit(null, NotifyKind.Telegram);
 
@@ -62,7 +64,10 @@ public sealed partial class NotifyChannelsViewModel : ObservableObject
 
     private void Edit(NotifyChannelRowViewModel? row, NotifyKind kind)
     {
-        var dlg = new NotifyChannelWindow(row?.Channel ?? new NotifyChannel { Kind = kind, Name = kind.ToString() }) { Owner = Application.Current.MainWindow };
+        var dlg = new NotifyChannelWindow(row?.Channel ?? new NotifyChannel { Kind = kind, Name = kind.ToString() }, isNew: row is null)
+        {
+            Owner = Application.Current.MainWindow,
+        };
         if (dlg.ShowDialog() != true || dlg.Result is not { } result) return;
         try
         {
