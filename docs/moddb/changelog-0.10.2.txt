@@ -1,0 +1,35 @@
+eViSTool 0.10.2: mod history with rollback.
+
+New
+- Mod history: the History tab in My mods shows what changed in the profile's mods and when. One line is everything changed between two launches of the game or the server ("3 mods updated, 1 mod installed"), with versions before and after and where it came from (Update all, the catalog, a modpack, a scheduled restart). Roll back this session returns all its mods to the versions they had before; one mod can be restored too. The old version comes from the saved copies, otherwise it is downloaded from the ModDB. For a server the agent keeps the history, so scheduled mod updates are there too. Kept for 30 days, the last three sessions longer.
+- My mods: the counters on top are now the filters, the History tab sits at the end of them. A mod's Versions tab shows what was done with it.
+- Announcements can go out at set times every day, not only on an interval (for example "Maintenance in 15 minutes" at 12:00).
+- Scheduled restart and announcement times are typed by your own clock; the window converts them to the server's time zone and shows what that is there.
+- Statistics: memory and CPU of the server, average and peak, for the chosen period.
+
+Fixes
+- A world backup before a scheduled restart could fail to start: two commands sent to the server at once were joined into one line, and the restart waited 10 minutes for the backup. Commands now go one at a time.
+- While the agent on the server computer restarts after Update on the server, the window no longer shows "No connection".
+- The status line while updating the agent said "Updating eViSTool there"; the announcements interval field was too narrow to show the digits. (0.10.1)
+- The store of old mod versions keeps one copy per version.
+
+Update from About; then update the agent on the server computer with Update on the server.
+
+---
+
+eViSTool 0.10.2: история модов с откатом.
+
+Новое
+- История модов: вкладка «История» в «Моих модах» показывает, что и когда менялось в модах профиля. Одна строка — всё, что поменялось между двумя запусками игры или сервера («Обновлено 3 мода, установлен 1»), с версиями до и после и тем, откуда это взялось («Обновить всё», каталог, модпак, перезапуск по расписанию). «Откатить сеанс» вернёт все её моды к прежним версиям, можно вернуть и один мод. Прежняя версия берётся из сохранённых копий, а если их нет, скачивается с модбазы. Историю сервера ведёт агент, так что в ней есть и обновления по расписанию. Хранится 30 дней, последние три сеанса — дольше.
+- «Мои моды»: счётчики сверху стали фильтрами, в конце ряда — вкладка «История». Во вкладке «Версии» карточки мода видно, что с ним делали.
+- Объявления можно отправлять в заданное время каждый день, а не только через интервал (например, «Плановые работы через 15 минут» в 12:00).
+- Время перезапусков и объявлений вводится по твоим часам, окно пересчитывает его на пояс сервера и показывает, сколько это там.
+- Статистика: память и процессор сервера в среднем и в пике за выбранный срок.
+
+Исправления
+- Копия мира перед перезапуском по расписанию могла не начаться: две команды, отправленные серверу разом, склеивались в одну строку, и перезапуск ждал копию 10 минут. Теперь команды уходят по одной.
+- Пока агент на компьютере с сервером перезапускается после «Обновить на сервере», окно больше не пишет «Нет связи».
+- Строка состояния при обновлении агента писала «Обновляю eViSTool там»; поле интервала объявлений было слишком узким, и цифр было не видно. (0.10.1)
+- В хранилище старых версий мода — по одной копии каждой версии.
+
+Обнови из «О программе», потом обнови агента на компьютере с сервером кнопкой «Обновить на сервере».

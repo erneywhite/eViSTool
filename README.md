@@ -122,8 +122,8 @@ its data folder to the Recycle Bin — nothing is deleted without asking.
 
 ## My mods
 
-Everything installed in the active profile: name, version, side and status. The counters on top and the chips above the table
-filter the list — updates, problems, pinned, disabled. Click a mod to open its card on the right: description and screenshots
+Everything installed in the active profile: name, version, side and status. The counters on top are also the filters:
+installed, updates, problems, pinned, disabled (and, in a server profile, client-only mods it does not need). Click a mod to open its card on the right: description and screenshots
 from the ModDB, compatibility, file, and all actions for it.
 
 **Check** asks the ModDB about every installed mod (it can also run on start — see **Settings**). The status shows the result:
@@ -139,6 +139,18 @@ from the ModDB, compatibility, file, and all actions for it.
 **Updating.** **Update** on a mod, or **Update all**. Installs go through a queue at the bottom of the window:
 you can keep working, add more, stop the queue and retry failed items.
 Replaced versions are kept (the last three per mod), so any update can be undone.
+
+**History.** The **History** tab at the end of the counters shows what changed in the profile's mods and when.
+One line is everything changed between two launches of the game (or the server): "5 mods updated, 1 mod installed",
+with the versions before and after, where it came from (**Update all**, the catalog, a modpack, a scheduled restart…)
+and before which launch. If something broke after an update, **Roll back this session** returns every mod of that line
+to the version it had before: updated mods go back, new ones are removed, removed ones are put back. A single mod can be
+restored too. The old version comes from the saved copies, and if there is none, it is downloaded from the ModDB.
+A rollback is a line of its own, so it can be undone as well. A server's history is kept by its agent, so scheduled
+mod updates made with the window closed are there too. The history covers 30 days, and the last three sessions are kept
+longer. The **Versions** tab of a mod's card lists what was done with that mod.
+
+![Mod history](docs/screenshots/history.png)
 
 **Choose version / roll back** installs any release for your game version from the ModDB, or a saved copy of
 a version you had before. **Pin** keeps a mod on its current version (no updates are offered);
@@ -274,7 +286,8 @@ so changes can be saved only while it is stopped. A copy of the previous file st
   If the folder is unreachable, the copy stays on the server, you get a notification, and next time it moves along with
   the new one. The list, rotation and restore see both folders. The agent opens a network folder as the Windows user
   it runs as; write access is checked as soon as you pick the folder.
-- **Scheduled restarts** every N hours of uptime or at set times of day, with chat warnings
+- **Scheduled restarts** every N hours of uptime or at set times of day (typed by your own clock, even if the server
+  computer lives in another time zone), with chat warnings
   (10 and 5 minutes before, then every minute) and, if you like, a fresh backup right before the restart.
   With **Update mods on restart** on, the agent installs released mod updates while the server is stopped.
   Pinned mods and skipped versions are left alone, and what was updated is written to the console.
@@ -297,13 +310,14 @@ so you will most likely need to add your friends there.
 **Statistics.** Turned on with the **Collect statistics** switch, off by default. Once a minute the agent records how many
 players are online and how much memory and CPU the server uses, plus joins and leaves, starts and crashes. It is kept for
 30 days on the server computer, about a megabyte a month. The tab shows totals for a day, a week or 30 days: time played
-by everyone, peak online, how long the server was running, crashes. Below are charts of online players and server load
+by everyone, peak online, how long the server was running, crashes, and the server's memory and CPU, average and peak
+(counted only while it was running). Below are charts of online players and server load
 (hover to see exact values) and a players table: how long each played, how many sessions, and when they were last seen.
 
 ![Statistics](docs/screenshots/stats.png)
 
-**Announcements.** Chat messages on a schedule: server rules, a Discord link, the restart time. Each has its own interval
-in minutes and a switch. The agent sends them, so the window can be closed. By default an empty server stays quiet, and a player
+**Announcements.** Chat messages on a schedule: server rules, a Discord link, the restart time. Each goes out on its own
+interval in minutes or at set times every day ("Maintenance in 15 minutes" at 12:00), by your clock, and has a switch. The agent sends them, so the window can be closed. By default an empty server stays quiet, and a player
 who joins does not get a pile of queued messages. There is also **Say now** — a one-off message to everyone on the server.
 
 ![Announcements](docs/screenshots/announcements.png)
@@ -419,7 +433,8 @@ Good to know:
 - The `eViSTool-<version>-linux-x64.tar.gz` archive is in [Releases](https://github.com/erneywhite/eViSTool/releases); the same files as a zip are there and on the [ModDB page for Linux](https://mods.vintagestory.at/evistoollinux) (unpack with `sudo unzip … -d /home/vintagestory/evistool`).
   The agent doesn't need .NET, it ships with its own runtime. Tested on Ubuntu Server 24.04.
 - The agent is updated with **Update on the server** from the Windows window; systemd starts the new version by itself.
-- Scheduled restart times follow the server machine's clock. If it runs in another time zone, the window tells you.
+- Scheduled restart and announcement times are typed by your own clock; the window converts them to the server's
+  and shows what that is there.
 
 The full guide, with day-to-day commands, logs and uninstalling, is in [eViSTool on a Linux server](docs/linux.md).
 Which files the agent keeps and what's in them: [Configuration files](docs/config.md).
