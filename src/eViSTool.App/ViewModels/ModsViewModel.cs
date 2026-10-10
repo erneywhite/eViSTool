@@ -880,7 +880,7 @@ public sealed partial class ModsViewModel : ObservableObject
     /// Поставить в очередь; уже ждущий или ставящийся мод той же цели второй раз не добавляется.
     /// У каждого пункта своя цель: пункты разных профилей ставятся каждый в свой.
     /// </summary>
-    public void Enqueue(IEnumerable<UpdateQueueItem> items, string source, string? undoes = null)
+    public void Enqueue(IEnumerable<UpdateQueueItem> items, string source, string? undoes = null, bool runningConfirmed = false)
     {
         if (IsBusy && !IsQueueRunning) return; // идёт другая операция (импорт модпака и т.п.)
         var adding = items.ToList();
@@ -888,7 +888,8 @@ public sealed partial class ModsViewModel : ObservableObject
         var history = ModHistory.NewScope(source, undoes);
         foreach (var item in adding) item.History ??= history;
         // игра или сервер цели запущены — спросить один раз на цель, пока ничего не начато
-        var declined = adding.Select(i => i.Target).DistinctBy(t => t.ProfileId)
+        // (откат уже спросил сам — второй раз не спрашиваем)
+        var declined = runningConfirmed ? [] : adding.Select(i => i.Target).DistinctBy(t => t.ProfileId)
             .Where(t => !ConfirmIfRunning(t)).Select(t => t.ProfileId).ToHashSet();
         if (!IsQueueRunning)
         {

@@ -64,7 +64,7 @@ public sealed partial class ModsViewModel
             .Select(s => new UpdateQueueItem(target, s.Change.ModId, s.Change.Title, s.Current?.Info?.Version ?? "",
                 s.Change.Change.From!, s.Release, s.BackupPath) { History = history })
             .ToList();
-        if (installs.Count > 0) Enqueue(installs, history.Source, history.Undoes);
+        if (installs.Count > 0) Enqueue(installs, history.Source, history.Undoes, runningConfirmed: true);
         StatusText = problems.Count > 0 ? string.Join("; ", problems) : Loc.T("hist.revertStarted");
     }
 
