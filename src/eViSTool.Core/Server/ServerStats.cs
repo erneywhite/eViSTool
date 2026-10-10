@@ -168,6 +168,17 @@ public sealed record StatsReport
     /// <summary>Доля времени, когда сервер работал (от начала сбора в этом сроке); null — данных нет.</summary>
     public double? Uptime { get; init; }
 
+    /// <summary>
+    /// Расход сервера за срок — по минутным замерам, то есть только пока он работал (простой среднее не занижает):
+    /// в среднем и в пике, с минутой пика. null — замеров нет (или агент старее этих полей).
+    /// </summary>
+    public double? AvgMemoryMb { get; init; }
+    public long? PeakMemoryMb { get; init; }
+    public DateTime? PeakMemoryAt { get; init; }
+    public double? AvgCpu { get; init; }
+    public double? PeakCpu { get; init; }
+    public DateTime? PeakCpuAt { get; init; }
+
     public bool HasData => Points.Any(p => p.Players is not null) || Players.Count > 0;
 
     /// <summary>Замер раз в минуту: больше нет записей — агент не работал.</summary>
@@ -254,6 +265,7 @@ public sealed record StatsReport
             .ToList();
 
         var peak = samples.OrderByDescending(s => s.Players).ThenBy(s => s.Time).FirstOrDefault();
+        var memory = samples.Where(s => s.MemoryMb > 0).ToList(); // память не прочиталась — замер в среднее не берём
         double? uptime = null;
         if (samples.Count > 0)
         {
@@ -278,6 +290,12 @@ public sealed record StatsReport
             PeakAt = peak is { Players: > 0 } ? peak.Time : null,
             Restarts = inside.Count(e => e.Kind == StatsKind.Up),
             Uptime = uptime,
+            AvgMemoryMb = memory.Count > 0 ? memory.Average(s => (double)s.MemoryMb) : null,
+            PeakMemoryMb = memory.Count > 0 ? memory.Max(s => s.MemoryMb) : null,
+            PeakMemoryAt = memory.OrderByDescending(s => s.MemoryMb).ThenBy(s => s.Time).FirstOrDefault()?.Time,
+            AvgCpu = samples.Count > 0 ? samples.Average(s => s.Cpu) : null,
+            PeakCpu = samples.Count > 0 ? samples.Max(s => s.Cpu) : null,
+            PeakCpuAt = samples.OrderByDescending(s => s.Cpu).ThenBy(s => s.Time).FirstOrDefault()?.Time,
         };
     }
 

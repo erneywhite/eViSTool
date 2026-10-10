@@ -55,6 +55,25 @@ public sealed class ServerStatsTests : IDisposable
     }
 
     [Fact]
+    public void MemoryAndCpu_AverageAndPeak_OnlyWhileRunning()
+    {
+        // час работы: память 2000 МБ, в одну минуту — 3000; процессор 10 %, пик 60 %; потом сервер стоял — замеров нет
+        var start = Now.AddHours(-5);
+        var entries = new List<StatsEntry> { new(start, StatsKind.Up) };
+        for (var m = 0; m < 60; m++)
+            entries.Add(new StatsEntry(start.AddMinutes(m), StatsKind.Sample, 0, m == 30 ? 3000 : 2000, m == 45 ? 60 : 10));
+        entries.Add(new(start.AddMinutes(60), StatsKind.Down));
+
+        var r = StatsReport.Build(entries, StatsPeriod.Day, Now);
+        Assert.Equal(2000 + 1000.0 / 60, r.AvgMemoryMb!.Value, 3);
+        Assert.Equal((3000L, start.AddMinutes(30)), (r.PeakMemoryMb!.Value, r.PeakMemoryAt!.Value));
+        Assert.Equal(10 + 50.0 / 60, r.AvgCpu!.Value, 3);
+        Assert.Equal((60.0, start.AddMinutes(45)), (r.PeakCpu!.Value, r.PeakCpuAt!.Value));
+
+        Assert.Null(StatsReport.Build([], StatsPeriod.Day, Now).AvgMemoryMb);
+    }
+
+    [Fact]
     public void Sessions_PlaytimeAndOnline()
     {
         var start = Now.AddHours(-3);

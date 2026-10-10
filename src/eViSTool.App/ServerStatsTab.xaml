@@ -95,6 +95,10 @@
                         <ColumnDefinition />
                         <ColumnDefinition Width="12" />
                         <ColumnDefinition />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition />
                     </Grid.ColumnDefinitions>
                     <Border Style="{StaticResource Tile}">
                         <StackPanel>
@@ -131,6 +135,21 @@
                                 </TextBlock.Style>
                             </TextBlock>
                             <TextBlock Text="{Binding LastCrashText}" Style="{StaticResource TileNote}" />
+                        </StackPanel>
+                    </Border>
+                    <!-- расход сервера: в среднем / в пике (пока он работал) -->
+                    <Border Grid.Column="8" Style="{StaticResource Tile}" ToolTip="{local:Tr stats.loadTip}">
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr stats.memoryTile}" Style="{StaticResource TileLabel}" />
+                            <TextBlock Text="{Binding MemoryText}" Style="{StaticResource TileValue}" />
+                            <TextBlock Text="{Binding MemoryPeakText}" Style="{StaticResource TileNote}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="10" Style="{StaticResource Tile}" ToolTip="{local:Tr stats.loadTip}">
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr stats.cpuTile}" Style="{StaticResource TileLabel}" />
+                            <TextBlock Text="{Binding CpuText}" Style="{StaticResource TileValue}" />
+                            <TextBlock Text="{Binding CpuPeakText}" Style="{StaticResource TileNote}" />
                         </StackPanel>
                     </Border>
                 </Grid>

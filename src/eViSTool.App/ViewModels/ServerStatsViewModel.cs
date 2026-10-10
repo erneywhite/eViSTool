@@ -46,6 +46,15 @@ public sealed partial class ServerStatsViewModel : ObservableObject
     [ObservableProperty] private string _crashesText = "0";
     [ObservableProperty] private string _lastCrashText = "";
     [ObservableProperty] private bool _hasCrashes;
+    [ObservableProperty] private string _memoryText = "—";
+    [ObservableProperty] private string _memoryPeakText = "";
+    [ObservableProperty] private string _cpuText = "—";
+    [ObservableProperty] private string _cpuPeakText = "";
+
+    /// <summary>«2,1 ГБ» (меньше гигабайта — «850 МБ»).</summary>
+    private static string Gb(double mb) => mb >= 1024
+        ? (mb / 1024).ToString("0.0", Loc.Culture) + " " + Loc.T("stats.gb")
+        : mb.ToString("0", Loc.Culture) + " " + Loc.T("stats.mb");
     [ObservableProperty] private bool _hasData;
 
     public ObservableCollection<PlayerStatsRow> Players { get; } = [];
@@ -168,6 +177,11 @@ public sealed partial class ServerStatsViewModel : ObservableObject
         CrashesText = (r?.Crashes.Count ?? 0).ToString(c);
         HasCrashes = r?.Crashes.Count > 0;
         LastCrashText = r?.Crashes.Count > 0 ? When(r.Crashes.Max()) : "";
+        // расход: «в среднем / в пике» крупно, когда был пик — мелко
+        MemoryText = r is { AvgMemoryMb: { } avgMem, PeakMemoryMb: { } peakMem } ? $"{Gb(avgMem)} / {Gb(peakMem)}" : "—";
+        MemoryPeakText = r?.PeakMemoryAt is { } memAt ? Loc.T("stats.peakAt", When(memAt)) : "";
+        CpuText = r is { AvgCpu: { } avgCpu, PeakCpu: { } peakCpu } ? $"{avgCpu.ToString("0", c)} / {peakCpu.ToString("0", c)} %" : "—";
+        CpuPeakText = r?.PeakCpuAt is { } cpuAt ? Loc.T("stats.peakAt", When(cpuAt)) : "";
 
         Players.Clear();
         var best = r?.Players.FirstOrDefault()?.Played.Ticks ?? 0;
