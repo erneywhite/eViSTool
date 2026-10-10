@@ -100,7 +100,7 @@
                                     <DockPanel>
                                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
                                             <TextBlock Text="{local:Tr ann.every}" FontSize="12" Foreground="{StaticResource Forest.Muted}" VerticalAlignment="Center" />
-                                            <TextBox Width="56" Margin="8,0,0,0" Text="{Binding IntervalText, UpdateSourceTrigger=PropertyChanged}"
+                                            <TextBox Width="96" Margin="8,0,0,0" Text="{Binding IntervalText, UpdateSourceTrigger=PropertyChanged}"
                                                      VerticalContentAlignment="Center" HorizontalContentAlignment="Center" MaxLength="4"
                                                      AutomationProperties.Name="{local:Tr ann.every}">
                                                 <TextBox.Style>
