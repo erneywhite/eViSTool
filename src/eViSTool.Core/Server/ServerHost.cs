@@ -341,13 +341,34 @@ public sealed class ServerHost : IAsyncDisposable
         RestartScheduledAt = null;
     }
 
-    /// <summary>Команда в консоль сервера (как если бы её набрали в окне сервера).</summary>
+    /// <summary>
+    /// Между командами — не меньше этого. Две строки, пришедшие в консоль сервера разом, он может склеить в одну:
+    /// так «/announce …» и «/genbackup имя» перед перезапуском по расписанию стали одним объявлением, копия не началась,
+    /// и перезапуск ждал её 10 минут (Linux, 0.10.1).
+    /// </summary>
+    public static readonly TimeSpan CommandGap = TimeSpan.FromSeconds(1);
+
+    private readonly SemaphoreSlim _commandLock = new(1, 1);
+    private DateTime _lastCommandAt = DateTime.MinValue;
+
+    /// <summary>Команда в консоль сервера (как если бы её набрали в окне сервера). Команды уходят по одной, с паузой.</summary>
     public async Task SendCommandAsync(string command)
     {
-        var stdin = _stdin;
-        if (stdin is null || State is ServerState.Stopped) throw new InvalidOperationException(Loc.T("srv.notRunning"));
-        Console.Add(ConsoleLineKind.Input, command);
-        await stdin.WriteLineAsync(command).ConfigureAwait(false);
+        await _commandLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var wait = _lastCommandAt + CommandGap - DateTime.UtcNow;
+            if (wait > TimeSpan.Zero) await Task.Delay(wait).ConfigureAwait(false);
+            var stdin = _stdin;
+            if (stdin is null || State is ServerState.Stopped) throw new InvalidOperationException(Loc.T("srv.notRunning"));
+            Console.Add(ConsoleLineKind.Input, command);
+            await stdin.WriteLineAsync(command).ConfigureAwait(false);
+            _lastCommandAt = DateTime.UtcNow;
+        }
+        finally
+        {
+            _commandLock.Release();
+        }
     }
 
     /// <summary>Корректная остановка: /stop, ждём реального завершения; не вышел — Ctrl+C (Linux — SIGTERM); не помогло — kill.</summary>

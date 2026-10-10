@@ -47,6 +47,23 @@ public sealed class ServerHostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CommandsSentTogether_GoOneByOne_WithAPause()
+    {
+        var host = Host();
+        await host.StartAsync();
+        await Until(() => host.State == ServerState.Running);
+
+        // «/announce …» и «/genbackup» перед перезапуском — подряд, как в агенте
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        await Task.WhenAll(host.SendCommandAsync("/announce one"), host.SendCommandAsync("/time"));
+        Assert.True(clock.Elapsed >= ServerHost.CommandGap - TimeSpan.FromMilliseconds(50), clock.Elapsed.ToString());
+        await Until(() => host.Console.GetSince(0).Any(l => l.Text.Contains("Handling Console Command /time")));
+        Assert.Contains(host.Console.GetSince(0), l => l.Text.Contains("Handling Console Command /announce one"));
+
+        await host.StopAsync();
+    }
+
+    [Fact]
     public async Task StartsSendsCommandAndStopsGracefully()
     {
         var host = Host();
