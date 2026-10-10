@@ -503,8 +503,9 @@ public sealed partial class ServerViewModel : ObservableObject
                          && Core.Versioning.ModVersion.TryParse(AgentProtocol.AppVersion, out var appVersion)
                          && agentVersion.CompareTo(appVersion) < 0;
         _remoteServerUp = s.State != ServerState.Stopped;
-        // ставит новую версию — скоро перезапустится; пока не вернётся (до трёх минут), пропажа связи — не ошибка
-        if (s.SelfUpdate is "install" or "restart") _agentRestartingUntil = DateTime.UtcNow.AddMinutes(3);
+        // обновляется — скоро перезапустится; пока не вернётся (до трёх минут), пропажа связи — не ошибка. Любой этап:
+        // скачивание с GitHub бывает таким быстрым, что опрос раз в полторы секунды «установку» и «перезапуск» не застаёт
+        if (s.SelfUpdate is "download" or "stop" or "install" or "restart") _agentRestartingUntil = DateTime.UtcNow.AddMinutes(3);
         else if (s.SelfUpdate is null or "failed") _agentRestartingUntil = DateTime.MinValue;
         CanUpdateRemoteAgent = olderAgent && s.SelfUpdate is null or "failed";
         AgentNote = s.SelfUpdate switch
@@ -677,12 +678,19 @@ public sealed partial class ServerViewModel : ObservableObject
             return;
         try
         {
+            _agentRestartingUntil = DateTime.UtcNow.AddMinutes(3); // с этой минуты агент может пропасть — это он обновляется
             Apply(await client.SelfUpdateAsync(AgentProtocol.AppVersion));
         }
         catch (InvalidOperationException ex) when (ex.Message.StartsWith("404"))
         {
             // агент из версии без самообновления — его один раз обновляют руками
+            _agentRestartingUntil = DateTime.MinValue;
             throw new InvalidOperationException(Loc.T("selfupd.tooOld"));
+        }
+        catch
+        {
+            _agentRestartingUntil = DateTime.MinValue; // не началось — пропажа связи снова ошибка
+            throw;
         }
     });
 
