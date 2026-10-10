@@ -104,6 +104,15 @@ public static class ModTargets
         return new ModInstallOutcome(info.Name, info.Version, plan.Replaces.FirstOrDefault()?.Info?.Version);
     }
 
+    /// <summary>История изменений модов цели (записи и отметки запусков): своя — из файла, удалённого сервера — у агента.</summary>
+    public static async Task<IReadOnlyList<ModHistoryEntry>> HistoryAsync(ModTarget target, CancellationToken ct = default)
+    {
+        if (target.Remote is not { } code)
+            return await Task.Run(() => ModHistory.ReadEntries(ModHistory.FileFor(target.ProfileId)), ct).ConfigureAwait(false);
+        using var agent = AgentClient.ForRemote(code);
+        return await agent.ModHistoryAsync(ct).ConfigureAwait(false);
+    }
+
     /// <summary>Включить или выключить мод цели — так же, как это делает менеджер модов игры.</summary>
     public static async Task SetEnabledAsync(ModTarget target, LocalMod mod, bool enabled, CancellationToken ct = default)
     {

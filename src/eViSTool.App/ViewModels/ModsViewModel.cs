@@ -20,7 +20,7 @@ using System.Windows.Threading;
 namespace eViSTool.App.ViewModels;
 
 /// <summary>Чипы над таблицей модов.</summary>
-public enum ModFilter { All, Updates, Problems, Pinned, Disabled, Unneeded }
+public enum ModFilter { All, Updates, Problems, Pinned, Disabled, Unneeded, History }
 
 public sealed partial class ModsViewModel : ObservableObject
 {
@@ -162,8 +162,30 @@ public sealed partial class ModsViewModel : ObservableObject
         else if (!active) _diskWatch.Stop();
     }
 
-    partial void OnFilterChanged(ModFilter value) => RefreshView();
-    partial void OnSearchChanged(string value) => RefreshView();
+    partial void OnFilterChanged(ModFilter value)
+    {
+        RefreshView();
+        OnPropertyChanged(nameof(IsHistory));
+        if (value == ModFilter.History) _ = LoadHistoryAsync();
+    }
+
+    partial void OnSearchChanged(string value)
+    {
+        RefreshView();
+        History.SetSearch(value);
+    }
+
+    // ---------- история изменений модов ----------
+
+    /// <summary>Вкладка «История»: вместо таблицы — сеансы изменений, справа — детали выбранного.</summary>
+    public ModHistoryViewModel History { get; } = new();
+    public bool IsHistory => Filter == ModFilter.History;
+
+    private async Task LoadHistoryAsync()
+    {
+        if (CurrentTarget() is not { } target) return;
+        await History.LoadAsync(target, _locals);
+    }
     partial void OnSortIndexChanged(int value) => ApplySort();
 
     private void RefreshView()
@@ -434,6 +456,7 @@ public sealed partial class ModsViewModel : ObservableObject
             else if (same == Selected) OnSelectedChanged(same);
             else Selected = same;
         }
+        if (IsHistory) _ = LoadHistoryAsync(); // моды поменялись — в истории появилось новое
     }
 
     [RelayCommand(IncludeCancelCommand = true)]

@@ -303,7 +303,18 @@
 
                 <!-- чипы-фильтры и сортировка -->
                 <DockPanel DockPanel.Dock="Top" Margin="0,12,0,10">
-                    <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding SortModes}" SelectedIndex="{Binding SortIndex}" MinWidth="170" FontSize="12" />
+                    <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding SortModes}" SelectedIndex="{Binding SortIndex}" MinWidth="170" FontSize="12"
+                              Visibility="{Binding IsHistory, Converter={StaticResource InvertVis}}" />
+                    <!-- история изменений модов — справа от фильтров: это не фильтр таблицы, а другой список -->
+                    <RadioButton DockPanel.Dock="Right" GroupName="ModFilter" Style="{StaticResource Forest.Chip}" Margin="6,2,8,2" VerticalAlignment="Top"
+                                 ToolTip="{local:Tr hist.tabTip}" AutomationProperties.AutomationId="ModsHistoryTab"
+                                 IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=History}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource Icon.History}" Style="{StaticResource Forest.Icon}" Width="13" Height="13" Margin="0,0,6,0"
+                                  VerticalAlignment="Center" />
+                            <TextBlock Text="{local:Tr hist.tab}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
                     <!-- узкая таблица (открыта карточка) — чипы переносятся на вторую строку, а не уходят под сортировку -->
                     <WrapPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
                         <WrapPanel.Resources>
@@ -339,8 +350,49 @@
                     </WrapPanel>
                 </DockPanel>
 
+                <Grid>
+                <!-- история: сеансы изменений модов -->
+                <Border Style="{StaticResource Forest.Card}" ClipToBounds="True" DataContext="{Binding History}"
+                        Visibility="{Binding DataContext.IsHistory, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}">
+                    <Grid>
+                        <TextBlock Text="{Binding Status}" Foreground="{StaticResource Forest.Muted}" FontSize="13" TextWrapping="Wrap" TextAlignment="Center"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24" MaxWidth="420"
+                                   Visibility="{Binding Status, Converter={StaticResource TextToVis}}" />
+                        <ListBox ItemsSource="{Binding Sessions}" SelectedItem="{Binding Selected}" Background="Transparent" BorderThickness="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.AutomationId="ModsHistoryList">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="0" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,0,0,1" Padding="14,10">
+                                        <StackPanel>
+                                            <DockPanel>
+                                                <TextBlock DockPanel.Dock="Right" Text="{Binding When}" FontSize="11" Foreground="{StaticResource Forest.Muted}"
+                                                           VerticalAlignment="Center" Margin="12,0,0,0" />
+                                                <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </DockPanel>
+                                            <TextBlock Text="{Binding Summary}" FontSize="11" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap"
+                                                       MaxHeight="32" TextTrimming="CharacterEllipsis" Margin="0,3,0,0" />
+                                            <TextBlock FontSize="11" Foreground="{StaticResource Forest.Accent}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis">
+                                                <Run Text="{Binding Sources, Mode=OneWay}" /><Run Text=" · " Foreground="{StaticResource Forest.Muted}" /><Run Text="{Binding Closed, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" />
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </Border>
+
                 <!-- таблица -->
-                <Border Style="{StaticResource Forest.Card}" ClipToBounds="True">
+                <Border Style="{StaticResource Forest.Card}" ClipToBounds="True"
+                        Visibility="{Binding IsHistory, Converter={StaticResource InvertVis}}">
                     <DataGrid x:Name="Grid" ItemsSource="{Binding View}" SelectedItem="{Binding Selected}" AutoGenerateColumns="False" IsReadOnly="True"
                               HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource Forest.Line}"
                               SelectionMode="Single" CanUserResizeRows="False" RowHeight="54"
@@ -440,10 +492,58 @@
                         </DataGrid.Columns>
                     </DataGrid>
                 </Border>
+                </Grid>
             </DockPanel>
 
+            <!-- ===== история: выбранный сеанс ===== -->
+            <Border Grid.Column="2" Style="{StaticResource Forest.Card}" DataContext="{Binding History}"
+                    Visibility="{Binding DataContext.IsHistory, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}">
+                <Grid>
+                    <TextBlock Text="{local:Tr hist.pick}" Foreground="{StaticResource Forest.Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Visibility="{Binding HasSelected, Converter={StaticResource InvertVis}}" />
+                    <ScrollViewer DataContext="{Binding Selected}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                  Visibility="{Binding DataContext.HasSelected, RelativeSource={RelativeSource AncestorType=Grid}, Converter={StaticResource BoolToVis}}">
+                        <StackPanel Margin="18,16,18,16">
+                            <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding WhenLine}" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="0,4,0,0" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding Sources}" FontSize="12" Foreground="{StaticResource Forest.Accent}" Margin="0,2,0,0" TextWrapping="Wrap" />
+
+                            <TextBlock Text="{local:Tr hist.mods}" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="0,16,0,4" />
+                            <ItemsControl ItemsSource="{Binding Changes}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Padding="0,8">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" FontSize="13" Foreground="{StaticResource Forest.Text}" TextTrimming="CharacterEllipsis"
+                                                           ToolTip="{Binding ModId}" />
+                                                <TextBlock FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap">
+                                                    <Run Text="{Binding Versions, Mode=OneWay}" FontFamily="Consolas" Foreground="{StaticResource Forest.Muted}" />
+                                                    <Run Text="{Binding Later, Mode=OneWay}" Foreground="{StaticResource Forest.Warn}" />
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="{local:Tr hist.steps}" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="0,16,0,4" />
+                            <Border Background="{StaticResource Forest.Base}" CornerRadius="6" Padding="10,8">
+                                <ItemsControl ItemsSource="{Binding Steps}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" FontSize="11" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
             <!-- ===== карточка выбранного мода ===== -->
-            <Border Grid.Column="2" Style="{StaticResource Forest.Card}">
+            <Border Grid.Column="2" Style="{StaticResource Forest.Card}"
+                    Visibility="{Binding IsHistory, Converter={StaticResource InvertVis}}">
                 <Grid>
                     <TextBlock Text="{local:Tr mcard.pick}" Foreground="{StaticResource Forest.Muted}" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <TextBlock.Style>

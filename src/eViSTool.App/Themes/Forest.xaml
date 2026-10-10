@@ -149,6 +149,7 @@
     <Geometry x:Key="Icon.ModConfig">M6,3 H14 L19,8 V21 H6 Z M14,3 V8 H19 M9,13 H16 M9,17 H14</Geometry>
     <Geometry x:Key="Icon.About">M3,12 A9,9 0 1 1 21,12 A9,9 0 1 1 3,12 Z M12,11 V17 M12,7 V8</Geometry>
     <Geometry x:Key="Icon.Refresh">M20,7 A9,9 0 1 0 21,14 M20,2 V8 H14</Geometry>
+    <Geometry x:Key="Icon.History">M12,8 V12 L14,14 M3.05,11 A9,9 0 1 1 3.55,15 M3,20 V15 H8</Geometry>
     <Geometry x:Key="Icon.Play">M7,4 L20,12 L7,20 Z</Geometry>
     <Geometry x:Key="Icon.Plus">M12,5 V19 M5,12 H19</Geometry>
     <Geometry x:Key="Icon.Download">M12,3 V15 M7,10 L12,15 L17,10 M4,16 V21 H20 V16</Geometry>
