@@ -86,17 +86,39 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     [ObservableProperty] private bool _restartUpdateMods;
     [ObservableProperty] private string _restartError = "";
 
-    /// <summary>Часы машины с сервером идут в другом поясе — время перезапусков задаётся по ним; пусто — пояс тот же.</summary>
+    /// <summary>
+    /// Часы машины с сервером идут в другом поясе: время перезапусков в поле — по часам этого окна, а сколько это на
+    /// сервере — здесь. Пусто — пояс тот же.
+    /// </summary>
     [ObservableProperty] private string _serverTimeNote = "";
+
+    /// <summary>
+    /// Пояс машины с сервером (минуты от UTC; null — не знаем: агент старый или ещё не ответил). Расписание агент
+    /// хранит по своим часам, а в окне время показывается и вводится по часам окна: «у меня 21:00» понятнее, чем
+    /// «на сервере 18:00 UTC» (просьба Erney).
+    /// </summary>
+    private int? _serverOffset;
+
+    /// <summary>На сколько минут часы окна впереди часов сервера (0 — пояс тот же или не знаем).</summary>
+    private int ClockShift => _serverOffset is { } server ? (int)TimeZoneInfo.Local.GetUtcOffset(DateTime.Now).TotalMinutes - server : 0;
+
+    /// <summary>«18:00» на часах сервера → «21:00» на часах окна (и обратно — с минусом).</summary>
+    public static string ShiftTime(string time, int minutes)
+    {
+        if (minutes == 0 || !ServerAutomation.TryTimeOfDay(time, out var t)) return time;
+        var total = ((int)t.TotalMinutes + minutes) % (24 * 60);
+        if (total < 0) total += 24 * 60;
+        return $"{total / 60:00}:{total % 60:00}";
+    }
 
     /// <summary>Подсказка к папке для копий: пример сетевой папки — под систему машины с сервером.</summary>
     [ObservableProperty] private string _backupDirHint = Loc.T("backupdir.hint");
 
-    private static string ServerTimeNoteFor(int? serverMinutes)
+    private string ServerTimeNoteFor(int? serverMinutes)
     {
         if (serverMinutes is not { } server) return "";
         var mine = (int)TimeZoneInfo.Local.GetUtcOffset(DateTime.Now).TotalMinutes;
-        return server == mine ? "" : Loc.T("sched.serverTime", Utc(server), Utc(mine));
+        return server == mine ? "" : Loc.T("sched.serverTime", Utc(mine), string.Join(", ", _saved.RestartTimes), Utc(server));
 
         static string Utc(int minutes) => minutes == 0 ? "UTC"
             : $"UTC{(minutes > 0 ? "+" : "−")}{Math.Abs(minutes) / 60}" + (Math.Abs(minutes) % 60 is var m and > 0 ? $":{m:00}" : "");
@@ -208,7 +230,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
             BackupDirError = BackupDirOk = "";
             RestartMode = settings.RestartMode;
             RestartIntervalText = settings.RestartIntervalHours.ToString("0.##", CultureInfo.CurrentCulture);
-            RestartTimesText = string.Join(", ", settings.RestartTimes);
+            RestartTimesText = string.Join(", ", settings.RestartTimes.Select(t => ShiftTime(t, ClockShift)));
             RestartWarnText = string.Join(", ", settings.RestartWarnMinutes);
             RestartBackup = settings.RestartBackup;
             RestartUpdateMods = settings.RestartUpdateMods;
@@ -273,6 +295,17 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
 
         _nextBackupAt = status?.NextBackupAt;
         _nextRestartAt = status?.NextRestartAt;
+        if (status?.UtcOffsetMinutes != _serverOffset && status is not null)
+        {
+            // пояс сервера стал известен (или сменился) — время в поле пересчитываем на часы окна, ничего не сохраняя
+            _serverOffset = status.UtcOffsetMinutes;
+            if (_loaded && !_loading && RestartError.Length == 0)
+            {
+                _loading = true;
+                try { RestartTimesText = string.Join(", ", _saved.RestartTimes.Select(t => ShiftTime(t, ClockShift))); }
+                finally { _loading = false; }
+            }
+        }
         ServerTimeNote = ServerTimeNoteFor(status?.UtcOffsetMinutes);
         BackupDirHint = Loc.T(status?.Os == "Linux" ? "backupdir.hintLinux" : "backupdir.hint");
         // агент сообщил о новой копии — список устарел
@@ -410,8 +443,10 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         }
         else if (RestartMode == RestartMode.Daily)
         {
+            // в поле — часы окна, агенту — часы сервера
             var parts = Split(RestartTimesText);
-            if (parts.Count > 0 && parts.All(t => ServerAutomation.TryTimeOfDay(t, out _))) times = parts;
+            if (parts.Count > 0 && parts.All(t => ServerAutomation.TryTimeOfDay(t, out _)))
+                times = [.. parts.Select(t => ShiftTime(t, -ClockShift))];
             else RestartError = Loc.T("sched.timesError");
         }
         if (RestartMode != RestartMode.Off && RestartError.Length == 0)
@@ -437,6 +472,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
             RestartUpdateMods = RestartUpdateMods,
         };
         _ = SaveAsync(data, _saved);
+        ServerTimeNote = ServerTimeNoteFor(_serverOffset); // «на сервере это …» — сразу по новому времени
         UpdateTexts();
     }
 

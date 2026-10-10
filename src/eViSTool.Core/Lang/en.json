@@ -1564,7 +1564,7 @@
   "sched.restoredModData": "Mod data was restored too.",
   "sched.restoredNoModData": "This backup has no mod data — the current one was kept.",
   "sched.saveFailed": "Could not save the schedule: {0}",
-  "sched.serverTime": "Times are by the clock of the server computer: {0} (yours is {1}).",
+  "sched.serverTime": "Times are by your clock ({0}). On the server computer that is {1} by its clock ({2}).",
   "sched.show": "Show",
   "sched.tab": "Schedule",
   "sched.timesError": "Times as HH:MM, comma-separated — for example 05:00, 17:30.",
