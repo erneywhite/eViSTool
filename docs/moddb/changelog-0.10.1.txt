@@ -1,0 +1,15 @@
+eViSTool 0.10.1: small fixes.
+
+- While updating the agent on the server computer, the status line said "Updating eViSTool there"; it now says "on the server", matching the button. Messages about an outdated agent now point to the "Update on the server" button.
+- The "every … min" field of scheduled announcements was too narrow: with the cursor in it, the clear button covered the digits.
+
+Update from About; a running server keeps running.
+
+---
+
+eViSTool 0.10.1: мелкие исправления.
+
+- Пока агент на компьютере с сервером обновляется, строка состояния писала «Обновляю eViSTool там»; теперь «на сервере», как и кнопка. Сообщения о старом агенте теперь подсказывают кнопку «Обновить на сервере».
+- Поле «каждые … мин» у объявлений по расписанию было слишком узким: когда в нём курсор, крестик очистки закрывал цифры.
+
+Обнови из «О программе», запущенный сервер не остановится.
