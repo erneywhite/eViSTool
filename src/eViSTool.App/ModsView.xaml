@@ -147,32 +147,44 @@
             </StackPanel>
         </DockPanel>
 
-        <!-- ===== счётчики (клик — фильтр) ===== -->
-        <Border DockPanel.Dock="Top" BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,0,0,1" Padding="0,14,0,14">
+        <!-- ===== вкладки-счётчики: число и фильтр таблицы в одном; справа — история изменений ===== -->
+        <Border DockPanel.Dock="Top" BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,0,0,1" Padding="0,14,0,0">
             <DockPanel>
-            <!-- история изменений модов — справа в ряду счётчиков: это не фильтр таблицы, а другой список -->
-            <RadioButton DockPanel.Dock="Right" GroupName="ModFilter" Style="{StaticResource Forest.Chip}" Margin="12,0,0,0" FontSize="13" VerticalAlignment="Center"
+            <RadioButton DockPanel.Dock="Right" GroupName="ModFilter" Style="{StaticResource Forest.StatTab}" Margin="12,0,0,0" FontSize="13" VerticalAlignment="Bottom"
                          ToolTip="{local:Tr hist.tabTip}" AutomationProperties.AutomationId="ModsHistoryTab"
                          IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=History}">
                 <StackPanel Orientation="Horizontal">
-                    <Path Data="{StaticResource Icon.History}" Style="{StaticResource Forest.Icon}" Width="15" Height="15" Margin="0,0,6,0"
+                    <Path Data="{StaticResource Icon.History}" Style="{StaticResource Forest.Icon}" Width="16" Height="16" Margin="0,0,8,0"
                           VerticalAlignment="Center" />
                     <TextBlock Text="{local:Tr hist.tab}" VerticalAlignment="Center" />
                 </StackPanel>
             </RadioButton>
             <WrapPanel>
-                <Button Style="{StaticResource Forest.StatButton}" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:ModFilter.All}">
+                <RadioButton Style="{StaticResource Forest.StatTab}" GroupName="ModFilter"
+                             IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=All}">
                     <TextBlock><Run Text="{Binding ModCount, Mode=OneWay}" FontSize="24" /><Run Text="  " /><Run Text="{Binding InstalledLabel, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" FontSize="13" /></TextBlock>
-                </Button>
-                <Button Style="{StaticResource Forest.StatButton}" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:ModFilter.Updates}">
+                </RadioButton>
+                <RadioButton Style="{StaticResource Forest.StatTab}" GroupName="ModFilter"
+                             IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=Updates}">
                     <TextBlock><Run Text="{Binding UpdatesAvailable, Mode=OneWay}" FontSize="24" /><Run Text="  " /><Run Text="{Binding UpdatesLabel, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" FontSize="13" /></TextBlock>
-                </Button>
-                <Button Style="{StaticResource Forest.StatButton}" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:ModFilter.Problems}">
+                </RadioButton>
+                <RadioButton Style="{StaticResource Forest.StatTab}" GroupName="ModFilter"
+                             IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=Problems}">
                     <TextBlock><Run Text="{Binding ProblemCount, Mode=OneWay}" FontSize="24" /><Run Text="  " /><Run Text="{Binding ProblemsLabel, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" FontSize="13" /></TextBlock>
-                </Button>
-                <Button Style="{StaticResource Forest.StatButton}" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:ModFilter.Disabled}">
+                </RadioButton>
+                <RadioButton Style="{StaticResource Forest.StatTab}" GroupName="ModFilter"
+                             IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=Pinned}">
+                    <TextBlock><Run Text="{Binding PinnedCount, Mode=OneWay}" FontSize="24" /><Run Text="  " /><Run Text="{Binding PinnedLabel, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" FontSize="13" /></TextBlock>
+                </RadioButton>
+                <RadioButton Style="{StaticResource Forest.StatTab}" GroupName="ModFilter"
+                             IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=Disabled}">
                     <TextBlock><Run Text="{Binding DisabledCount, Mode=OneWay}" FontSize="24" /><Run Text="  " /><Run Text="{Binding DisabledLabel, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" FontSize="13" /></TextBlock>
-                </Button>
+                </RadioButton>
+                <RadioButton Style="{StaticResource Forest.StatTab}" GroupName="ModFilter" ToolTip="{local:Tr mods.chipUnneededTip}"
+                             Visibility="{Binding HasUnneeded, Converter={StaticResource BoolToVis}}"
+                             IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=Unneeded}">
+                    <TextBlock><Run Text="{Binding UnneededCount, Mode=OneWay}" FontSize="24" /><Run Text="  " /><Run Text="{Binding UnneededLabel, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" FontSize="13" /></TextBlock>
+                </RadioButton>
             </WrapPanel>
             </DockPanel>
         </Border>
@@ -244,7 +256,8 @@
 
         <!-- ===== строка статуса ===== -->
         <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,8">
-            <TextBlock DockPanel.Dock="Right" Text="{Binding ShownText}" Foreground="{StaticResource Forest.Muted}" FontSize="12" Margin="16,0,0,0" />
+            <TextBlock DockPanel.Dock="Right" Text="{Binding ShownText}" Foreground="{StaticResource Forest.Muted}" FontSize="12" Margin="16,0,0,0"
+                       Visibility="{Binding IsHistory, Converter={StaticResource InvertVis}}" />
             <TextBlock Text="{Binding StatusText}" ToolTip="{Binding StatusText}" Foreground="{StaticResource Forest.Muted}" FontSize="12"
                        TextTrimming="CharacterEllipsis" />
         </DockPanel>
@@ -264,6 +277,17 @@
             <DockPanel>
                 <DockPanel DockPanel.Dock="Top">
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="8,0,0,0">
+<ComboBox ItemsSource="{Binding SortModes}" SelectedIndex="{Binding SortIndex}" MinWidth="160" FontSize="12" Margin="0,0,8,0">
+                        <ComboBox.Style>
+                            <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsHistory}" Value="True">
+                                        <Setter Property="Visibility" Value="Hidden" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ComboBox.Style>
+                    </ComboBox>
                         <Button Command="{Binding AddFromFileCommand}" ToolTip="{local:Tr mods.addTip}"
                                 IsEnabled="{Binding IsBusy, Converter={StaticResource Invert}}">
                             <StackPanel Orientation="Horizontal">
@@ -313,55 +337,7 @@
                     </Grid>
                 </DockPanel>
 
-                <!-- чипы-фильтры и сортировка -->
-                <DockPanel DockPanel.Dock="Top" Margin="0,12,0,10">
-                    <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding SortModes}" SelectedIndex="{Binding SortIndex}" MinWidth="170" FontSize="12">
-                        <ComboBox.Style>
-                            <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsHistory}" Value="True">
-                                        <Setter Property="Visibility" Value="Hidden" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </ComboBox.Style>
-                    </ComboBox>
-                    <!-- узкая таблица (открыта карточка) — чипы переносятся на вторую строку, а не уходят под сортировку -->
-                    <WrapPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
-                        <WrapPanel.Resources>
-                            <Style TargetType="RadioButton" BasedOn="{StaticResource Forest.Chip}">
-                                <Setter Property="Margin" Value="0,2,6,2" />
-                            </Style>
-                        </WrapPanel.Resources>
-                        <RadioButton GroupName="ModFilter"
-                                     IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=All}">
-                            <TextBlock><Run Text="{local:Tr mods.chipAll}" /><Run Text="  " /><Run Text="{Binding ModCount, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" /></TextBlock>
-                        </RadioButton>
-                        <RadioButton GroupName="ModFilter"
-                                     IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=Updates}">
-                            <TextBlock><Run Text="{local:Tr mods.chipUpdates}" /><Run Text="  " /><Run Text="{Binding UpdatesAvailable, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" /></TextBlock>
-                        </RadioButton>
-                        <RadioButton GroupName="ModFilter"
-                                     IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=Problems}">
-                            <TextBlock><Run Text="{local:Tr mods.chipProblems}" /><Run Text="  " /><Run Text="{Binding ProblemCount, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" /></TextBlock>
-                        </RadioButton>
-                        <RadioButton GroupName="ModFilter"
-                                     IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=Pinned}">
-                            <TextBlock><Run Text="{local:Tr mods.chipPinned}" /><Run Text="  " /><Run Text="{Binding PinnedCount, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" /></TextBlock>
-                        </RadioButton>
-                        <RadioButton GroupName="ModFilter"
-                                     IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=Disabled}">
-                            <TextBlock><Run Text="{local:Tr mods.chipDisabled}" /><Run Text="  " /><Run Text="{Binding DisabledCount, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" /></TextBlock>
-                        </RadioButton>
-                        <RadioButton GroupName="ModFilter" ToolTip="{local:Tr mods.chipUnneededTip}"
-                                     Visibility="{Binding HasUnneeded, Converter={StaticResource BoolToVis}}"
-                                     IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=Unneeded}">
-                            <TextBlock><Run Text="{local:Tr mods.chipUnneeded}" /><Run Text="  " /><Run Text="{Binding UnneededCount, Mode=OneWay}" Foreground="{StaticResource Forest.Muted}" /></TextBlock>
-                        </RadioButton>
-                    </WrapPanel>
-                </DockPanel>
-
-                <Grid>
+                <Grid Margin="0,12,0,0">
                 <!-- история: сеансы изменений модов -->
                 <Border Style="{StaticResource Forest.Card}" ClipToBounds="True" DataContext="{Binding History}"
                         Visibility="{Binding DataContext.IsHistory, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}">

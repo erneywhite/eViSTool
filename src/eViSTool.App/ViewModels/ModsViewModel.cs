@@ -57,7 +57,11 @@ public sealed partial class ModsViewModel : ObservableObject
     /// <summary>Клиентские моды в серверном профиле — фильтр виден, только когда они есть.</summary>
     [ObservableProperty] private int _unneededCount;
     public bool HasUnneeded => UnneededCount > 0;
-    partial void OnUnneededCountChanged(int value) => OnPropertyChanged(nameof(HasUnneeded));
+    partial void OnUnneededCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(HasUnneeded));
+        OnPropertyChanged(nameof(UnneededLabel));
+    }
 
     /// <summary>Идёт скачивание/установка — кнопки операций недоступны.</summary>
     [ObservableProperty] private bool _isBusy;
@@ -78,6 +82,8 @@ public sealed partial class ModsViewModel : ObservableObject
     public string UpdatesLabel => Loc.Plural("mods.cntUpdates", UpdatesAvailable);
     public string ProblemsLabel => Loc.Plural("mods.cntProblems", ProblemCount);
     public string DisabledLabel => Loc.Plural("mods.cntDisabled", DisabledCount);
+    public string PinnedLabel => Loc.Plural("mods.cntPinned", PinnedCount);
+    public string UnneededLabel => Loc.Plural("mods.cntUnneeded", UnneededCount);
     public string ShownText => Loc.T("mods.shown", View.Cast<object>().Count(), Rows.Count);
 
     public IReadOnlyList<string> SortModes { get; } = [Loc.T("mods.sortImportant"), Loc.T("mods.sortName")];
@@ -95,6 +101,7 @@ public sealed partial class ModsViewModel : ObservableObject
     partial void OnUpdatesAvailableChanged(int value) => OnPropertyChanged(nameof(UpdatesLabel));
     partial void OnProblemCountChanged(int value) => OnPropertyChanged(nameof(ProblemsLabel));
     partial void OnDisabledCountChanged(int value) => OnPropertyChanged(nameof(DisabledLabel));
+    partial void OnPinnedCountChanged(int value) => OnPropertyChanged(nameof(PinnedLabel));
 
     partial void OnSelectedChanged(ModRowViewModel? value)
     {
