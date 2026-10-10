@@ -335,6 +335,7 @@ public sealed partial class ServerViewModel : ObservableObject
         ForeignPid = null;
         ErrorText = "";
         AgentNote = "";
+        _agentRestartingUntil = DateTime.MinValue;
         ClearStats();
         OnPropertyChanged(nameof(HeaderSubtitle));
         OnPropertyChanged(nameof(DataDir));
@@ -467,7 +468,13 @@ public sealed partial class ServerViewModel : ObservableObject
         {
             if (ct.IsCancellationRequested) return false;
             if (_client is not null) Detach();
-            ErrorText = RemoteSecret.Describe(ex);
+            // агент обновляется и перезапускается — связь и должна пропасть: не пугаем ошибкой, ждём его
+            if (DateTime.UtcNow < _agentRestartingUntil)
+            {
+                AgentNote = Loc.T("selfupd.stateRestart");
+                ErrorText = "";
+            }
+            else ErrorText = RemoteSecret.Describe(ex);
         }
         _stateKnown = true;
         Refresh();
@@ -496,6 +503,9 @@ public sealed partial class ServerViewModel : ObservableObject
                          && Core.Versioning.ModVersion.TryParse(AgentProtocol.AppVersion, out var appVersion)
                          && agentVersion.CompareTo(appVersion) < 0;
         _remoteServerUp = s.State != ServerState.Stopped;
+        // ставит новую версию — скоро перезапустится; пока не вернётся (до трёх минут), пропажа связи — не ошибка
+        if (s.SelfUpdate is "install" or "restart") _agentRestartingUntil = DateTime.UtcNow.AddMinutes(3);
+        else if (s.SelfUpdate is null or "failed") _agentRestartingUntil = DateTime.MinValue;
         CanUpdateRemoteAgent = olderAgent && s.SelfUpdate is null or "failed";
         AgentNote = s.SelfUpdate switch
         {
@@ -580,6 +590,9 @@ public sealed partial class ServerViewModel : ObservableObject
         AgentRunning = true;
         _ = PumpConsoleAsync(client, ct);
     }
+
+    /// <summary>До какого времени ждём удалённого агента, перезапускающегося после «Обновить на сервере».</summary>
+    private DateTime _agentRestartingUntil = DateTime.MinValue;
 
     private void Detach()
     {
