@@ -273,6 +273,8 @@ public sealed partial class MainViewModel : ObservableObject
                 var dataDir = string.IsNullOrWhiteSpace(active.DataDir) ? GameInstall.DefaultDataDir : active.DataDir;
                 _session = new Core.Diagnostics.GameSession(dataDir, started, active.GameDir);
                 _sessionProfile = active;
+                // запуск игры закрывает строку истории модов профиля: всё, что поменяли до него, — одним сеансом
+                Core.Mods.ModHistory.MarkLaunch(Core.Mods.ModHistory.FileFor(active.Id), started);
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)

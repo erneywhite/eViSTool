@@ -214,7 +214,7 @@ public sealed class AgentClient : IDisposable
         if (op.Undoes is { } undoes) content.Headers.Add(OpUndoesHeader, undoes);
     }
 
-    /// <summary>История изменений модов сервера (записи; в действия их собирает <see cref="ModHistory.Group"/>).</summary>
+    /// <summary>История изменений модов сервера (записи и отметки запусков; в сеансы их собирает <see cref="ModHistory.Sessions"/>).</summary>
     public Task<List<ModHistoryEntry>> ModHistoryAsync(CancellationToken ct = default) => Get<List<ModHistoryEntry>>("mods/history", ct);
 
     private static CancellationTokenSource Timed(CancellationToken ct, TimeSpan? timeout = null)

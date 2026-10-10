@@ -215,7 +215,12 @@ void Stat(StatsEntry entry)
 }
 host.StateChanged += state =>
 {
-    if (state == ServerState.Running) Stat(new StatsEntry(DateTime.Now, StatsKind.Up));
+    if (state == ServerState.Running)
+    {
+        Stat(new StatsEntry(DateTime.Now, StatsKind.Up));
+        // запуск сервера закрывает строку истории модов: всё, что поменяли до него, — одним сеансом
+        eViSTool.Core.Mods.ModHistory.MarkLaunch(eViSTool.Core.Mods.ModHistory.FileFor(opts.ProfileId));
+    }
     // сам остановился после запуска — упал (как и для оповещения «сервер упал»)
     else if (state == ServerState.Stopped)
         Stat(new StatsEntry(DateTime.Now, host.LastExitOnItsOwn && reachedRunning ? StatsKind.Crash : StatsKind.Down));
@@ -822,12 +827,9 @@ web.MapPost("/mods/delete", async (HttpContext ctx) =>
     using var history = HistoryOp(ctx);
     return request is null ? Results.BadRequest() : Guard(() => { mods.Delete(request.Path); return Status(); });
 });
-// история изменений модов сервера за 90 дней (записи; окно собирает их в действия)
+// история изменений модов сервера (записи и отметки запусков; в строки-сеансы их собирает окно)
 web.MapGet("/mods/history", () => Guard(() =>
-{
-    var since = DateTime.UtcNow.AddDays(-eViSTool.Core.Mods.ModHistory.KeepDays);
-    return eViSTool.Core.Mods.ModHistory.ReadEntries(eViSTool.Core.Mods.ModHistory.FileFor(opts.ProfileId)).Where(e => e.At >= since).ToList();
-}));
+    eViSTool.Core.Mods.ModHistory.ReadEntries(eViSTool.Core.Mods.ModHistory.FileFor(opts.ProfileId))));
 // игроки: списки — всегда; правка файлов — только у остановленного (работающий держит списки в памяти и перезапишет их)
 web.MapGet("/players", () => Guard(() => playerLists.Read()));
 web.MapPost("/players/edit", async (HttpContext ctx) =>

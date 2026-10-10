@@ -469,13 +469,12 @@ public sealed class AgentTests : IAsyncLifetime
             Assert.Equal(["gamma", "other"], list.Mods.Select(m => m.Info!.ModId).Order());
             Assert.DoesNotContain("CarryOn", list.DisabledMods);
 
-            // история на сервере: обе установки — в действии окна, удаление — отдельным
-            var ops = ModHistory.Group(await client.ModHistoryAsync());
-            var updates = Assert.Single(ops, o => o.Id == batchId);
-            Assert.Equal(ModHistorySource.UpdateAll, updates.Source);
-            Assert.Equal([("carryon", "1.0.0", "1.1.0"), ("gamma", null, "0.5.0")], updates.Changes.Select(c => (c.ModId, c.From, c.To)));
-            var removed = Assert.Single(ops, o => o.Id != batchId).Changes.Single();
-            Assert.Equal(("carryon", "1.1.0", (string?)null), (removed.ModId, removed.From, removed.To));
+            // история на сервере: установки — с нажатием окна, удаление — отдельным; сервер не запускали — один сеанс
+            var session = Assert.Single(ModHistory.Sessions(await client.ModHistoryAsync()));
+            Assert.Equal([(batchId, "carryon", "1.0.0", "1.1.0"), (batchId, "gamma", null, "0.5.0")],
+                session.Changes.Where(c => c.Op == batchId).Select(c => (c.Op, c.ModId, c.From, c.To)));
+            Assert.Equal([ModHistorySource.UpdateAll, ModHistorySource.Manual], session.Sources);
+            Assert.Equal([("carryon", "1.0.0", (string?)null), ("gamma", null, "0.5.0")], session.Net.Select(c => (c.ModId, c.From, c.To)));
         }
         finally
         {

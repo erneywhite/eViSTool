@@ -3,20 +3,41 @@ using Newtonsoft.Json;
 namespace eViSTool.Core.Mods;
 
 /// <summary>
-/// Одно изменение мода в истории. <see cref="From"/> null — мод поставлен впервые, <see cref="To"/> null — удалён.
-/// <see cref="Op"/> — действие, в которое оно входит: «Обновить всё» на пять модов — пять записей с одним Op.
-/// Время — UTC: историю удалённого сервера пишет его агент, окно переводит в свой пояс.
+/// Строка файла истории: изменение мода или отметка о запуске игры/сервера (<see cref="Event"/> = «launch», мода нет).
+/// У изменения <see cref="From"/> null — мод поставлен впервые, <see cref="To"/> null — удалён. <see cref="Op"/> — нажатие,
+/// которым оно сделано; <see cref="Undoes"/> — какой сеанс откатывает. Время — UTC: историю удалённого сервера пишет его
+/// агент, окно переводит в свой пояс.
 /// </summary>
 public sealed record ModHistoryEntry(string Op, DateTime At, string Source, string ModId, string? Name, string? From, string? To,
-    string? Undoes = null)
+    string? Undoes = null, string? Event = null)
 {
+    public const string Launch = "launch";
+
+    [JsonIgnore] public bool IsLaunch => Event == Launch;
     [JsonIgnore] public string Title => string.IsNullOrWhiteSpace(Name) ? ModId : Name;
 }
 
-/// <summary>Действие целиком — то, что видит человек одной строкой: «Обновлено 5 модов», «Откат: Footprints».</summary>
-public sealed record ModHistoryOp(string Id, DateTime At, string Source, string? Undoes, IReadOnlyList<ModHistoryEntry> Changes);
+/// <summary>
+/// Сеанс — то, что человек видит одной строкой истории: всё, что поменялось в модах между двумя запусками игры (или
+/// сервера). Без запуска сеанс заканчивается, когда изменения прервались больше чем на полчаса.
+/// <see cref="LaunchedAt"/> — запуск, которым он закрылся (null — после него игру ещё не запускали или был перерыв).
+/// </summary>
+public sealed record ModHistorySession(string Id, DateTime Start, DateTime End, DateTime? LaunchedAt, IReadOnlyList<ModHistoryEntry> Changes)
+{
+    /// <summary>Откуда изменения сеанса, без повторов, в порядке появления.</summary>
+    public IReadOnlyList<string> Sources => [.. Changes.Select(c => c.Source).Distinct()];
 
-/// <summary>Откуда взялось действие — для подписи в истории.</summary>
+    /// <summary>
+    /// Итог по модам: какая версия была до сеанса и какая стала после (мод обновили дважды — одна строка 1.0 → 1.2).
+    /// Мод, вернувшийся к той же версии, пропускается. Порядок — по первому изменению мода.
+    /// </summary>
+    public IReadOnlyList<ModHistoryEntry> Net =>
+        [.. Changes.GroupBy(c => c.ModId, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.Last() with { From = g.First().From, Name = g.Last().Name ?? g.First().Name })
+            .Where(c => !string.Equals(c.From, c.To, StringComparison.OrdinalIgnoreCase))];
+}
+
+/// <summary>Откуда взялось изменение — для подписи в истории.</summary>
 public static class ModHistorySource
 {
     public const string Manual = "manual";       // кнопки у одного мода: удалить, поставить ту же
@@ -31,25 +52,28 @@ public static class ModHistorySource
 }
 
 /// <summary>
-/// История изменений модов профиля: файл <c>ModHistory/&lt;профиль&gt;.jsonl</c> в данных eViSTool, по строке на мод.
-/// Пишет её то, что меняет моды: окно для своих профилей, агент для сервера (в том числе по просьбе окна с другого
-/// компьютера — тогда действие окна приходит в заголовках и записи агента встают в ту же пачку). Хранится 90 дней.
+/// История изменений модов профиля: файл <c>ModHistory/&lt;профиль&gt;.jsonl</c> в данных eViSTool, по строке на мод
+/// и отметки запусков. Пишет её то, что меняет моды: окно для своих профилей, агент для сервера (в том числе по просьбе
+/// окна с другого компьютера — нажатие окна приходит в заголовках). Запуск игры отмечает окно, запуск сервера — агент.
 /// <para>
-/// Пачка задаётся областью <see cref="Begin"/>: всё, что поставлено или удалено внутри неё (и в вызванных из неё
-/// задачах), — одно действие. Изменение вне области — отдельное действие с источником «вручную».
+/// В строки истории (<see cref="ModHistorySession"/>) записи собираются при чтении: граница — запуск или перерыв
+/// больше <see cref="Gap"/>. Хранится <see cref="KeepDays"/> дней, но последние <see cref="KeepSessions"/> сеанса —
+/// всегда: кто месяц не играл, после отпуска всё равно увидит, что менял перед ним.
 /// </para>
 /// </summary>
 public static class ModHistory
 {
-    public const int KeepDays = 90;
+    public const int KeepDays = 30;
+    public const int KeepSessions = 3;
+    public static readonly TimeSpan Gap = TimeSpan.FromMinutes(30);
 
     public static string Dir => Path.Combine(AppPaths.Root, "ModHistory");
 
     public static string FileFor(string profileId, string? dir = null) => Path.Combine(dir ?? Dir, $"{profileId}.jsonl");
 
-    // ---- текущее действие
+    // ---- текущее нажатие
 
-    /// <summary>Действие, внутри которого идёт работа: его id, источник и какое действие оно откатывает.</summary>
+    /// <summary>Нажатие, внутри которого идёт работа: его id, источник и какой сеанс оно откатывает.</summary>
     public sealed record Scope(string Id, string Source, string? Undoes);
 
     private static readonly AsyncLocal<Scope?> _current = new();
@@ -57,19 +81,21 @@ public static class ModHistory
     public static Scope? Current => _current.Value;
 
     /// <summary>
-    /// Начать действие. Вложенный вызов внутри уже начатого ничего не меняет: «Обновить всё» зовёт установку каждого
-    /// мода, и всё это — одна пачка.
+    /// Начать нажатие. Вложенный вызов внутри уже начатого ничего не меняет: модпак зовёт установку каждого мода,
+    /// а источник у них один — «модпак».
     /// </summary>
     public static IDisposable Begin(string source, string? undoes = null) =>
         _current.Value is null ? Enter(new Scope(NewId(), source, undoes)) : Nothing.Instance;
 
-    /// <summary>
-    /// Продолжить действие, начатое в другом процессе (агент получил его от окна). Без id — как <see cref="Begin"/>.
-    /// </summary>
+    /// <summary>Продолжить нажатие, начатое в другом процессе (агент получил его от окна). Без id — как <see cref="Begin"/>.</summary>
     public static IDisposable Join(string? id, string? source, string? undoes = null) =>
-        id is { Length: > 0 } && id.Length <= 64 && id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_')
-            ? Enter(new Scope(id, Known(source), undoes is { Length: > 0 and <= 64 } ? undoes : null))
-            : Begin(Known(source), undoes);
+        IsId(id) ? Enter(new Scope(id!, Known(source), IsId(undoes) ? undoes : null)) : Begin(Known(source), IsId(undoes) ? undoes : null);
+
+    /// <summary>Новое нажатие, не делая его текущим: очередь окна запоминает его у пунктов и входит в него при установке.</summary>
+    public static Scope NewScope(string source, string? undoes = null) => new(NewId(), source, undoes);
+
+    private static bool IsId(string? id) =>
+        id is { Length: > 0 and <= 64 } && id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
 
     private static string Known(string? source) => source is { Length: > 0 and <= 32 } && source.All(char.IsAsciiLetterOrDigit)
         ? source : ModHistorySource.Manual;
@@ -80,9 +106,6 @@ public static class ModHistory
         _current.Value = scope;
         return new Restore(previous);
     }
-
-    /// <summary>Новое действие, не делая его текущим: очередь окна запоминает его у пунктов и входит в него при установке.</summary>
-    public static Scope NewScope(string source, string? undoes = null) => new(NewId(), source, undoes);
 
     private static string NewId() => Guid.NewGuid().ToString("N")[..12];
 
@@ -97,13 +120,28 @@ public static class ModHistory
         public void Dispose() { }
     }
 
-    // ---- запись и чтение
+    // ---- запись
 
-    /// <summary>Записать изменение мода в историю файла <paramref name="file"/> (в текущее действие или отдельным).</summary>
+    /// <summary>Записать изменение мода (в текущее нажатие или отдельным, «вручную»).</summary>
     public static void Record(string file, string modId, string? name, string? from, string? to, DateTime? at = null)
     {
         var scope = Current ?? new Scope(NewId(), ModHistorySource.Manual, null);
-        var entry = new ModHistoryEntry(scope.Id, at ?? DateTime.UtcNow, scope.Source, modId, name, from, to, scope.Undoes);
+        Append(file, new ModHistoryEntry(scope.Id, at ?? DateTime.UtcNow, scope.Source, modId, name, from, to, scope.Undoes));
+    }
+
+    /// <summary>
+    /// Отметить запуск игры или сервера — границу сеанса. Пишется, только если с прошлой отметки моды менялись: иначе
+    /// ежедневные запуски без изменений раздували бы файл.
+    /// </summary>
+    public static void MarkLaunch(string file, DateTime? at = null)
+    {
+        var entries = ReadEntries(file);
+        if (entries.Count == 0 || entries[^1].IsLaunch) return;
+        Append(file, new ModHistoryEntry("", at ?? DateTime.UtcNow, "", "", null, null, null, Event: ModHistoryEntry.Launch));
+    }
+
+    private static void Append(string file, ModHistoryEntry entry)
+    {
         try
         {
             Retry(() =>
@@ -111,7 +149,7 @@ public static class ModHistory
                 Directory.CreateDirectory(Path.GetDirectoryName(file)!);
                 using (var stream = new FileStream(file, FileMode.Append, FileAccess.Write, FileShare.Read))
                 using (var writer = new StreamWriter(stream))
-                    writer.WriteLine(JsonConvert.SerializeObject(entry));
+                    writer.WriteLine(JsonConvert.SerializeObject(entry, Settings));
                 PruneIfOld(file);
             });
         }
@@ -121,18 +159,48 @@ public static class ModHistory
         }
     }
 
-    /// <summary>Действия за последние <paramref name="days"/> дней, новые сверху. Битые строки пропускаются.</summary>
-    public static IReadOnlyList<ModHistoryOp> Read(string file, int days = KeepDays, DateTime? now = null)
+    private static readonly JsonSerializerSettings Settings = new() { NullValueHandling = NullValueHandling.Ignore };
+
+    // ---- чтение
+
+    /// <summary>Строки истории, которые хранятся (за срок и последние сеансы), новые сверху.</summary>
+    public static IReadOnlyList<ModHistorySession> Read(string file, DateTime? now = null) => Kept(Sessions(ReadEntries(file)), now);
+
+    /// <summary>
+    /// Записи → сеансы: граница — отметка запуска или перерыв между изменениями больше <see cref="Gap"/>.
+    /// Новые сверху. Id сеанса — нажатие, с которого он начался (по нему откат ссылается на сеанс).
+    /// </summary>
+    public static IReadOnlyList<ModHistorySession> Sessions(IEnumerable<ModHistoryEntry> entries)
     {
-        var since = (now ?? DateTime.UtcNow).AddDays(-days);
-        return Group(ReadEntries(file).Where(e => e.At >= since));
+        var sessions = new List<ModHistorySession>();
+        var current = new List<ModHistoryEntry>();
+        void Close(DateTime? launched)
+        {
+            if (current.Count == 0) return;
+            sessions.Add(new ModHistorySession(current[0].Op, current[0].At, current[^1].At, launched, [.. current]));
+            current = [];
+        }
+        foreach (var e in entries.OrderBy(e => e.At))
+        {
+            if (e.IsLaunch)
+            {
+                Close(e.At);
+                continue;
+            }
+            if (current.Count > 0 && e.At - current[^1].At > Gap) Close(null);
+            current.Add(e);
+        }
+        Close(null);
+        sessions.Reverse();
+        return sessions;
     }
 
-    /// <summary>Записи → действия: по Op, в порядке записи; действие датировано первым изменением; новые сверху.</summary>
-    public static IReadOnlyList<ModHistoryOp> Group(IEnumerable<ModHistoryEntry> entries) =>
-        [.. entries.GroupBy(e => e.Op)
-            .Select(g => new ModHistoryOp(g.Key, g.Min(e => e.At), g.First().Source, g.First().Undoes, [.. g]))
-            .OrderByDescending(op => op.At)];
+    /// <summary>Сеансы, которые храним: закончившиеся не раньше срока и, в любом случае, последние несколько.</summary>
+    public static IReadOnlyList<ModHistorySession> Kept(IReadOnlyList<ModHistorySession> sessions, DateTime? now = null)
+    {
+        var since = (now ?? DateTime.UtcNow).AddDays(-KeepDays);
+        return [.. sessions.Where((s, i) => i < KeepSessions || s.End >= since)];
+    }
 
     public static IReadOnlyList<ModHistoryEntry> ReadEntries(string file)
     {
@@ -156,7 +224,7 @@ public static class ModHistory
         {
             try
             {
-                if (JsonConvert.DeserializeObject<ModHistoryEntry>(line) is { Op.Length: > 0, ModId.Length: > 0 } e)
+                if (JsonConvert.DeserializeObject<ModHistoryEntry>(line) is { } e && (e.IsLaunch || e is { Op.Length: > 0, ModId.Length: > 0 }))
                     list.Add(e with { At = DateTime.SpecifyKind(e.At, DateTimeKind.Utc) });
             }
             catch (JsonException) { }
@@ -165,16 +233,18 @@ public static class ModHistory
     }
 
     /// <summary>
-    /// Убрать записи старше срока. Переписываем файл, только когда старейшая запись вышла за срок больше чем на неделю:
-    /// иначе каждая установка переписывала бы весь файл.
+    /// Убрать из файла то, что больше не хранится. Переписываем, только когда лишнее старше начала хранимого больше чем
+    /// на неделю: иначе каждая установка переписывала бы весь файл.
     /// </summary>
     private static void PruneIfOld(string file)
     {
         var entries = ReadEntries(file);
-        var limit = DateTime.UtcNow.AddDays(-KeepDays);
-        if (entries.Count == 0 || entries[0].At >= limit.AddDays(-7)) return;
+        var kept = Kept(Sessions(entries));
+        if (entries.Count == 0 || kept.Count == 0) return;
+        var from = kept.Min(s => s.Start);
+        if (entries[0].At >= from.AddDays(-7)) return;
         var tmp = file + ".tmp";
-        File.WriteAllLines(tmp, entries.Where(e => e.At >= limit).Select(e => JsonConvert.SerializeObject(e)));
+        File.WriteAllLines(tmp, entries.Where(e => e.At >= from).Select(e => JsonConvert.SerializeObject(e, Settings)));
         File.Move(tmp, file, overwrite: true);
     }
 
