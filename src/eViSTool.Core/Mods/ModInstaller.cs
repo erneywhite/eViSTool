@@ -170,8 +170,26 @@ public sealed class ModBackupStore(string root, int keepPerMod = 3, string? hist
         if (File.Exists(dest)) File.SetCreationTimeUtc(dest, DateTime.UtcNow);
         else Directory.SetCreationTimeUtc(dest, DateTime.UtcNow);
 
+        DropSameVersion(dir, dest, mod.Info?.Version);
         Prune(dir);
         return dest;
+    }
+
+    /// <summary>
+    /// Та же версия уже лежит в хранилище (мод откатывали туда и обратно) — старую копию убираем: две одинаковые копии
+    /// только вытесняли бы другие версии из трёх хранимых.
+    /// </summary>
+    private static void DropSameVersion(string dir, string kept, string? version)
+    {
+        if (string.IsNullOrEmpty(version)) return;
+        foreach (var other in Directory.EnumerateFiles(dir).Where(f => !string.Equals(f, kept, StringComparison.OrdinalIgnoreCase)).ToList())
+        {
+            try
+            {
+                if (string.Equals(ModScanner.ReadZip(other).Info?.Version, version, StringComparison.OrdinalIgnoreCase)) File.Delete(other);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
     }
 
     public IReadOnlyList<string> List(string modId)

@@ -107,6 +107,24 @@ public sealed class ModManagementTests : IDisposable
         Assert.Single(store.List("carryon"));
     }
 
+    [Fact]
+    public void BackupStore_KeepsOneCopyPerVersion()
+    {
+        // мод гоняли туда-обратно: 1.2.12 → 1.2.13 → 1.2.12 → 1.2.13 — в хранилище по одной копии каждой версии
+        var p = Server("""{ "ModPaths": [] }""");
+        var dl = Directory.CreateDirectory(Path.Combine(_root, "dl")).FullName;
+        var store = new ModBackupStore(Path.Combine(_root, "backups"));
+        MakeZip(_mods, "Footprints-v1.2.12.zip", "footprints", "1.2.12");
+        foreach (var version in new[] { "1.2.13", "1.2.12", "1.2.13" })
+        {
+            var zip = MakeZip(dl, $"Footprints-v{version}.zip", "footprints", version);
+            ModInstaller.Apply(ModInstaller.Plan(zip, p, ModUpdateService.ScanLocal(p)), store);
+            File.Delete(zip);
+        }
+
+        Assert.Equal(["1.2.12", "1.2.13"], store.List("footprints").Select(f => ModScanner.ReadZip(f).Info!.Version).Order());
+    }
+
     [Theory]
     [InlineData("1.22.7", "1.22.8")] // игра старее, чем нужно моду, — план это видит
     [InlineData("1.22.8", null)]
