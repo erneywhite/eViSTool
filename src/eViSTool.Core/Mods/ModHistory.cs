@@ -24,6 +24,9 @@ public sealed record ModHistoryEntry(string Op, DateTime At, string Source, stri
 /// </summary>
 public sealed record ModHistorySession(string Id, DateTime Start, DateTime End, DateTime? LaunchedAt, IReadOnlyList<ModHistoryEntry> Changes)
 {
+    /// <summary>Какой сеанс откатывает этот (null — это не откат).</summary>
+    public string? Undoes => Changes[0].Undoes;
+
     /// <summary>Откуда изменения сеанса, без повторов, в порядке появления.</summary>
     public IReadOnlyList<string> Sources => [.. Changes.Select(c => c.Source).Distinct()];
 
@@ -167,7 +170,7 @@ public static class ModHistory
     public static IReadOnlyList<ModHistorySession> Read(string file, DateTime? now = null) => Kept(Sessions(ReadEntries(file)), now);
 
     /// <summary>
-    /// Записи → сеансы: граница — отметка запуска или перерыв между изменениями больше <see cref="Gap"/>.
+    /// Записи → сеансы: граница — отметка запуска, перерыв между изменениями больше <see cref="Gap"/> или откат.
     /// Новые сверху. Id сеанса — нажатие, с которого он начался (по нему откат ссылается на сеанс).
     /// </summary>
     public static IReadOnlyList<ModHistorySession> Sessions(IEnumerable<ModHistoryEntry> entries)
@@ -187,7 +190,9 @@ public static class ModHistory
                 Close(e.At);
                 continue;
             }
-            if (current.Count > 0 && e.At - current[^1].At > Gap) Close(null);
+            // откат — всегда своя строка: иначе он слился бы с тем, что откатывает, в «ничего не поменялось»,
+            // и ни исходный сеанс, ни сам откат было бы не увидеть и не вернуть
+            if (current.Count > 0 && (e.At - current[^1].At > Gap || (e.Undoes is not null && e.Op != current[^1].Op))) Close(null);
             current.Add(e);
         }
         Close(null);

@@ -495,11 +495,28 @@
                             <TextBlock Text="{Binding WhenLine}" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="0,4,0,0" TextWrapping="Wrap" />
                             <TextBlock Text="{Binding Sources}" FontSize="12" Foreground="{StaticResource Forest.Accent}" Margin="0,2,0,0" TextWrapping="Wrap" />
 
+                            <!-- откат сеанса целиком: моды — к версиям до него -->
+                            <Button Style="{StaticResource Forest.PrimaryButton}" Margin="0,14,0,0" HorizontalAlignment="Stretch"
+                                    Command="{Binding DataContext.RollbackSessionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}" IsEnabled="{Binding CanRevert}" ToolTip="{local:Tr hist.revertSessionTip}"
+                                    AutomationProperties.AutomationId="HistoryRevertSession">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="{StaticResource Icon.History}" Style="{StaticResource Forest.Icon}" Width="14" Height="14" Margin="0,0,8,0" />
+                                    <TextBlock Text="{local:Tr hist.revertSession}" />
+                                </StackPanel>
+                            </Button>
+
                             <TextBlock Text="{local:Tr hist.mods}" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="0,16,0,4" />
                             <ItemsControl ItemsSource="{Binding Changes}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Padding="0,8">
+                                            <DockPanel>
+                                            <Button DockPanel.Dock="Right" Content="{Binding RevertText}" Padding="10,4" MinHeight="0" FontSize="12"
+                                                    VerticalAlignment="Center" Margin="10,0,0,0"
+                                                    Command="{Binding DataContext.RevertChangeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Visibility="{Binding CanRevert, Converter={StaticResource BoolToVis}}" />
                                             <StackPanel>
                                                 <TextBlock Text="{Binding Title}" FontSize="13" Foreground="{StaticResource Forest.Text}" TextTrimming="CharacterEllipsis"
                                                            ToolTip="{Binding ModId}" />
@@ -508,6 +525,7 @@
                                                     <Run Text="{Binding Later, Mode=OneWay}" Foreground="{StaticResource Forest.Warn}" />
                                                 </TextBlock>
                                             </StackPanel>
+                                            </DockPanel>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

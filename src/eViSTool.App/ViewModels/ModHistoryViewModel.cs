@@ -42,7 +42,10 @@ public sealed partial class ModHistoryViewModel : ObservableObject
                 .GroupBy(m => m.Info!.ModId, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First().Info!.Version, StringComparer.OrdinalIgnoreCase);
             var server = target.Profile.Kind == ProfileKind.Server;
-            _all = [.. ModHistory.Kept(ModHistory.Sessions(entries)).Select(s => new HistorySessionRow(s, now, server))];
+            var sessions = ModHistory.Kept(ModHistory.Sessions(entries));
+            // сеанс потом откатили — у него пометка «откачен в 20:38»
+            var undone = sessions.Where(s => s.Undoes is not null).GroupBy(s => s.Undoes!).ToDictionary(g => g.Key, g => g.Max(s => s.Start));
+            _all = [.. sessions.Select(s => new HistorySessionRow(s, now, server, undone.TryGetValue(s.Id, out var at) ? at : null))];
             Show();
         }
         catch (Exception ex) when (ex is IOException or HttpRequestException or InvalidOperationException or TaskCanceledException
@@ -83,7 +86,7 @@ public sealed class HistorySessionRow
     public ModHistorySession Session { get; }
     public IReadOnlyList<HistoryChangeRow> Changes { get; }
 
-    public HistorySessionRow(ModHistorySession session, IReadOnlyDictionary<string, string> installedNow, bool server)
+    public HistorySessionRow(ModHistorySession session, IReadOnlyDictionary<string, string> installedNow, bool server, DateTime? undoneAt = null)
     {
         Session = session;
         Changes = [.. session.Net.Select(c => new HistoryChangeRow(c, installedNow))];
@@ -93,6 +96,7 @@ public sealed class HistorySessionRow
         Closed = session.LaunchedAt is { } launched
             ? Loc.T(server ? "hist.beforeServer" : "hist.beforeGame", launched.ToLocalTime().ToString("HH:mm", Loc.Culture))
             : Loc.T("hist.notLaunched");
+        if (undoneAt is { } undone) Closed += " · " + Loc.T("hist.undoneAt", undone.ToLocalTime().ToString("HH:mm", Loc.Culture));
         Sources = string.Join(", ", session.Sources.Select(s => SourceText(s)));
         Summary = Changes.Count == 0 ? Loc.T("hist.noNet") : string.Join(" · ", Changes.Select(c => $"{c.Title} {c.Versions}"));
         Steps = [.. session.Changes.GroupBy(c => c.Op).Select(g =>
@@ -111,6 +115,9 @@ public sealed class HistorySessionRow
 
     /// <summary>Нажатия сеанса по порядку: «09:14  «Обновить всё»: Footprints 1.2.12 → 1.2.13, …».</summary>
     public IReadOnlyList<string> Steps { get; }
+
+    /// <summary>Хоть один мод сеанса можно вернуть — кнопка «Откатить сеанс» доступна.</summary>
+    public bool CanRevert => Changes.Any(c => c.CanRevert);
 
     public bool Matches(string search) => search.Length == 0
         || Session.Changes.Any(c => c.ModId.Contains(search, StringComparison.OrdinalIgnoreCase)
@@ -183,6 +190,19 @@ public sealed class HistoryChangeRow(ModHistoryEntry change, IReadOnlyDictionary
     }
 
     public bool HasLater => Later.Length > 0;
+
+    /// <summary>Сейчас стоит не то, что было до сеанса, — есть что вернуть.</summary>
+    public bool CanRevert
+    {
+        get
+        {
+            installedNow.TryGetValue(Change.ModId, out var now);
+            return Change.From is null ? now is not null : !string.Equals(now, Change.From, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>«Вернуть 1.2.12» или «Убрать» (мод поставлен в этом сеансе).</summary>
+    public string RevertText => Change.From is null ? Loc.T("hist.revertRemove") : Loc.T("hist.revertTo", Change.From);
 
     /// <summary>«1.2.12 → 1.2.13», «установлен 1.0.0», «2.0.1 → удалён».</summary>
     public static string Arrow(string? from, string? to) =>

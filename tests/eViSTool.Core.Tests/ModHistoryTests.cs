@@ -52,6 +52,26 @@ public sealed class ModHistoryTests : IDisposable
     }
 
     [Fact]
+    public void Rollback_IsItsOwnSession_EvenRightAfterWhatItUndoes()
+    {
+        string updateId;
+        using (ModHistory.Begin(ModHistorySource.UpdateAll))
+        {
+            updateId = ModHistory.Current!.Id;
+            ModHistory.Record(_file, "footprints", "Footprints", "1.2.12", "1.2.13", T0);
+        }
+        using (ModHistory.Begin(ModHistorySource.Rollback, undoes: updateId))
+            ModHistory.Record(_file, "footprints", "Footprints", "1.2.13", "1.2.12", T0.AddMinutes(1));
+        ModHistory.Record(_file, "other", "Other", "1", "2", T0.AddMinutes(2)); // после отката — в его же строку
+
+        var sessions = ModHistory.Read(_file, T0.AddHours(1));
+        Assert.Equal(2, sessions.Count);
+        Assert.Equal((updateId, (string?)"1.2.13"), (sessions[0].Undoes, sessions[0].Net[0].From));
+        Assert.Equal(["footprints", "other"], sessions[0].Changes.Select(c => c.ModId));
+        Assert.Equal((updateId, (string?)null), (sessions[1].Id, sessions[1].Undoes));
+    }
+
+    [Fact]
     public void Net_ShowsVersionBeforeAndAfterTheSession_PerMod()
     {
         ModHistory.Record(_file, "carryon", "Carry On", "1.0", "1.1", T0);
