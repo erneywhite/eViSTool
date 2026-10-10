@@ -31,6 +31,11 @@ public sealed partial class ModCardViewModel : ObservableObject
     [ObservableProperty] private bool _isVersionsTab;
     [ObservableProperty] private IReadOnlyList<VersionRowViewModel> _versions = [];
     [ObservableProperty] private string _versionsStatus = "";
+
+    /// <summary>Последние изменения этого мода из истории — над списком версий.</summary>
+    [ObservableProperty] private IReadOnlyList<string> _historyLines = [];
+    public bool HasHistory => HistoryLines.Count > 0;
+    partial void OnHistoryLinesChanged(IReadOnlyList<string> value) => OnPropertyChanged(nameof(HasHistory));
     private bool _versionsLoaded;
 
     public ModCardViewModel(ModRowViewModel row, ModsViewModel owner, ModVersion? game, string profileName)
@@ -133,6 +138,7 @@ public sealed partial class ModCardViewModel : ObservableObject
         if (!value || _versionsLoaded) return;
         _versionsLoaded = true;
         VersionsStatus = Loc.T("mcard.versionsLoading");
+        HistoryLines = await Owner.ModHistoryLinesAsync(Row.ModId);
         var options = await Owner.LoadVersionOptionsAsync(Row);
         Versions = options.Select(o => new VersionRowViewModel(o, Row.Installed)).ToList();
         VersionsStatus = Versions.Count == 0 ? Loc.T("mcard.versionsNone") : Loc.T("mcard.versionsHint");

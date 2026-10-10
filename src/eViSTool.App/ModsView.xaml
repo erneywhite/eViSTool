@@ -739,6 +739,19 @@
 
                                 <!-- ===== вкладка «Версии» ===== -->
                                 <StackPanel Visibility="{Binding IsVersionsTab, Converter={StaticResource BoolToVis}}" Margin="0,12,0,0">
+                                    <!-- что с модом делали: последние изменения из истории -->
+                                    <StackPanel Visibility="{Binding HasHistory, Converter={StaticResource BoolToVis}}" Margin="0,0,0,14">
+                                        <TextBlock Text="{local:Tr mcard.historyTitle}" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="0,0,0,4" />
+                                        <Border Background="{StaticResource Forest.Base}" CornerRadius="6" Padding="10,8">
+                                            <ItemsControl ItemsSource="{Binding HistoryLines}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding}" FontSize="11" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Border>
+                                    </StackPanel>
                                     <TextBlock Text="{Binding VersionsStatus}" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap"
                                                Margin="0,0,0,8" />
                                     <ItemsControl ItemsSource="{Binding Versions}">

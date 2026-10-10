@@ -68,6 +68,26 @@ public sealed partial class ModsViewModel
         StatusText = problems.Count > 0 ? string.Join("; ", problems) : Loc.T("hist.revertStarted");
     }
 
+    /// <summary>
+    /// Последние изменения одного мода — для вкладки «Версии» его карточки: «сегодня, 20:37 · 1.2.10 → 1.2.11 · «Обновить всё»».
+    /// История не читается (нет связи, старый агент) — пусто, карточке это не мешает.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> ModHistoryLinesAsync(string modId, int count = 5)
+    {
+        if (modId.Length == 0 || CurrentTarget() is not { } target) return [];
+        try
+        {
+            var entries = await ModTargets.HistoryAsync(target);
+            return [.. entries.Where(e => !e.IsLaunch && string.Equals(e.ModId, modId, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(e => e.At).Take(count)
+                .Select(e => $"{HistorySessionRow.Day(e.At.ToLocalTime())} · {HistoryChangeRow.Arrow(e.From, e.To)} · {HistorySessionRow.SourceText(e.Source)}")];
+        }
+        catch (Exception ex) when (ex is IOException or HttpRequestException or InvalidOperationException or TaskCanceledException)
+        {
+            return [];
+        }
+    }
+
     /// <summary>Где взять прежнюю версию мода: сохранённая копия этого профиля, иначе релиз модбазы с той же версией.</summary>
     private async Task<RevertStep> PlanRevertAsync(ModTarget target, HistoryChangeRow change)
     {

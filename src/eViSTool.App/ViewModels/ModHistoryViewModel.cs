@@ -43,9 +43,12 @@ public sealed partial class ModHistoryViewModel : ObservableObject
                 .ToDictionary(g => g.Key, g => g.First().Info!.Version, StringComparer.OrdinalIgnoreCase);
             var server = target.Profile.Kind == ProfileKind.Server;
             var sessions = ModHistory.Kept(ModHistory.Sessions(entries));
-            // сеанс потом откатили — у него пометка «откачен в 20:38»
-            var undone = sessions.Where(s => s.Undoes is not null).GroupBy(s => s.Undoes!).ToDictionary(g => g.Key, g => g.Max(s => s.Start));
-            _all = [.. sessions.Select(s => new HistorySessionRow(s, now, server, undone.TryGetValue(s.Id, out var at) ? at : null))];
+            // сеанс потом откатили — у него пометка «откачен в 20:38» (или «частично», если вернули не все его моды)
+            var undone = sessions.Where(s => s.Undoes is not null).GroupBy(s => s.Undoes!).ToDictionary(g => g.Key,
+                g => (At: g.Max(s => s.Start), Mods: g.SelectMany(s => s.Changes).Select(c => c.ModId).ToHashSet(StringComparer.OrdinalIgnoreCase)));
+            _all = [.. sessions.Select(s => new HistorySessionRow(s, now, server,
+                undone.TryGetValue(s.Id, out var u) ? u.At : null,
+                undone.TryGetValue(s.Id, out var w) && !s.Net.All(c => w.Mods.Contains(c.ModId))))];
             Show();
         }
         catch (Exception ex) when (ex is IOException or HttpRequestException or InvalidOperationException or TaskCanceledException
@@ -86,7 +89,8 @@ public sealed class HistorySessionRow
     public ModHistorySession Session { get; }
     public IReadOnlyList<HistoryChangeRow> Changes { get; }
 
-    public HistorySessionRow(ModHistorySession session, IReadOnlyDictionary<string, string> installedNow, bool server, DateTime? undoneAt = null)
+    public HistorySessionRow(ModHistorySession session, IReadOnlyDictionary<string, string> installedNow, bool server, DateTime? undoneAt = null,
+        bool partly = false)
     {
         Session = session;
         Changes = [.. session.Net.Select(c => new HistoryChangeRow(c, installedNow))];
@@ -96,7 +100,8 @@ public sealed class HistorySessionRow
         Closed = session.LaunchedAt is { } launched
             ? Loc.T(server ? "hist.beforeServer" : "hist.beforeGame", launched.ToLocalTime().ToString("HH:mm", Loc.Culture))
             : Loc.T("hist.notLaunched");
-        if (undoneAt is { } undone) Closed += " · " + Loc.T("hist.undoneAt", undone.ToLocalTime().ToString("HH:mm", Loc.Culture));
+        if (undoneAt is { } undone)
+            Closed += " · " + Loc.T(partly ? "hist.undonePartlyAt" : "hist.undoneAt", undone.ToLocalTime().ToString("HH:mm", Loc.Culture));
         Sources = string.Join(", ", session.Sources.Select(s => SourceText(s)));
         Summary = Changes.Count == 0 ? Loc.T("hist.noNet") : string.Join(" · ", Changes.Select(c => $"{c.Title} {c.Versions}"));
         Steps = [.. session.Changes.GroupBy(c => c.Op).Select(g =>
@@ -154,7 +159,7 @@ public sealed class HistorySessionRow
         _ => Loc.T("hist.src.manual"),
     };
 
-    private static string Day(DateTime t)
+    public static string Day(DateTime t)
     {
         var time = t.ToString("HH:mm", Loc.Culture);
         if (t.Date == DateTime.Today) return Loc.T("stats.today", time);
