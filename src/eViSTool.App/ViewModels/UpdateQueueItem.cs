@@ -34,6 +34,9 @@ public sealed partial class UpdateQueueItem : ObservableObject
     public string To { get; }
     public string Versions => From.Length > 0 ? $"{From} → {To}" : To;
 
+    /// <summary>Действие для истории модов: пункты, добавленные одним нажатием («Обновить всё»), — одна пачка.</summary>
+    public ModHistory.Scope? History { get; set; }
+
     /// <summary>Что ставить: релиз модбазы (скачать) или сохранённая копия.</summary>
     public ModDbRelease? Release { get; }
     public string? Path { get; }

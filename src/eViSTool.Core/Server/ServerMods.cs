@@ -58,6 +58,7 @@ public sealed class ServerMods(string profileId, string gameDir, string dataDir)
         var resolved = Resolve();
         var mod = Find(resolved, path);
         RecycleBin.Send(mod.Path);
+        if (mod.Info is { } gone) ModHistory.Record(ModHistory.FileFor(profileId), gone.ModId, gone.Name, gone.Version, null);
         // других копий мода не осталось — убираем его и из списка выключенных
         if (mod.Info is { } info && ModUpdateService.ScanLocal(resolved).All(l => l.Info?.ModId != info.ModId))
             ModConfigEditor.Forget(resolved, info);
@@ -71,7 +72,7 @@ public sealed class ServerMods(string profileId, string gameDir, string dataDir)
         var info = plan.Incoming.Info!;
         var disabled = new HashSet<string>(resolved.DisabledMods);
         var wasDisabled = plan.Replaces.Any(r => ModUpdateService.IsDisabled(r, disabled));
-        ModInstaller.Apply(plan, new ModBackupStore(System.IO.Path.Combine(AppPaths.ModBackups, profileId)));
+        ModInstaller.Apply(plan, ModBackupStore.ForProfileId(profileId));
         if (wasDisabled) ModConfigEditor.SetEnabled(Resolve(), info, enabled: false);
         return new ModInstallResult(info.Name, info.Version, plan.Replaces.FirstOrDefault()?.Info?.Version);
     }
@@ -102,6 +103,7 @@ public sealed class ServerMods(string profileId, string gameDir, string dataDir)
     public async Task<ModAutoUpdateResult> UpdateAllAsync(ModPolicy policy, bool allowUnstable, Mods.ModUpdater updater,
         ModDb.ModDbClient db, CancellationToken ct = default)
     {
+        using var history = ModHistory.Begin(ModHistorySource.Schedule); // все обновления этого перезапуска — одна пачка
         var resolved = Resolve();
         var game = resolved.GameVersion ?? throw new InvalidOperationException(Loc.T("err.noGameVersion"));
         var locals = ModUpdateService.ScanLocal(resolved);

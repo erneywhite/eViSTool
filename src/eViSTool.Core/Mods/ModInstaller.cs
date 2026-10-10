@@ -123,6 +123,9 @@ public static class ModInstaller
         {
             if (File.Exists(tmp)) File.Delete(tmp);
         }
+
+        if (backups.HistoryFile is { } history && plan.Incoming.Info is { } info)
+            ModHistory.Record(history, info.ModId, info.Name, plan.Replaces.FirstOrDefault()?.Info?.Version, info.Version);
     }
 
     /// <summary>Если назначение — заменяемый файл, в нём по-прежнему этот же мод (его не подменили после планирования).</summary>
@@ -138,11 +141,17 @@ public static class ModInstaller
 /// Хранилище старых версий модов: &lt;папка данных&gt;\ModBackups\&lt;профиль&gt;\&lt;modid&gt;\.
 /// Отсюда — откат (этап 2c). Держим несколько последних версий каждого мода.
 /// </summary>
-public sealed class ModBackupStore(string root, int keepPerMod = 3)
+public sealed class ModBackupStore(string root, int keepPerMod = 3, string? historyFile = null)
 {
     public string Root { get; } = root;
 
-    public static ModBackupStore ForProfile(GameProfile profile) => new(Path.Combine(AppPaths.ModBackups, profile.Id));
+    /// <summary>Куда писать историю изменений модов этого профиля (null — не писать).</summary>
+    public string? HistoryFile { get; } = historyFile;
+
+    public static ModBackupStore ForProfile(GameProfile profile) => ForProfileId(profile.Id);
+
+    public static ModBackupStore ForProfileId(string profileId) =>
+        new(Path.Combine(AppPaths.ModBackups, profileId), historyFile: ModHistory.FileFor(profileId));
 
     public string DirFor(string modId) => Path.Combine(Root, modId);
 

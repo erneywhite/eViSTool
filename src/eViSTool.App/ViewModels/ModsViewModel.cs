@@ -512,16 +512,19 @@ public sealed partial class ModsViewModel : ObservableObject
             return;
         await CopyWorldsAsync(target);
 
+        using var history = ModHistory.Begin(ModHistorySource.Manual);
         try
         {
             if (target.Remote is { } code)
             {
                 using var agent = AgentClient.ForRemote(code);
-                await agent.DeleteModAsync(row.Local.Path); // на сервере — в его корзину
+                await agent.DeleteModAsync(row.Local.Path); // на сервере — в его корзину (и в его историю)
             }
             else
             {
                 Shell.MoveToRecycleBin(row.Local.Path);
+                if (row.Local.Info is { } gone)
+                    ModHistory.Record(ModHistory.FileFor(target.ProfileId), gone.ModId, gone.Name, gone.Version, null);
                 // если других копий мода не осталось — чистим его и из списка выключенных
                 if (row.Local.Info is { } info && _locals.Count(l => l.Info?.ModId == info.ModId) == 1)
                     ModConfigEditor.Forget(profile, info);
@@ -577,6 +580,7 @@ public sealed partial class ModsViewModel : ObservableObject
         var installed = new List<string>();
         var problems = new List<string>();
         IsBusy = true;
+        using var history = ModHistory.Begin(ModHistorySource.Zip);
         try
         {
             foreach (var zip in zips)
@@ -790,7 +794,7 @@ public sealed partial class ModsViewModel : ObservableObject
     private void UpdateOne(ModRowViewModel? row)
     {
         if (row is not { CanUpdate: true } || CurrentTarget() is not { } target) return;
-        Enqueue([QueueItemFor(target, row, row.Result.LatestCompatible!)]);
+        Enqueue([QueueItemFor(target, row, row.Result.LatestCompatible!)], ModHistorySource.Update);
     }
 
     [RelayCommand]
@@ -802,7 +806,7 @@ public sealed partial class ModsViewModel : ObservableObject
 
         var list = string.Join("\n", todo.Select(r => $"• {r.Name}: {r.Installed} → {r.Latest}"));
         if (CurrentTarget() is not { } target || !Confirm(Loc.T("mods.updateAllConfirm", todo.Count, list))) return;
-        Enqueue(todo.Select(r => QueueItemFor(target, r, r.Result.LatestCompatible!)));
+        Enqueue(todo.Select(r => QueueItemFor(target, r, r.Result.LatestCompatible!)), ModHistorySource.UpdateAll);
     }
 
     private static UpdateQueueItem QueueItemFor(ModTarget target, ModRowViewModel row, ModDbRelease release) =>
@@ -846,10 +850,13 @@ public sealed partial class ModsViewModel : ObservableObject
     /// Поставить в очередь; уже ждущий или ставящийся мод той же цели второй раз не добавляется.
     /// У каждого пункта своя цель: пункты разных профилей ставятся каждый в свой.
     /// </summary>
-    public void Enqueue(IEnumerable<UpdateQueueItem> items)
+    public void Enqueue(IEnumerable<UpdateQueueItem> items, string source, string? undoes = null)
     {
         if (IsBusy && !IsQueueRunning) return; // идёт другая операция (импорт модпака и т.п.)
         var adding = items.ToList();
+        // всё, что добавлено одним нажатием, — одно действие в истории модов
+        var history = ModHistory.NewScope(source, undoes);
+        foreach (var item in adding) item.History ??= history;
         // игра или сервер цели запущены — спросить один раз на цель, пока ничего не начато
         var declined = adding.Select(i => i.Target).DistinctBy(t => t.ProfileId)
             .Where(t => !ConfirmIfRunning(t)).Select(t => t.ProfileId).ToHashSet();
@@ -889,6 +896,7 @@ public sealed partial class ModsViewModel : ObservableObject
                 NotifyQueue();
                 var problems = new List<string>();
                 bool ok;
+                using var history = ModHistory.Join(item.History?.Id, item.History?.Source, item.History?.Undoes);
                 // каждый пункт — в свою цель, запомненную при добавлении
                 if (item.Path is not null)
                     ok = await InstallZipAsync(item.Target, item.Path, interactive: false, installed, problems);
@@ -968,7 +976,8 @@ public sealed partial class ModsViewModel : ObservableObject
     public void InstallVersion(ModRowViewModel row, VersionOption option)
     {
         if (CurrentTarget() is { } target)
-            Enqueue([new UpdateQueueItem(target, row.ModId, row.Name, row.Installed, option.Version, option.Release, option.Path)]);
+            Enqueue([new UpdateQueueItem(target, row.ModId, row.Name, row.Installed, option.Version, option.Release, option.Path)],
+                ModHistorySource.Rollback);
     }
 
     [RelayCommand]
@@ -1006,6 +1015,7 @@ public sealed partial class ModsViewModel : ObservableObject
         var installed = new List<string>();
         var problems = new List<string>();
         IsBusy = true;
+        using var history = ModHistory.Begin(ModHistorySource.Dependencies);
         try
         {
             await FixDependencyIssuesAsync(target, game, installed, problems);
@@ -1086,6 +1096,7 @@ public sealed partial class ModsViewModel : ObservableObject
         var installed = new List<string>();
         var problems = new List<string>();
         IsBusy = true;
+        using var history = ModHistory.Begin(ModHistorySource.Catalog);
         try
         {
             var done = new List<ModTarget>();

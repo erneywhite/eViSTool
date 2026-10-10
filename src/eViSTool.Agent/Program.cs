@@ -733,6 +733,11 @@ async Task<T?> ReadBody<T>(HttpContext ctx) where T : class
     }
 }
 
+// действие окна для истории модов: его id, источник и что откатывает — изменения агента встанут в ту же пачку
+IDisposable HistoryOp(HttpContext ctx) => eViSTool.Core.Mods.ModHistory.Join(
+    ctx.Request.Headers[AgentClient.OpHeader].ToString(), ctx.Request.Headers[AgentClient.OpSourceHeader].ToString(),
+    ctx.Request.Headers[AgentClient.OpUndoesHeader].ToString());
+
 async Task<string?> ReadName(HttpContext ctx)
 {
     using var reader = new StreamReader(ctx.Request.Body);
@@ -814,8 +819,15 @@ web.MapPost("/mods/delete", async (HttpContext ctx) =>
 {
     using var reader = new StreamReader(ctx.Request.Body);
     var request = JsonConvert.DeserializeObject<ModPathRequest>(await reader.ReadToEndAsync());
+    using var history = HistoryOp(ctx);
     return request is null ? Results.BadRequest() : Guard(() => { mods.Delete(request.Path); return Status(); });
 });
+// история изменений модов сервера за 90 дней (записи; окно собирает их в действия)
+web.MapGet("/mods/history", () => Guard(() =>
+{
+    var since = DateTime.UtcNow.AddDays(-eViSTool.Core.Mods.ModHistory.KeepDays);
+    return eViSTool.Core.Mods.ModHistory.ReadEntries(eViSTool.Core.Mods.ModHistory.FileFor(opts.ProfileId)).Where(e => e.At >= since).ToList();
+}));
 // игроки: списки — всегда; правка файлов — только у остановленного (работающий держит списки в памяти и перезапишет их)
 web.MapGet("/players", () => Guard(() => playerLists.Read()));
 web.MapPost("/players/edit", async (HttpContext ctx) =>
@@ -842,6 +854,7 @@ web.MapPost("/mods/install", async (HttpContext ctx) =>
         var zip = Path.Combine(dir, name);
         await using (var file = File.Create(zip))
             await ctx.Request.Body.CopyToAsync(file, ctx.RequestAborted);
+        using var history = HistoryOp(ctx);
         return Guard(() => mods.Install(zip));
     }
     finally

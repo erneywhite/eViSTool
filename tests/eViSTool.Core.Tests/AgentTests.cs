@@ -409,6 +409,9 @@ public sealed class AgentTests : IAsyncLifetime
         var code = new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint);
         using var client = AgentClient.ForRemote(code);
         var backups = Path.Combine(Path.GetDirectoryName(AgentExe)!, "data", "ModBackups", _profile.Id);
+        var historyFile = ModHistory.FileFor(_profile.Id, Path.Combine(Path.GetDirectoryName(AgentExe)!, "data", "ModHistory"));
+        var batch = ModHistory.Begin(ModHistorySource.UpdateAll); // установка ниже — одним действием окна
+        var batchId = ModHistory.Current!.Id;
         try
         {
             // список: оба мода, папки и modinfo доезжают до окна целиком
@@ -458,16 +461,27 @@ public sealed class AgentTests : IAsyncLifetime
             var (_, remoteMods) = await ModTargets.ScanAsync(target);
             await ModTargets.SetEnabledAsync(target, remoteMods.Single(m => m.Info?.ModId == "gamma"), enabled: false);
             Assert.Contains("gamma", (await client.ModsAsync()).DisabledMods);
+            batch.Dispose();
 
             // удаление последней копии — в корзину, и из списка выключенных тоже
             await client.DeleteModAsync(Path.Combine(mods, "carryon_1.1.0.zip"));
             list = await client.ModsAsync();
             Assert.Equal(["gamma", "other"], list.Mods.Select(m => m.Info!.ModId).Order());
             Assert.DoesNotContain("CarryOn", list.DisabledMods);
+
+            // история на сервере: обе установки — в действии окна, удаление — отдельным
+            var ops = ModHistory.Group(await client.ModHistoryAsync());
+            var updates = Assert.Single(ops, o => o.Id == batchId);
+            Assert.Equal(ModHistorySource.UpdateAll, updates.Source);
+            Assert.Equal([("carryon", "1.0.0", "1.1.0"), ("gamma", null, "0.5.0")], updates.Changes.Select(c => (c.ModId, c.From, c.To)));
+            var removed = Assert.Single(ops, o => o.Id != batchId).Changes.Single();
+            Assert.Equal(("carryon", "1.1.0", (string?)null), (removed.ModId, removed.From, removed.To));
         }
         finally
         {
+            batch.Dispose();
             try { Directory.Delete(backups, recursive: true); } catch (IOException) { }
+            try { File.Delete(historyFile); } catch (IOException) { }
         }
     }
 

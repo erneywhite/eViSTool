@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using eViSTool.Core.Localization;
+using eViSTool.Core.Mods;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Server.Remote;
 using Newtonsoft.Json;
@@ -190,6 +191,7 @@ public sealed class AgentClient : IDisposable
         await using var file = File.OpenRead(zipPath);
         using var content = new StreamContent(file);
         content.Headers.Add(ModFileHeader, Uri.EscapeDataString(Path.GetFileName(zipPath)));
+        TagHistory(content);
         using var cts = Timed(ct, TimeSpan.FromMinutes(15));
         using var resp = await _http.PostAsync("mods/install", content, cts.Token).ConfigureAwait(false);
         return await Read<ModInstallResult>(resp, cts.Token).ConfigureAwait(false);
@@ -197,6 +199,23 @@ public sealed class AgentClient : IDisposable
 
     /// <summary>Имя файла присланного архива (имя важно: мод ляжет в папку под ним).</summary>
     public const string ModFileHeader = "X-eViSTool-File";
+
+    /// <summary>
+    /// Действие окна для истории модов (<see cref="ModHistory"/>): id, источник и что оно откатывает. Агент пишет свои
+    /// изменения в это же действие — «Обновить всё» по удалённому серверу остаётся одной пачкой, хоть моды и едут по одному.
+    /// </summary>
+    public const string OpHeader = "X-eViSTool-Op", OpSourceHeader = "X-eViSTool-OpSource", OpUndoesHeader = "X-eViSTool-OpUndoes";
+
+    private static void TagHistory(HttpContent content)
+    {
+        if (ModHistory.Current is not { } op) return;
+        content.Headers.Add(OpHeader, op.Id);
+        content.Headers.Add(OpSourceHeader, op.Source);
+        if (op.Undoes is { } undoes) content.Headers.Add(OpUndoesHeader, undoes);
+    }
+
+    /// <summary>История изменений модов сервера (записи; в действия их собирает <see cref="ModHistory.Group"/>).</summary>
+    public Task<List<ModHistoryEntry>> ModHistoryAsync(CancellationToken ct = default) => Get<List<ModHistoryEntry>>("mods/history", ct);
 
     private static CancellationTokenSource Timed(CancellationToken ct, TimeSpan? timeout = null)
     {
@@ -217,6 +236,7 @@ public sealed class AgentClient : IDisposable
     private async Task<T> Post<T>(string path, object? body, CancellationToken ct)
     {
         using var content = new StringContent(body is null ? "" : JsonConvert.SerializeObject(body), Encoding.UTF8, "application/json");
+        TagHistory(content);
         using var cts = Timed(ct);
         using var resp = await _http.PostAsync(path, content, cts.Token).ConfigureAwait(false);
         return await Read<T>(resp, ct).ConfigureAwait(false);

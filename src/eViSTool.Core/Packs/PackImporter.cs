@@ -239,6 +239,7 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
         bool mirror, bool applyConfig, IProgress<string>? progress, CancellationToken ct,
         Func<IReadOnlyList<string>, bool>? confirmChanged)
     {
+        using var history = ModHistory.Begin(ModHistorySource.Pack); // весь модпак — одно действие в истории
         var done = new List<string>();
         var problems = new List<string>();
         var temp = System.IO.Path.Combine(updater.DownloadDir, "pack-" + Guid.NewGuid().ToString("N")[..8]);
