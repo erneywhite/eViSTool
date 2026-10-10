@@ -72,7 +72,7 @@ public sealed partial class ModsViewModel
     /// Последние изменения одного мода — для вкладки «Версии» его карточки: «сегодня, 20:37 · 1.2.10 → 1.2.11 · «Обновить всё»».
     /// История не читается (нет связи, старый агент) — пусто, карточке это не мешает.
     /// </summary>
-    public async Task<IReadOnlyList<string>> ModHistoryLinesAsync(string modId, int count = 5)
+    public async Task<IReadOnlyList<string>> ModHistoryLinesAsync(string modId, int count = 30)
     {
         if (modId.Length == 0 || CurrentTarget() is not { } target) return [];
         try

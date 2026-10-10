@@ -742,7 +742,9 @@
                                     <!-- что с модом делали: последние изменения из истории -->
                                     <StackPanel Visibility="{Binding HasHistory, Converter={StaticResource BoolToVis}}" Margin="0,0,0,14">
                                         <TextBlock Text="{local:Tr mcard.historyTitle}" FontSize="12" Foreground="{StaticResource Forest.Muted}" Margin="0,0,0,4" />
+                                        <!-- видно около пяти строк, остальное — прокруткой: за день действий бывает много -->
                                         <Border Background="{StaticResource Forest.Base}" CornerRadius="6" Padding="10,8">
+                                            <ScrollViewer MaxHeight="96" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                             <ItemsControl ItemsSource="{Binding HistoryLines}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
@@ -750,6 +752,7 @@
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
+                                            </ScrollViewer>
                                         </Border>
                                     </StackPanel>
                                     <TextBlock Text="{Binding VersionsStatus}" FontSize="12" Foreground="{StaticResource Forest.Muted}" TextWrapping="Wrap"
