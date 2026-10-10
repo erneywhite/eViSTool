@@ -75,6 +75,17 @@
                         <StackPanel Margin="0,0,16,0">
                             <TextBlock Text="{local:Tr ann.listTitle}" Style="{StaticResource CardTitle}" />
                             <TextBlock Text="{local:Tr ann.listHint}" Style="{StaticResource Hint}" />
+                            <TextBlock Text="{Binding TimeNote}" FontSize="12" Foreground="{StaticResource Forest.Warn}" TextWrapping="Wrap" Margin="0,4,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding TimeNote}" Value="">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </StackPanel>
                     </DockPanel>
 
@@ -99,7 +110,27 @@
                                 <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Padding="0,10" Margin="0,4,0,0">
                                     <DockPanel>
                                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
-                                            <TextBlock Text="{local:Tr ann.every}" FontSize="12" Foreground="{StaticResource Forest.Muted}" VerticalAlignment="Center" />
+                                            <!-- «каждые N мин» или «в 12:00, 18:00» -->
+                                            <ComboBox SelectedIndex="{Binding ModeIndex}" FontSize="12" MinWidth="96" VerticalAlignment="Center"
+                                                      AutomationProperties.Name="{local:Tr ann.mode}">
+                                                <ComboBoxItem Content="{local:Tr ann.every}" />
+                                                <ComboBoxItem Content="{local:Tr ann.at}" />
+                                            </ComboBox>
+                                            <TextBox Width="150" Margin="8,0,0,0" Text="{Binding TimesText, UpdateSourceTrigger=PropertyChanged}"
+                                                     VerticalContentAlignment="Center" MaxLength="60" ToolTip="{local:Tr ann.timesTip}"
+                                                     AutomationProperties.Name="{local:Tr ann.at}"
+                                                     Visibility="{Binding IsTimed, Converter={StaticResource BoolToVis}}">
+                                                <TextBox.Style>
+                                                    <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IntervalBad}" Value="True">
+                                                                <Setter Property="BorderBrush" Value="{StaticResource Forest.Danger}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBox.Style>
+                                            </TextBox>
+                                            <StackPanel Orientation="Horizontal" Visibility="{Binding IsTimed, Converter={StaticResource InvertVis}}">
                                             <TextBox Width="96" Margin="8,0,0,0" Text="{Binding IntervalText, UpdateSourceTrigger=PropertyChanged}"
                                                      VerticalContentAlignment="Center" HorizontalContentAlignment="Center" MaxLength="4"
                                                      AutomationProperties.Name="{local:Tr ann.every}">
@@ -115,6 +146,7 @@
                                             </TextBox>
                                             <TextBlock Text="{local:Tr ann.minutes}" FontSize="12" Foreground="{StaticResource Forest.Muted}" VerticalAlignment="Center"
                                                        Margin="8,0,0,0" />
+                                            </StackPanel>
                                             <CheckBox Style="{StaticResource Forest.Switch}" IsChecked="{Binding Enabled}" VerticalAlignment="Center" Margin="22,0,0,0"
                                                       ToolTip="{local:Tr ann.enabled}" AutomationProperties.Name="{local:Tr ann.enabled}" />
                                             <Button Style="{StaticResource Forest.LinkButton}" Content="{local:Tr ann.delete}" Foreground="{StaticResource Forest.Danger}"

@@ -24,6 +24,37 @@ public sealed class AnnouncementSchedulerTests
     }
 
     [Fact]
+    public void Timed_SaidOnceAtItsTime_EveryDay_AlongsideIntervalOnes()
+    {
+        // сервер работает с 12:00; «плановые работы» — в 12:20 и 12:40, правила — каждые 10 минут
+        var settings = new ServerAnnouncements
+        {
+            Items = [new Announcement("maintenance", Times: ["12:20", "12:40"]), new Announcement("rules", 10)],
+        };
+        var said = Run(new AnnouncementScheduler(), settings, 45);
+
+        Assert.Equal([(10, "rules"), (20, "maintenance"), (21, "rules"), (31, "rules"), (40, "maintenance"), (41, "rules")], said);
+    }
+
+    [Fact]
+    public void Timed_TooLate_OrNobodyOnline_IsNotCaughtUpLater()
+    {
+        var settings = new ServerAnnouncements { Items = [new Announcement("maintenance", Times: ["12:00"])] };
+        var s = new AnnouncementScheduler();
+
+        // в 12:00 никого — не говорим и в 12:03, когда игрок зашёл, тоже
+        Assert.Null(s.Tick(settings, Start, ServerState.Running, Start, 0));
+        Assert.Null(s.Tick(settings, Start.AddMinutes(3), ServerState.Running, Start, 1));
+
+        // сервер запустили в 12:30 — 12:00 уже прошло больше чем на 5 минут
+        var late = new AnnouncementScheduler();
+        Assert.Null(late.Tick(settings, Start.AddMinutes(30), ServerState.Running, Start.AddMinutes(30), 1));
+
+        // на следующий день — снова
+        Assert.Equal("maintenance", s.Tick(settings, Start.AddDays(1).AddSeconds(30), ServerState.Running, Start, 1));
+    }
+
+    [Fact]
     public void EachOnItsOwnInterval_StaggeredByAMinute_DisabledNever()
     {
         var said = Run(new AnnouncementScheduler(), Two(), 30);

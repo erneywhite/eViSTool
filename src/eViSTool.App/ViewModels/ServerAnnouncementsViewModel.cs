@@ -11,7 +11,10 @@ using Newtonsoft.Json;
 
 namespace eViSTool.App.ViewModels;
 
-/// <summary>Строка списка объявлений: текст, интервал в минутах, включено ли.</summary>
+/// <summary>
+/// Строка списка объявлений: текст, «каждые N минут» или «в 12:00, 18:00», включено ли. Время в поле — по часам окна,
+/// в объявление (агенту) — по часам сервера.
+/// </summary>
 public sealed partial class AnnouncementRowViewModel : ObservableObject
 {
     private readonly ServerAnnouncementsViewModel _owner;
@@ -22,6 +25,8 @@ public sealed partial class AnnouncementRowViewModel : ObservableObject
         _text = a.Text;
         _intervalText = a.IntervalMinutes.ToString();
         _enabled = a.Enabled;
+        _isTimed = a.IsTimed;
+        _timesText = string.Join(", ", (a.Times ?? []).Select(t => ServerScheduleViewModel.ShiftTime(t, owner.ClockShift)));
     }
 
     [ObservableProperty] private string _text;
@@ -29,16 +34,44 @@ public sealed partial class AnnouncementRowViewModel : ObservableObject
     [ObservableProperty] private bool _enabled;
     [ObservableProperty] private bool _intervalBad;
 
+    /// <summary>В заданное время, а не через интервал.</summary>
+    [ObservableProperty] private bool _isTimed;
+    [ObservableProperty] private string _timesText;
+
+    /// <summary>Выбор в строке: 0 — «каждые», 1 — «в».</summary>
+    public int ModeIndex
+    {
+        get => IsTimed ? 1 : 0;
+        set => IsTimed = value == 1;
+    }
+
     partial void OnTextChanged(string value) => _owner.Changed();
     partial void OnIntervalTextChanged(string value) => _owner.Changed();
     partial void OnEnabledChanged(bool value) => _owner.Changed();
+    partial void OnTimesTextChanged(string value) => _owner.Changed();
 
-    /// <summary>Интервал разобрался — объявление; нет — null (строку подсвечиваем, файл не трогаем).</summary>
+    partial void OnIsTimedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ModeIndex));
+        if (value && TimesText.Trim().Length == 0) TimesText = "12:00"; // пустое поле времени непонятно, с чего начать
+        _owner.Changed();
+    }
+
+    /// <summary>Интервал или время разобрались — объявление; нет — null (строку подсвечиваем, файл не трогаем).</summary>
     internal Announcement? ToModel()
     {
-        var ok = int.TryParse(IntervalText.Trim(), out var minutes) && minutes is >= Announcement.MinInterval and <= Announcement.MaxInterval;
-        IntervalBad = !ok;
-        return ok ? new Announcement(Text, minutes, Enabled) : null;
+        var intervalOk = int.TryParse(IntervalText.Trim(), out var minutes) && minutes is >= Announcement.MinInterval and <= Announcement.MaxInterval;
+        if (!IsTimed)
+        {
+            IntervalBad = !intervalOk;
+            return intervalOk ? new Announcement(Text, minutes, Enabled) : null;
+        }
+        var parts = TimesText.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var timesOk = parts.Length > 0 && parts.All(t => ServerAutomation.TryTimeOfDay(t, out _));
+        IntervalBad = !timesOk;
+        return timesOk
+            ? new Announcement(Text, intervalOk ? minutes : 30, Enabled, [.. parts.Select(t => ServerScheduleViewModel.ShiftTime(t, -_owner.ClockShift))])
+            : null;
     }
 }
 
@@ -59,6 +92,18 @@ public sealed partial class ServerAnnouncementsViewModel : ObservableObject
     private DateTime? _seenChange;
 
     public ServerAnnouncementsViewModel(ServerViewModel server) => _server = server;
+
+    /// <summary>Пояс машины с сервером (минуты от UTC; null — не знаем). Время объявлений в окне — по своим часам.</summary>
+    private int? _serverOffset;
+
+    /// <summary>На сколько минут часы окна впереди часов сервера.</summary>
+    public int ClockShift => _serverOffset is { } server ? (int)TimeZoneInfo.Local.GetUtcOffset(DateTime.Now).TotalMinutes - server : 0;
+
+    /// <summary>Пояса разные — под списком: время по твоим часам, сервер живёт по своим.</summary>
+    public string TimeNote => ClockShift == 0 ? "" : Loc.T("ann.timeNote", Utc((int)TimeZoneInfo.Local.GetUtcOffset(DateTime.Now).TotalMinutes), Utc(_serverOffset ?? 0));
+
+    private static string Utc(int minutes) => minutes == 0 ? "UTC"
+        : $"UTC{(minutes > 0 ? "+" : "−")}{Math.Abs(minutes) / 60}" + (Math.Abs(minutes) % 60 is var m and > 0 ? $":{m:00}" : "");
 
     public ObservableCollection<AnnouncementRowViewModel> Items { get; } = [];
     public bool HasItems => Items.Count > 0;
@@ -104,6 +149,13 @@ public sealed partial class ServerAnnouncementsViewModel : ObservableObject
     public void ShowStatus(AgentStatus? s)
     {
         OnServerStateChanged();
+        if (s is not null && s.UtcOffsetMinutes != _serverOffset)
+        {
+            // пояс сервера стал известен — время в строках пересчитываем на свои часы (ничего не сохраняя)
+            _serverOffset = s.UtcOffsetMinutes;
+            OnPropertyChanged(nameof(TimeNote));
+            if (Loaded && _saveTicket == _savedTicket) Show(_saved);
+        }
         if (s is null || _profile is not { IsRemote: true }) return;
         if (!Loaded || s.AnnouncementsChangedAt != _seenChange)
         {
@@ -188,7 +240,8 @@ public sealed partial class ServerAnnouncementsViewModel : ObservableObject
         var rows = Items.Select(r => r.ToModel()).ToList();
         if (rows.Any(r => r is null))
         {
-            ErrorText = Loc.T("ann.intervalBad", Announcement.MinInterval, Announcement.MaxInterval);
+            ErrorText = Items.Any(r => r.IsTimed && r.IntervalBad) ? Loc.T("ann.timesBad")
+                : Loc.T("ann.intervalBad", Announcement.MinInterval, Announcement.MaxInterval);
             _savedTicket = ticket;
             return;
         }
