@@ -303,18 +303,31 @@
 
                 <!-- чипы-фильтры и сортировка -->
                 <DockPanel DockPanel.Dock="Top" Margin="0,12,0,10">
-                    <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding SortModes}" SelectedIndex="{Binding SortIndex}" MinWidth="170" FontSize="12"
-                              Visibility="{Binding IsHistory, Converter={StaticResource InvertVis}}" />
-                    <!-- история изменений модов — справа от фильтров: это не фильтр таблицы, а другой список -->
-                    <RadioButton DockPanel.Dock="Right" GroupName="ModFilter" Style="{StaticResource Forest.Chip}" Margin="6,2,8,2" VerticalAlignment="Top"
-                                 ToolTip="{local:Tr hist.tabTip}" AutomationProperties.AutomationId="ModsHistoryTab"
-                                 IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=History}">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Data="{StaticResource Icon.History}" Style="{StaticResource Forest.Icon}" Width="13" Height="13" Margin="0,0,6,0"
-                                  VerticalAlignment="Center" />
-                            <TextBlock Text="{local:Tr hist.tab}" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </RadioButton>
+                    <!-- справа: «История» и сортировка — одной группой у верхней строки: чипы могут перенестись на вторую -->
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                        <!-- история изменений модов — справа от фильтров: это не фильтр таблицы, а другой список -->
+                        <RadioButton GroupName="ModFilter" Style="{StaticResource Forest.Chip}" Margin="6,2,8,2" VerticalAlignment="Center"
+                                     ToolTip="{local:Tr hist.tabTip}" AutomationProperties.AutomationId="ModsHistoryTab"
+                                     IsChecked="{Binding Filter, Converter={StaticResource EnumEq}, ConverterParameter=History}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource Icon.History}" Style="{StaticResource Forest.Icon}" Width="13" Height="13" Margin="0,0,6,0"
+                                      VerticalAlignment="Center" />
+                                <TextBlock Text="{local:Tr hist.tab}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+                        <!-- в истории сортировка не нужна, но место за ней остаётся: иначе «История» прыгает при переключении -->
+                        <ComboBox ItemsSource="{Binding SortModes}" SelectedIndex="{Binding SortIndex}" MinWidth="170" FontSize="12">
+                            <ComboBox.Style>
+                                <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsHistory}" Value="True">
+                                            <Setter Property="Visibility" Value="Hidden" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ComboBox.Style>
+                        </ComboBox>
+                    </StackPanel>
                     <!-- узкая таблица (открыта карточка) — чипы переносятся на вторую строку, а не уходят под сортировку -->
                     <WrapPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
                         <WrapPanel.Resources>
