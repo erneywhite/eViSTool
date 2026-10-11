@@ -1,6 +1,218 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="eViSTool.Desktop.Views.ServerPlayersTab">
-    <!-- заглушка: вкладка «Игроки» раздела «Сервер» ещё переносится с окна на WPF -->
-    <TextBlock Text="Экран «Игроки» ещё переносится" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
+             xmlns:vm="using:eViSTool.Presentation.ViewModels"
+             xmlns:srv="using:eViSTool.Core.Server"
+             xmlns:local="using:eViSTool.Desktop"
+             xmlns:ctl="using:eViSTool.Desktop.Controls"
+             x:Class="eViSTool.Desktop.Views.ServerPlayersTab"
+             x:DataType="vm:ServerPlayersViewModel">
+    <UserControl.Styles>
+        <!-- подпись строки настройки: здесь 13 и без отступа сверху (общая — 12 с отступом под поле формы) -->
+        <Style Selector="TextBlock.label">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Margin" Value="0" />
+        </Style>
+        <!-- карточка вкладки -->
+        <Style Selector="Border.playersCard">
+            <Setter Property="Padding" Value="20,16,20,18" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+        <!-- действие в строке списка: кнопка-ссылка (Theme на самой кнопке), подсказка видна и у выключенной -->
+        <Style Selector="Button.action">
+            <Setter Property="Margin" Value="14,0,0,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="ToolTip.ShowOnDisabled" Value="True" />
+        </Style>
+        <Style Selector="Button.action.ban">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Danger}" />
+        </Style>
+        <!-- строка списка: линия сверху -->
+        <Style Selector="Border.entry">
+            <Setter Property="BorderBrush" Value="{DynamicResource Forest.Line}" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
+        <StackPanel Margin="0,0,14,0">
+            <!-- ===== как применяются изменения, ответ сервера, ошибки ===== -->
+            <TextBlock Text="{Binding ModeText}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="2,0,0,10"
+                       AutomationProperties.AutomationId="PlayersMode" />
+            <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{DynamicResource Forest.Accent}" TextWrapping="Wrap" Margin="2,0,0,10"
+                       IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" AutomationProperties.AutomationId="PlayersStatus" />
+            <TextBlock Text="{Binding ErrorText}" FontSize="12" Foreground="{DynamicResource Forest.Danger}" TextWrapping="Wrap" Margin="2,0,0,10"
+                       IsVisible="{Binding ErrorText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" AutomationProperties.AutomationId="PlayersError" />
+
+            <!-- ===== доступ: белый список и «добавить по имени» ===== -->
+            <Border Classes="card playersCard">
+                <StackPanel>
+                    <TextBlock Text="{local:Tr players.accessTitle}" Classes="cardTitle" />
+
+                    <Border Classes="row">
+                        <DockPanel>
+                            <CheckBox DockPanel.Dock="Right" Theme="{StaticResource Forest.Switch}" IsChecked="{Binding WhitelistOn}" VerticalAlignment="Center"
+                                      IsEnabled="{Binding CanEdit}" AutomationProperties.AutomationId="PlayersWhitelistMode"
+                                      AutomationProperties.Name="{local:Tr players.whitelistMode}" />
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{local:Tr players.whitelistMode}" Classes="label" />
+                                <TextBlock Text="{local:Tr players.whitelistModeHint}" Classes="hint" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <Border Classes="row">
+                        <StackPanel>
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                    <TextBox Width="200" Text="{Binding AddName}" VerticalContentAlignment="Center"
+                                             IsEnabled="{Binding CanCommand}" AutomationProperties.AutomationId="PlayersAddName"
+                                             AutomationProperties.Name="{local:Tr players.addName}" />
+                                    <Button Content="{local:Tr players.addWhitelist}" Command="{Binding AddToWhitelistCommand}" IsEnabled="{Binding CanCommand}"
+                                            Margin="8,0,0,0" Padding="12,6" AutomationProperties.AutomationId="PlayersAddWhitelist" />
+                                    <Button Content="{local:Tr players.addBan}" Command="{Binding BanNameCommand}" IsEnabled="{Binding CanCommand}"
+                                            Margin="8,0,0,0" Padding="12,6" AutomationProperties.AutomationId="PlayersAddBan" />
+                                </StackPanel>
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock Text="{local:Tr players.addName}" Classes="label" />
+                                    <TextBlock Text="{local:Tr players.addNameHint}" Classes="hint" />
+                                </StackPanel>
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- ===== кто заходил ===== -->
+            <Border Classes="card playersCard">
+                <StackPanel>
+                    <DockPanel>
+                        <!-- поиск: отступ слева — под лупу (InnerLeftContent), как в остальных поисках, но по высоте чуть ниже -->
+                        <TextBox DockPanel.Dock="Right" Classes="search" Width="240" Padding="8,6,10,6" Text="{Binding Search}"
+                                 PlaceholderText="{local:Tr players.search}" AutomationProperties.AutomationId="PlayersSearch">
+                            <TextBox.InnerLeftContent>
+                                <Path Classes="icon searchIcon" Data="{StaticResource Icon.Search}" />
+                            </TextBox.InnerLeftContent>
+                        </TextBox>
+                        <StackPanel Margin="0,0,16,0">
+                            <TextBlock Text="{local:Tr players.listTitle}" Classes="cardTitle" />
+                            <TextBlock Text="{local:Tr players.listHint}" Classes="hint" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <TextBlock Text="{local:Tr players.empty}" Classes="hint" FontSize="12" Margin="0,14,0,0" IsVisible="{Binding !HasPlayers}" />
+
+                    <ItemsControl ItemsSource="{Binding PlayersView.Items}" Margin="0,6,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PlayerRowViewModel">
+                                <Border Classes="entry" Padding="0,10">
+                                    <DockPanel>
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <ComboBox Width="170" ItemsSource="{Binding Roles}" SelectedItem="{Binding Role}"
+                                                      DisplayMemberBinding="{Binding Name, DataType=srv:ServerRole}"
+                                                      ToolTip.Tip="{local:Tr players.role}" VerticalAlignment="Center" ctl:WheelToParent.IsEnabled="True"
+                                                      IsEnabled="{Binding $parent[UserControl].((vm:ServerPlayersViewModel)DataContext).CanEdit}"
+                                                      AutomationProperties.Name="{local:Tr players.role}" />
+                                            <CheckBox Theme="{StaticResource Forest.Switch}" IsChecked="{Binding Whitelisted}" VerticalAlignment="Center" Margin="18,0,0,0"
+                                                      ToolTip.Tip="{local:Tr players.inWhitelist}"
+                                                      IsEnabled="{Binding $parent[UserControl].((vm:ServerPlayersViewModel)DataContext).CanEdit}"
+                                                      AutomationProperties.Name="{local:Tr players.inWhitelist}" />
+                                            <TextBlock Text="{local:Tr players.whitelistShort}" FontSize="12" Foreground="{DynamicResource Forest.Muted}"
+                                                       VerticalAlignment="Center" Margin="8,0,0,0" />
+                                            <Button Classes="action" Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr players.charsel}"
+                                                    ToolTip.Tip="{local:Tr players.charselTip}" Margin="22,0,0,0"
+                                                    Command="{Binding $parent[UserControl].((vm:ServerPlayersViewModel)DataContext).AllowCharSelCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    IsEnabled="{Binding $parent[UserControl].((vm:ServerPlayersViewModel)DataContext).CanCommand}" />
+                                            <Button Classes="action" Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr players.kick}"
+                                                    ToolTip.Tip="{local:Tr players.kickTip}"
+                                                    Command="{Binding $parent[UserControl].((vm:ServerPlayersViewModel)DataContext).KickCommand}"
+                                                    CommandParameter="{Binding}" IsEnabled="{Binding CanKick}" />
+                                            <!-- «Забанить…» и «Разбанить» в одной ячейке постоянной ширины, чтобы строки не съезжали -->
+                                            <Grid Width="78" Margin="14,0,0,0">
+                                                <Button Classes="action ban" Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr players.ban}"
+                                                        ToolTip.Tip="{local:Tr players.banTip}" Margin="0" HorizontalAlignment="Left"
+                                                        Command="{Binding $parent[UserControl].((vm:ServerPlayersViewModel)DataContext).BanCommand}"
+                                                        CommandParameter="{Binding}" IsVisible="{Binding !IsBanned}"
+                                                        IsEnabled="{Binding $parent[UserControl].((vm:ServerPlayersViewModel)DataContext).CanCommand}" />
+                                                <Button Classes="action" Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr players.unban}"
+                                                        Margin="0" HorizontalAlignment="Left"
+                                                        Command="{Binding $parent[UserControl].((vm:ServerPlayersViewModel)DataContext).UnbanCommand}"
+                                                        CommandParameter="{Binding}" IsVisible="{Binding IsBanned}"
+                                                        IsEnabled="{Binding $parent[UserControl].((vm:ServerPlayersViewModel)DataContext).CanEdit}" />
+                                            </Grid>
+                                        </StackPanel>
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Ellipse Width="8" Height="8" Margin="0,1,8,0" Fill="{DynamicResource Forest.Good}" VerticalAlignment="Center"
+                                                         IsVisible="{Binding IsOnline}" />
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource Forest.Text}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding SeenText}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0"
+                                                       TextTrimming="CharacterEllipsis" IsVisible="{Binding SeenText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                            <TextBlock Text="{Binding BanText}" FontSize="11" Foreground="{DynamicResource Forest.Danger}" Margin="0,2,0,0"
+                                                       TextWrapping="Wrap" IsVisible="{Binding IsBanned}" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- ===== белый список и баны целиком (и те, кто ещё не заходил) ===== -->
+            <Grid ColumnDefinitions="*,14,*">
+                <Border Classes="card playersCard">
+                    <StackPanel>
+                        <TextBlock Text="{Binding WhitelistTitle}" Classes="cardTitle" />
+                        <TextBlock Text="{local:Tr players.whitelistEmpty}" Classes="hint" FontSize="12" Margin="0,10,0,0" IsVisible="{Binding !HasWhitelist}" />
+                        <ItemsControl ItemsSource="{Binding Whitelist}" Margin="0,6,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PlayerListRowViewModel">
+                                    <Border Classes="entry" Padding="0,8">
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" Classes="action" Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr players.remove}"
+                                                    Command="{Binding $parent[UserControl].((vm:ServerPlayersViewModel)DataContext).RemoveEntryCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    IsEnabled="{Binding $parent[UserControl].((vm:ServerPlayersViewModel)DataContext).CanEdit}" />
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{DynamicResource Forest.Text}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Details}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Classes="card playersCard">
+                    <StackPanel>
+                        <TextBlock Text="{Binding BansTitle}" Classes="cardTitle" />
+                        <TextBlock Text="{local:Tr players.bansEmpty}" Classes="hint" FontSize="12" Margin="0,10,0,0" IsVisible="{Binding !HasBans}" />
+                        <ItemsControl ItemsSource="{Binding Bans}" Margin="0,6,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PlayerListRowViewModel">
+                                    <Border Classes="entry" Padding="0,8">
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" Classes="action" Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr players.unban}"
+                                                    Command="{Binding $parent[UserControl].((vm:ServerPlayersViewModel)DataContext).RemoveEntryCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    IsEnabled="{Binding $parent[UserControl].((vm:ServerPlayersViewModel)DataContext).CanEdit}" />
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{DynamicResource Forest.Text}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Details}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>
