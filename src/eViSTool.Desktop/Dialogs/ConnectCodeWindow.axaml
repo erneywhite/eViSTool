@@ -1,0 +1,49 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:local="using:eViSTool.Desktop"
+                      xmlns:ctl="using:eViSTool.Desktop.Controls"
+                      x:Class="eViSTool.Desktop.Dialogs.ConnectCodeWindow"
+                      x:DataType="vm:ConnectCodeViewModel"
+                      Width="544" SizeToContent="Height" CanResize="False"
+                      Title="{local:Tr connect.title}">
+    <dialogs:DialogWindow.Styles>
+        <!-- поле в фокусе — как в окне на WPF: песочная рамка в 1 px, снизу 2 px (у темы — 2 px со всех сторон), заливка —
+             полупрозрачная тёмная (Fluent ControlFillColorInputActive, #B31E1E1E), а не Forest.Side. Кандидат в тему -->
+        <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+            <Setter Property="BorderThickness" Value="1,1,1,2" />
+            <Setter Property="Background" Value="#B31E1E1E" />
+        </Style>
+    </dialogs:DialogWindow.Styles>
+    <!-- ширина — содержимого окна: в окне на WPF Width="560" считал и рамку (по 8 px с боков), внутри было 544 -->
+    <StackPanel Margin="24,20,24,22">
+        <TextBlock Text="{local:Tr connect.title}" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock Classes="muted" Text="{local:Tr connect.hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" />
+
+        <TextBlock Classes="label" Text="{local:Tr connect.code}" />
+        <!-- код — секрет: поле скрытое, как для пароля. Точки — из Cascadia Mono (mono): в Noto Sans нет «●», и она
+             бралась бы из случайного системного шрифта, а у Cascadia она того же размера, что у Segoe UI в окне на WPF -->
+        <DockPanel Margin="0,6,0,0">
+            <Button DockPanel.Dock="Right" Content="{local:Tr connect.paste}" Click="Paste_Click" Margin="8,0,0,0"
+                    ToolTip.Tip="{local:Tr connect.pasteTip}" AutomationProperties.AutomationId="ConnectPaste" />
+            <dialogs:SecretTextBox Classes="mono" Text="{Binding Text}" PasswordChar="●" VerticalContentAlignment="Center"
+                                   ctl:Focus.OnOpen="True" AutomationProperties.AutomationId="ConnectCode" />
+        </DockPanel>
+        <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding ParsedTone}" Text="{Binding ParsedText}"
+                   FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" />
+
+        <DockPanel Margin="0,12,0,0">
+            <Button DockPanel.Dock="Left" Content="{local:Tr connect.check}" Command="{Binding CheckCommand}"
+                    AutomationProperties.AutomationId="ConnectCheck" />
+            <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding CheckTone}" Text="{Binding CheckText}"
+                       TextWrapping="Wrap" Margin="12,0,0,0" AutomationProperties.AutomationId="ConnectResult" />
+        </DockPanel>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Classes="primary" Content="{Binding OkText}" IsDefault="True" IsEnabled="{Binding CanAccept}"
+                    Click="Ok_Click" Padding="18,8" AutomationProperties.AutomationId="ConnectOk" />
+            <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8" />
+        </StackPanel>
+    </StackPanel>
+</dialogs:DialogWindow>
