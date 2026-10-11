@@ -143,7 +143,11 @@ public sealed class SecretKeyFile
         byte[] key;
         try
         {
-            key = File.ReadAllBytes(file);
+            // не File.ReadAllBytes: тот не пускает читать, пока соседний процесс дописывает новый ключ («файл занят»)
+            using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var copy = new MemoryStream();
+            stream.CopyTo(copy);
+            key = copy.ToArray();
         }
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
         {
