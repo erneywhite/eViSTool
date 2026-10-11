@@ -1,0 +1,29 @@
+eViSTool 0.10.5: signed updates and a welcome message.
+
+New
+- Updates are signed. eViSTool and the agent install an update only if it carries the signature of eViSTool releases, so an archive swapped on the way or on GitHub will not be installed.
+- Announcements: a Welcome message card shows the chat message every player gets on joining. Edit opens Configuration right at that field.
+
+Fixes
+- Turning mods on or off and saving the server config from the window and the agent at the same moment no longer loses one of the changes.
+- Cloning a server profile keeps its world busy for the whole copy: a running server or a restore in progress gives a clear refusal, and the watchdog or a scheduled restart cannot start the server in the middle of the copy.
+- On Linux, secrets saved by two processes at the same moment (for example notification tokens) could become unreadable. Fixed.
+- An error in one of the agent's reactions to the server starting or stopping no longer breaks the start, the stop or the others (notifications, statistics).
+
+Update from About; then update the agent on the server computer with Update on the server.
+
+---
+
+eViSTool 0.10.5: подпись обновлений и приветствие при входе.
+
+Новое
+- Обновления подписаны. eViSTool и агент ставят обновление, только если на нём подпись релизов eViSTool: архив, подменённый по дороге или на GitHub, не установится.
+- «Объявления»: карточка «Приветствие при входе» показывает сообщение, которое получает каждый вошедший игрок. «Изменить» открывает «Конфигурацию» прямо на этом поле.
+
+Исправления
+- Включение и выключение модов и сохранение конфига сервера из окна и агента в один и тот же момент больше не теряют одну из правок.
+- Клонирование серверного профиля держит его мир занятым всё время копирования: работающий сервер или идущее восстановление дают понятный отказ, а сторож или перезапуск по расписанию не запустят сервер посреди копии.
+- На Linux секреты, сохранённые двумя процессами в один момент (например, токены оповещений), могли перестать читаться. Исправлено.
+- Ошибка в одной из реакций агента на запуск или остановку сервера больше не ломает ни запуск, ни остановку, ни остальные реакции (оповещения, статистику).
+
+Обнови из «О программе», потом обнови агента на компьютере с сервером кнопкой «Обновить на сервере».

@@ -1,0 +1,21 @@
+eViSTool 0.10.5 for Linux: signed updates and agent fixes.
+
+- Updates are signed: the agent installs an update only if it carries the signature of eViSTool releases, so an archive swapped on the way or on GitHub will not be installed.
+- Secrets saved by two processes at the same moment (for example notification tokens) could become unreadable. Fixed.
+- Turning mods on or off and saving the server config at the same moment no longer loses one of the changes.
+- An error in one of the agent's reactions to the server starting or stopping no longer breaks the start, the stop or the others (notifications, statistics).
+- The Windows app can now show and edit the welcome message every player gets on joining (Announcements tab).
+
+Update the Windows app from About, then press Update on the server in it.
+
+---
+
+eViSTool 0.10.5 для Linux: подпись обновлений и исправления агента.
+
+- Обновления подписаны: агент ставит обновление, только если на нём подпись релизов eViSTool, и архив, подменённый по дороге или на GitHub, не установится.
+- Секреты, сохранённые двумя процессами в один момент (например, токены оповещений), могли перестать читаться. Исправлено.
+- Включение и выключение модов и сохранение конфига сервера в один и тот же момент больше не теряют одну из правок.
+- Ошибка в одной из реакций агента на запуск или остановку сервера больше не ломает ни запуск, ни остановку, ни остальные реакции (оповещения, статистику).
+- В программе на Windows теперь видно и можно поменять приветствие, которое получает каждый вошедший игрок (вкладка «Объявления»).
+
+Обнови программу на Windows из «О программе», потом нажми в ней «Обновить на сервере».
