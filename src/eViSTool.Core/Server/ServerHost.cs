@@ -307,16 +307,22 @@ public sealed class ServerHost : IAsyncDisposable
             RestartScheduledAt = DateTime.Now + _options.RestartDelay;
             _ = Task.Delay(_options.RestartDelay, ct).ContinueWith(async t =>
             {
-                if (t.IsCanceled) return;
-                RestartScheduledAt = null;
+                // задержка истекла, а «Стоп» нажали в этот же миг: отмену проверяем под тем же замком, под которым её
+                // ставит «Стоп», — иначе сервер поднялся бы вопреки ему
+                lock (_lock)
+                {
+                    if (t.IsCanceled || ct.IsCancellationRequested) return;
+                    RestartScheduledAt = null;
+                }
                 try { await StartAsync().ConfigureAwait(false); }
                 catch (WorldBusyException ex)
                 {
                     if (afterCrash) Sys(Loc.T("srv.watchdogWaiting", ex.Message)); // один раз за ожидание, без спама
                     if (!ct.IsCancellationRequested) ScheduleRestart(afterCrash: false);
                 }
-                catch (Exception ex) when (ex is IOException or InvalidOperationException or System.ComponentModel.Win32Exception)
+                catch (Exception ex)
                 {
+                    // любая ошибка — в консоль: молча упавший сторож больше не поднял бы сервер
                     Sys(Loc.T("srv.watchdogFailed", ex.Message));
                 }
             }, TaskScheduler.Default);
