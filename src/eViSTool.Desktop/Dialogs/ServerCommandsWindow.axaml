@@ -1,0 +1,53 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:srv="using:eViSTool.Core.Server"
+                      xmlns:local="using:eViSTool.Desktop"
+                      xmlns:ctl="using:eViSTool.Desktop.Controls"
+                      x:Class="eViSTool.Desktop.Dialogs.ServerCommandsWindow"
+                      x:DataType="vm:ServerCommandsViewModel"
+                      Title="{local:Tr cmds.title}"
+                      Width="744" Height="521" MinWidth="504" MinHeight="321">
+    <!-- размеры окна — клиентская область: Width/Height у окна на WPF (760×560, минимум 520×360) считают и рамку с заголовком (16 и 39 пикселей на Windows 11) -->
+    <Window.Styles>
+        <!-- строка списка в WPF Fluent выше стандартной в Avalonia (12,11) на три пикселя: шаг строк 65 вместо 62 -->
+        <Style Selector="ListBox#List ListBoxItem">
+            <Setter Property="Padding" Value="12,12.5" />
+        </Style>
+    </Window.Styles>
+    <DockPanel Margin="16">
+        <TextBlock DockPanel.Dock="Top" FontSize="16" FontWeight="SemiBold" Text="{local:Tr cmds.title}" />
+        <TextBlock DockPanel.Dock="Top" Margin="0,4,0,12" Opacity="0.7" TextWrapping="Wrap" Text="{local:Tr cmds.hint}" />
+
+        <TextBox x:Name="SearchBox" DockPanel.Dock="Top" Classes="clearButton" Margin="0,0,0,10" Text="{Binding Search}"
+                 ctl:Focus.OnOpen="True" AutomationProperties.AutomationId="CmdsSearch" AutomationProperties.Name="{local:Tr cmds.search}" />
+
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+            <Button DockPanel.Dock="Left" Content="{local:Tr cmds.refresh}" Command="{Binding RefreshCommand}" Padding="14,6"
+                    ToolTip.Tip="{local:Tr cmds.refreshTip}" ToolTip.ShowOnDisabled="True" AutomationProperties.AutomationId="CmdsRefresh" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Classes="primary" Content="{local:Tr cmds.insert}" IsDefault="True" Command="{Binding InsertCommand}" Padding="16,6"
+                        AutomationProperties.AutomationId="CmdsInsert" />
+                <Button Content="{local:Tr common.cancel}" IsCancel="True" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,6" />
+            </StackPanel>
+        </DockPanel>
+
+        <TextBlock DockPanel.Dock="Bottom" Text="{Binding Status}" Opacity="0.7" Margin="0,8,0,0" TextWrapping="Wrap"
+                   AutomationProperties.AutomationId="CmdsStatus" />
+
+        <!-- двойной щелчок по строке = «Вставить» -->
+        <ListBox x:Name="List" ItemsSource="{Binding View.Items}" SelectedItem="{Binding Selected}" SelectionMode="Single"
+                 ctl:DoubleTap.Command="{Binding InsertCommand}" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 AutomationProperties.AutomationId="CmdsList">
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="srv:ServerCommand">
+                    <StackPanel Margin="2,3">
+                        <TextBlock Classes="mono" Text="{Binding Usage}" FontSize="13" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Description}" FontSize="12" Opacity="0.7" TextWrapping="Wrap" Margin="0,2,0,0" />
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </DockPanel>
+</dialogs:DialogWindow>
