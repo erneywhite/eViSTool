@@ -1,0 +1,1 @@
+{ "ServerName": "Стенд", "WelcomeMessage": "Привет, {playername}! Правила — в Discord: discord.gg/example", "Port": 42420, "WorldConfig": { "DisabledMods": [] } }

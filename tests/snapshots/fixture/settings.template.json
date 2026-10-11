@@ -1,0 +1,30 @@
+{
+  "Profiles": [
+    {
+      "Id": "stand",
+      "Name": "Стенд",
+      "Kind": "Server",
+      "GameDir": "{{GAME}}",
+      "DataDir": "{{VSDATA}}",
+      "RemoteCode": null,
+      "PinnedMods": {},
+      "BlockedVersions": {},
+      "LinkedProfiles": [],
+      "DefaultServer": null
+    }
+  ],
+  "ActiveProfileId": "stand",
+  "AllowUnstable": false,
+  "AutoCheckUpdates": false,
+  "AlsoInstallWithoutAsking": false,
+  "CopyWorldsBeforeModChanges": true,
+  "SkippedAppVersion": null,
+  "Language": "ru",
+  "Layout": {
+    "Width": 1400.0,
+    "Height": 860.0,
+    "Maximized": false,
+    "CatalogDetailsWidth": 760.0,
+    "ModsCardWidth": 420.0
+  }
+}
