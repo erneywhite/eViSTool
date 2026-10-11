@@ -153,7 +153,11 @@ public sealed class ModBackupStore(string root, int keepPerMod = 3, string? hist
     public static ModBackupStore ForProfileId(string profileId) =>
         new(Path.Combine(AppPaths.ModBackups, profileId), historyFile: ModHistory.FileFor(profileId));
 
-    public string DirFor(string modId) => Path.Combine(Root, modId);
+    /// <summary>Папка мода в хранилище; modid, уводящий за пределы хранилища, — отказ (сканер такие моды и не пускает).</summary>
+    public string DirFor(string modId) =>
+        PathRules.IsSafeModId(modId) || modId == "_unknown"
+            ? Path.Combine(Root, modId)
+            : throw new InvalidDataException(Loc.T("scan.badModId", modId));
 
     /// <summary>Переносит файл мода в хранилище (не копирует — из папки модов он должен исчезнуть).</summary>
     public string Keep(LocalMod mod)

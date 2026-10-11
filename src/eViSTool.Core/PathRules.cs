@@ -22,6 +22,24 @@ public static class PathRules
     public static bool IsBadInFileName(char c) => c < ' ' || c is '"' or '<' or '>' or '|' or ':' or '*' or '?' or '\\' or '/';
 
     /// <summary>
+    /// modid годится в имя папки: строчные латинские буквы, цифры и «_ . -», начинается с буквы или цифры, без «..».
+    /// modid пишет автор мода в modinfo.json, а по нему eViSTool строит пути (хранилище старых версий, история) —
+    /// «..\..\Documents» увёл бы перенос и удаление файлов за пределы своих папок.
+    /// </summary>
+    public static bool IsSafeModId(string? modId) =>
+        modId is { Length: > 0 and <= 128 } && char.IsAsciiLetterOrDigit(modId[0]) && !modId.Contains("..")
+        && modId.All(c => char.IsAsciiDigit(c) || char.IsAsciiLetterLower(c) || c is '_' or '.' or '-');
+
+    /// <summary>
+    /// Имя файла из чужих данных (манифест пака, заголовок запроса) → файл в папке <paramref name="dir"/>; имя с путём,
+    /// «..», запрещёнными знаками или пустое — null.
+    /// </summary>
+    public static string? FileIn(string dir, string? fileName) =>
+        fileName is { Length: > 0 and <= 255 } && fileName != "." && fileName != ".." && !fileName.Any(IsBadInFileName)
+            ? Inside(dir, fileName)
+            : null;
+
+    /// <summary>
     /// Путь внутри папки, присланный окном («sub/x.json»), → полный путь на этой машине; выход за папку — null.
     /// «\» считается разделителем и на Linux: окно на Windows пишет пути с ним, и «..\x» должно значить то же, что там.
     /// Путь от корня («/etc/x», «\\сервер\x») и с диском Windows («C:/x») не принимается ни на какой системе.

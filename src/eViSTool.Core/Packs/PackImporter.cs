@@ -52,7 +52,8 @@ public sealed class PackFile : IDisposable
         var entry = _zip.GetEntry(PackManifest.ModsFolder + mod.FileName)
                     ?? throw new InvalidDataException(Loc.T("pack.fileMissing", mod.FileName));
         Directory.CreateDirectory(tempDir);
-        var dest = System.IO.Path.Combine(tempDir, mod.FileName);
+        // имя из манифеста — только имя: «..\..\x» записал бы файл за пределы временной папки
+        var dest = PathRules.FileIn(tempDir, mod.FileName) ?? throw new InvalidDataException(Loc.T("pack.badFileName", mod.FileName));
         entry.ExtractToFile(dest, overwrite: true);
         return dest;
     }

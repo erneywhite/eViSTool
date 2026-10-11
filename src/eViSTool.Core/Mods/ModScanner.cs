@@ -86,9 +86,11 @@ public static class ModScanner
         try
         {
             var info = ModInfo.Parse(readJson());
-            return string.IsNullOrEmpty(info.ModId)
-                ? new LocalMod(path, info, Loc.T("scan.noModId"))
-                : new LocalMod(path, info, null);
+            if (string.IsNullOrEmpty(info.ModId)) return new LocalMod(path, info, Loc.T("scan.noModId"));
+            // modid идёт в пути (хранилище версий, история) — такой мод не трогаем, только показываем
+            return PathRules.IsSafeModId(info.ModId)
+                ? new LocalMod(path, info, null)
+                : new LocalMod(path, null, Loc.T("scan.badModId", info.OriginalModId));
         }
         catch (Newtonsoft.Json.JsonException ex)
         {
