@@ -88,6 +88,7 @@
   "backup.badModData": "The mod data archive contains a path outside Saves and ModData: {0}",
   "backup.created": "▸ Backup created: {0} · {1}",
   "backup.exists": "The backup \"{0}\" already exists — not overwriting it.",
+  "backup.journalBroken": "The journal of the previous world restore is damaged, so it is unknown what was changed. Nothing was deleted: the temporary files were moved to {0}. If the world or mod data look wrong, the previous files are there and next to the world (*.evistool.old).",
   "backup.noSpace": "Not enough space on drive {0}: the restore needs about {1} MB, {2} MB is free.",
   "backup.recovered": "▸ The previous world restore was interrupted — the previous world and mod data files were put back.",
   "backup.badArchive": "the mod data archive \"{0}\" is damaged ({1})",

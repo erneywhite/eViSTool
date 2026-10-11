@@ -152,7 +152,7 @@ public sealed class ServerHost : IAsyncDisposable
                 // .dll (Linux) — через dotnet; нет нужного .NET или файл битый — понятная ошибка, а не падение за падением
                 psi = ServerExecutable.StartInfo(_options.ExePath);
                 // восстановление мира оборвалось посреди подмены — сервер не должен стартовать на половине старого и нового
-                if (WorldRestore.Recover(_options.DataPath)) Sys(Loc.T("backup.recovered"));
+                if (WorldRestore.Recover(_options.DataPath, Sys)) Sys(Loc.T("backup.recovered"));
             }
             catch
             {

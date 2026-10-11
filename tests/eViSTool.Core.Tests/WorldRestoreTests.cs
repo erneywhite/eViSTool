@@ -161,4 +161,22 @@ public sealed class WorldRestoreTests : IDisposable
         Assert.True(Directory.Exists(stage));
         Assert.Equal(b, State().Where(kv => !kv.Key.StartsWith(WorldRestore.StageName)).ToDictionary());
     }
+
+    [Fact]
+    public void ADamagedJournal_DoesNotBlock_AndDeletesNothing()
+    {
+        var (_, _, _, b) = Setup();
+        var stage = Directory.CreateDirectory(WorldRestore.StageFor(_data)).FullName;
+        File.WriteAllText(Path.Combine(stage, "restore.json"), "{ \"Swapping\": tr");
+        Directory.CreateDirectory(Path.Combine(stage, "old", "ModData"));
+        File.WriteAllText(Path.Combine(stage, "old", "ModData", "keep.json"), "old mod data");
+        var reports = new List<string>();
+
+        Assert.False(WorldRestore.Recover(_data, reports.Add)); // «откатил» не пишется — ничего не вернули
+        Assert.False(Directory.Exists(stage));                  // следующий запуск и восстановление не упрутся в неё
+        var aside = Assert.Single(Directory.GetDirectories(_data, WorldRestore.StageName + "-*"));
+        Assert.Equal("old mod data", File.ReadAllText(Path.Combine(aside, "old", "ModData", "keep.json")));
+        Assert.Contains(aside, Assert.Single(reports));
+        Assert.Equal(b, State().Where(kv => !kv.Key.StartsWith(WorldRestore.StageName)).ToDictionary());
+    }
 }

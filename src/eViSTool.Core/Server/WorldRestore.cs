@@ -100,8 +100,11 @@ public static class WorldRestore
 
     /// <summary>
     /// Довести до конца или откатить оборванное восстановление. false — нечего делать или оно ещё идёт в другом процессе.
+    /// Журнал не прочитать (пишется атомарно, так что это порча диска) — что было сделано, неизвестно: временная папка
+    /// не удаляется (в ней могут лежать прежние данные модов), а отодвигается в сторону, и <paramref name="report"/>
+    /// получает, куда. Запуск сервера это не держит.
     /// </summary>
-    public static bool Recover(string dataDir)
+    public static bool Recover(string dataDir, Action<string>? report = null)
     {
         var stage = StageFor(dataDir);
         if (!Directory.Exists(stage)) return false;
@@ -116,13 +119,29 @@ public static class WorldRestore
         }
 
         Journal? journal;
+        var broken = false;
         using (gate)
         {
             var path = Path.Combine(stage, JournalName);
-            journal = File.Exists(path) ? JsonConvert.DeserializeObject<Journal>(File.ReadAllText(path)) : null;
+            try
+            {
+                journal = File.Exists(path) ? JsonConvert.DeserializeObject<Journal>(File.ReadAllText(path)) : null;
+            }
+            catch (JsonException)
+            {
+                journal = null;
+                broken = true;
+            }
             // подмена не закончена — вернуть прежнее; закончена или не начиналась — только убрать временное
             if (journal is { Swapping: true, Done: false } && !Rollback(journal))
                 throw new InvalidOperationException(Loc.T("backup.rollbackFailed", stage, ""));
+        }
+        if (broken)
+        {
+            var aside = $"{stage}-{DateTime.Now:yyyyMMdd-HHmmss}";
+            Directory.Move(stage, aside);
+            report?.Invoke(Loc.T("backup.journalBroken", aside));
+            return false; // ничего не вернули — «откатил» не пишем
         }
         Cleanup(stage, journal);
         return true;
