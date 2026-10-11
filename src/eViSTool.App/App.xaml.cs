@@ -50,6 +50,11 @@ public partial class App : Application
             target.UpdateLayout();
             var (w, h) = target == content ? (request.Width, request.Height) : ((int)Math.Ceiling(target.ActualWidth), (int)Math.Ceiling(target.ActualHeight));
             var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(w, h, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+            // часть окон программы — с фоном Mica (прозрачным для снимка): подложить лесной фон, как их видно на экране
+            var under = new System.Windows.Media.DrawingVisual();
+            using (var dc = under.RenderOpen())
+                dc.DrawRectangle((System.Windows.Media.Brush)FindResource("Forest.Base"), null, new Rect(0, 0, w, h));
+            bitmap.Render(under);
             bitmap.Render(target);
             var png = new System.Windows.Media.Imaging.PngBitmapEncoder();
             png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));

@@ -46,7 +46,7 @@
     <SolidColorBrush x:Key="Forest.SelectedHover" Color="#414D39" />
     <SolidColorBrush x:Key="Forest.Disabled" Color="#242C25" />
     <SolidColorBrush x:Key="Forest.DisabledText" Color="#6E7A6A" />
-    <SolidColorBrush x:Key="Forest.Selection" Color="#6B6044" />
+    <SolidColorBrush x:Key="Forest.Selection" Color="#666B6044" /> <!-- песок с прозрачностью 0.4, как выделение в WPF -->
 
     <!-- ===== шрифты ===== -->
     <!-- основной (Noto Sans) задан шрифтом по умолчанию в Program.cs; здесь — моноширинный для версий, кода, консоли -->
@@ -61,7 +61,9 @@
          до полей не доходила). На карточке поле так чуть светлее её; непрозрачная «поверхность» с карточкой сливалась. -->
     <SolidColorBrush x:Key="TextControlBackground" Color="#0FFFFFFF" />
     <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#15FFFFFF" />
-    <StaticResource x:Key="TextControlBackgroundFocused" ResourceKey="Forest.Side" />
+    <!-- в фокусе — тёмная полупрозрачная заливка (Fluent ControlFillColorInputActive) и песочная рамка: 1 px, снизу 2 px -->
+    <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#B31E1E1E" />
+    <Thickness x:Key="TextControlBorderThemeThicknessFocused">1,1,1,2</Thickness>
     <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#0BFFFFFF" />
     <StaticResource x:Key="TextControlBorderBrush" ResourceKey="Forest.Line" />
     <StaticResource x:Key="TextControlBorderBrushPointerOver" ResourceKey="Forest.LineStrong" />
@@ -128,6 +130,12 @@
     <StaticResource x:Key="CheckBoxCheckGlyphForegroundIndeterminate" ResourceKey="Forest.AccentInk" />
     <StaticResource x:Key="CheckBoxCheckGlyphForegroundIndeterminatePointerOver" ResourceKey="Forest.AccentInk" />
     <StaticResource x:Key="CheckBoxCheckGlyphForegroundIndeterminatePressed" ResourceKey="Forest.AccentInk" />
+    <!-- выключенная галочка: тусклый контур и приглушённая галка (Fluent красит отмеченную серой заливкой, а контур
+         неотмеченной оставляет светлым) -->
+    <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedDisabled" Color="Transparent" />
+    <StaticResource x:Key="CheckBoxCheckBackgroundStrokeCheckedDisabled" ResourceKey="Forest.LineStrong" />
+    <StaticResource x:Key="CheckBoxCheckBackgroundStrokeUncheckedDisabled" ResourceKey="Forest.LineStrong" />
+    <StaticResource x:Key="CheckBoxCheckGlyphForegroundCheckedDisabled" ResourceKey="Forest.DisabledText" />
     <StaticResource x:Key="RadioButtonOuterEllipseCheckedFill" ResourceKey="Forest.Accent" />
     <StaticResource x:Key="RadioButtonOuterEllipseCheckedFillPointerOver" ResourceKey="Forest.Accent" />
     <StaticResource x:Key="RadioButtonOuterEllipseCheckedFillPressed" ResourceKey="Forest.Accent" />

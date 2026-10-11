@@ -8,14 +8,6 @@
                       x:DataType="vm:AlsoInstallViewModel"
                       Width="544" SizeToContent="Height" CanResize="False"
                       Title="{local:Tr also.title}">
-    <dialogs:DialogWindow.Resources>
-        <!-- недоступная галочка (текущий профиль — отмечена, профиль без версии мода — нет): тусклый контур и приглушённая
-             галка, как в окне на WPF; Fluent красит отмеченную серой заливкой, а контур неотмеченной оставляет светлым -->
-        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedDisabled" Color="Transparent" />
-        <StaticResource x:Key="CheckBoxCheckBackgroundStrokeCheckedDisabled" ResourceKey="Forest.LineStrong" />
-        <StaticResource x:Key="CheckBoxCheckBackgroundStrokeUncheckedDisabled" ResourceKey="Forest.LineStrong" />
-        <StaticResource x:Key="CheckBoxCheckGlyphForegroundCheckedDisabled" ResourceKey="Forest.DisabledText" />
-    </dialogs:DialogWindow.Resources>
     <StackPanel Margin="24,20,24,22">
         <TextBlock Text="{local:Tr also.title}" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />
         <TextBlock Text="{Binding Hint}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="0,4,0,0" />

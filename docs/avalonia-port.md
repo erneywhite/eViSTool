@@ -77,6 +77,10 @@
 - Ответ возвращаем через `Close(ответ)` на `this`, открываем через `new XWindow { … }.ShowModal<TResult>()`. Модели ждут ответа на месте, как с `ShowDialog` в WPF: вложенный цикл диспетчера проверен на Windows и на Linux (Wayland).
 - Открывает окно метод `IAppWindows` в своём файле `Platform/AppWindows/AvaloniaAppWindows.<Метод>.cs`: заменить заглушку на настоящее окно. Другие файлы `AppWindows` не трогаем.
 - `DialogResult = true` становится `Close(результат)`, `IsCancel` — Escape (уже в базе), `IsDefault` у кнопки остаётся `IsDefault="True"`.
+- Размер окна: в WPF `Width`/`Height` считают и рамку с заголовком, в Avalonia — только содержимое. Окно WPF `Width="560"` в Avalonia — `Width="544"` (рамка по 8 px с боков), `Height` — на 39 меньше (640x460 → 624x421). Так снимки и окна на экране совпадают.
+- У окна должен быть публичный конструктор без параметров (иначе предупреждение AVLN3001): модель передаём через `DataContext` (`new XWindow { DataContext = model }`), а не аргументом конструктора.
+- Enter в `DataGrid`, на переключателе или галочке до кнопки `IsDefault` не доходит: таблица и переключатели забирают его себе (в WPF доходил). Где Enter должен подтверждать окно — туннельный обработчик `KeyDown` в коде окна (образец — `RollbackWindow.axaml.cs`, `ImportPackWindow.axaml.cs`).
+- Поле пароля или секрета: `<ctl:SecretTextBox Classes="mono" PasswordChar="●" />`. Обычный `TextBox` отдаёт свой текст специальным возможностям системы даже с точками; `mono` — потому что в Noto Sans нет символа «●».
 - Логику из кода за окном WPF переносим в новую модель окна в `src/eViSTool.Presentation/ViewModels/` (`BanViewModel` и т. п.) с тестами. Окно на WPF не трогаем: оно уйдёт целиком, когда перенос закончится, а сравнивать с ним удобнее, пока оно как было.
 - Снимок окна: `pwsh build/snapshot.ps1 -Screens dialog.<имя>`. Окно открывает метод с атрибутом `[SnapshotDialog("<имя>")]` в своём файле `src/eViSTool.Presentation/SnapshotDialogs/<Окно>.cs`: вызывает `AppWindows.Current.<Метод>(…)` с примерными данными (образец — `SnapshotDialogs/Ban.cs`). Снимается верхнее окно, без заголовка. Окно на WPF откроется тем же вызовом, так что пара сравнима.
 

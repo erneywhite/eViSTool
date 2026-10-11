@@ -39,6 +39,12 @@ public class DialogWindow : Window
         base.Close(dialogResult);
     }
 
+    protected override void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
+        WindowCaption.Dark(this); // заголовок в цвет окна, как у главного
+    }
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);

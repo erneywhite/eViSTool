@@ -8,14 +8,6 @@
                       x:DataType="vm:ConnectCodeViewModel"
                       Width="544" SizeToContent="Height" CanResize="False"
                       Title="{local:Tr connect.title}">
-    <dialogs:DialogWindow.Styles>
-        <!-- поле в фокусе — как в окне на WPF: песочная рамка в 1 px, снизу 2 px (у темы — 2 px со всех сторон), заливка —
-             полупрозрачная тёмная (Fluent ControlFillColorInputActive, #B31E1E1E), а не Forest.Side. Кандидат в тему -->
-        <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
-            <Setter Property="BorderThickness" Value="1,1,1,2" />
-            <Setter Property="Background" Value="#B31E1E1E" />
-        </Style>
-    </dialogs:DialogWindow.Styles>
     <!-- ширина — содержимого окна: в окне на WPF Width="560" считал и рамку (по 8 px с боков), внутри было 544 -->
     <StackPanel Margin="24,20,24,22">
         <TextBlock Text="{local:Tr connect.title}" FontSize="20" FontWeight="SemiBold" />
@@ -27,7 +19,7 @@
         <DockPanel Margin="0,6,0,0">
             <Button DockPanel.Dock="Right" Content="{local:Tr connect.paste}" Click="Paste_Click" Margin="8,0,0,0"
                     ToolTip.Tip="{local:Tr connect.pasteTip}" AutomationProperties.AutomationId="ConnectPaste" />
-            <dialogs:SecretTextBox Classes="mono" Text="{Binding Text}" PasswordChar="●" VerticalContentAlignment="Center"
+            <ctl:SecretTextBox Classes="mono" Text="{Binding Text}" PasswordChar="●" VerticalContentAlignment="Center"
                                    ctl:Focus.OnOpen="True" AutomationProperties.AutomationId="ConnectCode" />
         </DockPanel>
         <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding ParsedTone}" Text="{Binding ParsedText}"

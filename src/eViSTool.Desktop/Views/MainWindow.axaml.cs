@@ -1,9 +1,9 @@
 using System.ComponentModel;
-using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using eViSTool.Desktop.Platform;
 using eViSTool.Presentation.ViewModels;
 
 namespace eViSTool.Desktop.Views;
@@ -53,7 +53,7 @@ public partial class MainWindow : Window
     // размер окна — как в прошлый раз (но не больше рабочей области экрана)
     private void OnOpened()
     {
-        if (OperatingSystem.IsWindows()) DarkCaption();
+        WindowCaption.Dark(this);
         var l = Vm.Layout;
         if (Screens.ScreenFromWindow(this) is { } screen)
         {
@@ -77,19 +77,6 @@ public partial class MainWindow : Window
         // несохранённые правки конфигурации сервера и конфига мода — спросить; отказались — окно остаётся
         if (!Vm.ConfirmExit()) e.Cancel = true;
     }
-
-    // тёмный заголовок окна в цвет боковой колонки (Windows 11; на Windows 10 — просто тёмный)
-    private void DarkCaption()
-    {
-        if (TryGetPlatformHandle()?.Handle is not { } hwnd || hwnd == IntPtr.Zero) return;
-        int dark = 1, caption = 0x001D2319 /* #19231D в формате 0x00BBGGRR */, text = 0x00DDE9E7;
-        DwmSetWindowAttribute(hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, ref dark, sizeof(int));
-        DwmSetWindowAttribute(hwnd, 35 /* DWMWA_CAPTION_COLOR */, ref caption, sizeof(int));
-        DwmSetWindowAttribute(hwnd, 36 /* DWMWA_TEXT_COLOR */, ref text, sizeof(int));
-    }
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
     // ---------- меню «Играть ▾»: собирается заново при каждом открытии (серверы могли запустить, избранное — поменять)
 
