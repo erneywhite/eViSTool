@@ -1,0 +1,25 @@
+eViSTool 0.10.3: reliability fixes.
+
+- Update on the server: if the update failed after the server was stopped (a broken download, no disk space or permissions), the agent now starts the server again on the previous version instead of leaving it stopped.
+- A mod or modpack can no longer make eViSTool touch files outside its own folders: a mod whose modid is not a plain name is shown as broken and left alone, and a mod file in a modpack with a path in its name is not unpacked.
+- The server tab and its console no longer stop updating silently after an unexpected error, and the agent's main loop no longer stops on one.
+- The watchdog no longer starts a server that was stopped at the very moment of an automatic restart.
+- Renaming a profile no longer saves the profile and reconnects the server on every typed letter; the name is applied when you leave the field.
+- While the agent restarts after Update on the server, the window no longer flashes "No connection".
+- Statistics open on the last day by default.
+
+Update from About; then update the agent on the server computer with Update on the server.
+
+---
+
+eViSTool 0.10.3: исправления надёжности.
+
+- «Обновить на сервере»: если обновление сорвалось после остановки сервера (битый архив, нет места или прав), агент запускает сервер обратно на прежней версии, а не оставляет его стоять.
+- Мод или модпак больше не может заставить eViSTool трогать файлы вне его папок: мод с modid, который не похож на простое имя, показывается сломанным и не трогается, а файл мода в модпаке с путём в имени не распаковывается.
+- Вкладка сервера и его консоль больше не перестают обновляться молча после неожиданной ошибки, и главный цикл агента от такой ошибки не останавливается.
+- Сторож больше не запускает сервер, который остановили в ту самую секунду, когда он собирался его перезапустить.
+- Переименование профиля больше не пересохраняет профиль и не переподключает сервер на каждую букву: имя применяется, когда уходишь из поля.
+- Пока агент перезапускается после «Обновить на сервере», окно больше не мигает «Нет связи».
+- Статистика по умолчанию открывается за сутки.
+
+Обнови из «О программе», потом обнови агента на компьютере с сервером кнопкой «Обновить на сервере».
