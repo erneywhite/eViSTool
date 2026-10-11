@@ -126,8 +126,12 @@ public static class WorldCopies
     {
         if (!File.Exists(copy.CopyPath)) throw new FileNotFoundException(Loc.T("wcopy.gone"), copy.CopyPath);
         var aside = Path.Combine(DirFor(dataDir), Path.GetFileName(copy.WorldPath) + BeforeRestoreSuffix);
-        // возвращаем отложенный мир — откладывать нечего: им же и затрётся текущий
-        if (!copy.IsBeforeRestore && File.Exists(copy.WorldPath))
+        // возвращаем отложенный мир — откладывать нечего: им же и затрётся текущий.
+        // Мир не менялся с прошлого возврата этой копии (время — как у копии, так его ставит возврат) — он и есть копия:
+        // отложенный перед тем прежний мир не затираем, иначе второе нажатие «Вернуть» потеряло бы его насовсем
+        var unchangedSinceRestore = File.Exists(aside) && File.Exists(copy.WorldPath)
+                                    && File.GetLastWriteTimeUtc(copy.WorldPath) == File.GetLastWriteTimeUtc(copy.CopyPath);
+        if (!copy.IsBeforeRestore && File.Exists(copy.WorldPath) && !unchangedSinceRestore)
         {
             var tmp = aside + ".new";
             if (File.Exists(tmp)) File.Delete(tmp);

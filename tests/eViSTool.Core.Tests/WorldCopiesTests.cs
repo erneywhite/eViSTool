@@ -111,6 +111,27 @@ public sealed class WorldCopiesTests : IDisposable
     }
 
     [Fact]
+    public void RestoringTheSameCopyTwice_KeepsTheWorldThatWasAside()
+    {
+        var alpha = World("Alpha", "good", T0);
+        WorldCopies.Refresh(_data);
+        World("Alpha", "my real world", T0.AddHours(1));
+        var copy = WorldCopies.List(_data).Single(c => !c.IsBeforeRestore);
+
+        WorldCopies.Restore(_data, copy);
+        WorldCopies.Restore(_data, copy); // второй раз, не играя: мир сейчас и есть эта копия
+
+        Assert.Equal("good", File.ReadAllText(alpha));
+        var aside = WorldCopies.List(_data).Single(c => c.IsBeforeRestore);
+        Assert.Equal("my real world", File.ReadAllText(aside.CopyPath)); // отложенный мир не затёрт копией
+
+        // а если после возврата в мир играли — отложенным становится уже он
+        World("Alpha", "played after restore", T0.AddHours(2));
+        WorldCopies.Restore(_data, copy);
+        Assert.Equal("played after restore", File.ReadAllText(WorldCopies.List(_data).Single(c => c.IsBeforeRestore).CopyPath));
+    }
+
+    [Fact]
     public void NoSaves_NothingToDo()
     {
         Directory.Delete(_saves);
