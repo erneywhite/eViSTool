@@ -618,17 +618,20 @@ public sealed partial class ModsViewModel : ObservableObject
         }
 
         if (CurrentTarget() is not { } target || !ConfirmIfRunning(target)) return;
-        // моды, нужные и в других профилях (сервер ↔ клиент), — предложить поставить и туда
-        var also = await PickAlsoForFilesAsync(target, zips);
-        if (also is null) return; // отменили
-        also = [.. also.Where(a => ConfirmIfRunning(a.Target))];
 
         var installed = new List<string>();
         var problems = new List<string>();
+        // занято — сразу, до первого await: второе быстрое перетаскивание, пока идёт выбор «поставить также в»,
+        // иначе прошло бы проверку выше и запустило вторую установку
         IsBusy = true;
-        using var history = ModHistory.Begin(ModHistorySource.Zip);
         try
         {
+            // моды, нужные и в других профилях (сервер ↔ клиент), — предложить поставить и туда
+            var also = await PickAlsoForFilesAsync(target, zips);
+            if (also is null) return; // отменили
+            also = [.. also.Where(a => ConfirmIfRunning(a.Target))];
+
+            using var history = ModHistory.Begin(ModHistorySource.Zip);
             foreach (var zip in zips)
                 await InstallZipAsync(target, zip, interactive: true, installed, problems);
             foreach (var a in also)
@@ -942,14 +945,28 @@ public sealed partial class ModsViewModel : ObservableObject
                 item.Progress = 0;
                 NotifyQueue();
                 var problems = new List<string>();
-                bool ok;
+                var ok = false;
                 using var history = ModHistory.Join(item.History?.Id, item.History?.Source, item.History?.Undoes);
-                // каждый пункт — в свою цель, запомненную при добавлении
-                if (item.Path is not null)
-                    ok = await InstallZipAsync(item.Target, item.Path, interactive: false, installed, problems);
-                else
-                    ok = await DownloadAndInstallAsync(item.Target, item.ModId, item.Name, item.Release!, installed, problems,
-                        x => { item.Progress = x; OnPropertyChanged(nameof(QueueProgress)); }, ct);
+                try
+                {
+                    // каждый пункт — в свою цель, запомненную при добавлении
+                    if (item.Path is not null)
+                        ok = await InstallZipAsync(item.Target, item.Path, interactive: false, installed, problems);
+                    else
+                        ok = await DownloadAndInstallAsync(item.Target, item.ModId, item.Name, item.Release!, installed, problems,
+                            x => { item.Progress = x; OnPropertyChanged(nameof(QueueProgress)); }, ct);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    // «Отменить» посреди пункта — он станет «отменён» ниже
+                }
+                catch (Exception ex)
+                {
+                    // неожиданная ошибка не должна оставлять пункт «в работе» навсегда и останавливать очередь молча:
+                    // пункт — «не удалось» с текстом ошибки, подробности — в журнал
+                    App.WriteCrashLog(ex);
+                    problems.Add(Loc.T("dl.failed", item.Name, item.To, ex.Message));
+                }
 
                 item.State = ok ? QueueState.Done : ct.IsCancellationRequested ? QueueState.Cancelled : QueueState.Failed;
                 item.Message = ok ? "" : ct.IsCancellationRequested ? "" : problems.FirstOrDefault() ?? "";

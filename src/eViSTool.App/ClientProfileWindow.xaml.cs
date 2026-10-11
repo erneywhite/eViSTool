@@ -227,6 +227,13 @@ public partial class ClientProfileWindow : Window
         {
             Finish(Loc.T("clone.failed", ex.Message));
         }
+        catch (Exception ex)
+        {
+            // неожиданное: без этого окно осталось бы с выключенной формой и больше не закрылось бы (копирование
+            // «идёт» навсегда) — возвращаем форму, подробности в журнал
+            App.WriteCrashLog(ex);
+            Finish(Loc.T("clone.failed", ex.Message));
+        }
     }
 
     /// <summary>Копирование прервано: вернуть форму, показать причину.</summary>
