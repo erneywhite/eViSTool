@@ -168,6 +168,34 @@
         <Setter Property="Opacity" Value="1" />
     </Style>
 
+    <!-- кнопка поменьше: в предупреждениях, очереди, шапках, списках версий -->
+    <Style Selector="Button.small">
+        <Setter Property="Padding" Value="12,4" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <!-- строка «ключ — значение» в карточке мода -->
+    <Style Selector="TextBlock.cardKey">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Margin" Value="0,4,12,4" />
+    </Style>
+    <Style Selector="TextBlock.cardValue">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Margin" Value="0,4,0,4" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="TextAlignment" Value="Right" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <!-- прокрутка: полоса тонкая, как у Fluent, но место под неё оставлено, а не поверх содержимого (как в окне на WPF) -->
+    <Style Selector="ScrollViewer /template/ ScrollContentPresenter#PART_ContentPresenter">
+        <Setter Property="Grid.ColumnSpan" Value="1" />
+        <Setter Property="Grid.RowSpan" Value="1" />
+    </Style>
+
     <!-- ===== служебные ===== -->
     <!-- невидимый, но место занимает (Visibility=Hidden в WPF) -->
     <Style Selector=":is(Control).hidden">

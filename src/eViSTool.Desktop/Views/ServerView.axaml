@@ -30,13 +30,6 @@
             <Setter Property="Height" Value="9" />
             <Setter Property="Margin" Value="0,0,9,0" />
         </Style>
-        <!-- кнопки поменьше: шапка консоли и строка про чужой сервер -->
-        <Style Selector="Button.small">
-            <Setter Property="Padding" Value="12,4" />
-            <Setter Property="MinHeight" Value="0" />
-            <Setter Property="FontSize" Value="12" />
-        </Style>
-
         <!-- консоль: строки плотно, с переносом; выделение — лесное (кисти выделения списков — в теме) -->
         <Style Selector="ListBox.console ListBoxItem">
             <Setter Property="Padding" Value="6,1" />
@@ -61,13 +54,6 @@
         </Style>
         <Style Selector="TextBlock.line.chat">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Good}" />
-        </Style>
-
-        <!-- поле команды, пока сервер не запущен: как выключенное поле в окне на WPF — полупрозрачные заливка и рамка
-             поверх карточки (Forest.Disabled темы заметно темнее) -->
-        <Style Selector="TextBox.command:disabled /template/ Border#PART_BorderElement">
-            <Setter Property="Background" Value="#0BFFFFFF" />
-            <Setter Property="BorderBrush" Value="#12FFFFFF" />
         </Style>
 
         <!-- подсказки команд: пункты не берут фокус (он остаётся в поле ввода) -->

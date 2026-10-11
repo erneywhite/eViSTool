@@ -5,16 +5,6 @@
              xmlns:conv="using:eViSTool.Desktop.Converters"
              x:Class="eViSTool.Desktop.Views.ModConfigView"
              x:DataType="vm:ModConfigViewModel">
-    <UserControl.Resources>
-        <!-- подсказка в пустом поле — приглушённым цветом без полупрозрачности Fluent, как в окне на WPF -->
-        <x:Double x:Key="TextControlPlaceholderOpacity">1</x:Double>
-        <!--
-            фон полей ввода — как его на деле рисует окно на WPF: полупрозрачный белый Fluent (ControlFillColorDefault и
-            Secondary). Непрозрачная поверхность темы в карточке сливается с ней, и поля формы теряют заливку
-        -->
-        <SolidColorBrush x:Key="TextControlBackground" Color="#0FFFFFFF" />
-        <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#15FFFFFF" />
-    </UserControl.Resources>
     <UserControl.Styles>
         <!-- ключ поля формы -->
         <Style Selector="TextBlock.fieldKey">

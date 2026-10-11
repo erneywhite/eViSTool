@@ -56,15 +56,20 @@
     <CornerRadius x:Key="ControlCornerRadius">4</CornerRadius>
     <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
 
-    <!-- ===== поля ввода: фон поверхности, рамка-линия, в фокусе — песок ===== -->
-    <StaticResource x:Key="TextControlBackground" ResourceKey="Forest.Surface" />
-    <StaticResource x:Key="TextControlBackgroundPointerOver" ResourceKey="Forest.Raised" />
+    <!-- ===== поля ввода: рамка-линия, в фокусе — песок ===== -->
+    <!-- Заливка — полупрозрачный белый, как её на деле рисует окно на WPF (Fluent ControlFillColor*: подмена в его теме
+         до полей не доходила). На карточке поле так чуть светлее её; непрозрачная «поверхность» с карточкой сливалась. -->
+    <SolidColorBrush x:Key="TextControlBackground" Color="#0FFFFFFF" />
+    <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#15FFFFFF" />
     <StaticResource x:Key="TextControlBackgroundFocused" ResourceKey="Forest.Side" />
-    <StaticResource x:Key="TextControlBackgroundDisabled" ResourceKey="Forest.Disabled" />
+    <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#0BFFFFFF" />
     <StaticResource x:Key="TextControlBorderBrush" ResourceKey="Forest.Line" />
     <StaticResource x:Key="TextControlBorderBrushPointerOver" ResourceKey="Forest.LineStrong" />
     <StaticResource x:Key="TextControlBorderBrushFocused" ResourceKey="Forest.Accent" />
-    <StaticResource x:Key="TextControlBorderBrushDisabled" ResourceKey="Forest.Line" />
+    <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#12FFFFFF" />
+    <!-- отступ текста и подсказка без полупрозрачности — тоже как в окне на WPF -->
+    <Thickness x:Key="TextControlThemePadding">11,5,11,6</Thickness>
+    <x:Double x:Key="TextControlPlaceholderOpacity">1</x:Double>
     <StaticResource x:Key="TextControlForeground" ResourceKey="Forest.Text" />
     <StaticResource x:Key="TextControlForegroundPointerOver" ResourceKey="Forest.Text" />
     <StaticResource x:Key="TextControlForegroundFocused" ResourceKey="Forest.Text" />
@@ -77,15 +82,15 @@
     <StaticResource x:Key="TextControlButtonBackgroundPressed" ResourceKey="Forest.Raised" />
 
     <!-- ===== выпадающие списки ===== -->
-    <StaticResource x:Key="ComboBoxBackground" ResourceKey="Forest.Surface" />
-    <StaticResource x:Key="ComboBoxBackgroundPointerOver" ResourceKey="Forest.Raised" />
-    <StaticResource x:Key="ComboBoxBackgroundPressed" ResourceKey="Forest.Raised" />
-    <StaticResource x:Key="ComboBoxBackgroundDisabled" ResourceKey="Forest.Disabled" />
+    <SolidColorBrush x:Key="ComboBoxBackground" Color="#0FFFFFFF" />
+    <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#15FFFFFF" />
+    <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#08FFFFFF" />
+    <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="#0BFFFFFF" />
     <StaticResource x:Key="ComboBoxBackgroundUnfocused" ResourceKey="Forest.Raised" />
     <StaticResource x:Key="ComboBoxBorderBrush" ResourceKey="Forest.Line" />
     <StaticResource x:Key="ComboBoxBorderBrushPointerOver" ResourceKey="Forest.LineStrong" />
     <StaticResource x:Key="ComboBoxBorderBrushPressed" ResourceKey="Forest.Accent" />
-    <StaticResource x:Key="ComboBoxBorderBrushDisabled" ResourceKey="Forest.Line" />
+    <SolidColorBrush x:Key="ComboBoxBorderBrushDisabled" Color="#12FFFFFF" />
     <StaticResource x:Key="ComboBoxBackgroundBorderBrushUnfocused" ResourceKey="Forest.Line" />
     <StaticResource x:Key="ComboBoxForeground" ResourceKey="Forest.Text" />
     <StaticResource x:Key="ComboBoxPlaceHolderForeground" ResourceKey="Forest.Muted" />

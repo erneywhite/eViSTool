@@ -24,13 +24,16 @@
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <ControlTemplate>
-                <!-- содержимое всегда по центру, как в шаблоне WPF -->
+                <!-- содержимое всегда по центру, как в шаблоне WPF. RequiresFullOpacityHandling: прозрачность выключенной кнопки
+                     применяется к ней целиком, как Opacity на Border в WPF; иначе тёмный текст песочной кнопки
+                     смешивается с уже приглушённой заливкой и светлеет -->
                 <ContentPresenter x:Name="PART_ContentPresenter"
                                   Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
                                   BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
                                   Padding="{TemplateBinding Padding}" Content="{TemplateBinding Content}"
                                   ContentTemplate="{TemplateBinding ContentTemplate}" RecognizesAccessKey="True"
-                                  HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+                                  HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                  RenderOptions.RequiresFullOpacityHandling="True" />
             </ControlTemplate>
         </Setter>
         <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">

@@ -6,32 +6,10 @@
              xmlns:conv="using:eViSTool.Desktop.Converters"
              x:Class="eViSTool.Desktop.Views.ModsView"
              x:DataType="vm:ModsViewModel">
-    <UserControl.Styles>
-        <!-- строка «ключ — значение» в карточке -->
-        <Style Selector="TextBlock.cardKey">
-            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Margin" Value="0,4,12,4" />
-        </Style>
-        <Style Selector="TextBlock.cardValue">
-            <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Margin" Value="0,4,0,4" />
-            <Setter Property="HorizontalAlignment" Value="Right" />
-            <Setter Property="TextAlignment" Value="Right" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-        </Style>
-        <!-- пометка «не нужен на этой стороне» в строке мода -->
+    <UserControl.Styles>        <!-- пометка «не нужен на этой стороне» в строке мода -->
         <Style Selector="Run.warn">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
-        </Style>
-        <!-- кнопки поменьше: в предупреждении, очереди, истории, версиях -->
-        <Style Selector="Button.small">
-            <Setter Property="Padding" Value="12,4" />
-            <Setter Property="MinHeight" Value="0" />
-            <Setter Property="FontSize" Value="12" />
-        </Style>
-        <!-- список сеансов истории: строки во всю ширину, без своих отступов -->
+        </Style>        <!-- список сеансов истории: строки во всю ширину, без своих отступов -->
         <Style Selector="ListBox.history ListBoxItem">
             <Setter Property="Padding" Value="0" />
             <Setter Property="Margin" Value="0" />
@@ -438,12 +416,16 @@
                                                 <TextBlock IsVisible="{Binding #Logo1.Source, Converter={x:Static ObjectConverters.IsNull}}" Text="{Binding Row.Initials}"
                                                            FontSize="40" FontWeight="Bold" Foreground="{DynamicResource Forest.Accent}"
                                                            Margin="20,0,0,0" VerticalAlignment="Center" Opacity="0.85" />
-                                                <!-- логотип целиком, по краям — он же, размытый -->
-                                                <Image ctl:RemoteImage.Source="{Binding Logo}" Stretch="UniformToFill" Opacity="0.35">
-                                                    <Image.Effect>
-                                                        <BlurEffect Radius="24" />
-                                                    </Image.Effect>
-                                                </Image>
+                                                <!-- логотип целиком, по краям — он же, размытый. Размытый — во всю ширину и прижат к верху,
+                                                     низ обрезает шапка (как в окне на WPF): Image у Avalonia обрезает UniformToFill по центру
+                                                     своих границ, а в StackPanel её высоту ничто не ограничивает -->
+                                                <StackPanel>
+                                                    <Image ctl:RemoteImage.Source="{Binding Logo}" Stretch="UniformToFill" Opacity="0.35">
+                                                        <Image.Effect>
+                                                            <BlurEffect Radius="24" />
+                                                        </Image.Effect>
+                                                    </Image>
+                                                </StackPanel>
                                                 <Image x:Name="Logo1" ctl:RemoteImage.Source="{Binding Logo}" Stretch="Uniform"
                                                        RenderOptions.BitmapInterpolationMode="HighQuality" />
                                                 <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,12,0" Padding="8,2" CornerRadius="4"

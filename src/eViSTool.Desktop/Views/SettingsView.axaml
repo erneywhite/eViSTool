@@ -5,18 +5,7 @@
              xmlns:ctl="using:eViSTool.Desktop.Controls"
              x:Class="eViSTool.Desktop.Views.SettingsView"
              x:DataType="vm:MainViewModel">
-    <UserControl.Resources>
-        <!-- поля и списки лежат на карточке цвета «поверхности»: заливка у них — полупрозрачный белый, как у Fluent в окне
-             на WPF (на карточке выходит чуть светлее её), а не сама «поверхность», которую не отличить от карточки -->
-        <SolidColorBrush x:Key="TextControlBackground" Color="#0FFFFFFF" />
-        <SolidColorBrush x:Key="ComboBoxBackground" Color="#0FFFFFFF" />
-    </UserControl.Resources>
-
     <UserControl.Styles>
-        <!-- отступ текста в полях, как у Fluent в окне на WPF -->
-        <Style Selector="TextBox">
-            <Setter Property="Padding" Value="11,5,11,6" />
-        </Style>
         <!-- пояснение под заголовком и полем: здесь с отступом снизу -->
         <Style Selector="TextBlock.hint">
             <Setter Property="Margin" Value="0,2,0,6" />

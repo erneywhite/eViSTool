@@ -32,33 +32,6 @@
         <Style Selector="TextBlock.stateBadgeText.installed">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Good}" />
         </Style>
-
-        <!-- строка «ключ — значение» в карточке -->
-        <Style Selector="TextBlock.cardKey">
-            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Margin" Value="0,4,12,4" />
-        </Style>
-        <Style Selector="TextBlock.cardValue">
-            <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Margin" Value="0,4,0,4" />
-            <Setter Property="HorizontalAlignment" Value="Right" />
-            <Setter Property="TextAlignment" Value="Right" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-        </Style>
-
-        <!-- прокрутка карточки: полоса тонкая, как у Fluent, но место под неё оставлено, а не поверх содержимого (как в окне на WPF) -->
-        <Style Selector="ScrollViewer.reserveBar /template/ ScrollContentPresenter#PART_ContentPresenter">
-            <Setter Property="Grid.ColumnSpan" Value="1" />
-        </Style>
-
-        <!-- кнопка поменьше: «Установить эту» в списке версий -->
-        <Style Selector="Button.small">
-            <Setter Property="Padding" Value="12,4" />
-            <Setter Property="MinHeight" Value="0" />
-            <Setter Property="FontSize" Value="12" />
-        </Style>
     </UserControl.Styles>
 
     <DockPanel Margin="10,4,10,0">
@@ -161,7 +134,7 @@
                     <TextBlock Text="{local:Tr catalog.pickMod}" Foreground="{DynamicResource Forest.Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"
                                IsVisible="{Binding Details, Converter={x:Static ObjectConverters.IsNull}}" />
 
-                    <ScrollViewer Classes="reserveBar" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                                   IsVisible="{Binding Details, Converter={x:Static ObjectConverters.IsNotNull}}">
                         <ContentControl Content="{Binding Details}">
                             <ContentControl.ContentTemplate>
