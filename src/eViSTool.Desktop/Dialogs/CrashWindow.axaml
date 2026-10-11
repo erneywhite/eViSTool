@@ -1,0 +1,88 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:local="using:eViSTool.Desktop"
+                      x:Class="eViSTool.Desktop.Dialogs.CrashWindow"
+                      x:DataType="vm:CrashWindowViewModel"
+                      Width="584" SizeToContent="Height" CanResize="False"
+                      WindowStartupLocation="CenterScreen" ShowInTaskbar="True" Topmost="True"
+                      Title="{Binding Title}">
+    <!-- ширина — содержимого окна: в окне на WPF Width="600" считал и рамку (по 8 px с боков), внутри было 584.
+         Окно — поверх всех и в панели задач, без владельца: вылет приходит, пока игрок в игре, а программа может быть
+         свёрнута (на Wayland «поверх всех» композитор может не выполнить) -->
+
+    <!-- «Подробности» — как Expander Fluent в окне на WPF (лесная тема его не перекрашивала): шапка и содержимое —
+         полупрозрачный белый, рамка — тёмная полупрозрачная (CardBackgroundFillColorDefault/Secondary, CardStrokeColorDefault) -->
+    <dialogs:DialogWindow.Resources>
+        <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#0DFFFFFF" />
+        <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="#19000000" />
+        <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="#19000000" />
+        <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPressed" Color="#19000000" />
+        <SolidColorBrush x:Key="ExpanderContentBackground" Color="#08FFFFFF" />
+        <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="#19000000" />
+    </dialogs:DialogWindow.Resources>
+    <dialogs:DialogWindow.Styles>
+        <!-- шапка ниже, чем у Fluent в Avalonia (48): в окне на WPF 43 с рамкой; текст и содержимое ближе к краю (11, у
+             Fluent в Avalonia 16) -->
+        <Style Selector="Expander.details">
+            <Setter Property="MinHeight" Value="43" />
+            <Setter Property="Padding" Value="11" />
+        </Style>
+        <Style Selector="Expander.details /template/ ToggleButton#ExpanderHeader">
+            <Setter Property="Padding" Value="11,0,0,0" />
+        </Style>
+        <!-- шеврон мельче и ближе к краю, как в окне на WPF (10×5 у правого края). Он в шаблоне шапки, вложенном в шаблон
+             Expander. Масштабом и сдвигом: размер и отступ заданы в самом шаблоне, а значения шаблона сильнее стиля -->
+        <Style Selector="Expander.details /template/ ToggleButton#ExpanderHeader /template/ Border#ExpandCollapseChevronBorder">
+            <Setter Property="RenderTransform" Value="translate(7px, 0px) scale(0.71)" />
+        </Style>
+        <!-- тонкая полоса прокрутки по горизонтали ложится поверх нижней строки стека: снизу у текста место под неё (в окне
+             на WPF она так же лежит в нижнем отступе поля). Отступ поля снизу — тот же, только внутри прокрутки -->
+        <Style Selector="TextBox.details">
+            <Setter Property="Padding" Value="11,5,11,0" />
+        </Style>
+        <Style Selector="TextBox.details /template/ TextPresenter#PART_TextPresenter">
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+    </dialogs:DialogWindow.Styles>
+
+    <StackPanel Margin="24,20,24,22">
+        <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Classes="muted" Text="{Binding ProfileText}" FontSize="12" Margin="0,2,0,0" />
+
+        <!-- виновник -->
+        <Border Background="{DynamicResource Forest.Surface}" CornerRadius="6" Padding="14,10" Margin="0,14,0,0">
+            <StackPanel>
+                <TextBlock Text="{Binding CulpritText}" FontSize="14" TextWrapping="Wrap" />
+                <TextBlock Classes="muted" Text="{Binding HowText}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" />
+            </StackPanel>
+        </Border>
+
+        <TextBlock Classes="muted" Text="{Binding ReasonText}" FontSize="12" TextWrapping="Wrap" Margin="0,10,0,0" />
+
+        <!-- подробности: ошибка и стек — для автора мода или форума. AcceptsReturn — иначе TextBox однострочный и стек
+             сложится в одну строку -->
+        <Expander Classes="details" Header="{local:Tr crash.details}" Margin="0,10,0,0" HorizontalAlignment="Stretch">
+            <TextBox Classes="mono details" Text="{Binding Details, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                     FontSize="11" MaxHeight="220" Margin="0,6,0,0"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                     AutomationProperties.AutomationId="CrashDetails" />
+        </Expander>
+
+        <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource Forest.Accent}" TextWrapping="Wrap" Margin="0,10,0,0"
+                   AutomationProperties.AutomationId="CrashStatus" />
+
+        <WrapPanel HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Classes="primary" Content="{local:Tr crash.disable}" Command="{Binding DisableCommand}" IsVisible="{Binding CanDisable}"
+                    Padding="14,8" Margin="0,0,8,0" AutomationProperties.AutomationId="CrashDisable" />
+            <Button Content="{Binding ShowLabel}" Command="{Binding ShowCommand}" Padding="14,8" Margin="0,0,8,0"
+                    AutomationProperties.AutomationId="CrashShow" />
+            <Button Content="{local:Tr crash.catalog}" Command="{Binding CatalogCommand}" IsVisible="{Binding HasCatalogLink}"
+                    Padding="14,8" Margin="0,0,8,0" AutomationProperties.AutomationId="CrashCatalog" />
+            <Button Content="{local:Tr crash.copy}" Command="{Binding CopyCommand}" Padding="14,8" Margin="0,0,8,0"
+                    AutomationProperties.AutomationId="CrashCopy" />
+            <Button Content="{local:Tr common.close}" Click="Close_Click" Padding="16,8" AutomationProperties.AutomationId="CrashClose" />
+        </WrapPanel>
+    </StackPanel>
+</dialogs:DialogWindow>
