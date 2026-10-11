@@ -1,0 +1,37 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:local="using:eViSTool.Desktop"
+                      xmlns:ctl="using:eViSTool.Desktop.Controls"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      x:Class="eViSTool.Desktop.Dialogs.FavoriteServerWindow"
+                      x:DataType="vm:FavoriteServerViewModel"
+                      Title="{local:Tr browse.favTitle}" Width="444" SizeToContent="Height" CanResize="False">
+    <!-- ширина без рамки: в WPF Width="460" считается вместе с рамкой окна, внутри остаётся 444 -->
+    <StackPanel Margin="24,20,24,22">
+        <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="SemiBold" />
+
+        <!-- новый сервер — фокус в названии, правка записи — в адресе -->
+        <TextBlock Classes="label" Text="{local:Tr browse.favName}" />
+        <TextBox Classes="clearButton" Text="{Binding Name}" Margin="0,6,0,0" MaxLength="80" ctl:Focus.OnOpen="{Binding IsNew}"
+                 AutomationProperties.AutomationId="FavName" AutomationProperties.Name="{local:Tr browse.favName}" />
+
+        <TextBlock Classes="label" Text="{local:Tr browse.favAddress}" />
+        <TextBlock Classes="hint" Text="{local:Tr browse.favAddressHint}" Margin="0,2,0,6" />
+        <TextBox Classes="clearButton mono" Text="{Binding Address}" MaxLength="255" ctl:Focus.OnOpen="{Binding !IsNew}"
+                 AutomationProperties.AutomationId="FavAddress" AutomationProperties.Name="{local:Tr browse.favAddress}" />
+
+        <TextBlock Classes="label" Text="{local:Tr browse.favPassword}" />
+        <TextBlock Classes="hint" Text="{local:Tr browse.favPasswordHint}" Margin="0,2,0,6" />
+        <ctl:SecretTextBox Classes="mono" Text="{Binding Password}" PasswordChar="●"
+                           AutomationProperties.AutomationId="FavPassword" AutomationProperties.Name="{local:Tr browse.favPassword}" />
+
+        <TextBlock Classes="error" Text="{Binding ErrorText}" FontSize="12" Margin="0,12,0,0" IsVisible="{Binding HasError}" />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Classes="primary" Content="{local:Tr common.save}" IsDefault="True" Command="{Binding SaveCommand}" Padding="18,8"
+                    AutomationProperties.AutomationId="FavSave" />
+            <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8" />
+        </StackPanel>
+    </StackPanel>
+</dialogs:DialogWindow>
