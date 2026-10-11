@@ -234,6 +234,13 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// «Открыть настройки» в подсказке «каналов ещё нет»: переход в «Настройки», где каналы добавляют. То же, что делает
+    /// одноимённая команда раздела «Сервер» — в окне на WPF вкладка брала её у предка через RelativeSource.
+    /// </summary>
+    [RelayCommand]
+    private void OpenSettings() => _server.OpenSettingsCommand.Execute(null);
+
     private bool CanTest() => !IsTesting && _saved.Routes.Values.Any(v => v.Count > 0);
 
     /// <summary>Проверочное — так, как пойдут настоящие: с сервера (через агента), во все включённые каналы.</summary>

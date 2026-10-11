@@ -1,6 +1,118 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="eViSTool.Desktop.Views.ServerNotifyTab">
-    <!-- заглушка: вкладка «Оповещения» раздела «Сервер» ещё переносится с окна на WPF -->
-    <TextBlock Text="Экран «Оповещения» ещё переносится" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
+             xmlns:vm="using:eViSTool.Presentation.ViewModels"
+             xmlns:local="using:eViSTool.Desktop"
+             xmlns:ctl="using:eViSTool.Desktop.Controls"
+             x:Class="eViSTool.Desktop.Views.ServerNotifyTab"
+             x:DataType="vm:ServerNotifyViewModel">
+    <UserControl.Styles>
+        <!-- карточка вкладки: поля чуть другие, чем у карточки по умолчанию -->
+        <Style Selector="Border.notifyCard">
+            <Setter Property="Padding" Value="20,16,20,18" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
+        <StackPanel Margin="0,0,14,0">
+            <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{DynamicResource Forest.Accent}" TextWrapping="Wrap" Margin="2,0,0,10"
+                       IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" AutomationProperties.AutomationId="SrvNotifyStatus" />
+            <TextBlock Text="{Binding ErrorText}" FontSize="12" Foreground="{DynamicResource Forest.Danger}" TextWrapping="Wrap" Margin="2,0,0,10"
+                       IsVisible="{Binding ErrorText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" AutomationProperties.AutomationId="SrvNotifyError" />
+
+            <!-- чат игры → Discord -->
+            <Border Classes="card notifyCard">
+                <StackPanel>
+                    <TextBlock Text="{local:Tr chat.title}" Classes="cardTitle" />
+                    <TextBlock Text="{local:Tr chat.hint}" Classes="hint" />
+                    <DockPanel Margin="0,12,0,0" IsVisible="{Binding HasDiscordChannels}">
+                        <ComboBox DockPanel.Dock="Right" Width="240" ctl:WheelToParent.IsEnabled="True" ItemsSource="{Binding ChatChannels}"
+                                  DisplayMemberBinding="{Binding Title, DataType=vm:ServerNotifyViewModel+ChatChannelOption}"
+                                  SelectedValueBinding="{Binding Id, DataType=vm:ServerNotifyViewModel+ChatChannelOption}"
+                                  SelectedValue="{Binding ChatChannelId}" IsEnabled="{Binding Loaded}"
+                                  AutomationProperties.AutomationId="ChatChannel" AutomationProperties.Name="{local:Tr chat.channel}" />
+                        <TextBlock Text="{local:Tr chat.channel}" FontSize="13" Foreground="{DynamicResource Forest.Text}" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <DockPanel Margin="0,12,0,0" IsVisible="{Binding ChatOn}">
+                        <CheckBox DockPanel.Dock="Right" Theme="{StaticResource Forest.Switch}" IsChecked="{Binding ChatJoins}" VerticalAlignment="Center"
+                                  AutomationProperties.AutomationId="ChatJoins" AutomationProperties.Name="{local:Tr chat.joins}" />
+                        <TextBlock Text="{local:Tr chat.joins}" FontSize="13" Foreground="{DynamicResource Forest.Text}" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <TextBlock Text="{local:Tr chat.noDiscord}" Classes="hint" FontSize="12" Margin="0,10,0,0" IsVisible="{Binding !HasDiscordChannels}" />
+                </StackPanel>
+            </Border>
+
+            <Border Classes="card notifyCard">
+                <StackPanel>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="{local:Tr srvnotify.test}" Command="{Binding TestCommand}" Padding="12,6" VerticalAlignment="Top"
+                                ToolTip.Tip="{local:Tr srvnotify.testTip}" ToolTip.ShowOnDisabled="True" Margin="16,0,0,0"
+                                AutomationProperties.AutomationId="SrvNotifyTest" />
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr srvnotify.title}" Classes="cardTitle" />
+                            <TextBlock Text="{local:Tr srvnotify.hint}" Classes="hint" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <!-- каналов ещё нет — куда их добавить -->
+                    <Border IsVisible="{Binding !HasChannels}" Margin="0,16,0,0" Padding="14,12" CornerRadius="8" Background="{DynamicResource Forest.Raised}">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="{local:Tr srvnotify.openSettings}" Margin="16,0,0,0" Padding="12,6" VerticalAlignment="Center"
+                                    Command="{Binding OpenSettingsCommand}" />
+                            <TextBlock Text="{local:Tr srvnotify.noChannels}" FontSize="12" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                        </DockPanel>
+                    </Border>
+
+                    <!-- шапка: имена каналов над столбцами тумблеров -->
+                    <DockPanel Margin="0,16,0,0" IsVisible="{Binding HasChannels}">
+                        <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding ChannelNames}" Focusable="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <TextBlock Text="{Binding .}" Width="120" TextAlignment="Center" FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Forest.Text}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding .}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{local:Tr srvnotify.event}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" />
+                    </DockPanel>
+
+                    <ItemsControl ItemsSource="{Binding Rows}" Focusable="False" IsVisible="{Binding HasChannels}" IsEnabled="{Binding Loaded}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:NotifyEventRowViewModel">
+                                <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="0,10" Margin="0,6,0,0">
+                                    <DockPanel>
+                                        <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Cells}" Focusable="False" VerticalAlignment="Center">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:NotifyCellViewModel">
+                                                    <Grid Width="120">
+                                                        <CheckBox Theme="{StaticResource Forest.Switch}" IsChecked="{Binding IsOn}" HorizontalAlignment="Center"
+                                                                  ToolTip.Tip="{Binding ChannelName}" AutomationProperties.Name="{Binding ChannelName}" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <StackPanel Margin="0,0,16,0">
+                                            <TextBlock Text="{Binding Title}" FontSize="13" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Hint}" Classes="hint" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>
