@@ -1,0 +1,29 @@
+eViSTool 0.10.4 for Linux: important fixes for the server agent.
+
+- World backups: on the night the clocks go back, rotation could delete the newest backup. It now goes by the file time.
+- Safety copies made before a restore no longer pile up: the last three are kept.
+- A damaged restore journal no longer prevents the server from starting.
+- Mod downloads and agent updates that stall for 60 seconds now stop with a clear error instead of waiting forever, and half-downloaded files are removed. Mod files are downloaded only over https from the mod database.
+- The agent refuses to roll itself back to an older version.
+- The agent's key, remote access settings and certificate are created readable only by their owner from the start, not made private a moment later.
+- Console lines longer than 16 KB are cut, so a mod that prints megabytes in one line no longer bloats the agent's memory.
+- A game folder such as "Vintagestory2" is no longer mistaken for "Vintagestory" when looking for running servers.
+- eViSTool on Windows no longer freezes for up to 15 seconds when this server is slow or unreachable.
+
+Update the Windows app from About, then press Update on the server in it.
+
+---
+
+eViSTool 0.10.4 для Linux: важные исправления агента сервера.
+
+- Копии мира: в ночь перевода часов назад ротация могла удалить самую свежую копию, теперь она смотрит на время файла.
+- Страховочные копии «до восстановления» больше не копятся без конца: хранятся три последние.
+- Испорченный журнал восстановления мира больше не мешает запуску сервера.
+- Скачивание модов и обновлений агента, замолчавшее на 60 секунд, теперь прерывается с понятной ошибкой, а недокачанные файлы удаляются. Файлы модов скачиваются только по https с модбазы.
+- Агент отказывается откатываться на старую версию.
+- Ключ агента, настройки удалённого доступа и сертификат сразу создаются с правами только для владельца, а не закрываются мгновением позже.
+- Строки консоли длиннее 16 КБ обрезаются: мод, выводящий мегабайты одной строкой, больше не раздувает память агента.
+- Папка игры вроде «Vintagestory2» больше не принимается за «Vintagestory» при поиске запущенных серверов.
+- eViSTool на Windows больше не замирает до 15 секунд, когда этот сервер медленный или недоступен.
+
+Обнови программу на Windows из «О программе», потом нажми в ней «Обновить на сервере».
