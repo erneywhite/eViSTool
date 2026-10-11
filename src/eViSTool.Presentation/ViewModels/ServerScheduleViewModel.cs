@@ -382,6 +382,14 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
 
     [RelayCommand]
     private void DefaultBackupDir() => BackupDirText = "";
+
+    /// <summary>
+    /// Enter в поле папки для копий: применить набранное сразу, не дожидаясь, пока поле отпустят. Привязка поля —
+    /// LostFocus (на каждую букву путь проверять незачем), а Enter окно передаёт сюда текстом из поля. Тот же путь,
+    /// что и при уходе из поля: проверка машиной с сервером, потом сохранение.
+    /// </summary>
+    public void CommitBackupDir(string? text) => BackupDirText = text ?? "";
+
     partial void OnRestartIntervalTextChanged(string value) => SaveSettings();
     partial void OnRestartTimesTextChanged(string value) => SaveSettings();
     partial void OnRestartWarnTextChanged(string value) => SaveSettings();
