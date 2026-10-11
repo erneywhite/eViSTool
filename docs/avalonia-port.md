@@ -59,7 +59,10 @@
 - Картинки по URL (логотипы, скриншоты): `<Image ctl:RemoteImage.Source="{Binding Logo}" />`. Сама `Image` http не грузит. Заглушку из букв показываем, пока у картинки нет `Source`: `IsVisible="{Binding #Logo1.Source, Converter={x:Static ObjectConverters.IsNull}}"`.
 - `AutomationProperties.AutomationId` переносим один в один: по ним работает стенд.
 - Меню по кнопке (`ContextMenu`, открываемое в Click) делаем через `<Button.Flyout><MenuFlyout>…</MenuFlyout></Button.Flyout>`, код не нужен. Контекстное меню таблицы наследует `DataContext` модели экрана; команде передаём выбранную строку модели (`CommandParameter="{Binding Selected}"`), а строку под правым кликом выделяет код окна (см. `ModsView.axaml.cs`).
-- Двойной щелчок по строке: `ctl:DoubleTap.Command="{Binding OpenPageCommand}"`.
+- Двойной щелчок по строке: `ctl:DoubleTap.Command="{Binding OpenPageCommand}"`. Без `CommandParameter` в команду идёт элемент строки. Щелчок по кнопке или переключателю внутри строки команду не вызывает.
+- Поле со списком и свободным вводом: встроенный `ComboBox IsEditable="True" Text="{Binding …}"` (текст двусторонний, обновляется на каждый символ). `DisplayMemberPath` → `DisplayMemberBinding="{Binding Title}"`, `TextSearch.TextPath` → `TextSearch.TextBinding="{Binding Name, DataType=vm:…}"` (без `DataType=` сборка падает). Автодополнения при вводе и групп у него нет. Группы делаем плоским списком: заголовок категории — отдельный тип элемента со своим шаблоном, контейнер заголовка выключен стилем.
+- Колесо над закрытым списком крутит страницу, а не значение: `ctl:WheelToParent.IsEnabled="True"`. Фокус при открытии окна: `ctl:Focus.OnOpen="True"` (и `ctl:Focus.SelectAll="True"`).
+- Значок игры: `Source="{Binding IconSearchDirs, Converter={x:Static conv:GameIconConverter.Instance}}"`.
 - Таблица: `DataGrid` из `Avalonia.Controls.DataGrid`. `GridView`/`ListView` с колонками тоже переносим на `DataGrid`.
 
 ## Окна (диалоги)
@@ -71,6 +74,6 @@
 
 ## Проверка
 
-- `dotnet build eViSTool.slnx` без ошибок и предупреждений, `dotnet test eViSTool.slnx` зелёный.
+- `dotnet build eViSTool.slnx` без ошибок и предупреждений, `dotnet test eViSTool.slnx` зелёный. Свои элементы (`Controls/`, `Converters/`) проверяются headless-тестами в `tests/eViSTool.Desktop.Tests` (xunit v3).
 - Снимки рядом: `pwsh build/snapshot.ps1 -Screens <экран>` → `<экран>.wpf.png` и `<экран>.avalonia.png` во временной папке. Окна берут данные стенда (`tests/snapshots/fixture`), настоящие данные пользователя не трогаются. Нужного состояния на снимке нет (выбранная строка, открытая вкладка) — добавь экран в `Snapshots.Navigate` (`src/eViSTool.Presentation/Snapshots.cs`), как `mods.card`.
 - Шрифт другой (Noto Sans вместо Segoe UI, Cascadia Mono вместо Consolas), поэтому текст чуть шире и плотнее. Это ожидаемо. Ищем другое: пропавшие элементы, чужие цвета Fluent (синий акцент, белые рамки), обрезанный текст, лишние отступы.

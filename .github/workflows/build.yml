@@ -45,6 +45,9 @@ jobs:
       - name: Test the window models
         run: dotnet test tests/eViSTool.App.Tests --no-build -c Debug --logger "console;verbosity=normal"
 
+      - name: Test the Avalonia window
+        run: dotnet test tests/eViSTool.Desktop.Tests --no-build -c Debug --logger "console;verbosity=normal"
+
       - name: Release build
         shell: pwsh
         run: ./build/publish.ps1
@@ -68,7 +71,7 @@ jobs:
           path: dist/*.tar.gz*
           retention-days: 14
 
-  # окно (WPF) на Linux не собирается — только ядро, агент и их тесты
+  # окно на WPF на Linux не собирается — ядро, агент, окно на Avalonia и их тесты
   linux:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -80,10 +83,15 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Build
-        run: dotnet build tests/eViSTool.Core.Tests -c Debug
+        run: |
+          dotnet build tests/eViSTool.Core.Tests -c Debug
+          dotnet build tests/eViSTool.Desktop.Tests -c Debug
 
       - name: Test
         run: dotnet test tests/eViSTool.Core.Tests --no-build -c Debug --logger "console;verbosity=normal"
+
+      - name: Test the Avalonia window
+        run: dotnet test tests/eViSTool.Desktop.Tests --no-build -c Debug --logger "console;verbosity=normal"
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')

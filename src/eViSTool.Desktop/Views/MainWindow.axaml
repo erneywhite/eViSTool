@@ -3,6 +3,7 @@
         xmlns:vm="using:eViSTool.Presentation.ViewModels"
         xmlns:local="using:eViSTool.Desktop"
         xmlns:views="using:eViSTool.Desktop.Views"
+        xmlns:conv="using:eViSTool.Desktop.Converters"
         x:Class="eViSTool.Desktop.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="eViSTool" Icon="avares://eViSTool.Desktop/Assets/eViSTool.ico"
@@ -154,7 +155,7 @@
                         <Border Background="{DynamicResource Forest.Raised}" CornerRadius="6" Width="30" Height="30" Margin="0,0,10,0">
                             <Panel>
                                 <!-- значок из установленной игры; игры на компьютере нет — буквы -->
-                                <Image x:Name="GameIconImage" Width="24" Height="24" RenderOptions.BitmapInterpolationMode="HighQuality"
+                                <Image x:Name="GameIconImage" Source="{Binding IconSearchDirs, Converter={x:Static conv:GameIconConverter.Instance}}" Width="24" Height="24" RenderOptions.BitmapInterpolationMode="HighQuality"
                                        IsVisible="{Binding $self.Source, Converter={x:Static ObjectConverters.IsNotNull}}" />
                                 <TextBlock Text="VS" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"
