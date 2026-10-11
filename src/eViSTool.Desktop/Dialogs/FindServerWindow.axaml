@@ -1,0 +1,226 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:local="using:eViSTool.Desktop"
+                      xmlns:ctl="using:eViSTool.Desktop.Controls"
+                      x:Class="eViSTool.Desktop.Dialogs.FindServerWindow"
+                      x:DataType="vm:FindServerViewModel"
+                      Title="{local:Tr browse.title}"
+                      Width="964" Height="681" MinWidth="704" MinHeight="441">
+    <!-- Размер — рабочей области: у окна на WPF Width=980, Height=720 (MinWidth=720, MinHeight=480) считаются с рамкой и
+         заголовком -->
+    <Window.Resources>
+        <!-- чип-переключатель фильтра: как Forest.Chip, но для CheckBox и с рамкой-линией у невыбранного -->
+        <ControlTheme x:Key="FindServer.FilterChip" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border x:Name="Bd" CornerRadius="6" Padding="10,5" Background="Transparent" BorderThickness="1"
+                            BorderBrush="{DynamicResource Forest.Line}">
+                        <ContentPresenter x:Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}" />
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover">
+                <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+            </Style>
+            <Style Selector="^:checked">
+                <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+            </Style>
+            <Style Selector="^:checked /template/ Border#Bd">
+                <Setter Property="Background" Value="{DynamicResource Forest.Raised}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource Forest.Accent}" />
+            </Style>
+        </ControlTheme>
+
+        <!-- кнопка без вида: имя и подробности сервера, нажатие раскрывает строку -->
+        <ControlTheme x:Key="FindServer.RowToggle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ContentPresenter x:Name="PART_ContentPresenter" Background="{TemplateBinding Background}"
+                                      Padding="{TemplateBinding Padding}" Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                </ControlTemplate>
+            </Setter>
+        </ControlTheme>
+
+        <!-- строка списка без своего вида: ни выделения, ни подсветки (вид у строки — свой, в шаблоне ServerRow) -->
+        <ControlTheme x:Key="FindServer.PlainItem" TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ContentPresenter x:Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                </ControlTemplate>
+            </Setter>
+        </ControlTheme>
+
+        <!-- строка сервера: имя и подробности — нажатие раскрывает описание и моды; справа игроки и кнопки -->
+        <DataTemplate x:Key="ServerRow" x:DataType="vm:ServerRowViewModel">
+            <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="4,10,4,10">
+                <StackPanel>
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <StackPanel Width="78" Margin="0,0,12,0" IsVisible="{Binding HasPlayers}">
+                                <TextBlock Text="{Binding PlayersText}" FontSize="13" Foreground="{DynamicResource Forest.Text}" HorizontalAlignment="Right" />
+                                <TextBlock Text="{local:Tr browse.online}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" HorizontalAlignment="Right" />
+                            </StackPanel>
+                            <!-- общий список: «В избранное» (или выключенная «В избранном»); у избранного её нет — там «Изменить» и «Убрать» -->
+                            <Button Padding="11,5" MinHeight="0" Margin="0,0,8,0" IsVisible="{Binding !IsFavoriteRow}" IsEnabled="{Binding !InFavorites}"
+                                    Command="{Binding $parent[Window].((vm:FindServerViewModel)DataContext).AddToFavoritesCommand}"
+                                    CommandParameter="{Binding}">
+                                <Panel>
+                                    <TextBlock Text="{local:Tr browse.addFavorite}" IsVisible="{Binding !InFavorites}" />
+                                    <TextBlock Text="{local:Tr browse.inFavorites}" IsVisible="{Binding InFavorites}" />
+                                </Panel>
+                            </Button>
+                            <Button Content="{local:Tr browse.editFavorite}" Padding="11,5" MinHeight="0" Margin="0,0,8,0"
+                                    IsVisible="{Binding IsFavoriteRow}"
+                                    Command="{Binding $parent[Window].((vm:FindServerViewModel)DataContext).EditFavoriteCommand}"
+                                    CommandParameter="{Binding}" />
+                            <Button Content="{local:Tr browse.removeFavorite}" Padding="11,5" MinHeight="0" Margin="0,0,8,0"
+                                    IsVisible="{Binding IsFavoriteRow}"
+                                    Command="{Binding $parent[Window].((vm:FindServerViewModel)DataContext).RemoveFavoriteCommand}"
+                                    CommandParameter="{Binding}" />
+                            <Button Classes="primary" Content="{local:Tr browse.play}" Padding="14,5" MinHeight="0"
+                                    Command="{Binding $parent[Window].((vm:FindServerViewModel)DataContext).PlayCommand}"
+                                    CommandParameter="{Binding}" />
+                        </StackPanel>
+                        <Button Theme="{StaticResource FindServer.RowToggle}" Command="{Binding ToggleCommand}"
+                                AutomationProperties.Name="{Binding Name}">
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}"
+                                           TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                    <TextBlock Text="{Binding Details}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextTrimming="CharacterEllipsis" />
+                                    <StackPanel Orientation="Horizontal" Margin="10,0,0,0" IsVisible="{Binding HasPassword}">
+                                        <Path Classes="icon" Data="{StaticResource Icon.Lock}" Width="12" Height="12" Stroke="{DynamicResource Forest.Muted}"
+                                              VerticalAlignment="Center" />
+                                        <TextBlock Text="{local:Tr browse.password}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" Margin="4,0,0,0" />
+                                    </StackPanel>
+                                    <TextBlock Text="{local:Tr browse.whitelist}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" Margin="10,0,0,0"
+                                               IsVisible="{Binding Whitelisted}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Button>
+                    </DockPanel>
+
+                    <!-- раскрытая строка: описание и моды сервера -->
+                    <Border Margin="0,10,0,0" Padding="12,10" CornerRadius="8" Background="{DynamicResource Forest.Surface}"
+                            IsVisible="{Binding IsExpanded}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding Description}" FontSize="12" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap" MaxHeight="160" />
+                            <TextBlock Text="{Binding ModsSummary}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" Margin="0,8,0,4" TextWrapping="Wrap"
+                                       IsVisible="{Binding ModsSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            <ItemsControl ItemsSource="{Binding ModTags}" Focusable="False">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Border CornerRadius="5" Padding="7,2" Margin="0,3,5,0" Background="{DynamicResource Forest.Raised}">
+                                            <TextBlock Text="{Binding}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" />
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </Window.Resources>
+
+    <DockPanel Margin="24,18,24,16">
+        <!-- вкладки -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
+            <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="BrowseTab" FontSize="15" Content="{Binding AllTabTitle}"
+                         IsChecked="{Binding IsAllTab}" AutomationProperties.AutomationId="BrowseTabAll" />
+            <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="BrowseTab" FontSize="15" Content="{Binding FavoritesTabTitle}"
+                         IsChecked="{Binding IsFavoritesTab}" AutomationProperties.AutomationId="BrowseTabFavorites" />
+        </StackPanel>
+
+        <!-- внизу: откуда список, сколько показано -->
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+            <TextBlock DockPanel.Dock="Right" Text="{Binding CountText}" FontSize="11" Foreground="{DynamicResource Forest.Muted}"
+                       IsVisible="{Binding IsAllTab}" />
+            <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextTrimming="CharacterEllipsis" />
+        </DockPanel>
+
+        <TextBlock DockPanel.Dock="Top" Text="{Binding ErrorText}" FontSize="12" Foreground="{DynamicResource Forest.Danger}" TextWrapping="Wrap" Margin="0,10,0,0"
+                   IsVisible="{Binding ErrorText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" AutomationProperties.AutomationId="BrowseError" />
+
+        <!-- поиск и фильтры — только для общего списка -->
+        <StackPanel DockPanel.Dock="Top" Margin="0,14,0,0" IsVisible="{Binding IsAllTab}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Command="{Binding LoadCommand}" Margin="8,0,0,0" Padding="10,8" ToolTip.Tip="{local:Tr browse.refresh}"
+                        AutomationProperties.Name="{local:Tr browse.refresh}">
+                    <Path Classes="icon" Data="{StaticResource Icon.Refresh}" Width="14" Height="14" />
+                </Button>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center">
+                    <RadioButton Theme="{StaticResource Forest.Chip}" GroupName="BrowseSort" Content="{local:Tr browse.sortPlayers}" IsChecked="{Binding ByPlayers}" />
+                    <RadioButton Theme="{StaticResource Forest.Chip}" GroupName="BrowseSort" Content="{local:Tr browse.sortName}" IsChecked="{Binding ByName}" />
+                </StackPanel>
+                <!-- фильтр — после паузы в печати (SearchInput → Search в модели) -->
+                <TextBox Classes="search" Text="{Binding SearchInput}" PlaceholderText="{local:Tr browse.search}" ctl:Focus.OnOpen="True"
+                         AutomationProperties.AutomationId="BrowseSearch">
+                    <TextBox.InnerLeftContent>
+                        <Path Classes="icon searchIcon" Data="{StaticResource Icon.Search}" />
+                    </TextBox.InnerLeftContent>
+                </TextBox>
+            </DockPanel>
+            <WrapPanel Margin="0,10,0,0">
+                <CheckBox Theme="{StaticResource FindServer.FilterChip}" Content="{Binding VersionChip}" IsChecked="{Binding MyVersion}" />
+                <CheckBox Theme="{StaticResource FindServer.FilterChip}" Content="{local:Tr browse.hasSlots}" IsChecked="{Binding HasSlots}" />
+                <CheckBox Theme="{StaticResource FindServer.FilterChip}" Content="{local:Tr browse.noPassword}" IsChecked="{Binding NoPassword}" />
+                <CheckBox Theme="{StaticResource FindServer.FilterChip}" Content="{local:Tr browse.noWhitelist}" IsChecked="{Binding NoWhitelist}" />
+                <CheckBox Theme="{StaticResource FindServer.FilterChip}" Content="{local:Tr browse.noModsChip}" IsChecked="{Binding NoMods}" />
+                <CheckBox Theme="{StaticResource FindServer.FilterChip}" Content="{local:Tr browse.withModsChip}" IsChecked="{Binding WithMods}" />
+            </WrapPanel>
+        </StackPanel>
+
+        <Grid Margin="0,6,0,0">
+            <!-- общий список: тысячи строк — ListBox виртуализирует сам. Выделения у строк нет (как в окне на WPF): щелчок
+                 мимо кнопок строку всё же выделяет, но прокручивать к ней список не нужно -->
+            <ListBox ItemsSource="{Binding View.Items}" ItemTemplate="{StaticResource ServerRow}" ItemContainerTheme="{StaticResource FindServer.PlainItem}"
+                     Background="Transparent" BorderThickness="0" Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     AutoScrollToSelectedItem="False"
+                     IsVisible="{Binding IsAllTab}" AutomationProperties.AutomationId="BrowseList" />
+            <TextBlock Text="{local:Tr browse.loadingShort}" FontSize="13" Foreground="{DynamicResource Forest.Muted}" HorizontalAlignment="Center"
+                       VerticalAlignment="Center" IsVisible="{Binding IsLoading}" />
+
+            <!-- избранное игры целиком -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding IsFavoritesTab}">
+                <StackPanel>
+                    <DockPanel Margin="0,10,0,8">
+                        <Button DockPanel.Dock="Right" Command="{Binding AddManualCommand}" Padding="12,6" VerticalAlignment="Center" Margin="16,0,0,0"
+                                AutomationProperties.AutomationId="BrowseAddManual">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Classes="icon" Data="{StaticResource Icon.Plus}" Width="12" Height="12" Margin="0,0,7,0" />
+                                <TextBlock Text="{local:Tr browse.favAddButton}" />
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Text="{local:Tr browse.favoritesHint}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap"
+                                   VerticalAlignment="Center" />
+                    </DockPanel>
+                    <ItemsControl ItemsSource="{Binding Favorites}" ItemTemplate="{StaticResource ServerRow}" Focusable="False" />
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </DockPanel>
+</dialogs:DialogWindow>

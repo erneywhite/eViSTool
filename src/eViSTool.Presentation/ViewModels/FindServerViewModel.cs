@@ -113,7 +113,16 @@ public sealed partial class FindServerViewModel : ObservableObject
 
     public string AllTabTitle => Loc.T("browse.tabAll", View.Count);
     public string FavoritesTabTitle => Loc.T("browse.tabFavorites", Favorites.Count);
-    public bool IsAllTab => !IsFavoritesTab;
+
+    /// <summary>
+    /// Вкладка «Все серверы» — обратная сторона <see cref="IsFavoritesTab"/>. Записать можно: переключатель вкладки
+    /// привязан к ней в обе стороны (в окне на WPF вместо этого был обработчик Checked).
+    /// </summary>
+    public bool IsAllTab
+    {
+        get => !IsFavoritesTab;
+        set => IsFavoritesTab = !value;
+    }
 
     partial void OnIsFavoritesTabChanged(bool value) => OnPropertyChanged(nameof(IsAllTab));
     partial void OnSearchChanged(string value) => Refilter();
@@ -291,6 +300,88 @@ public sealed partial class FindServerViewModel : ObservableObject
             ErrorText = ex.Message;
         }
     }
+
+    // ---------- для окна на Avalonia: то, что в окне на WPF делали код окна и привязки
+
+    /// <summary>
+    /// Окно просит закрыться: игру запустили с сервером из списка (<see cref="PlayCommand"/>). В окне на WPF то же
+    /// делал Close() в обработчике кнопки «Играть».
+    /// </summary>
+    public event EventHandler? CloseRequested;
+
+    /// <summary>Пауза после последней буквы в поле поиска, после неё список фильтруется (в окне на WPF — Delay у привязки).</summary>
+    public static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(200);
+
+    private IUiTimer? _searchDelay;
+
+    /// <summary>
+    /// Текст поля поиска, как его печатают. В <see cref="Search"/> (по нему фильтр) он попадает после паузы
+    /// <see cref="SearchDelay"/>: тысячи серверов не перефильтровываются на каждую букву. Каждая новая буква паузу
+    /// начинает заново, как Delay у привязки в WPF.
+    /// </summary>
+    [ObservableProperty] private string _searchInput = "";
+
+    partial void OnSearchInputChanged(string value)
+    {
+        if (_searchDelay is null)
+        {
+            // таймер — при первой букве: окну на WPF (оно пишет прямо в Search) он не нужен
+            _searchDelay = Ui.Timer(SearchDelay);
+            _searchDelay.Tick += (_, _) =>
+            {
+                _searchDelay.Stop();
+                Search = SearchInput;
+            };
+        }
+        _searchDelay.Stop();
+        _searchDelay.Start();
+    }
+
+    /// <summary>
+    /// Сортировка по игрокам — обратная сторона <see cref="ByName"/>, для второго переключателя: оба привязаны в обе
+    /// стороны (в окне на WPF вместо этого были конвертер и обработчик Checked).
+    /// </summary>
+    public bool ByPlayers
+    {
+        get => !ByName;
+        set => ByName = !value;
+    }
+
+    partial void OnByNameChanged(bool oldValue, bool newValue) => OnPropertyChanged(nameof(ByPlayers));
+
+    /// <summary>
+    /// «Играть» в строке: запустить игру с этим сервером (пароль спросит окно, у избранного он уже сохранён). Игру
+    /// запустили — окно закрывается (<see cref="CloseRequested"/>); от пароля отказались — остаётся.
+    /// </summary>
+    [RelayCommand]
+    private async Task Play(ServerRowViewModel? row)
+    {
+        if (row is null) return;
+        if (await PlayAsync(row, AskPassword)) CloseRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>«В избранное» в строке общего списка (пароль — по желанию, если сервер с паролем).</summary>
+    [RelayCommand]
+    private void AddToFavorites(ServerRowViewModel? row)
+    {
+        if (row is not null) AddFavorite(row, AskPassword);
+    }
+
+    /// <summary>«Изменить» в строке избранного: название, адрес и пароль записи — в окне «Сервер в избранном».</summary>
+    [RelayCommand]
+    private void EditFavorite(ServerRowViewModel? row)
+    {
+        if (row?.Favorite is { } favorite) SaveFavorite(favorite, EditServer);
+    }
+
+    /// <summary>«Добавить сервер» на вкладке избранного: новая запись через окно «Сервер в избранном».</summary>
+    [RelayCommand]
+    private void AddManual() => SaveFavorite(null, EditServer);
+
+    private static string? AskPassword(string server) => AppWindows.Current.AskServerPassword(server);
+
+    private static (string Name, string Address, string? Password)? EditServer(PlayTarget? old) =>
+        AppWindows.Current.EditFavoriteServer(old) is { } c ? (c.Name, c.Address, c.Password) : null;
 
     /// <summary>Стиль игры по коду из списка; незнакомый — без подписи.</summary>
     internal static string PlaystyleText(string? langCode) => langCode switch
