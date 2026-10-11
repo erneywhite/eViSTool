@@ -1,6 +1,469 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="eViSTool.Desktop.Views.ServerConfigView">
-    <!-- заглушка: вкладка «Конфигурация» раздела «Сервер» ещё переносится с окна на WPF -->
-    <TextBlock Text="Экран «Конфигурация» ещё переносится" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
+             xmlns:vm="using:eViSTool.Presentation.ViewModels"
+             xmlns:local="using:eViSTool.Desktop"
+             xmlns:views="using:eViSTool.Desktop.Views"
+             xmlns:ctl="using:eViSTool.Desktop.Controls"
+             xmlns:conv="using:eViSTool.Desktop.Converters"
+             x:Class="eViSTool.Desktop.Views.ServerConfigView"
+             x:DataType="vm:ServerConfigViewModel">
+    <!-- Редактор serverconfig.json в разделе «Сервер». DataContext — ServerConfigViewModel (его задаёт ServerView). -->
+    <UserControl.Styles>
+        <!-- карточка группы полей -->
+        <Style Selector="Border.cfgCard">
+            <Setter Property="Padding" Value="20,16,20,6" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+        <!-- строка поля: линия сверху -->
+        <Style Selector="Border.cfgRow">
+            <Setter Property="BorderBrush" Value="{DynamicResource Forest.Line}" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
+            <Setter Property="Padding" Value="0,12" />
+        </Style>
+        <!-- имя поля в JSON: мелко и моноширинно -->
+        <Style Selector="TextBlock.jsonName">
+            <Setter Property="FontFamily" Value="{DynamicResource Forest.Mono}" />
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="Foreground" Value="#8A9786" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <!-- точка «изменено, но не сохранено»: стоит в левом поле карточки (отступ −14 + ширина 7 + 7 = 0), подпись не сдвигает -->
+        <Style Selector="Ellipse.modifiedDot">
+            <Setter Property="Width" Value="7" />
+            <Setter Property="Height" Value="7" />
+            <Setter Property="Margin" Value="-14,6,7,0" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Fill" Value="{DynamicResource Forest.Accent}" />
+        </Style>
+        <!-- пометка у поля: «только при создании мира», «устарело» -->
+        <Style Selector="Border.badge">
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="6,1" />
+            <Setter Property="Margin" Value="0,5,6,0" />
+            <Setter Property="Background" Value="{DynamicResource Forest.Raised}" />
+        </Style>
+
+        <!-- статус в нижней полосе: цвет по тону (Ellipse.tone / TextBlock.tone в теме), размер — свой -->
+        <Style Selector="Ellipse.tone.statusDot">
+            <Setter Property="Width" Value="8" />
+            <Setter Property="Height" Value="8" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+        </Style>
+        <Style Selector="TextBlock.tone.statusLabel">
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <!-- редакторы: сервер работает — поле бледнее (переключатели и списки бледнеют сами, они выключены) -->
+        <Style Selector="TextBox.readOnly">
+            <Setter Property="Opacity" Value="0.7" />
+        </Style>
+        <!-- несколько строк; список — по одной записи в строке; сырой JSON — моноширинный, без переноса (JSON — после списка) -->
+        <Style Selector="TextBox.multiline">
+            <Setter Property="MinLines" Value="3" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBox.multiline.list">
+            <Setter Property="MinLines" Value="2" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+        </Style>
+        <Style Selector="TextBox.multiline.json">
+            <Setter Property="MinLines" Value="1" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+            <Setter Property="FontFamily" Value="{DynamicResource Forest.Mono}" />
+            <Setter Property="FontSize" Value="12.5" />
+        </Style>
+
+        <!-- ключи настроек мира: заголовок категории — выключенный пункт (не выбрать ни мышью, ни стрелками) без отступов пункта -->
+        <Style Selector="ComboBox.worldKey ComboBoxItem" x:DataType="x:Object">
+            <Setter Property="IsEnabled" Value="{Binding Converter={x:Static conv:CategoryHeaders.IsItem}}" />
+        </Style>
+        <Style Selector="ComboBox.worldKey ComboBoxItem:disabled">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+        </Style>
+    </UserControl.Styles>
+
+    <!-- ===== редакторы значений: шаблон выбирается по типу модели поля (наследники — раньше ConfigTextFieldViewModel) ===== -->
+    <UserControl.DataTemplates>
+        <!-- число: то же поле, но узкое -->
+        <DataTemplate DataType="vm:ConfigNumberFieldViewModel">
+            <TextBox Text="{Binding Text}" IsReadOnly="{Binding IsReadOnly}" Classes.readOnly="{Binding IsReadOnly}"
+                     Width="200" HorizontalAlignment="Left" VerticalContentAlignment="Center"
+                     AutomationProperties.Name="{Binding Label}" AutomationProperties.AutomationId="{Binding Path}" />
+        </DataTemplate>
+
+        <!-- несколько строк, список или сырой JSON -->
+        <DataTemplate DataType="vm:ConfigMultilineFieldViewModel">
+            <TextBox Classes="multiline" Classes.list="{Binding IsList}" Classes.json="{Binding IsJson}" Classes.readOnly="{Binding IsReadOnly}"
+                     Text="{Binding Text}" IsReadOnly="{Binding IsReadOnly}"
+                     AcceptsReturn="True" MaxLines="12" ScrollViewer.VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top"
+                     AutomationProperties.Name="{Binding Label}" AutomationProperties.AutomationId="{Binding Path}" />
+        </DataTemplate>
+
+        <!-- путь к файлу -->
+        <DataTemplate DataType="vm:ConfigPathFieldViewModel">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="{local:Tr common.browse}" Command="{Binding BrowseCommand}" IsEnabled="{Binding IsEditable}"
+                        Margin="8,0,0,0" VerticalAlignment="Top" />
+                <!-- длинный путь в поле не помещается — целиком он в подсказке -->
+                <TextBox Text="{Binding Text}" IsReadOnly="{Binding IsReadOnly}" Classes.readOnly="{Binding IsReadOnly}"
+                         VerticalContentAlignment="Center" ToolTip.Tip="{Binding Text}"
+                         AutomationProperties.Name="{Binding Label}" AutomationProperties.AutomationId="{Binding Path}" />
+            </DockPanel>
+        </DataTemplate>
+
+        <!-- строка -->
+        <DataTemplate DataType="vm:ConfigTextFieldViewModel">
+            <TextBox Text="{Binding Text}" IsReadOnly="{Binding IsReadOnly}" Classes.readOnly="{Binding IsReadOnly}"
+                     VerticalContentAlignment="Center"
+                     AutomationProperties.Name="{Binding Label}" AutomationProperties.AutomationId="{Binding Path}" />
+        </DataTemplate>
+
+        <!-- переключатель -->
+        <DataTemplate DataType="vm:ConfigBoolFieldViewModel">
+            <CheckBox Theme="{StaticResource Forest.Switch}" IsChecked="{Binding Value}" IsEnabled="{Binding IsEditable}"
+                      HorizontalAlignment="Left" Margin="0,2,0,0"
+                      AutomationProperties.Name="{Binding Label}" AutomationProperties.AutomationId="{Binding Path}" />
+        </DataTemplate>
+
+        <!-- выбор: подпись и (если отличается) то, что запишется в файл; колесо над закрытым списком крутит страницу -->
+        <DataTemplate DataType="vm:ConfigChoiceFieldViewModel">
+            <ComboBox ItemsSource="{Binding Options}" SelectedItem="{Binding Selected}" IsEnabled="{Binding IsEditable}"
+                      HorizontalAlignment="Stretch" ctl:WheelToParent.IsEnabled="True"
+                      AutomationProperties.Name="{Binding Label}" AutomationProperties.AutomationId="{Binding Path}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ConfigChoiceOption">
+                        <TextBlock TextTrimming="CharacterEllipsis">
+                            <Run Text="{Binding Label, Mode=OneWay}" /><Run Text="   " /><Run Text="{Binding Code, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" />
+                        </TextBlock>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+        </DataTemplate>
+
+        <!-- служебное: только посмотреть и скопировать -->
+        <DataTemplate DataType="vm:ConfigReadOnlyFieldViewModel">
+            <SelectableTextBlock Classes="selectable" Text="{Binding Text}" FontFamily="{DynamicResource Forest.Mono}" Margin="0,2,0,0"
+                                 AutomationProperties.Name="{Binding Label}" AutomationProperties.AutomationId="{Binding Path}" />
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
+    <UserControl.Resources>
+        <!-- ===== строка поля: слева подпись, имя в JSON, пометки и подсказка; справа редактор и ошибка ===== -->
+        <DataTemplate x:Key="FieldRow" x:DataType="vm:ConfigFieldViewModel">
+            <Border Classes="cfgRow" IsVisible="{Binding IsVisible}">
+                <Grid ColumnDefinitions="42*,58*">
+                    <StackPanel Margin="0,0,24,0">
+                        <DockPanel>
+                            <Ellipse DockPanel.Dock="Left" Classes="modifiedDot" ToolTip.Tip="{local:Tr srvcfg.modified}" IsVisible="{Binding IsModified}" />
+                            <TextBlock Text="{Binding Label}" FontSize="13" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap" />
+                        </DockPanel>
+                        <TextBlock Classes="jsonName" Text="{Binding Path}" Margin="0,2,0,0" IsVisible="{Binding ShowPath}" />
+                        <WrapPanel>
+                            <Border Classes="badge" ToolTip.Tip="{local:Tr srvcfg.badgeWorldCreationTip}" IsVisible="{Binding IsWorldCreationOnly}">
+                                <TextBlock Text="{local:Tr srvcfg.badgeWorldCreation}" FontSize="10.5" Foreground="{DynamicResource Forest.Warn}" />
+                            </Border>
+                            <Border Classes="badge" ToolTip.Tip="{local:Tr srvcfg.badgeLegacyTip}" IsVisible="{Binding IsLegacy}">
+                                <TextBlock Text="{local:Tr srvcfg.badgeLegacy}" FontSize="10.5" Foreground="{DynamicResource Forest.Muted}" />
+                            </Border>
+                        </WrapPanel>
+                        <TextBlock Classes="hint" Text="{Binding Hint}" Margin="0,5,0,0"
+                                   IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <!-- редактор — по типу поля (UserControl.DataTemplates) -->
+                        <ContentControl Content="{Binding}" HorizontalContentAlignment="Stretch" />
+                        <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Forest.Danger}" FontSize="12" TextWrapping="Wrap" Margin="0,5,0,0"
+                                   IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- ===== группа полей — карточка с заголовком ===== -->
+        <DataTemplate x:Key="GroupTemplate" x:DataType="vm:ConfigGroupViewModel">
+            <Border Classes="card cfgCard" IsVisible="{Binding IsVisible}">
+                <StackPanel>
+                    <TextBlock Classes="cardTitle" Text="{Binding Title}" Margin="0,0,0,12" />
+                    <!-- без обрезки по краю: точка «изменено» стоит левее строк, в поле карточки (ItemsControl Avalonia обрезает) -->
+                    <ItemsControl ItemsSource="{Binding Fields}" ItemTemplate="{StaticResource FieldRow}" ClipToBounds="False" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <!-- ===== строка таблицы «Настройки мира» ===== -->
+        <DataTemplate x:Key="WorldSettingRow" x:DataType="vm:WorldSettingRowViewModel">
+            <Border Classes="cfgRow">
+                <Grid ColumnDefinitions="42*,58*" RowDefinitions="Auto,Auto">
+                    <!--
+                        ключ: известные игре — из списка (по категориям), любой другой — вписать руками. Список плоский, с
+                        заголовками категорий: их не выбрать ни мышью (контейнер выключен стилем), ни стрелками
+                        (ctl:ComboHeaders). Текст поля сравнивается с текстом пункта (ToString: у ключа — сам ключ, у
+                        заголовка — такой, что не набрать); список — до привязки текста, чтобы ключ строки сразу был выбран
+                    -->
+                    <DockPanel Margin="0,0,24,0">
+                        <Ellipse DockPanel.Dock="Left" Classes="modifiedDot" Margin="-14,13,7,0" ToolTip.Tip="{local:Tr srvcfg.modified}"
+                                 IsVisible="{Binding IsModified}" />
+                        <ComboBox Classes="worldKey" IsEditable="True"
+                                  ItemsSource="{Binding KeyOptions, Converter={x:Static conv:CategoryHeaders.Interleave}}"
+                                  Text="{Binding Key}" IsEnabled="{Binding IsEditable}" HorizontalAlignment="Stretch" MaxDropDownHeight="420"
+                                  ctl:ComboHeaders.HeaderType="{x:Type vm:WorldSettingCategoryHeader}"
+                                  ctl:WheelToParent.IsEnabled="True" ToolTip.Tip="{local:Tr srvcfg.wsKeyTip}"
+                                  AutomationProperties.Name="{local:Tr srvcfg.wsKey}" AutomationProperties.AutomationId="{Binding KeyAutomationId}">
+                            <ComboBox.DataTemplates>
+                                <DataTemplate DataType="vm:WorldSettingCategoryHeader">
+                                    <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Accent}"
+                                               Margin="12,10,12,4" />
+                                </DataTemplate>
+                                <DataTemplate DataType="vm:WorldSettingKeyOption">
+                                    <TextBlock>
+                                        <Run Text="{Binding Label, Mode=OneWay}" /><Run Text="   " /><Run Text="{Binding KeyNote, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" />
+                                    </TextBlock>
+                                </DataTemplate>
+                            </ComboBox.DataTemplates>
+                        </ComboBox>
+                    </DockPanel>
+
+                    <!-- значение: для известных Choice/Bool — список, иначе текст -->
+                    <DockPanel Grid.Column="1">
+                        <Button DockPanel.Dock="Right" Command="{Binding RemoveCommand}" IsEnabled="{Binding IsEditable}" Padding="10,8" Margin="8,0,0,0"
+                                VerticalAlignment="Top" ToolTip.Tip="{local:Tr srvcfg.wsRemove}"
+                                AutomationProperties.Name="{local:Tr srvcfg.wsRemove}" AutomationProperties.AutomationId="{Binding RemoveAutomationId}">
+                            <Path Classes="icon" Data="{StaticResource Icon.Close}" Width="12" Height="12" />
+                        </Button>
+                        <Panel>
+                            <ComboBox ItemsSource="{Binding ValueOptions}" SelectedItem="{Binding SelectedOption}" IsEnabled="{Binding IsEditable}"
+                                      HorizontalAlignment="Stretch" IsVisible="{Binding HasValueOptions}" ctl:WheelToParent.IsEnabled="True"
+                                      AutomationProperties.Name="{local:Tr srvcfg.wsValue}" AutomationProperties.AutomationId="{Binding ValueAutomationId}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:WorldSettingValueOption">
+                                        <TextBlock>
+                                            <Run Text="{Binding Label, Mode=OneWay}" /><Run Text="   " /><Run Text="{Binding ValueNote, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" />
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBox Text="{Binding Value}" IsReadOnly="{Binding IsReadOnly}" Classes.readOnly="{Binding IsReadOnly}"
+                                     VerticalContentAlignment="Center" IsVisible="{Binding !HasValueOptions}"
+                                     AutomationProperties.Name="{local:Tr srvcfg.wsValue}" AutomationProperties.AutomationId="{Binding ValueAutomationId}" />
+                        </Panel>
+                    </DockPanel>
+
+                    <!-- что это за настройка -->
+                    <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,6,0,0">
+                        <TextBlock Text="{Binding Title}" FontSize="12" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap"
+                                   IsVisible="{Binding Title, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <TextBlock Classes="hint" Text="{Binding Hint}"
+                                   IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <TextBlock Classes="hint" Text="{Binding DefaultText}"
+                                   IsVisible="{Binding DefaultText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <TextBlock Text="{local:Tr srvcfg.wsUnknown}" FontSize="11" Foreground="{DynamicResource Forest.Warn}" TextWrapping="Wrap" Margin="0,2,0,0"
+                                   IsVisible="{Binding IsUnknown}" />
+                        <TextBlock Text="{Binding Error}" FontSize="12" Foreground="{DynamicResource Forest.Danger}" TextWrapping="Wrap" Margin="0,2,0,0"
+                                   IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <DockPanel>
+        <!-- ===== сервер работает — только чтение ===== -->
+        <Border DockPanel.Dock="Top" Classes="warning" Margin="0,14,0,0" IsVisible="{Binding IsServerRunning}">
+            <DockPanel>
+                <Path Classes="icon" DockPanel.Dock="Left" Data="{StaticResource Icon.Warning}" Stroke="{DynamicResource Forest.Warn}"
+                      VerticalAlignment="Center" Margin="0,0,12,0" />
+                <TextBlock Text="{local:Tr srvcfg.runningReadOnly}" TextWrapping="Wrap" VerticalAlignment="Center"
+                           Foreground="{DynamicResource Forest.Warn}" FontSize="13" />
+            </DockPanel>
+        </Border>
+
+        <!-- ===== вкладки редактора и действия с файлом ===== -->
+        <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1" Margin="0,14,0,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,8">
+                    <Button Command="{Binding ShowFileCommand}" Padding="11,5" MinHeight="0" ToolTip.Tip="{Binding FilePath}"
+                            IsVisible="{Binding !IsRemote}" AutomationProperties.AutomationId="CfgShowFile">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Classes="icon" Data="{StaticResource Icon.Folder}" Width="13" Height="13" Margin="0,0,7,0" />
+                            <TextBlock Text="{local:Tr srvcfg.showFile}" FontSize="12" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ReloadCommand}" Padding="11,5" MinHeight="0" Margin="8,0,0,0" ToolTip.Tip="{local:Tr srvcfg.reloadTip}"
+                            AutomationProperties.AutomationId="CfgReload">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Classes="icon" Data="{StaticResource Icon.Refresh}" Width="13" Height="13" Margin="0,0,7,0" />
+                            <TextBlock Text="{local:Tr srvcfg.reload}" FontSize="12" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom"
+                            IsVisible="{Binding State, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Loaded}">
+                    <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="CfgTab" Content="{local:Tr srvcfg.tabGeneral}"
+                                 IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=General}"
+                                 AutomationProperties.AutomationId="CfgTabGeneral" />
+                    <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="CfgTab" Content="{local:Tr srvcfg.tabWorld}"
+                                 IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=World}"
+                                 AutomationProperties.AutomationId="CfgTabWorld" />
+                    <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="CfgTab" Content="{local:Tr srvcfg.tabRoles}"
+                                 IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Roles}"
+                                 AutomationProperties.AutomationId="CfgTabRoles" />
+                    <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="CfgTab" Content="{local:Tr srvcfg.tabAdvanced}"
+                                 IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Advanced}"
+                                 AutomationProperties.AutomationId="CfgTabAdvanced" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- ===== нижняя полоса: статус, «Отменить изменения», «Сохранить» (не прокручивается) ===== -->
+        <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="0,10,0,12"
+                IsVisible="{Binding State, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Loaded}">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="16,0,0,0">
+                    <Button Content="{local:Tr srvcfg.revert}" Command="{Binding RevertCommand}" AutomationProperties.AutomationId="CfgRevert" />
+                    <Button Classes="primary" Content="{local:Tr srvcfg.save}" Command="{Binding SaveCommand}"
+                            Padding="22,8" Margin="8,0,0,0" AutomationProperties.AutomationId="CfgSave" />
+                </StackPanel>
+                <!-- при ошибках в подсказке — их перечень -->
+                <DockPanel VerticalAlignment="Center" Background="Transparent" ToolTip.Tip="{Binding StatusTip}">
+                    <Ellipse DockPanel.Dock="Left" Classes="tone statusDot" ctl:EnumClass.Value="{Binding StatusTone}" />
+                    <TextBlock Classes="tone statusLabel" ctl:EnumClass.Value="{Binding StatusTone}" Text="{Binding StatusText}"
+                               AutomationProperties.AutomationId="CfgStatus" />
+                </DockPanel>
+            </DockPanel>
+        </Border>
+
+        <Panel>
+            <!-- ===== файла ещё нет ===== -->
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="560"
+                        IsVisible="{Binding State, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Missing}">
+                <Border Width="64" Height="64" CornerRadius="14" Background="{DynamicResource Forest.Surface}" BorderBrush="{DynamicResource Forest.Line}"
+                        BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,16">
+                    <Path Classes="icon" Data="{StaticResource Icon.Settings}" Stroke="{DynamicResource Forest.Accent}" Width="28" Height="28" />
+                </Border>
+                <TextBlock Text="{local:Tr srvcfg.missingTitle}" FontSize="18" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap"
+                           Foreground="{DynamicResource Forest.Text}" />
+                <TextBlock Text="{local:Tr srvcfg.missingHint}" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" TextAlignment="Center"
+                           Margin="0,8,0,0" />
+                <TextBlock Classes="jsonName" Text="{Binding FilePath}" FontSize="11" TextAlignment="Center" Margin="0,10,0,0" />
+                <!-- сервер сам запишет конфиг по умолчанию (ключ setconfig) и выйдет: мир не создаётся -->
+                <Button Classes="primary" Command="{Binding GenerateCommand}" HorizontalAlignment="Center"
+                        Margin="0,18,0,0" Padding="22,8" AutomationProperties.AutomationId="CfgGenerate">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Classes="icon" Data="{StaticResource Icon.Plus}" Width="12" Height="12" Margin="0,0,8,0" />
+                        <TextBlock Text="{local:Tr srvcfg.generate}" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Text="{local:Tr srvcfg.generating}" Foreground="{DynamicResource Forest.Muted}" FontSize="12" TextAlignment="Center"
+                           Margin="0,10,0,0" IsVisible="{Binding IsGenerating}" />
+                <TextBlock Text="{Binding GenerateError}" Foreground="{DynamicResource Forest.Danger}" FontSize="12" TextAlignment="Center"
+                           TextWrapping="Wrap" Margin="0,10,0,0"
+                           IsVisible="{Binding GenerateError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+
+            <!-- ===== ждём конфиг от агента на компьютере с сервером ===== -->
+            <TextBlock Text="{local:Tr srvcfg.loadingRemote}" Foreground="{DynamicResource Forest.Muted}" FontSize="13"
+                       VerticalAlignment="Center" HorizontalAlignment="Center" AutomationProperties.AutomationId="CfgLoading"
+                       IsVisible="{Binding State, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Loading}" />
+
+            <!-- ===== файл не читается: ничего не перезаписываем ===== -->
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="620"
+                        IsVisible="{Binding State, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Failed}">
+                <Border Width="64" Height="64" CornerRadius="14" Background="{DynamicResource Forest.Surface}" BorderBrush="{DynamicResource Forest.Line}"
+                        BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,16">
+                    <Path Classes="icon" Data="{StaticResource Icon.Warning}" Stroke="{DynamicResource Forest.Danger}" Width="28" Height="28" />
+                </Border>
+                <TextBlock Text="{local:Tr srvcfg.failedTitle}" FontSize="18" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap"
+                           Foreground="{DynamicResource Forest.Text}" />
+                <TextBlock Text="{Binding LoadError}" Foreground="{DynamicResource Forest.Danger}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,0"
+                           AutomationProperties.AutomationId="CfgLoadError" />
+                <TextBlock Text="{local:Tr srvcfg.failedHint}" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" TextAlignment="Center"
+                           Margin="0,8,0,0" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
+                    <Button Content="{local:Tr srvcfg.showFile}" Command="{Binding ShowFileCommand}" IsVisible="{Binding !IsRemote}" />
+                    <Button Content="{local:Tr srvcfg.reload}" Command="{Binding ReloadCommand}" Margin="8,0,0,0" />
+                </StackPanel>
+            </StackPanel>
+
+            <!-- ===== редактор: подвкладки живут всё время (прокрутка не сбрасывается), видна одна — по Tab ===== -->
+            <Panel IsVisible="{Binding State, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Loaded}">
+                <!-- «Основное» -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False"
+                              IsVisible="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=General}">
+                    <ItemsControl ItemsSource="{Binding GeneralGroups}" ItemTemplate="{StaticResource GroupTemplate}" Margin="0,14,14,0" />
+                </ScrollViewer>
+
+                <!-- «Мир» -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False"
+                              IsVisible="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=World}">
+                    <StackPanel Margin="0,14,14,0">
+                        <!-- мир уже создан: часть параметров больше ни на что не влияет -->
+                        <Border Classes="warning" Margin="0,0,0,14" IsVisible="{Binding WorldExists}">
+                            <DockPanel>
+                                <Path Classes="icon" DockPanel.Dock="Left" Data="{StaticResource Icon.About}" Stroke="{DynamicResource Forest.Warn}"
+                                      VerticalAlignment="Center" Margin="0,0,12,0" />
+                                <TextBlock Text="{local:Tr srvcfg.worldExists}" TextWrapping="Wrap" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource Forest.Warn}" FontSize="13" />
+                            </DockPanel>
+                        </Border>
+
+                        <ItemsControl ItemsSource="{Binding WorldGroups}" ItemTemplate="{StaticResource GroupTemplate}" />
+
+                        <!-- настройки мира: словарь «ключ → значение» -->
+                        <Border Classes="card cfgCard">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,12">
+                                    <Button DockPanel.Dock="Right" Command="{Binding AddWorldSettingCommand}" VerticalAlignment="Top" Padding="12,5" MinHeight="0"
+                                            Margin="16,0,0,0" AutomationProperties.AutomationId="CfgAddWorldSetting">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Classes="icon" Data="{StaticResource Icon.Plus}" Width="11" Height="11" Margin="0,0,7,0" />
+                                            <TextBlock Text="{local:Tr srvcfg.wsAdd}" FontSize="12" />
+                                        </StackPanel>
+                                    </Button>
+                                    <StackPanel>
+                                        <TextBlock Classes="cardTitle" Text="{local:Tr srvcfg.wsTitle}" />
+                                        <TextBlock Classes="jsonName" Text="WorldConfig.WorldConfiguration" Margin="0,2,0,0" />
+                                        <WrapPanel>
+                                            <Border Classes="badge" ToolTip.Tip="{local:Tr srvcfg.badgeWorldCreationTip}">
+                                                <TextBlock Text="{local:Tr srvcfg.badgeWorldCreation}" FontSize="10.5" Foreground="{DynamicResource Forest.Warn}" />
+                                            </Border>
+                                        </WrapPanel>
+                                        <TextBlock Classes="hint" Text="{local:Tr srvcfg.wsHint}" Margin="0,5,0,0" />
+                                    </StackPanel>
+                                </DockPanel>
+                                <Border Classes="cfgRow" IsVisible="{Binding !HasWorldSettings}">
+                                    <TextBlock Classes="hint" Text="{local:Tr srvcfg.wsEmpty}" FontSize="12" Margin="0" />
+                                </Border>
+                                <ItemsControl ItemsSource="{Binding WorldSettings}" ItemTemplate="{StaticResource WorldSettingRow}" ClipToBounds="False" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- «Роли»: вёрстка и прокрутка — свои -->
+                <Panel Margin="0,14,0,0" IsVisible="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Roles}">
+                    <views:RolesView DataContext="{Binding Roles}" />
+                </Panel>
+
+                <!-- «Дополнительно»: полей много — сверху поиск -->
+                <DockPanel IsVisible="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Advanced}">
+                    <TextBox DockPanel.Dock="Top" Classes="search" Margin="0,14,14,0" Text="{Binding Search}"
+                             PlaceholderText="{local:Tr srvcfg.searchPlaceholder}"
+                             AutomationProperties.Name="{local:Tr srvcfg.searchPlaceholder}" AutomationProperties.AutomationId="CfgSearch">
+                        <TextBox.InnerLeftContent>
+                            <Path Classes="icon searchIcon" Data="{StaticResource Icon.Search}" />
+                        </TextBox.InnerLeftContent>
+                    </TextBox>
+                    <TextBlock DockPanel.Dock="Top" Text="{local:Tr srvcfg.searchEmpty}" Foreground="{DynamicResource Forest.Muted}" Margin="2,16,0,0"
+                               IsVisible="{Binding SearchEmpty}" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                        <ItemsControl ItemsSource="{Binding AdvancedGroups}" ItemTemplate="{StaticResource GroupTemplate}" Margin="0,14,14,0" />
+                    </ScrollViewer>
+                </DockPanel>
+            </Panel>
+        </Panel>
+    </DockPanel>
 </UserControl>
