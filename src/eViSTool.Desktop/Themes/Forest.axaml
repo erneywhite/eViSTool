@@ -196,6 +196,12 @@
         <Setter Property="Grid.RowSpan" Value="1" />
     </Style>
 
+    <!-- стрелка выпадающего списка — мельче, как у Fluent в окне на WPF (у Fluent в Avalonia 12×12). Масштабом, а не
+         размером: размер задан в самом шаблоне, а значения шаблона сильнее обычного стиля -->
+    <Style Selector="ComboBox /template/ PathIcon#DropDownGlyph">
+        <Setter Property="RenderTransform" Value="scale(0.7)" />
+    </Style>
+
     <!-- ===== служебные ===== -->
     <!-- невидимый, но место занимает (Visibility=Hidden в WPF) -->
     <Style Selector=":is(Control).hidden">
