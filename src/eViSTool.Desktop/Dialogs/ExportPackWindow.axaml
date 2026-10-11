@@ -1,0 +1,42 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:local="using:eViSTool.Desktop"
+                      xmlns:ctl="using:eViSTool.Desktop.Controls"
+                      x:Class="eViSTool.Desktop.Dialogs.ExportPackWindow"
+                      x:DataType="vm:ExportPackViewModel"
+                      Title="{local:Tr packx.title}"
+                      Width="544" SizeToContent="Height" CanResize="False">
+    <StackPanel Margin="20">
+        <TextBlock Text="{local:Tr packx.name}" FontWeight="SemiBold" />
+        <TextBox x:Name="NameBox" Classes="clearButton" Margin="0,4,0,0" Text="{Binding Name}"
+                 ctl:Focus.OnOpen="True" ctl:Focus.SelectAll="True"
+                 AutomationProperties.AutomationId="PackName" />
+
+        <TextBlock Text="{local:Tr packx.description}" FontWeight="SemiBold" Margin="0,14,0,0" />
+        <TextBox Margin="0,4,0,0" Text="{Binding Description}" AcceptsReturn="True" TextWrapping="Wrap" Height="60"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 AutomationProperties.AutomationId="PackDescription" />
+
+        <CheckBox Content="{local:Tr packx.bundle}" IsChecked="{Binding BundleFiles}" Margin="0,18,0,0"
+                  AutomationProperties.AutomationId="PackBundle" />
+        <TextBlock Text="{local:Tr packx.bundleHint}" Opacity="0.7" TextWrapping="Wrap" Margin="28,2,0,0" />
+
+        <CheckBox Content="{local:Tr packx.config}" IsChecked="{Binding IncludeModConfig}" IsEnabled="{Binding HasModConfig}" Margin="0,12,0,0"
+                  AutomationProperties.AutomationId="PackConfig" />
+        <TextBlock Text="{local:Tr packx.configHint}" Opacity="0.7" TextWrapping="Wrap" Margin="28,2,0,0" />
+
+        <CheckBox Content="{local:Tr packx.disabled}" IsChecked="{Binding IncludeDisabled}" Margin="0,12,0,0"
+                  AutomationProperties.AutomationId="PackDisabled" />
+
+        <TextBlock Text="{Binding Summary}" Opacity="0.8" TextWrapping="Wrap" Margin="0,18,0,0" />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,18,0,0">
+            <Button Content="{local:Tr packx.build}" IsDefault="True" Click="Build_Click" Padding="16,6" Classes="primary"
+                    AutomationProperties.AutomationId="PackBuild" />
+            <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Padding="16,6"
+                    AutomationProperties.AutomationId="PackCancel" />
+        </StackPanel>
+    </StackPanel>
+</dialogs:DialogWindow>
