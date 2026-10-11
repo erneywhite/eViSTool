@@ -193,7 +193,13 @@ public sealed class AppUpdater
         return result;
     }
 
-    /// <summary>Скачать архив и сверить отпечаток. Без отпечатка не ставим: файл мог подмениться по дороге.</summary>
+    /// <summary>Сколько ждать следующего куска архива: дольше — скачивание считается зависшим.</summary>
+    public TimeSpan StallTimeout { get; init; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// Скачать архив и сверить отпечаток. Без отпечатка не ставим: файл мог подмениться по дороге. Сбой, отмена или
+    /// сервер, замолчавший посреди файла, — недокачанный архив удаляется.
+    /// </summary>
     public async Task<string> DownloadAsync(AppRelease release, string downloadsDir, IProgress<double>? progress = null, CancellationToken ct = default)
     {
         var expected = release.Sha256 ?? (release.ChecksumUrl is { } checksumUrl ? await ReadChecksumAsync(checksumUrl, ct).ConfigureAwait(false) : null);
@@ -201,21 +207,36 @@ public sealed class AppUpdater
         Directory.CreateDirectory(downloadsDir);
         var path = Path.Combine(downloadsDir, release.AssetName);
 
-        using (var response = await _http.GetAsync(release.AssetUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
+        // тайм-аут HttpClient покрывает только заголовки: сервер, замолчавший посреди архива, держал бы обновление вечно
+        using var stall = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        try
         {
+            using var response = await _http.GetAsync(release.AssetUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode) throw new HttpRequestException(Loc.T("update.httpFailed", (int)response.StatusCode));
             var total = response.Content.Headers.ContentLength ?? release.AssetSize;
             await using var src = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
             await using var dst = File.Create(path);
             var buffer = new byte[1 << 16];
             long done = 0;
-            int read;
-            while ((read = await src.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+            while (true)
             {
+                stall.CancelAfter(StallTimeout);
+                var read = await src.ReadAsync(buffer, stall.Token).ConfigureAwait(false);
+                if (read <= 0) break;
                 await dst.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
                 done += read;
                 if (total > 0) progress?.Report((double)done / total);
             }
+        }
+        catch (OperationCanceledException) when (stall.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            DeleteQuietly(path);
+            throw new TimeoutException(Loc.T("dl.stalled", (int)StallTimeout.TotalSeconds));
+        }
+        catch
+        {
+            DeleteQuietly(path); // недокачанный архив не оставляем
+            throw;
         }
 
         if (!string.Equals(Sha256Of(path), expected, StringComparison.OrdinalIgnoreCase))
@@ -233,6 +254,12 @@ public sealed class AppUpdater
         if (!response.IsSuccessStatusCode) return null;
         var first = (await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false)).Trim().Split(' ', '\t', '\n').FirstOrDefault() ?? "";
         return first.Length == 64 && first.All(Uri.IsHexDigit) ? first.ToLowerInvariant() : null;
+    }
+
+    private static void DeleteQuietly(string path)
+    {
+        try { File.Delete(path); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     public static string Sha256Of(string path)

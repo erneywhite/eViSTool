@@ -146,7 +146,7 @@ public sealed partial class AboutViewModel : ObservableObject
             return release;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException
-                                       or InvalidOperationException or InvalidDataException)
+                                       or InvalidOperationException or InvalidDataException or TimeoutException)
         {
             UpdateStatus = Loc.T("about.updateFailed", ex.Message);
             return null;

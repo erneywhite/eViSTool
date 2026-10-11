@@ -1,3 +1,5 @@
+namespace eViSTool.Core.Server;
+
 /// <summary>
 /// Один агент на профиль. На Windows — именованный Mutex, как всегда (имя то же: копия после обновления ждёт прежнюю
 /// именно по нему). На Linux именованный Mutex .NET виден только внутри своего сеанса (getsid): агент из systemd и агент,
@@ -5,7 +7,7 @@
 /// открытый файл «&lt;профиль&gt;.lock» рядом с файлом адреса (flock): его видят все процессы машины, и два eViSTool
 /// в разных папках с одинаковым профилем друг другу не мешают. Процесс вышел или упал — замок снимает сама система.
 /// </summary>
-internal sealed class ProfileLock : IDisposable
+public sealed class ProfileLock : IDisposable
 {
     private readonly Mutex? _mutex;
     private readonly FileStream? _file;
