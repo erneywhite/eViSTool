@@ -1,0 +1,53 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:local="using:eViSTool.Desktop"
+                      xmlns:ctl="using:eViSTool.Desktop.Controls"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      x:Class="eViSTool.Desktop.Dialogs.AlsoInstallWindow"
+                      x:DataType="vm:AlsoInstallViewModel"
+                      Width="544" SizeToContent="Height" CanResize="False"
+                      Title="{local:Tr also.title}">
+    <dialogs:DialogWindow.Resources>
+        <!-- недоступная галочка (текущий профиль — отмечена, профиль без версии мода — нет): тусклый контур и приглушённая
+             галка, как в окне на WPF; Fluent красит отмеченную серой заливкой, а контур неотмеченной оставляет светлым -->
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedDisabled" Color="Transparent" />
+        <StaticResource x:Key="CheckBoxCheckBackgroundStrokeCheckedDisabled" ResourceKey="Forest.LineStrong" />
+        <StaticResource x:Key="CheckBoxCheckBackgroundStrokeUncheckedDisabled" ResourceKey="Forest.LineStrong" />
+        <StaticResource x:Key="CheckBoxCheckGlyphForegroundCheckedDisabled" ResourceKey="Forest.DisabledText" />
+    </dialogs:DialogWindow.Resources>
+    <StackPanel Margin="24,20,24,22">
+        <TextBlock Text="{local:Tr also.title}" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />
+        <TextBlock Text="{Binding Hint}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="0,4,0,0" />
+
+        <!-- профили: текущий отмечен всегда; недоступные — с причиной, без галочки -->
+        <ItemsControl ItemsSource="{Binding Rows}" Margin="0,14,0,0">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:AlsoInstallRowViewModel">
+                    <!-- 12,12,12,10 вместо 12,8: у CheckBox в WPF отступ сверху 6, у Avalonia его нет, а галочка у неё прижата к верху -->
+                    <Border Background="{DynamicResource Forest.Surface}" CornerRadius="6" Padding="12,12,12,10" Margin="0,0,0,6">
+                        <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding IsEnabled}" VerticalContentAlignment="Center"
+                                  AutomationProperties.Name="{Binding Name}">
+                            <StackPanel Margin="4,0,0,0">
+                                <TextBlock FontSize="13" Foreground="{DynamicResource Forest.Text}">
+                                    <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding KindText, Mode=OneWay}" Foreground="{DynamicResource Forest.Muted}" />
+                                </TextBlock>
+                                <TextBlock Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </CheckBox>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <CheckBox IsChecked="{Binding Remember}" Margin="0,8,0,0" AutomationProperties.AutomationId="AlsoRemember">
+            <TextBlock Text="{Binding RememberText}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Forest.Text}" />
+        </CheckBox>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button Content="{local:Tr also.install}" Classes="primary" IsDefault="True" Click="Ok_Click" Padding="18,8"
+                    ctl:Focus.OnOpen="True" AutomationProperties.AutomationId="AlsoOk" />
+            <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8" />
+        </StackPanel>
+    </StackPanel>
+</dialogs:DialogWindow>
