@@ -1,0 +1,87 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:local="using:eViSTool.Desktop"
+                      xmlns:ctl="using:eViSTool.Desktop.Controls"
+                      x:Class="eViSTool.Desktop.Dialogs.ImportPackWindow"
+                      x:DataType="vm:ImportPackViewModel"
+                      Title="{local:Tr packi.title}"
+                      Width="804" Height="601" MinWidth="584" MinHeight="381">
+    <!-- Размер — рабочей области: у окна на WPF Width=820, Height=640 считаются с рамкой и заголовком (804×601 внутри) -->
+    <DockPanel Margin="20">
+        <!-- ===== о паке ===== -->
+        <StackPanel DockPanel.Dock="Top">
+            <TextBlock Text="{Binding PackName}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding Info}" Opacity="0.7" TextWrapping="Wrap" Margin="0,2,0,0" />
+            <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Margin="0,8,0,0" IsVisible="{Binding HasDescription}" />
+            <!-- пак собран для другой версии игры: полупрозрачный жёлтый, как в окне на WPF -->
+            <Border Margin="0,10,0,0" Padding="10,6" CornerRadius="6" Background="#40F0A020" IsVisible="{Binding HasWarning}">
+                <TextBlock Text="{Binding Warning}" TextWrapping="Wrap" />
+            </Border>
+        </StackPanel>
+
+        <!-- ===== режим, настройки модов, кнопки ===== -->
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+            <RadioButton GroupName="ImportMode" Content="{local:Tr packi.modeAdd}" IsChecked="{Binding !Mirror, Mode=OneWay}"
+                         AutomationProperties.AutomationId="ImportPackAddMode" />
+            <RadioButton GroupName="ImportMode" Margin="0,6,0,0" Content="{Binding MirrorText}" IsEnabled="{Binding CanMirror}"
+                         IsChecked="{Binding Mirror}" ToolTip.Tip="{Binding MirrorTip}" AutomationProperties.AutomationId="ImportPackMirrorMode" />
+            <CheckBox Margin="0,10,0,0" Content="{local:Tr packi.applyConfig}" IsChecked="{Binding ApplyConfig}"
+                      IsVisible="{Binding HasModConfig}" AutomationProperties.AutomationId="ImportPackApplyConfig" />
+            <DockPanel Margin="0,14,0,0">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Classes="primary" Content="{local:Tr packi.import}" IsDefault="True" Padding="16,6" Click="Import_Click"
+                            AutomationProperties.AutomationId="ImportPackImport" />
+                    <Button Content="{local:Tr common.cancel}" Margin="8,0,0,0" Padding="16,6" Click="Cancel_Click"
+                            AutomationProperties.AutomationId="ImportPackCancel" />
+                </StackPanel>
+                <TextBlock Text="{Binding Summary}" Opacity="0.8" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </DockPanel>
+        </StackPanel>
+
+        <!-- ===== что произойдёт с каждым модом ===== -->
+        <DataGrid Margin="0,12,0,0" ItemsSource="{Binding Items}" AutoGenerateColumns="False" IsReadOnly="True"
+                  HeadersVisibility="Column" GridLinesVisibility="None" CanUserSortColumns="False" CanUserResizeColumns="True"
+                  RowHeight="42" Background="Transparent" RowBackground="Transparent" BorderThickness="0"
+                  ColumnHeaderTheme="{StaticResource Forest.ColumnHeader}" AutomationProperties.AutomationId="ImportPackItems">
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Header="{local:Tr col.mod}" Width="*" MinWidth="200">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate x:DataType="vm:PackItemRow">
+                            <TextBlock Text="{Binding Name}" Margin="10,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="{local:Tr packi.colPack}" Width="110">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate x:DataType="vm:PackItemRow">
+                            <TextBlock Text="{Binding PackVersion}" Margin="10,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="{local:Tr packi.colMine}" Width="110">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate x:DataType="vm:PackItemRow">
+                            <TextBlock Text="{Binding MineVersion}" Margin="10,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="{local:Tr packi.colAction}" Width="170">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate x:DataType="vm:PackItemRow">
+                            <TextBlock Text="{Binding ActionText}" Margin="10,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="{local:Tr packi.colSource}" Width="120">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate x:DataType="vm:PackItemRow">
+                            <TextBlock Text="{Binding SourceText}" Margin="10,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</dialogs:DialogWindow>
