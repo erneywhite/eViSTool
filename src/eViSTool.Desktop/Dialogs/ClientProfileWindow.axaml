@@ -1,0 +1,129 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:local="using:eViSTool.Desktop"
+                      xmlns:ctl="using:eViSTool.Desktop.Controls"
+                      xmlns:conv="using:eViSTool.Desktop.Converters"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      x:Class="eViSTool.Desktop.Dialogs.ClientProfileWindow"
+                      x:DataType="vm:ClientProfileViewModel"
+                      Title="{Binding Title}" Width="624" SizeToContent="Height" CanResize="False">
+    <!-- ширина без рамки: в WPF Width="640" считается вместе с рамкой окна, внутри остаётся 624 -->
+    <Window.Styles>
+        <!-- вариант с пояснением: у Fluent в окне на WPF текст варианта на 6 ниже верха переключателя (вровень с кружком),
+             у Fluent в Avalonia — вплотную к верху -->
+        <Style Selector="RadioButton">
+            <Setter Property="Padding" Value="8,6,0,0" />
+        </Style>
+        <!-- название варианта (OptionTitle): цвет свой, как в окне на WPF, — у выключенного варианта он не бледнеет -->
+        <Style Selector="TextBlock.optionTitle">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+        </Style>
+    </Window.Styles>
+    <StackPanel Margin="24,20,24,22">
+        <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Classes="hint" Text="{Binding Intro}" FontSize="12" Margin="0,4,0,0" />
+
+        <!-- игра запущена — копия мира может получиться битой -->
+        <Border Classes="warning" Margin="0,14,0,0" IsVisible="{Binding IsGameRunning}">
+            <DockPanel>
+                <Path Classes="icon" DockPanel.Dock="Left" Data="{StaticResource Icon.Warning}" Stroke="{DynamicResource Forest.Warn}"
+                      VerticalAlignment="Center" Margin="0,0,12,0" />
+                <TextBlock Text="{local:Tr cprofile.running}" Foreground="{DynamicResource Forest.Warn}" TextWrapping="Wrap" FontSize="12" />
+            </DockPanel>
+        </Border>
+
+        <StackPanel IsEnabled="{Binding !IsCopying}">
+            <TextBlock Classes="label" Text="{local:Tr clone.name}" />
+            <TextBox Classes="clearButton" Text="{Binding Name}" Margin="0,6,0,0" MaxLength="60" ctl:Focus.OnOpen="True" ctl:Focus.SelectAll="True"
+                     AutomationProperties.AutomationId="CProfileName" />
+
+            <TextBlock Classes="label" Text="{local:Tr clone.target}" />
+            <TextBlock Classes="hint" Text="{local:Tr clone.targetHint}" Margin="0,2,0,6" />
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="{local:Tr common.browse}" Command="{Binding BrowseCommand}" Margin="8,0,0,0" />
+                <TextBox Classes="clearButton" Text="{Binding TargetDir}" VerticalContentAlignment="Center" AutomationProperties.AutomationId="CProfileTarget" />
+            </DockPanel>
+
+            <!-- моды: общие с основой, своя копия или с нуля; у основы модов нет — только с нуля -->
+            <TextBlock Classes="label" Text="{local:Tr clone.mods}" />
+            <Border Classes="card" Padding="14,10" Margin="0,6,0,0">
+                <StackPanel>
+                    <RadioButton GroupName="Mods" IsEnabled="{Binding HasMods}"
+                                 IsChecked="{Binding Mods, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Shared}"
+                                 AutomationProperties.AutomationId="CProfileModsShared">
+                        <StackPanel>
+                            <TextBlock Classes="optionTitle" Text="{local:Tr cprofile.modsShared}" />
+                            <TextBlock Classes="hint" Text="{Binding SharedModsHint}" />
+                        </StackPanel>
+                    </RadioButton>
+                    <Border Classes="row" Margin="0,10,0,0" Padding="0,10,0,0">
+                        <RadioButton GroupName="Mods" IsEnabled="{Binding HasMods}"
+                                     IsChecked="{Binding Mods, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Copy}"
+                                     AutomationProperties.AutomationId="CProfileModsCopy">
+                            <StackPanel>
+                                <TextBlock Classes="optionTitle" Text="{local:Tr cprofile.modsCopy}" />
+                                <TextBlock Classes="hint" Text="{local:Tr cprofile.modsCopyHint}" />
+                            </StackPanel>
+                        </RadioButton>
+                    </Border>
+                    <Border Classes="row" Margin="0,10,0,0" Padding="0,10,0,0">
+                        <RadioButton GroupName="Mods"
+                                     IsChecked="{Binding Mods, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Empty}"
+                                     AutomationProperties.AutomationId="CProfileModsEmpty">
+                            <StackPanel>
+                                <TextBlock Classes="optionTitle" Text="{local:Tr cprofile.modsEmpty}" />
+                                <TextBlock Classes="hint" Text="{local:Tr cprofile.modsEmptyHint}" />
+                            </StackPanel>
+                        </RadioButton>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- настройки игры: как у основы или чистые -->
+            <TextBlock Classes="label" Text="{local:Tr cprofile.settings}" />
+            <Border Classes="card" Padding="14,10" Margin="0,6,0,0">
+                <StackPanel>
+                    <RadioButton GroupName="Settings" IsChecked="{Binding CopySettings}" AutomationProperties.AutomationId="CProfileSettingsCopy">
+                        <StackPanel>
+                            <TextBlock Classes="optionTitle" Text="{local:Tr cprofile.settingsCopy}" />
+                            <TextBlock Classes="hint" Text="{local:Tr cprofile.settingsCopyHint}" />
+                        </StackPanel>
+                    </RadioButton>
+                    <Border Classes="row" Margin="0,10,0,0" Padding="0,10,0,0">
+                        <!-- в одну сторону: выбор этого варианта снимает соседний, и тот сам пишет CopySettings = false -->
+                        <RadioButton GroupName="Settings" IsChecked="{Binding !CopySettings, Mode=OneWay}"
+                                     AutomationProperties.AutomationId="CProfileSettingsClean">
+                            <StackPanel>
+                                <TextBlock Classes="optionTitle" Text="{local:Tr cprofile.settingsClean}" />
+                                <TextBlock Classes="hint" Text="{local:Tr cprofile.settingsCleanHint}" />
+                            </StackPanel>
+                        </RadioButton>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- миры: показываем, только если в основе они есть -->
+            <CheckBox Content="{Binding WorldsText}" IsChecked="{Binding CopyWorlds}" IsVisible="{Binding HasWorlds}" Margin="0,16,0,0"
+                      AutomationProperties.AutomationId="CProfileWorlds" />
+        </StackPanel>
+
+        <!-- что получится / почему нельзя -->
+        <TextBlock Classes="hint" Text="{Binding Summary}" FontSize="12" Margin="0,16,0,0" />
+        <TextBlock Classes="error" Text="{Binding ErrorText}" FontSize="12" Margin="0,8,0,0"
+                   IsVisible="{Binding ErrorText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+        <!-- ход копирования -->
+        <StackPanel Margin="0,14,0,0" IsVisible="{Binding IsCopying}">
+            <ProgressBar Theme="{StaticResource Forest.Progress}" Value="{Binding ProgressValue}" />
+            <TextBlock Classes="hint" Text="{Binding ProgressText}" Margin="0,6,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Classes="primary" Content="{Binding GoText}" IsDefault="True" Command="{Binding GoCommand}" Padding="18,8"
+                    AutomationProperties.AutomationId="CProfileGo" />
+            <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8" />
+        </StackPanel>
+    </StackPanel>
+</dialogs:DialogWindow>

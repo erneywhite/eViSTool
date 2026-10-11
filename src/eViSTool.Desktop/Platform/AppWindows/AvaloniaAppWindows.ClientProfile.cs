@@ -1,13 +1,11 @@
 using eViSTool.Core.Profiles;
+using eViSTool.Desktop.Dialogs;
+using eViSTool.Presentation.ViewModels;
 
 namespace eViSTool.Desktop.Platform;
 
 partial class AvaloniaAppWindows
 {
-    /// <summary>Заглушка: окно ClientProfileWindow ещё не перенесено на Avalonia.</summary>
-    public GameProfile? ClientProfile(GameProfile source, bool clone, string suggestedName)
-    {
-        Stub("ClientProfileWindow");
-        return null;
-    }
+    public GameProfile? ClientProfile(GameProfile source, bool clone, string suggestedName) =>
+        new ClientProfileWindow { DataContext = new ClientProfileViewModel(source, clone, suggestedName) }.ShowModal<GameProfile>();
 }
