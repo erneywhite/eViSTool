@@ -155,33 +155,35 @@ public sealed class SecretKeyFile
     }
 
     /// <summary>
-    /// Новый ключ: сначала во временный файл, сразу с правами 600, потом переименованием на место. Соседний процесс не
-    /// прочитает полузаписанный ключ, а два процесса разом не создадут два разных: второй возьмёт ключ первого.
+    /// Новый ключ: файл создаётся атомарно (CreateNew — O_EXCL), сразу с правами 600. Из нескольких процессов, создающих
+    /// ключ разом, файл достаётся одному, остальные берут его ключ, подождав, пока он допишет свои 32 байта.
+    /// Не временный файл с переименованием: «переименовать, не затирая» на Linux .NET делает через link(), а где тот не
+    /// выходит — через «проверить и rename», и второй процесс успевал затереть ключ первого, уже им использованный.
     /// null — на месте уже лежит повреждённый файл.
     /// </summary>
     private static byte[]? Create(string file)
     {
         XdgDirs.CreatePrivate(Path.GetDirectoryName(file)!);
         var key = RandomNumberGenerator.GetBytes(KeySize);
-        var tmp = $"{file}.{Guid.NewGuid():N}.tmp";
-        var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write };
+        var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write,
+            Share = FileShare.ReadWrite }; // соседи читают, пока пишем: недописанный ключ для них — «повреждён», и они ждут
         if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
         try
         {
-            using (var stream = new FileStream(tmp, options)) stream.Write(key);
-            try
-            {
-                File.Move(tmp, file, overwrite: false);
-                return key;
-            }
-            catch (IOException) when (File.Exists(file))
-            {
-                return Read(file);
-            }
+            using var stream = new FileStream(file, options);
+            stream.Write(key);
+            stream.Flush(flushToDisk: true);
+            return key;
         }
-        finally
+        catch (IOException) when (File.Exists(file))
         {
-            File.Delete(tmp);
+            // ключ создаёт кто-то другой прямо сейчас — его и берём, когда допишет
+            for (var attempt = 0; attempt < 50; attempt++)
+            {
+                if (Read(file) is { } theirs) return theirs;
+                Thread.Sleep(20);
+            }
+            return null;
         }
     }
 
