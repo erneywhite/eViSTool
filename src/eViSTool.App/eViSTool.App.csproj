@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\eViSTool.Core\eViSTool.Core.csproj" />
+    <ProjectReference Include="..\eViSTool.Presentation\eViSTool.Presentation.csproj" />
     <!-- агент собирается вместе с окном и кладётся рядом: общая папка data -->
     <ProjectReference Include="..\eViSTool.Agent\eViSTool.Agent.csproj" ReferenceOutputAssembly="false"
                       Condition="'$(_IsPublishing)' != 'true'" />

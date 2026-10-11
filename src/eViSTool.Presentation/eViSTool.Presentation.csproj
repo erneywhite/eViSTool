@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Модели окна без привязки к конкретному оконному движку: всё, что им нужно от платформы (вопросы, поток окна,
+    таймеры, выбор файлов, оболочка системы, окна-диалоги), — через Ui. Сейчас его реализует окно на WPF
+    (eViSTool.App), потом — и на Avalonia (Windows и Linux).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>eViSTool.Presentation</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\eViSTool.Core\eViSTool.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+</Project>

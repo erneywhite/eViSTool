@@ -17,6 +17,7 @@ public partial class App : Application
         DispatcherUnhandledException += OnDispatcherError;
         AppDomain.CurrentDomain.UnhandledException += (_, a) => WriteCrashLog(a.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, a) => { WriteCrashLog(a.Exception); a.SetObserved(); };
+        Presentation.Ui.Platform = new WpfUiPlatform(); // модели спрашивают, открывают файлы и ставят таймеры через него
         Core.AppPaths.MigrateLegacy(); // до первого чтения настроек
         Core.AppUpdate.AppUpdater.CleanupOld(AppContext.BaseDirectory); // хвосты прошлого обновления
         base.OnStartup(e);
