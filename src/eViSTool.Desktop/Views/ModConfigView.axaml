@@ -1,6 +1,233 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="eViSTool.Desktop.Views.ModConfigView">
-    <!-- заглушка: экран «Настройки модов» ещё переносится с окна на WPF -->
-    <TextBlock Text="Экран «Настройки модов» ещё переносится" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
+             xmlns:vm="using:eViSTool.Presentation.ViewModels"
+             xmlns:local="using:eViSTool.Desktop"
+             xmlns:conv="using:eViSTool.Desktop.Converters"
+             x:Class="eViSTool.Desktop.Views.ModConfigView"
+             x:DataType="vm:ModConfigViewModel">
+    <UserControl.Resources>
+        <!-- подсказка в пустом поле — приглушённым цветом без полупрозрачности Fluent, как в окне на WPF -->
+        <x:Double x:Key="TextControlPlaceholderOpacity">1</x:Double>
+        <!--
+            фон полей ввода — как его на деле рисует окно на WPF: полупрозрачный белый Fluent (ControlFillColorDefault и
+            Secondary). Непрозрачная поверхность темы в карточке сливается с ней, и поля формы теряют заливку
+        -->
+        <SolidColorBrush x:Key="TextControlBackground" Color="#0FFFFFFF" />
+        <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#15FFFFFF" />
+    </UserControl.Resources>
+    <UserControl.Styles>
+        <!-- ключ поля формы -->
+        <Style Selector="TextBlock.fieldKey">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="Margin" Value="0,0,12,0" />
+        </Style>
+        <!-- что не так со значением — под полем справа; пустая строка скрыта привязкой IsVisible -->
+        <Style Selector="TextBlock.fieldError">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Danger}" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+        <!-- строка поля: линия снизу — направляющая от ключа к значению; под мышкой и при правке — подсвечена -->
+        <Style Selector="Border.fieldRow">
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Forest.Line}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+        </Style>
+        <Style Selector="Border.fieldRow:pointerover">
+            <Setter Property="Background" Value="{DynamicResource Forest.Raised}" />
+        </Style>
+        <Style Selector="Border.fieldRow:focus-within">
+            <Setter Property="Background" Value="{DynamicResource Forest.Selected}" />
+        </Style>
+    </UserControl.Styles>
+
+    <DockPanel Margin="10,4,10,0">
+        <!-- ===== заголовок ===== -->
+        <DockPanel DockPanel.Dock="Top">
+            <Button DockPanel.Dock="Right" VerticalAlignment="Top" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsLoading}">
+                <StackPanel Orientation="Horizontal">
+                    <Path Classes="icon" Data="{StaticResource Icon.Refresh}" Width="14" Height="14" Margin="0,0,8,0" />
+                    <TextBlock Text="{local:Tr mcfg.refresh}" />
+                </StackPanel>
+            </Button>
+            <StackPanel>
+                <TextBlock Classes="pageTitle" Text="{local:Tr mcfg.title}" />
+                <TextBlock Text="{Binding Subtitle}" Foreground="{DynamicResource Forest.Accent}" FontSize="12" Margin="0,4,0,0"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </DockPanel>
+
+        <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1" Margin="0,14,0,0" />
+
+        <!-- ===== строка статуса ===== -->
+        <TextBlock DockPanel.Dock="Bottom" Margin="0,8,0,8" Text="{Binding Status}" Foreground="{DynamicResource Forest.Muted}" FontSize="12"
+                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Status}" />
+
+        <!-- нет списка (удалённый профиль, нет папки) — объяснение вместо колонок -->
+        <TextBlock DockPanel.Dock="Top" Text="{Binding Notice}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" TextWrapping="Wrap"
+                   Margin="0,24,0,0" IsVisible="{Binding Notice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+        <Grid Margin="0,14,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="340" MinWidth="240" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="*" MinWidth="360" />
+            </Grid.ColumnDefinitions>
+            <GridSplitter Grid.Column="1" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Cursor="SizeWestEast" />
+
+            <!-- ===== поиск и список файлов: крупно мод, мелко файл ===== -->
+            <DockPanel>
+                <TextBox DockPanel.Dock="Top" Classes="search" Margin="0,0,0,10" Text="{Binding Search}" PlaceholderText="{local:Tr mcfg.search}"
+                         AutomationProperties.AutomationId="McfgSearch">
+                    <TextBox.InnerLeftContent>
+                        <Path Classes="icon searchIcon" Data="{StaticResource Icon.Search}" />
+                    </TextBox.InnerLeftContent>
+                </TextBox>
+                <ListBox ItemsSource="{Binding RowsView.Items}" SelectedItem="{Binding Selected}"
+                         ItemContainerTheme="{StaticResource Forest.CardItem}" Background="Transparent" BorderThickness="0" Padding="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ModConfigRow">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource Forest.Text}"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0"
+                                           TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Subtitle}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+
+            <!-- ===== редактор выбранного файла ===== -->
+            <Border Grid.Column="2" Classes="card">
+                <Panel>
+                    <TextBlock Text="{local:Tr mcfg.pick}" Foreground="{DynamicResource Forest.Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsVisible="{Binding !HasFile}" />
+
+                    <DockPanel Margin="18,14,18,16" IsVisible="{Binding HasFile}">
+                        <DockPanel DockPanel.Dock="Top">
+                            <!-- вид: форма или текст (форма — только для JSON) -->
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" IsVisible="{Binding CanUseForm}">
+                                <RadioButton x:Name="FormChip" Theme="{StaticResource Forest.Chip}" GroupName="McfgView" IsChecked="{Binding IsFormMode}"
+                                             Content="{local:Tr mcfg.form}" AutomationProperties.AutomationId="McfgForm" />
+                                <RadioButton x:Name="TextChip" Theme="{StaticResource Forest.Chip}" GroupName="McfgView" IsChecked="{Binding IsTextMode}"
+                                             Content="{local:Tr mcfg.textView}" Margin="6,0,0,0" AutomationProperties.AutomationId="McfgTextView" />
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Text="{Binding Heading}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Classes="mono" Text="{Binding PathText}" FontSize="12" Foreground="{DynamicResource Forest.Muted}"
+                                           Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="{Binding FormNote}" Foreground="{DynamicResource Forest.Warn}" FontSize="12"
+                                   TextWrapping="Wrap" Margin="0,8,0,0"
+                                   IsVisible="{Binding FormNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                        <!-- кнопки и ошибка JSON — снизу -->
+                        <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                            <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Forest.Danger}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"
+                                       IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            <DockPanel>
+                                <Button DockPanel.Dock="Left" Content="{local:Tr mcfg.openFolder}" Command="{Binding OpenFolderCommand}" Padding="12,6"
+                                        IsVisible="{Binding CanShowFile}" />
+                                <!--
+                                    кнопки справа. Не влезают (узкое окно) — уходят под левый край, «Сохранить» видно всегда,
+                                    как в окне на WPF. Панель с HorizontalAlignment=Right Avalonia сжала бы до места и вытолкнула
+                                    правые кнопки за карточку, поэтому холст: он ставит панель по её полной ширине от правого края
+                                -->
+                                <Canvas ClipToBounds="True" Height="{Binding #Actions.Bounds.Height}">
+                                    <StackPanel x:Name="Actions" Canvas.Right="0" Orientation="Horizontal">
+                                        <Button Content="{local:Tr mcfg.reset}" Command="{Binding ResetCommand}" ToolTip.Tip="{local:Tr mcfg.resetTip}"
+                                                Padding="12,6" AutomationProperties.AutomationId="McfgReset" />
+                                        <Button Content="{Binding RestoreText}" Command="{Binding RestorePreviousCommand}" ToolTip.Tip="{local:Tr mcfg.restoreTip}"
+                                                ToolTip.ShowOnDisabled="True" Padding="12,6" Margin="8,0,0,0" AutomationProperties.AutomationId="McfgRestore" />
+                                        <Button Classes="primary" Content="{local:Tr mcfg.save}" Command="{Binding SaveCommand}"
+                                                Padding="18,6" Margin="8,0,0,0" AutomationProperties.AutomationId="McfgSave" />
+                                    </StackPanel>
+                                </Canvas>
+                            </DockPanel>
+                        </StackPanel>
+
+                        <!-- последний в DockPanel — занимает всё оставшееся место: и форма, и текст -->
+                        <Panel>
+                            <!-- форма: поля по одному на значение, вложенное — под заголовком группы -->
+                            <ScrollViewer Margin="0,12,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                          IsVisible="{Binding ShowForm}">
+                                <ItemsControl ItemsSource="{Binding Fields}" Margin="0,0,10,0">
+                                    <!-- поле — по типу значения (шаблон подбирается по DataType, как неявные шаблоны WPF) -->
+                                    <ItemsControl.DataTemplates>
+                                        <DataTemplate DataType="vm:GroupField">
+                                            <TextBlock Text="{Binding Key}" Margin="{Binding IndentLeft, Converter={x:Static conv:LeftMarginConverter.Instance}}"
+                                                       Padding="8,14,0,4" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Accent}" />
+                                        </DataTemplate>
+                                        <DataTemplate DataType="vm:BoolField">
+                                            <Border Classes="fieldRow" Margin="{Binding IndentLeft, Converter={x:Static conv:LeftMarginConverter.Instance}}">
+                                                <DockPanel Height="36">
+                                                    <CheckBox DockPanel.Dock="Right" Theme="{StaticResource Forest.Switch}" IsChecked="{Binding Value}"
+                                                              VerticalAlignment="Center" AutomationProperties.Name="{Binding Key}" />
+                                                    <TextBlock Classes="fieldKey" Text="{Binding Key}" />
+                                                </DockPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                        <DataTemplate DataType="vm:NumberField">
+                                            <Border Classes="fieldRow" Margin="{Binding IndentLeft, Converter={x:Static conv:LeftMarginConverter.Instance}}">
+                                                <StackPanel>
+                                                    <DockPanel MinHeight="36">
+                                                        <TextBox DockPanel.Dock="Right" Classes="mono" Text="{Binding Value}" Width="140" VerticalAlignment="Center"
+                                                                 AutomationProperties.Name="{Binding Key}" />
+                                                        <TextBlock Classes="fieldKey" Text="{Binding Key}" />
+                                                    </DockPanel>
+                                                    <TextBlock Classes="fieldError" Text="{Binding Error}"
+                                                               IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                        <DataTemplate DataType="vm:TextField">
+                                            <Border Classes="fieldRow" Margin="{Binding IndentLeft, Converter={x:Static conv:LeftMarginConverter.Instance}}">
+                                                <DockPanel MinHeight="36">
+                                                    <!-- подсказка «null» — только у поля, где в файле был null -->
+                                                    <TextBox DockPanel.Dock="Right" Text="{Binding Value}" Width="260" VerticalAlignment="Center"
+                                                             ToolTip.Tip="{Binding Hint}"
+                                                             ToolTip.ServiceEnabled="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                             AutomationProperties.Name="{Binding Key}" />
+                                                    <TextBlock Classes="fieldKey" Text="{Binding Key}" />
+                                                </DockPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                        <DataTemplate DataType="vm:JsonField">
+                                            <Border Classes="fieldRow" Margin="{Binding IndentLeft, Converter={x:Static conv:LeftMarginConverter.Instance}}"
+                                                    Padding="8,0,8,8">
+                                                <StackPanel>
+                                                    <TextBlock Classes="fieldKey" Text="{Binding Key}" Margin="0,8,0,4" />
+                                                    <TextBox Classes="mono" Text="{Binding Value}" FontSize="12" AcceptsReturn="True" TextWrapping="Wrap"
+                                                             MaxHeight="220" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                                             AutomationProperties.Name="{Binding Key}" />
+                                                    <TextBlock Classes="fieldError" Text="{Binding Error}"
+                                                               IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.DataTemplates>
+                                </ItemsControl>
+                            </ScrollViewer>
+
+                            <TextBox Classes="mono" Text="{Binding Text}" Margin="0,12,0,0" IsVisible="{Binding ShowText}"
+                                     AcceptsReturn="True" AcceptsTab="True" TextWrapping="NoWrap" FontSize="13"
+                                     VerticalContentAlignment="Top" Padding="10,8"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                     AutomationProperties.AutomationId="McfgText" />
+                        </Panel>
+                    </DockPanel>
+                </Panel>
+            </Border>
+        </Grid>
+    </DockPanel>
 </UserControl>
