@@ -1,0 +1,121 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:notify="using:eViSTool.Core.Notifications"
+                      xmlns:local="using:eViSTool.Desktop"
+                      xmlns:ctl="using:eViSTool.Desktop.Controls"
+                      x:Class="eViSTool.Desktop.Dialogs.NotifyChannelWindow"
+                      x:DataType="vm:NotifyChannelEditorViewModel"
+                      Title="{local:Tr notify.windowTitle}" Width="544" SizeToContent="Height" CanResize="False">
+    <!-- ширина без рамки: в WPF Width="560" считается вместе с рамкой окна, внутри остаётся 544 -->
+    <dialogs:DialogWindow.Styles>
+        <!-- строка состояния: песочная, ошибка — красная (в окне на WPF цвет ставил код через FindResource) -->
+        <Style Selector="TextBlock.notifyStatus">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
+        </Style>
+        <Style Selector="TextBlock.notifyStatus.bad">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Danger}" />
+        </Style>
+    </dialogs:DialogWindow.Styles>
+
+    <StackPanel Margin="24,20,24,22">
+        <TextBlock Text="{local:Tr notify.windowTitle}" FontSize="20" FontWeight="SemiBold" />
+
+        <!-- тип канала, как в Uptime Kuma: поля ниже — под выбранный тип; у сохранённого канала тип не меняется -->
+        <TextBlock Classes="label" Text="{local:Tr notify.kind}" />
+        <ComboBox ItemsSource="{Binding Kinds}" SelectedItem="{Binding SelectedKind}" IsEnabled="{Binding IsKindEditable}"
+                  DisplayMemberBinding="{Binding Title, DataType=vm:NotifyKindItem}" HorizontalAlignment="Stretch" Margin="0,6,0,0"
+                  AutomationProperties.AutomationId="NotifyKind" AutomationProperties.Name="{local:Tr notify.kind}" />
+        <TextBlock Classes="hint" Text="{Binding IntroText}" FontSize="12" Margin="0,8,0,0" />
+
+        <TextBlock Classes="label" Text="{local:Tr notify.name}" />
+        <TextBox Classes="clearButton" Text="{Binding Name}" Margin="0,6,0,0" MaxLength="60" ctl:Focus.OnOpen="True"
+                 AutomationProperties.AutomationId="NotifyName" AutomationProperties.Name="{local:Tr notify.name}" />
+
+        <!-- ===== Telegram ===== -->
+        <StackPanel IsVisible="{Binding IsTelegram}">
+            <TextBlock Classes="label" Text="{local:Tr notify.tgToken}" />
+            <TextBlock Classes="hint" Text="{Binding TokenHint}" Margin="0,2,0,6" />
+            <!-- секрет: поле с точками, специальным возможностям текст не отдаёт. Точки — из Cascadia Mono (mono):
+                 в Noto Sans нет «●» -->
+            <ctl:SecretTextBox Classes="mono" Text="{Binding TelegramToken}" PasswordChar="●" Padding="8,6"
+                               AutomationProperties.AutomationId="NotifyToken" AutomationProperties.Name="{local:Tr notify.tgToken}" />
+
+            <TextBlock Classes="label" Text="{local:Tr notify.tgChat}" />
+            <TextBlock Classes="hint" Text="{local:Tr notify.tgChatHint}" Margin="0,2,0,6" />
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="{local:Tr notify.tgFind}" Command="{Binding FindChatsCommand}" Margin="8,0,0,0" Padding="12,6"
+                        AutomationProperties.AutomationId="NotifyFindChat" />
+                <!-- чат: найденный (в поле — подпись, в канал идёт его ID) или ID, вписанный руками. Список — до выбора и
+                     текста: поле сравнивает текст с подписями пунктов, и без списка выбранный чат сбросился бы.
+                     Список раскрывает код окна по просьбе модели, а не привязка IsDropDownOpen: с привязкой поле при
+                     открытии окна забирало фокус у названия -->
+                <ComboBox x:Name="ChatBox" IsEditable="True" ItemsSource="{Binding Chats}" SelectedItem="{Binding SelectedChat}" Text="{Binding ChatText}"
+                          DisplayMemberBinding="{Binding Title, DataType=notify:TelegramChat}" HorizontalAlignment="Stretch"
+                          AutomationProperties.AutomationId="NotifyChat" AutomationProperties.Name="{local:Tr notify.tgChat}" />
+            </DockPanel>
+
+            <TextBlock Classes="label" Text="{local:Tr notify.tgTopic}" />
+            <TextBlock Classes="hint" Text="{local:Tr notify.tgTopicHint}" Margin="0,2,0,6" />
+            <TextBox Classes="clearButton" Text="{Binding TopicText}" Width="160" HorizontalAlignment="Left" MaxLength="12"
+                     AutomationProperties.AutomationId="NotifyTopic" AutomationProperties.Name="{local:Tr notify.tgTopic}" />
+        </StackPanel>
+
+        <!-- ===== Discord ===== -->
+        <StackPanel IsVisible="{Binding IsDiscord}">
+            <TextBlock Classes="label" Text="{local:Tr notify.dcUrl}" />
+            <TextBlock Classes="hint" Text="{Binding DiscordHint}" Margin="0,2,0,6" />
+            <ctl:SecretTextBox Classes="mono" Text="{Binding DiscordUrl}" PasswordChar="●" Padding="8,6"
+                               AutomationProperties.AutomationId="NotifyDiscordUrl" AutomationProperties.Name="{local:Tr notify.dcUrl}" />
+        </StackPanel>
+
+        <!-- ===== ntfy: тема видна — её вписывают в приложение на телефоне ===== -->
+        <StackPanel IsVisible="{Binding IsNtfy}">
+            <TextBlock Classes="label" Text="{local:Tr notify.ntfyTopic}" />
+            <TextBlock Classes="hint" Text="{local:Tr notify.ntfyTopicHint}" Margin="0,2,0,6" />
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="{local:Tr notify.ntfyNewTopic}" Command="{Binding NewTopicCommand}" Margin="8,0,0,0" Padding="12,6"
+                        AutomationProperties.AutomationId="NotifyNtfyNewTopic" />
+                <TextBox Classes="mono clearButton" Text="{Binding NtfyTopic}" MaxLength="64" VerticalContentAlignment="Center"
+                         AutomationProperties.AutomationId="NotifyNtfyTopic" AutomationProperties.Name="{local:Tr notify.ntfyTopic}" />
+            </DockPanel>
+
+            <TextBlock Classes="label" Text="{local:Tr notify.ntfyServer}" />
+            <TextBlock Classes="hint" Text="{local:Tr notify.ntfyServerHint}" Margin="0,2,0,6" />
+            <TextBox Classes="clearButton" Text="{Binding NtfyServer}" MaxLength="200" AutomationProperties.AutomationId="NotifyNtfyServer"
+                     AutomationProperties.Name="{local:Tr notify.ntfyServer}" />
+        </StackPanel>
+
+        <!-- ===== свой вебхук ===== -->
+        <StackPanel IsVisible="{Binding IsWebhook}">
+            <TextBlock Classes="label" Text="{local:Tr notify.whUrl}" />
+            <TextBlock Classes="hint" Text="{Binding WebhookHint}" Margin="0,2,0,6" />
+            <ctl:SecretTextBox Classes="mono" Text="{Binding WebhookUrl}" PasswordChar="●" Padding="8,6"
+                               AutomationProperties.AutomationId="NotifyWebhookUrl" AutomationProperties.Name="{local:Tr notify.whUrl}" />
+
+            <TextBlock Classes="label" Text="{local:Tr notify.whTemplate}" />
+            <TextBlock Classes="hint" Text="{local:Tr notify.whTemplateHint}" Margin="0,2,0,6" />
+            <ComboBox ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}"
+                      DisplayMemberBinding="{Binding Title, DataType=vm:WebhookPresetItem}" Width="240" HorizontalAlignment="Left" Margin="0,0,0,8"
+                      AutomationProperties.AutomationId="NotifyWebhookPreset" AutomationProperties.Name="{local:Tr notify.whTemplate}" />
+            <TextBox Classes="mono" Text="{Binding Template}" FontSize="12" Height="150" AcceptsReturn="True" TextWrapping="NoWrap"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" VerticalContentAlignment="Top"
+                     AutomationProperties.AutomationId="NotifyWebhookTemplate" AutomationProperties.Name="{local:Tr notify.whTemplate}" />
+        </StackPanel>
+
+        <TextBlock Classes="notifyStatus" Classes.bad="{Binding StatusIsError}" Text="{Binding StatusText}" FontSize="12" TextWrapping="Wrap"
+                   Margin="0,14,0,0" IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   AutomationProperties.AutomationId="NotifyStatus" />
+
+        <DockPanel Margin="0,20,0,0">
+            <Button DockPanel.Dock="Left" Content="{local:Tr notify.test}" Command="{Binding TestCommand}" Padding="14,8"
+                    AutomationProperties.AutomationId="NotifyTest" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Classes="primary" Content="{local:Tr common.save}" IsDefault="True" Command="{Binding SaveCommand}" Padding="18,8"
+                        AutomationProperties.AutomationId="NotifySave" />
+                <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8" />
+            </StackPanel>
+        </DockPanel>
+    </StackPanel>
+</dialogs:DialogWindow>
