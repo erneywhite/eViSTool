@@ -14,19 +14,20 @@
 
 .EXAMPLE
     pwsh build/snapshot.ps1 -Screens mods,mods.card,settings
-    # → <Out>\mods.wpf.png, <Out>\mods.avalonia.png, ...
+    # → <Out>\mods.wpf.png, <Out>\mods.avalonia.png, ... (папка Out печатается в конце)
 
 .EXAMPLE
     pwsh build/snapshot.ps1 -Screens server.config.world -Only Avalonia -NoBuild -Out C:\snap
 #>
 param(
     [Parameter(Mandatory)][string[]]$Screens,
-    [string]$Out = (Join-Path ([IO.Path]::GetTempPath()) 'evistool-snap'),
+    # по умолчанию — evistool-snap-<метка копии репозитория> во временной папке
+    [string]$Out,
     [ValidateSet('Both', 'Wpf', 'Avalonia')][string]$Only = 'Both',
     [string]$Size = '1400x860',
     [double]$Wait = 4,
     [string]$Profile = 'Стенд',
-    # не пересобирать: взять сборки из прошлого запуска
+    # не пересобирать: взять сборки из прошлого запуска (если они есть)
     [switch]$NoBuild
 )
 
@@ -34,7 +35,10 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $Screens = $Screens -split ',' | ForEach-Object Trim | Where-Object { $_ } # pwsh -File отдаёт «a,b» одной строкой
 $root = Split-Path $PSScriptRoot
-$work = Join-Path ([IO.Path]::GetTempPath()) 'evistool-snap-work'
+# своя временная папка у каждой копии репозитория: агенты в разных worktree снимают одновременно и не мешают друг другу
+$tag = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($root.ToLowerInvariant()))).Substring(0, 8).ToLowerInvariant()
+$work = Join-Path ([IO.Path]::GetTempPath()) "evistool-snap-work-$tag"
+if (-not $Out) { $Out = Join-Path ([IO.Path]::GetTempPath()) "evistool-snap-$tag" }
 $fixture = Join-Path $root 'tests/snapshots/fixture'
 if (-not $IsWindows -and $Only -ne 'Avalonia') { $Only = 'Avalonia' } # окна на WPF есть только на Windows
 
@@ -48,7 +52,7 @@ New-Item -ItemType Directory -Force $work, $Out | Out-Null
 
 foreach ($app in $apps) {
     $dir = Join-Path $work $app.Name
-    if (-not $NoBuild) {
+    if (-not $NoBuild -or -not (Test-Path (Join-Path $dir $app.Exe))) {
         Write-Host "Сборка $($app.Project)…"
         dotnet build (Join-Path $root $app.Project) -c Debug -o $dir --nologo -v quiet | Out-Host
         if ($LASTEXITCODE -ne 0) { throw "Не собралось: $($app.Project)" }
@@ -91,3 +95,4 @@ foreach ($screen in $Screens) {
 }
 Remove-Item Env:EVISTOOL_SNAPSHOT -ErrorAction SilentlyContinue
 $made | ForEach-Object { Write-Host $_ }
+if (-not $made) { exit 1 }
