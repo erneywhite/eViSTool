@@ -105,6 +105,8 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null, s
     {
         var part = to + PartSuffix;
         File.Copy(from, part, overwrite: true);
+        // время копии — как у оригинала: по нему ротация решает, какая копия новее (на Linux File.Copy его не переносит)
+        File.SetLastWriteTimeUtc(part, File.GetLastWriteTimeUtc(from));
         File.Move(part, to, overwrite: true);
         File.Delete(from);
     }
@@ -157,11 +159,23 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null, s
     /// Оставить keep последних своих копий, остальные удалить (насовсем — это и есть ротация).
     /// keep ≤ 0 — ничего не удалять. Возвращает удалённые.
     /// </summary>
-    public IReadOnlyList<BackupFile> Prune(int keep)
+    public IReadOnlyList<BackupFile> Prune(int keep) => keep <= 0 ? [] : Delete(NewestFirst(List().Where(b => b.IsOwn)).Skip(keep));
+
+    /// <summary>Сколько страховочных копий «до восстановления» хранить: каждая — целый мир, без предела они копились бы.</summary>
+    public const int BeforeRestoreKeep = 3;
+
+    /// <summary>
+    /// Новые сверху — по времени файла (UTC), а не по местному времени в имени: в ночь перевода часов назад час
+    /// повторяется, и копия из второго «03:30» по имени выглядела бы старше копии из первого «03:45» — ротация удалила бы
+    /// самую свежую. Время в имени — только чтобы различить копии с одинаковым временем файла.
+    /// </summary>
+    private static IEnumerable<BackupFile> NewestFirst(IEnumerable<BackupFile> copies) =>
+        copies.OrderByDescending(b => File.GetLastWriteTimeUtc(b.Path)).ThenByDescending(b => b.Time);
+
+    private static IReadOnlyList<BackupFile> Delete(IEnumerable<BackupFile> doomed)
     {
-        if (keep <= 0) return [];
         var removed = new List<BackupFile>();
-        foreach (var old in List().Where(b => b.IsOwn).Skip(keep))
+        foreach (var old in doomed.ToList())
         {
             try
             {
@@ -216,7 +230,7 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null, s
     /// <summary>
     /// Восстановить мир из копии — только при ОСТАНОВЛЕННОМ сервере. Текущий мир сначала сохраняется в Backups как
     /// «&lt;профиль&gt;-before-restore-&lt;время&gt;.vcdbs» (журнал SQLite, если он остался, сведён внутрь) — восстановление
-    /// можно откатить; ротация такой файл не удаляет. Затем копия встаёт на место файла мира (журнал старой страховочной
+    /// можно откатить; обычная ротация такой файл не удаляет, хранятся <see cref="BeforeRestoreKeep"/> последних. Затем копия встаёт на место файла мира (журнал старой страховочной
     /// копии, лежащий рядом, тоже сводится внутрь), а остатки журнала прежнего мира убираются — они испортили бы восстановленный.
     /// Данные модов (Saves без миров, ModData) возвращаются из архива копии, если он есть, — текущие перед этим
     /// упаковываются рядом со страховочной копией. У старой копии без архива данные модов остаются как есть.
@@ -248,6 +262,8 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null, s
 
             // всё или ничего: подготовка во временной папке, подмена с возвратом при сбое (журнал копии сводится внутрь)
             WorldRestore.Run(dataDir, saveFile, backup.Path, withMods ? modArchive : null, hooks);
+            // восстановили — старые страховочные копии сверх последних трёх больше не нужны (только что сделанная — среди них)
+            Delete(NewestFirst(List().Where(b => IsBeforeRestoreName(b.Name))).Skip(BeforeRestoreKeep));
             return safety;
         }
         catch
@@ -317,6 +333,13 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null, s
 
     /// <summary>Файл копии по имени (null — такого нет).</summary>
     public BackupFile? Find(string name) => List().FirstOrDefault(b => string.Equals(b.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Страховочная копия этого профиля: «&lt;профиль&gt;-before-restore-&lt;время&gt;.vcdbs».</summary>
+    private bool IsBeforeRestoreName(string name)
+    {
+        var start = $"{prefix ?? "world"}-{BeforeRestore}-";
+        return name.StartsWith(start, StringComparison.OrdinalIgnoreCase) && name.Length == start.Length + StampFormat.Length + Extension.Length;
+    }
 
     private bool IsOwnName(string name) =>
         prefix is null || (name.StartsWith(prefix + "-", StringComparison.OrdinalIgnoreCase)

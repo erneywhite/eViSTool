@@ -131,6 +131,49 @@ public sealed class BackupTests : IDisposable
     }
 
     [Fact]
+    public void Prune_OnTheNightTheClocksGoBack_KeepsTheReallyNewestCopy()
+    {
+        // 25 октября (Латвия): в 04:00 по летнему часы уходят на 03:00 — час 03:00–04:00 повторяется.
+        // Копия из первого прохода называется «03-45», из второго, сделанная на 45 минут позже, — «03-30»
+        var first = Backup("srv-2026-10-25_03-45-00.vcdbs", "first pass");
+        var second = Backup("srv-2026-10-25_03-30-00.vcdbs", "second pass");
+        var at = new DateTime(2026, 10, 25, 0, 45, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(first, at);
+        File.SetLastWriteTimeUtc(second, at.AddMinutes(45));
+        var store = new BackupStore(_data, "srv");
+
+        var removed = store.Prune(1);
+
+        Assert.Equal("srv-2026-10-25_03-45-00.vcdbs", Assert.Single(removed).Name);
+        Assert.True(File.Exists(second));
+    }
+
+    [Fact]
+    public void Restore_KeepsTheThreeNewestSafetyCopies()
+    {
+        var save = Path.Combine(_data, "Saves", "default.vcdbs");
+        Directory.CreateDirectory(Path.GetDirectoryName(save)!);
+        File.WriteAllText(save, "current world");
+        for (var day = 1; day <= 4; day++)
+        {
+            var old = Backup($"Дуо-before-restore-2026-09-0{day}_10-00-00.vcdbs", "older world");
+            File.WriteAllText(WorldModData.ArchiveFor(old), "mods");
+            File.SetLastWriteTimeUtc(old, new DateTime(2026, 9, day, 8, 0, 0, DateTimeKind.Utc));
+        }
+        Backup("Дуо-before-restore-manual.vcdbs", "положил руками"); // не по шаблону — не трогаем
+        Backup("Дуо-2026-09-29_10-00-00.vcdbs", "yesterday's world");
+        var store = new BackupStore(_data, "Дуо");
+
+        var safety = store.Restore(store.Find("Дуо-2026-09-29_10-00-00.vcdbs")!, save, T0)!;
+
+        var left = store.List().Where(b => b.Name.Contains("before-restore")).Select(b => b.Name).Order(StringComparer.Ordinal);
+        Assert.Equal(["Дуо-before-restore-2026-09-03_10-00-00.vcdbs", "Дуо-before-restore-2026-09-04_10-00-00.vcdbs",
+            safety.Name, "Дуо-before-restore-manual.vcdbs"], left);
+        Assert.False(File.Exists(WorldModData.ArchiveFor(Path.Combine(_data, "Backups", "Дуо-before-restore-2026-09-01_10-00-00.vcdbs"))));
+        Assert.True(File.Exists(Path.Combine(_data, "Backups", "Дуо-2026-09-29_10-00-00.vcdbs"))); // сама копия на месте
+    }
+
+    [Fact]
     public void CopySave_MakesStampedCopy()
     {
         var save = Path.Combine(_data, "Saves", "default.vcdbs");
