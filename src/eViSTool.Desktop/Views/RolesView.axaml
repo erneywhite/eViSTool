@@ -1,0 +1,329 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:eViSTool.Presentation.ViewModels"
+             xmlns:cfg="using:eViSTool.Core.Server.Config"
+             xmlns:local="using:eViSTool.Desktop"
+             xmlns:ctl="using:eViSTool.Desktop.Controls"
+             xmlns:conv="using:eViSTool.Desktop.Converters"
+             x:Class="eViSTool.Desktop.Views.RolesView"
+             x:DataType="vm:RolesEditorViewModel">
+    <!-- Вкладка «Роли» редактора serverconfig: слева список ролей и роль для новых игроков, справа редактор выбранной роли.
+         DataContext — RolesEditorViewModel; правая часть — RoleItemViewModel выбранной роли. -->
+    <UserControl.Styles>
+        <!-- пояснение под подписью: здесь с отступом снизу (стили вкладки ближе, чем стили редактора конфигурации) -->
+        <Style Selector="TextBlock.hint">
+            <Setter Property="Margin" Value="0,2,0,6" />
+        </Style>
+        <!-- пояснение-предупреждение («сервер эти поля не читает»). Цвет — стилем, а не атрибутом: внутри DataTemplate
+             Foreground="{DynamicResource …}" у Avalonia слабее стиля класса hint, и текст остался бы серым -->
+        <Style Selector="TextBlock.hint.warnNote">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
+        </Style>
+        <!-- карточка редактора роли -->
+        <Style Selector="Border.roleCard">
+            <Setter Property="Padding" Value="20,16,20,20" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+        <!-- точка «изменено, не сохранено» -->
+        <Style Selector="Ellipse.changedDot">
+            <Setter Property="Width" Value="7" />
+            <Setter Property="Height" Value="7" />
+            <Setter Property="Fill" Value="{DynamicResource Forest.Accent}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <!-- строка списка ролей: для автоматизации имя элемента — код роли -->
+        <Style Selector="ListBox.roleList > ListBoxItem" x:DataType="vm:RoleItemViewModel">
+            <Setter Property="AutomationProperties.Name" Value="{Binding Code}" />
+        </Style>
+        <!-- подпись оси у полей минимального размера привата -->
+        <Style Selector="TextBlock.axis">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <!-- образец цвета: метка в списке, образец у поля и в выпадающем списке -->
+        <Style Selector="Border.swatch">
+            <Setter Property="BorderBrush" Value="{DynamicResource Forest.Line}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <!-- файла конфигурации нет -->
+        <TextBlock Text="{local:Tr roles.noDocument}" Foreground="{DynamicResource Forest.Muted}" FontSize="13"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !HasDocument}" />
+
+        <Grid ColumnDefinitions="300,18,*" IsVisible="{Binding HasDocument}">
+
+            <!-- ===== список ролей ===== -->
+            <Border Classes="card" Padding="12" Margin="0,0,0,14">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Margin="6,2,6,10">
+                        <TextBlock Text="{local:Tr roles.listTitle}" Classes="cardTitle" />
+                        <TextBlock Text="{local:Tr roles.listHint}" Classes="hint" />
+
+                        <!-- роль для новых игроков (DefaultRoleCode) -->
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <TextBlock Text="{local:Tr roles.defaultRole}" FontSize="12" Foreground="{DynamicResource Forest.Text}" />
+                            <Ellipse Classes="changedDot" Margin="7,1,0,0" ToolTip.Tip="{local:Tr roles.changedTip}"
+                                     IsVisible="{Binding IsDefaultRoleChanged}" />
+                        </StackPanel>
+                        <TextBlock Text="{local:Tr roles.defaultRoleHint}" Classes="hint" />
+                        <ComboBox ItemsSource="{Binding Roles}" SelectedItem="{Binding DefaultRole}" IsEnabled="{Binding CanEdit}"
+                                  HorizontalAlignment="Stretch" AutomationProperties.AutomationId="DefaultRole"
+                                  AutomationProperties.Name="{local:Tr roles.defaultRole}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RoleItemViewModel">
+                                    <TextBlock TextTrimming="CharacterEllipsis"><Run Text="{Binding DisplayName, Mode=OneWay}" /><Run Text="  " /><Run Text="{Binding Code, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" Foreground="{DynamicResource Forest.Muted}" /></TextBlock>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock Text="{Binding DefaultRoleError}" Classes="error"
+                                   IsVisible="{Binding DefaultRoleError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                        <Button Command="{Binding DuplicateCommand}" HorizontalAlignment="Stretch" Margin="0,0,0,8"
+                                ToolTip.Tip="{Binding DuplicateTip}" ToolTip.ShowOnDisabled="True"
+                                AutomationProperties.AutomationId="RoleDuplicate" AutomationProperties.Name="{local:Tr roles.duplicate}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Classes="icon" Data="{StaticResource Icon.Copy}" Width="13" Height="13" Margin="0,0,8,0" />
+                                <TextBlock Text="{local:Tr roles.duplicate}" />
+                            </StackPanel>
+                        </Button>
+                        <!-- стандартную роль и роль для новых игроков удалить нельзя — почему, говорит подсказка -->
+                        <Button Classes="danger" Content="{local:Tr roles.delete}" Command="{Binding DeleteCommand}"
+                                HorizontalAlignment="Stretch" ToolTip.Tip="{Binding DeleteTip}" ToolTip.ShowOnDisabled="True"
+                                AutomationProperties.AutomationId="RoleDelete" />
+                    </StackPanel>
+
+                    <ListBox Classes="roleList" ItemsSource="{Binding Roles}" SelectedItem="{Binding SelectedRole}"
+                             Background="Transparent" BorderThickness="0"
+                             ItemContainerTheme="{StaticResource Forest.NavItem}" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             AutomationProperties.AutomationId="RolesList" AutomationProperties.Name="{local:Tr roles.listTitle}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:RoleItemViewModel">
+                                <DockPanel>
+                                    <!-- метка цветом роли; цвет не распознан — пустой кружок -->
+                                    <Border Classes="swatch" DockPanel.Dock="Left" Width="14" Height="14" CornerRadius="7" Margin="0,0,12,0"
+                                            Background="{Binding Swatch, Converter={x:Static conv:RoleColorBrushConverter.Instance}}" />
+                                    <Ellipse DockPanel.Dock="Right" Classes="changedDot" Margin="8,0,0,0" ToolTip.Tip="{local:Tr roles.changedTip}"
+                                             IsVisible="{Binding IsChanged}" />
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextTrimming="CharacterEllipsis"><Run Text="{Binding Code, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" /><Run Text="  ·  " /><Run Text="{Binding LevelText, Mode=OneWay}" /></TextBlock>
+                                        <TextBlock Text="{local:Tr roles.defaultBadge}" FontSize="11" Foreground="{DynamicResource Forest.Accent}"
+                                                   IsVisible="{Binding IsDefault}" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- ===== выбранная роль ===== -->
+            <Panel Grid.Column="2">
+                <TextBlock Text="{Binding PickText}" Foreground="{DynamicResource Forest.Muted}" FontSize="13"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !HasSelection}" />
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasSelection}">
+                    <ContentControl Content="{Binding SelectedRole}" HorizontalContentAlignment="Stretch" Margin="0,0,14,0">
+                        <ContentControl.ContentTemplate>
+                            <DataTemplate x:DataType="vm:RoleItemViewModel">
+                                <StackPanel>
+
+                                    <!-- роль: код, название, описание, уровень, автовыдача -->
+                                    <Border Classes="card roleCard">
+                                        <StackPanel>
+                                            <TextBlock Text="{local:Tr roles.cardRole}" Classes="cardTitle" />
+
+                                            <TextBlock Text="{local:Tr roles.code}" Classes="label" />
+                                            <TextBlock Text="{Binding CodeHint}" Classes="hint" />
+                                            <TextBox Classes="mono" Text="{Binding CodeText}" IsReadOnly="{Binding IsCodeLocked}"
+                                                     MaxLength="60" Width="360" HorizontalAlignment="Left"
+                                                     AutomationProperties.AutomationId="RoleCode" AutomationProperties.Name="{local:Tr roles.code}" />
+                                            <TextBlock Text="{Binding CodeError}" Classes="error"
+                                                       IsVisible="{Binding CodeError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                                            <TextBlock Text="{local:Tr roles.name}" Classes="label" />
+                                            <TextBlock Text="{local:Tr roles.nameHint}" Classes="hint" />
+                                            <TextBox Text="{Binding NameText}" IsReadOnly="{Binding IsLocked}"
+                                                     MaxLength="80" Width="360" HorizontalAlignment="Left"
+                                                     AutomationProperties.AutomationId="RoleName" AutomationProperties.Name="{local:Tr roles.name}" />
+
+                                            <TextBlock Text="{local:Tr roles.description}" Classes="label" />
+                                            <TextBox Text="{Binding DescriptionText}" IsReadOnly="{Binding IsLocked}"
+                                                     AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" MaxHeight="160" Margin="0,6,0,0"
+                                                     ScrollViewer.VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top"
+                                                     AutomationProperties.AutomationId="RoleDescription" AutomationProperties.Name="{local:Tr roles.description}" />
+
+                                            <TextBlock Text="{local:Tr roles.level}" Classes="label" />
+                                            <TextBlock Text="{local:Tr roles.levelHint}" Classes="hint" />
+                                            <TextBox Text="{Binding PrivilegeLevelText}" IsReadOnly="{Binding IsLocked}"
+                                                     MaxLength="12" Width="160" HorizontalAlignment="Left"
+                                                     AutomationProperties.AutomationId="RolePrivilegeLevel" AutomationProperties.Name="{local:Tr roles.level}" />
+                                            <TextBlock Text="{Binding PrivilegeLevelError}" Classes="error"
+                                                       IsVisible="{Binding PrivilegeLevelError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                                            <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Margin="0,18,0,0" Padding="0,14,0,0">
+                                                <DockPanel>
+                                                    <CheckBox DockPanel.Dock="Right" Theme="{StaticResource Forest.Switch}" IsChecked="{Binding AutoGrant}"
+                                                              IsEnabled="{Binding CanEdit}" VerticalAlignment="Center"
+                                                              AutomationProperties.AutomationId="RoleAutoGrant" AutomationProperties.Name="{local:Tr roles.autoGrant}" />
+                                                    <StackPanel Margin="0,0,16,0">
+                                                        <TextBlock Text="{local:Tr roles.autoGrant}" FontSize="13" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap" />
+                                                        <TextBlock Text="{local:Tr roles.autoGrantHint}" Classes="hint" Margin="0,2,0,0" />
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- оформление и режим: оба поля сервер 1.22.7 не читает -->
+                                    <Border Classes="card roleCard">
+                                        <StackPanel>
+                                            <TextBlock Text="{local:Tr roles.cardLook}" Classes="cardTitle" />
+                                            <TextBlock Text="{local:Tr roles.unusedNote}" Classes="hint warnNote" Margin="0,2,0,0" />
+
+                                            <TextBlock Text="{local:Tr roles.color}" Classes="label" />
+                                            <TextBlock Text="{local:Tr roles.colorHint}" Classes="hint" />
+                                            <DockPanel Width="320" HorizontalAlignment="Left">
+                                                <!-- образец того, что сейчас в поле -->
+                                                <Border Classes="swatch" DockPanel.Dock="Left" Width="22" Height="22" CornerRadius="4" Margin="0,0,10,0"
+                                                        Background="{Binding Swatch, Converter={x:Static conv:RoleColorBrushConverter.Instance}}" />
+                                                <!-- с вводом: название из списка или #RRGGBB. Текст выбранного элемента — его Name (TextSearch.TextBinding).
+                                                     Свой DataContext закреплён, роль берётся из ContentControl: правая часть одна на все роли и при
+                                                     выборе другой роли только меняет DataContext, а ComboBox на время такой смены откладывает выбор
+                                                     элемента. Отложенный сброс выбора (была роль White, стала #7FB069) стирал бы текст поля и писал ""
+                                                     в цвет новой роли. Без смены DataContext выбор по тексту случается сразу. -->
+                                                <ComboBox DataContext="{x:Null}" IsEditable="True" ItemsSource="{x:Static cfg:RoleCatalog.Colors}"
+                                                          TextSearch.TextBinding="{Binding Name, DataType=cfg:RoleColorName}"
+                                                          Text="{Binding $parent[ContentControl].((vm:RoleItemViewModel)Content).ColorText}"
+                                                          IsEnabled="{Binding $parent[ContentControl].((vm:RoleItemViewModel)Content).CanEdit}"
+                                                          MaxDropDownHeight="320" HorizontalAlignment="Stretch" ctl:WheelToParent.IsEnabled="True"
+                                                          AutomationProperties.AutomationId="RoleColor" AutomationProperties.Name="{local:Tr roles.color}">
+                                                    <ComboBox.ItemTemplate>
+                                                        <DataTemplate x:DataType="cfg:RoleColorName">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <Border Classes="swatch" Width="14" Height="14" CornerRadius="3" Margin="0,0,8,0"
+                                                                        Background="{Binding Rgb, Converter={x:Static conv:RoleColorBrushConverter.Instance}}" />
+                                                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ComboBox.ItemTemplate>
+                                                </ComboBox>
+                                            </DockPanel>
+                                            <TextBlock Text="{Binding ColorError}" Classes="error"
+                                                       IsVisible="{Binding ColorError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                                            <TextBlock Text="{local:Tr roles.gameMode}" Classes="label" />
+                                            <ComboBox ItemsSource="{Binding GameModes}" SelectedItem="{Binding SelectedGameMode}" IsEnabled="{Binding CanEdit}"
+                                                      Width="240" HorizontalAlignment="Left" Margin="0,6,0,0" ctl:WheelToParent.IsEnabled="True"
+                                                      AutomationProperties.AutomationId="RoleGameMode" AutomationProperties.Name="{local:Tr roles.gameMode}" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- приват -->
+                                    <Border Classes="card roleCard">
+                                        <StackPanel>
+                                            <TextBlock Text="{local:Tr roles.cardClaims}" Classes="cardTitle" />
+
+                                            <TextBlock Text="{local:Tr roles.claimAllowance}" Classes="label" />
+                                            <TextBlock Text="{local:Tr roles.claimAllowanceHint}" Classes="hint" />
+                                            <TextBox Text="{Binding ClaimAllowanceText}" IsReadOnly="{Binding IsLocked}"
+                                                     MaxLength="12" Width="160" HorizontalAlignment="Left"
+                                                     AutomationProperties.AutomationId="RoleClaimAllowance" AutomationProperties.Name="{local:Tr roles.claimAllowance}" />
+                                            <TextBlock Text="{Binding ClaimAllowanceError}" Classes="error"
+                                                       IsVisible="{Binding ClaimAllowanceError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                                            <TextBlock Text="{local:Tr roles.claimMaxAreas}" Classes="label" />
+                                            <TextBlock Text="{local:Tr roles.claimMaxAreasHint}" Classes="hint" />
+                                            <TextBox Text="{Binding ClaimMaxAreasText}" IsReadOnly="{Binding IsLocked}"
+                                                     MaxLength="12" Width="160" HorizontalAlignment="Left"
+                                                     AutomationProperties.AutomationId="RoleClaimMaxAreas" AutomationProperties.Name="{local:Tr roles.claimMaxAreas}" />
+                                            <TextBlock Text="{Binding ClaimMaxAreasError}" Classes="error"
+                                                       IsVisible="{Binding ClaimMaxAreasError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                                            <TextBlock Text="{local:Tr roles.claimMinSize}" Classes="label" />
+                                            <TextBlock Text="{local:Tr roles.claimMinSizeHint}" Classes="hint" />
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="X" Classes="axis" Margin="0,0,8,0" />
+                                                <TextBox Text="{Binding ClaimMinXText}" IsReadOnly="{Binding IsLocked}" MaxLength="12" Width="90"
+                                                         AutomationProperties.AutomationId="RoleClaimMinX" AutomationProperties.Name="X" />
+                                                <TextBlock Text="Y" Classes="axis" Margin="16,0,8,0" />
+                                                <TextBox Text="{Binding ClaimMinYText}" IsReadOnly="{Binding IsLocked}" MaxLength="12" Width="90"
+                                                         AutomationProperties.AutomationId="RoleClaimMinY" AutomationProperties.Name="Y" />
+                                                <TextBlock Text="Z" Classes="axis" Margin="16,0,8,0" />
+                                                <TextBox Text="{Binding ClaimMinZText}" IsReadOnly="{Binding IsLocked}" MaxLength="12" Width="90"
+                                                         AutomationProperties.AutomationId="RoleClaimMinZ" AutomationProperties.Name="Z" />
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding ClaimMinError}" Classes="error"
+                                                       IsVisible="{Binding ClaimMinError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- привилегии -->
+                                    <Border Classes="card roleCard">
+                                        <StackPanel>
+                                            <DockPanel>
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,0,0,0">
+                                                    <Button Classes="small" Content="{local:Tr roles.grantAll}" Command="{Binding GrantAllCommand}" Padding="12,5"
+                                                            ToolTip.Tip="{local:Tr roles.grantAllTip}" AutomationProperties.AutomationId="PrivGrantAll" />
+                                                    <Button Classes="small" Content="{local:Tr roles.revokeAll}" Command="{Binding RevokeAllCommand}" Padding="12,5"
+                                                            Margin="8,0,0,0" AutomationProperties.AutomationId="PrivRevokeAll" />
+                                                </StackPanel>
+                                                <StackPanel>
+                                                    <TextBlock Text="{local:Tr roles.privileges}" Classes="cardTitle" />
+                                                    <TextBlock Text="{Binding PrivilegeCountText}" Classes="hint" Margin="0,2,0,0"
+                                                               AutomationProperties.AutomationId="PrivCount" />
+                                                </StackPanel>
+                                            </DockPanel>
+
+                                            <!-- при автовыдаче галочки мало что значат: сервер допишет всё сам -->
+                                            <Border Classes="warning" Margin="0,12,0,0" IsVisible="{Binding AutoGrant}">
+                                                <TextBlock Text="{local:Tr roles.autoGrantNote}" Foreground="{DynamicResource Forest.Warn}" FontSize="12" TextWrapping="Wrap" />
+                                            </Border>
+
+                                            <!-- сетка переключателей: колонок столько, сколько влезает по ширине (до трёх) -->
+                                            <ItemsControl ItemsSource="{Binding Privileges}" Margin="0,16,0,0" Focusable="False">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <ctl:ColumnsPanel MinColumnWidth="250" MaxColumns="3" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:PrivilegeItemViewModel">
+                                                        <DockPanel Margin="0,0,16,14">
+                                                            <CheckBox DockPanel.Dock="Left" Theme="{StaticResource Forest.Switch}" VerticalAlignment="Top" Margin="0,2,10,0"
+                                                                      IsChecked="{Binding IsGranted}"
+                                                                      IsEnabled="{Binding $parent[ItemsControl].((vm:RoleItemViewModel)DataContext).CanEdit}"
+                                                                      AutomationProperties.AutomationId="{Binding AutomationId}"
+                                                                      AutomationProperties.Name="{Binding Label}" />
+                                                            <StackPanel>
+                                                                <TextBlock Text="{Binding Label}" FontSize="13" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap" />
+                                                                <TextBlock Text="{Binding Hint}" Classes="hint" Margin="0,2,0,0" />
+                                                                <TextBlock Text="{Binding CodeLine}" Classes="mono" FontSize="11" Foreground="{DynamicResource Forest.Muted}"
+                                                                           Opacity="0.75" Margin="0,2,0,0"
+                                                                           IsVisible="{Binding CodeLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                                            </StackPanel>
+                                                        </DockPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <!-- RuntimePrivileges ведёт сам сервер: только показываем -->
+                                            <TextBlock Text="{Binding RuntimePrivilegesText}" Classes="hint" Margin="0,4,0,0"
+                                                       IsVisible="{Binding RuntimePrivilegesText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ContentControl.ContentTemplate>
+                    </ContentControl>
+                </ScrollViewer>
+            </Panel>
+        </Grid>
+    </Panel>
+</UserControl>
