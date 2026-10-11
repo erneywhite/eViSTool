@@ -1,0 +1,108 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:local="using:eViSTool.Desktop"
+                      xmlns:ctl="using:eViSTool.Desktop.Controls"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      x:Class="eViSTool.Desktop.Dialogs.CloneProfileWindow"
+                      x:DataType="vm:CloneProfileViewModel"
+                      Title="{Binding Title}" Width="624" SizeToContent="Height" CanResize="False">
+    <!-- ширина без рамки: в WPF Width="640" считается вместе с рамкой окна, внутри остаётся 624 -->
+    <StackPanel Margin="24,20,24,22">
+        <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Classes="hint" Text="{local:Tr clone.intro}" FontSize="12" Margin="0,4,0,0" />
+
+        <!-- сервер профиля запущен — копия мира может получиться битой -->
+        <Border Classes="warning" Margin="0,14,0,0" IsVisible="{Binding IsServerRunning}">
+            <DockPanel>
+                <Path Classes="icon" DockPanel.Dock="Left" Data="{StaticResource Icon.Warning}" Stroke="{DynamicResource Forest.Warn}"
+                      VerticalAlignment="Center" Margin="0,0,12,0" />
+                <TextBlock Text="{local:Tr clone.running}" Foreground="{DynamicResource Forest.Warn}" TextWrapping="Wrap" FontSize="12" />
+            </DockPanel>
+        </Border>
+
+        <!-- форма: пока идёт копирование, выключена -->
+        <StackPanel IsEnabled="{Binding IsFormEnabled}">
+            <TextBlock Classes="label" Text="{local:Tr clone.name}" />
+            <TextBox x:Name="NameBox" Classes="clearButton" Text="{Binding Name}" Margin="0,6,0,0" MaxLength="60" ctl:Focus.OnOpen="True" ctl:Focus.SelectAll="True"
+                     AutomationProperties.AutomationId="CloneName" />
+
+            <TextBlock Classes="label" Text="{local:Tr clone.target}" />
+            <TextBlock Classes="hint" Text="{local:Tr clone.targetHint}" Margin="0,2,0,6" />
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="{local:Tr common.browse}" Command="{Binding BrowseCommand}" Margin="8,0,0,0" />
+                <TextBox Classes="clearButton" Text="{Binding TargetDir}" VerticalContentAlignment="Center" AutomationProperties.AutomationId="CloneTarget" />
+            </DockPanel>
+
+            <!-- несколько serverconfig*.json в одной папке — выбрать мир -->
+            <StackPanel IsVisible="{Binding HasConfigChoice}">
+                <TextBlock Classes="label" Text="{local:Tr clone.config}" />
+                <TextBlock Classes="hint" Text="{local:Tr clone.configHint}" Margin="0,2,0,6" />
+                <ComboBox ItemsSource="{Binding Configs}" SelectedItem="{Binding SelectedConfig}" HorizontalAlignment="Stretch"
+                          ctl:WheelToParent.IsEnabled="True" />
+            </StackPanel>
+
+            <TextBlock Classes="label" Text="{local:Tr clone.world}" />
+            <Border Classes="card" Padding="14,12" Margin="0,6,0,0">
+                <StackPanel>
+                    <RadioButton GroupName="CloneWorld" IsChecked="{Binding !NewWorld, Mode=OneWay}">
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr clone.sameWorld}" FontSize="13" Foreground="{DynamicResource Forest.Text}" />
+                            <TextBlock Classes="hint" Text="{local:Tr clone.sameWorldHint}" />
+                        </StackPanel>
+                    </RadioButton>
+                    <!-- резервные копии нашлись (размер считается в фоне) и выбран «Тот же мир» -->
+                    <CheckBox Margin="28,8,0,0" Content="{Binding BackupsText}" IsChecked="{Binding IncludeBackups}" IsVisible="{Binding ShowBackups}" />
+
+                    <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Margin="0,12,0,0" Padding="0,12,0,0">
+                        <RadioButton GroupName="CloneWorld" IsChecked="{Binding NewWorld}">
+                            <StackPanel>
+                                <TextBlock Text="{local:Tr clone.newWorld}" FontSize="13" Foreground="{DynamicResource Forest.Text}" />
+                                <TextBlock Classes="hint" Text="{local:Tr clone.newWorldHint}" />
+                            </StackPanel>
+                        </RadioButton>
+                    </Border>
+                    <StackPanel Margin="28,8,0,0" IsVisible="{Binding NewWorld}">
+                        <TextBlock Text="{local:Tr clone.worldName}" FontSize="12" Foreground="{DynamicResource Forest.Text}" />
+                        <TextBox Classes="clearButton" Text="{Binding WorldName}" Margin="0,6,0,0" MaxLength="60" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Classes="label" Text="{local:Tr clone.mods}" />
+            <Border Classes="card" Padding="14,12" Margin="0,6,0,0">
+                <StackPanel>
+                    <RadioButton GroupName="CloneMods" IsChecked="{Binding ShareMods}">
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr clone.modsShared}" FontSize="13" Foreground="{DynamicResource Forest.Text}" />
+                            <TextBlock Classes="hint" Text="{Binding SharedModsHint}" />
+                        </StackPanel>
+                    </RadioButton>
+                    <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Margin="0,12,0,0" Padding="0,12,0,0">
+                        <RadioButton GroupName="CloneMods" IsChecked="{Binding !ShareMods, Mode=OneWay}">
+                            <StackPanel>
+                                <TextBlock Text="{local:Tr clone.modsOwn}" FontSize="13" Foreground="{DynamicResource Forest.Text}" />
+                                <TextBlock Classes="hint" Text="{local:Tr clone.modsOwnHint}" />
+                            </StackPanel>
+                        </RadioButton>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- что получится / почему нельзя -->
+        <TextBlock Classes="hint" Text="{Binding Summary}" FontSize="12" Margin="0,16,0,0" />
+        <TextBlock Classes="error" Text="{Binding ErrorText}" FontSize="12" Margin="0,8,0,0" IsVisible="{Binding HasError}" />
+
+        <!-- ход копирования -->
+        <StackPanel Margin="0,14,0,0" IsVisible="{Binding IsCopying}">
+            <ProgressBar Theme="{StaticResource Forest.Progress}" Value="{Binding Progress, Mode=OneWay}" />
+            <TextBlock Classes="hint" Text="{Binding ProgressText}" Margin="0,6,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Classes="primary" Content="{local:Tr clone.go}" IsDefault="True" Command="{Binding GoCommand}" Padding="18,8" />
+            <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8" />
+        </StackPanel>
+    </StackPanel>
+</dialogs:DialogWindow>
