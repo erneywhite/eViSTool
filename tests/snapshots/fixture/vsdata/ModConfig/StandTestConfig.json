@@ -1,0 +1,23 @@
+{
+  "Enabled": true,
+  "ShowHud": false,
+  "MaxStack": 4,
+  "SpeedMultiplier": 1.25,
+  "Mode": "normal",
+  "Owner": null,
+  "AllowedItems": ["game:stick", "game:flint", "game:clay-blue"],
+  "Drop": {
+    "OnDeath": true,
+    "Limit": 2.5,
+    "Message": "Тут кое-что выпало",
+    "Advanced": {
+      "Radius": 3,
+      "Particles": false
+    }
+  },
+  "Recipes": [
+    { "code": "stand:alpha", "count": 1, "tags": ["one", "two"] },
+    { "code": "stand:beta", "count": 2, "tags": ["three"] }
+  ],
+  "VeryLongSettingNameThatShouldBeTrimmedWhenTheColumnIsNarrowEnoughToSeeTheEllipsisAtTheEnd": 10
+}

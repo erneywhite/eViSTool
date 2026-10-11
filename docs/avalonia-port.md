@@ -38,6 +38,8 @@
 | `Visibility="Hidden"` (место остаётся) | `Classes="hidden"` |
 | бледная строка (`RowFade`) | `Classes.faded="{Binding !IsEnabled}"` |
 | точка и текст тона (`ToneDot`, `ToneText`) | `Ellipse Classes="tone"` / `TextBlock Classes="tone"` + `ctl:EnumClass.Value="{Binding Tone}"`; варианты `good`, `update`, `warn`, `danger` |
+| местные `Action`, `SmallButton` и т. п. — кнопка поменьше (Padding 12,4, MinHeight 0, FontSize 12) | `Classes="small"` |
+| «ключ — значение» в карточке (`CardKey`, `CardValue`) | `Classes="cardKey"`, `Classes="cardValue"` |
 | поле поиска с лупой и подсказкой поверх | `TextBox Classes="search" PlaceholderText="…"` с `<TextBox.InnerLeftContent><Path Classes="icon searchIcon" Data="{StaticResource Icon.Search}" /></TextBox.InnerLeftContent>` |
 
 Тему трогаем только между группами. Если экрану нужен стиль, которого в теме нет, его пишем в `UserControl.Styles` или `Window.Styles` своего файла и упоминаем в отчёте; общее потом переедет в тему.
@@ -64,6 +66,10 @@
 - Колесо над закрытым списком крутит страницу, а не значение: `ctl:WheelToParent.IsEnabled="True"`. Фокус при открытии окна: `ctl:Focus.OnOpen="True"` (и `ctl:Focus.SelectAll="True"`).
 - Значок игры: `Source="{Binding IconSearchDirs, Converter={x:Static conv:GameIconConverter.Instance}}"`.
 - Таблица: `DataGrid` из `Avalonia.Controls.DataGrid`. `GridView`/`ListView` с колонками тоже переносим на `DataGrid`.
+- Вложенный тип модели в разметке пишется через плюс: `vm:MainViewModel+DefaultServerOption` (в `DataType=`, `x:DataType`).
+- `ContentControl` по умолчанию прижимает содержимое влево: для карточки во всю ширину нужен `HorizontalContentAlignment="Stretch"`. `ComboBox` сам не растягивается, как в WPF: `HorizontalAlignment="Stretch"`.
+- Если модель в сеттере откатывает значение (отказались сохранить, текст не JSON), привязка Avalonia этого не увидит: во время своей записи она оповещения не слушает, а WPF после записи перечитывал источник. Такое место видно на экране как «переключатель остался в новом положении». Сверяй значение после записи в коде экрана (пример — `ModConfigView.axaml.cs`, чипы «Форма/Текст») или не откатывай в сеттере.
+- Полоса прокрутки уже не ложится поверх содержимого: тема оставляет под неё место, как WPF. Ничего делать не надо.
 
 ## Окна (диалоги)
 
@@ -75,5 +81,5 @@
 ## Проверка
 
 - `dotnet build eViSTool.slnx` без ошибок и предупреждений, `dotnet test eViSTool.slnx` зелёный. Свои элементы (`Controls/`, `Converters/`) проверяются headless-тестами в `tests/eViSTool.Desktop.Tests` (xunit v3).
-- Снимки рядом: `pwsh build/snapshot.ps1 -Screens <экран>` → `<экран>.wpf.png` и `<экран>.avalonia.png` во временной папке. Окна берут данные стенда (`tests/snapshots/fixture`), настоящие данные пользователя не трогаются. Нужного состояния на снимке нет (выбранная строка, открытая вкладка) — добавь экран в `Snapshots.Navigate` (`src/eViSTool.Presentation/Snapshots.cs`), как `mods.card`.
+- Снимки рядом: `pwsh build/snapshot.ps1 -Screens <экран>` → `<экран>.wpf.png` и `<экран>.avalonia.png` во временной папке. Окна берут данные стенда (`tests/snapshots/fixture`: серверный профиль «Стенд», четыре мода, конфиги модов в `ModConfig`), настоящие данные пользователя не трогаются. Нужного состояния на снимке нет (выбранная строка, открытая вкладка) — добавь экран в `Snapshots.Navigate` (`src/eViSTool.Presentation/Snapshots.cs`), как `mods.card`.
 - Шрифт другой (Noto Sans вместо Segoe UI, Cascadia Mono вместо Consolas), поэтому текст чуть шире и плотнее. Это ожидаемо. Ищем другое: пропавшие элементы, чужие цвета Fluent (синий акцент, белые рамки), обрезанный текст, лишние отступы.

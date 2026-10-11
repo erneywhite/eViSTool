@@ -1,0 +1,5 @@
+{
+  // сколько можно нести
+  "MaxCarry": 2,
+  "AllowSprint": false
+}
