@@ -1815,6 +1815,7 @@
   "srv.restartCanceled": "▸ Automatic restart cancelled: the world is being restored from a backup.",
   "srv.startFailed": "Could not start the server process",
   "srv.starting": "▶ Starting the server…",
+  "srv.stateHandlerFailed": "Error while handling a server state change: {0}",
   "srv.stopTimeoutCtrlC": "The server did not stop within {0} s after /stop — sending Ctrl+C (also a safe stop)",
   "srv.stopTimeoutSigterm": "The server did not stop within {0} s after /stop — sending SIGTERM (also a safe stop)",
   "srv.stopped": "■ Server stopped (exit code {0})",

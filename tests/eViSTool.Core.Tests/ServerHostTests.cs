@@ -318,4 +318,39 @@ public sealed class ServerHostTests : IAsyncLifetime
         await Task.Delay(1000);
         Assert.Equal(ServerState.Stopped, host.State);
     }
+
+    [Fact]
+    public async Task StateHandler_ThatWaitsForAnotherThreadUsingTheHost_DoesNotDeadlock()
+    {
+        var host = Host();
+        var otherThreadGotIn = false;
+        host.StateChanged += s =>
+        {
+            // обработчик ждёт другой поток, который тоже работает с сервером (раньше события шли под замком — вечное ожидание)
+            if (s == ServerState.Starting) otherThreadGotIn = Task.Run(host.CancelPendingRestart).Wait(TimeSpan.FromSeconds(5));
+        };
+
+        await host.StartAsync();
+
+        Assert.True(otherThreadGotIn);
+        await Until(() => host.State == ServerState.Running);
+        await host.StopAsync();
+    }
+
+    [Fact]
+    public async Task StateHandler_ThatThrows_DoesNotBreakStartAndStop()
+    {
+        var host = Host();
+        var seen = new List<ServerState>();
+        host.StateChanged += _ => throw new InvalidOperationException("обработчик сломан");
+        host.StateChanged += s => { lock (seen) seen.Add(s); };
+
+        await host.StartAsync();
+        await Until(() => host.State == ServerState.Running);
+        await host.StopAsync();
+
+        Assert.Equal(ServerState.Stopped, host.State);
+        lock (seen) Assert.Equal([ServerState.Starting, ServerState.Running, ServerState.Stopping, ServerState.Stopped], seen);
+        Assert.Contains(host.Console.GetSince(0), l => l.Text.Contains("обработчик сломан"));
+    }
 }

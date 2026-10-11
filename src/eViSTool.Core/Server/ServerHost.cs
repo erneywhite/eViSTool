@@ -60,6 +60,11 @@ public sealed class ServerHost : IAsyncDisposable
     private readonly object _lock = new();
     private readonly List<DateTime> _crashes = [];
 
+    // смены состояния копятся под _lock, а StateChanged вызывается уже без него (RaiseStateChanges): обработчик, который
+    // ждёт другой поток, работающий с сервером, иначе повесил бы и его, и всех, кто ждёт замок
+    private readonly Queue<ServerState> _pendingStates = new();
+    private readonly object _raiseLock = new();
+
     private Process? _process;
     private StreamWriter? _stdin;
     private bool _stopRequested;
@@ -120,20 +125,57 @@ public sealed class ServerHost : IAsyncDisposable
         }
     }
 
+    /// <summary>Сменить состояние — только под <see cref="_lock"/>; событие уйдёт из <see cref="RaiseStateChanges"/>.</summary>
     private void SetState(ServerState state)
     {
         if (State == state) return;
         State = state;
-        StateChanged?.Invoke(state);
+        _pendingStates.Enqueue(state);
+    }
+
+    /// <summary>
+    /// Разослать накопленные смены состояния — вне <see cref="_lock"/>, по одной и по порядку. Ошибка обработчика
+    /// не мешает ни остальным, ни запуску и остановке — только пишется в консоль.
+    /// </summary>
+    private void RaiseStateChanges()
+    {
+        lock (_raiseLock)
+        {
+            while (true)
+            {
+                ServerState next;
+                lock (_lock)
+                    if (!_pendingStates.TryDequeue(out next)) return;
+                // каждого подписчика отдельно: упавший не лишает события остальных (оповещения, статистику, историю)
+                foreach (var handler in StateChanged?.GetInvocationList() ?? [])
+                {
+                    try { ((Action<ServerState>)handler)(next); }
+                    catch (Exception ex) { Sys(Loc.T("srv.stateHandlerFailed", ex.Message)); }
+                }
+            }
+        }
     }
 
     private void Sys(string text) => Console.Add(ConsoleLineKind.System, text);
 
     public Task StartAsync()
     {
+        try
+        {
+            StartLocked();
+        }
+        finally
+        {
+            RaiseStateChanges();
+        }
+        return Task.CompletedTask;
+    }
+
+    private void StartLocked()
+    {
         lock (_lock)
         {
-            if (State is ServerState.Starting or ServerState.Running or ServerState.Stopping) return Task.CompletedTask;
+            if (State is ServerState.Starting or ServerState.Running or ServerState.Stopping) return;
 
             // мир занят (идёт восстановление, копия) — не стартуем на меняющихся файлах; бронь — до выхода процесса.
             // До отмены ожидающего перезапуска: сторож, упёршийся в занятый мир, должен продолжить ждать
@@ -208,7 +250,6 @@ public sealed class ServerHost : IAsyncDisposable
             _ = PumpAsync(process.StandardOutput, ConsoleLineKind.Output);
             _ = PumpAsync(process.StandardError, ConsoleLineKind.Error);
         }
-        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -232,10 +273,15 @@ public sealed class ServerHost : IAsyncDisposable
             {
                 Console.Add(kind, line);
                 if (kind != ConsoleLineKind.Output) continue;
-                if (State == ServerState.Starting && line.Contains(ReadyMarker, StringComparison.Ordinal))
-                    SetState(ServerState.Running);
-                else if (line.Contains(StoppingMarker, StringComparison.Ordinal) && State == ServerState.Running)
-                    SetState(ServerState.Stopping); // остановили изнутри (игрок-админ набрал /stop)
+                var ready = line.Contains(ReadyMarker, StringComparison.Ordinal);
+                var stopping = line.Contains(StoppingMarker, StringComparison.Ordinal);
+                if (!ready && !stopping) continue;
+                lock (_lock)
+                {
+                    if (ready && State == ServerState.Starting) SetState(ServerState.Running);
+                    else if (stopping && State == ServerState.Running) SetState(ServerState.Stopping); // остановили изнутри (/stop админа в игре)
+                }
+                RaiseStateChanges();
             }
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException)
@@ -250,6 +296,7 @@ public sealed class ServerHost : IAsyncDisposable
         try { code = process.ExitCode; } catch (InvalidOperationException) { code = -1; }
 
         bool unexpected;
+        TaskCompletionSource? exited;
         lock (_lock)
         {
             if (!ReferenceEquals(process, _process)) return;
@@ -263,8 +310,10 @@ public sealed class ServerHost : IAsyncDisposable
             StartedAt = null;
             ReleaseWorld(); // до «остановлен»: кто увидит это состояние, сразу может занять мир
             SetState(ServerState.Stopped);
-            _exited?.TrySetResult();
+            exited = _exited; // под замком: после него новый запуск может завести свой
         }
+        RaiseStateChanges();
+        exited?.TrySetResult(); // после события: кто дождался выхода, видит уже обработанное «остановлен»
 
         if (!unexpected)
         {
@@ -391,6 +440,7 @@ public sealed class ServerHost : IAsyncDisposable
             pid = _process.Id;
             SetState(ServerState.Stopping);
         }
+        RaiseStateChanges();
 
         Sys(Loc.T("srv.stopping"));
         try { await SendCommandAsync("/stop").ConfigureAwait(false); }
