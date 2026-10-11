@@ -1,0 +1,47 @@
+eViSTool 0.10.4: update window and important fixes.
+
+New
+- When a new version of eViSTool is out, a window shows what changed in every version you skipped, in the interface language, with Update now, Later and Skip this version. It does not pop up over a running game and waits until you close it.
+- Important updates are marked as recommended: the window says so, and the sidebar link reads "Important update".
+- If eViSTool on this computer was updated without the window (for example with Update on the server from another computer), the open window restarts into the new version by itself. With unsaved changes it shows a link to restart instead.
+
+Fixes
+- Restoring the same world copy twice in a client profile no longer loses the world that was set aside before the first restore.
+- Server world backups: on the night the clocks go back, rotation could delete the newest backup. It now goes by the file time. Safety copies made before a restore no longer pile up: the last three are kept.
+- The window no longer freezes for up to 15 seconds when the server computer is slow or unreachable: the server config and the mod list load in the background.
+- Leaving a profile with unsaved mod settings could hang the window for good if the agent answered with an error. Fixed.
+- A mod update check started on one profile no longer shows its results on another.
+- An unexpected error during installation no longer leaves a queue item "in progress" forever, and two quick drag-and-drops no longer start two installations.
+- Downloads of mods and of eViSTool updates that stall for 60 seconds now stop with a clear error instead of waiting forever, and half-downloaded files are removed.
+- Mod files are downloaded only over https from the mod database.
+- A game folder such as "Vintagestory2" is no longer mistaken for "Vintagestory" when looking for running games and servers.
+- A damaged restore journal no longer prevents the server from starting.
+- The agent refuses to roll itself back to an older version, cuts console lines longer than 16 KB, and on Linux creates its key files readable only by their owner from the start.
+- Dates and times follow your Windows regional settings; uptime is shown in the interface language.
+
+Update from About; then update the agent on the server computer with Update on the server.
+
+---
+
+eViSTool 0.10.4: окно обновления и важные исправления.
+
+Новое
+- Когда выходит новая версия eViSTool, появляется окно со списком изменений за все пропущенные версии на языке интерфейса и кнопками «Обновить сейчас», «Позже» и «Пропустить эту версию». Поверх запущенной игры оно не всплывает: ждёт, пока её закроют.
+- Важные обновления помечаются как рекомендуемые: об этом пишет окно, а ссылка в боковой панели говорит «Важное обновление».
+- Если eViSTool на этом компьютере обновили без окна (например, кнопкой «Обновить на сервере» с другого компьютера), открытое окно само перезапускается в новую версию. Когда есть несохранённые правки, вместо этого появляется ссылка «перезапустить».
+
+Исправления
+- В клиентском профиле повторный возврат той же копии мира больше не теряет мир, отложенный перед первым возвратом.
+- Копии мира сервера: в ночь перевода часов назад ротация могла удалить самую свежую копию, теперь она смотрит на время файла. Страховочные копии «до восстановления» больше не копятся без конца: хранятся три последние.
+- Окно больше не замирает до 15 секунд, когда компьютер с сервером медленный или недоступен: конфиг сервера и список модов загружаются в фоне.
+- Уход с профиля с несохранёнными настройками мода мог намертво повесить окно, если агент ответил ошибкой. Исправлено.
+- Проверка обновлений модов, начатая на одном профиле, больше не показывает результат на другом.
+- Неожиданная ошибка при установке больше не оставляет пункт очереди «в работе» навсегда, а два быстрых перетаскивания больше не запускают две установки.
+- Скачивание модов и обновлений eViSTool, замолчавшее на 60 секунд, теперь прерывается с понятной ошибкой, а недокачанные файлы удаляются.
+- Файлы модов скачиваются только по https с модбазы.
+- Папка игры вроде «Vintagestory2» больше не принимается за «Vintagestory» при поиске запущенных игр и серверов.
+- Испорченный журнал восстановления мира больше не мешает запуску сервера.
+- Агент отказывается откатываться на старую версию, обрезает строки консоли длиннее 16 КБ, а на Linux сразу создаёт свои ключи с правами только для владельца.
+- Даты и время показываются по региональным настройкам Windows, время работы сервера — на языке интерфейса.
+
+Обнови из «О программе», потом обнови агента на компьютере с сервером кнопкой «Обновить на сервере».
