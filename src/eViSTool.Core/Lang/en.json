@@ -1781,6 +1781,7 @@
   "shell.profileVersion": "Profile version",
   "shell.slogan": "Your world. Your rules.",
   "shell.updateAvailable": "Update {0} is available",
+  "shell.updatedOnDisk": "eViSTool was updated to {0} — restart",
   "shell.workspace": "WORKSPACE",
   "shell.workspaceCrumb": "Workspace",
   "shots.browser": "Open in browser",

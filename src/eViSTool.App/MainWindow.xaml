@@ -42,6 +42,10 @@
                 <Button Style="{StaticResource Forest.LinkButton}" Command="{Binding ShowAboutCommand}" HorizontalAlignment="Left" Margin="4,0,0,10"
                         Content="{Binding About.UpdateBadgeText}" Visibility="{Binding About.HasUpdate, Converter={StaticResource BoolToVis}}"
                         AutomationProperties.AutomationId="UpdateBadge" />
+                <!-- eViSTool обновили на диске (например, «Обновить на сервере» с другого компьютера), а перезапуск отложен -->
+                <Button Style="{StaticResource Forest.LinkButton}" Command="{Binding RestartUpdatedCommand}" HorizontalAlignment="Left" Margin="4,0,0,10"
+                        Content="{Binding UpdatedOnDiskText}" Visibility="{Binding HasUpdatedOnDisk, Converter={StaticResource BoolToVis}}"
+                        AutomationProperties.AutomationId="UpdatedOnDisk" />
                 <Border Background="{StaticResource Forest.Surface}" CornerRadius="8" Padding="10,8">
                     <DockPanel>
                         <Border Background="{StaticResource Forest.Raised}" CornerRadius="6" Width="30" Height="30" Margin="0,0,10,0">

@@ -1,7 +1,9 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.IO;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using eViSTool.Core;
 using eViSTool.Core.Game;
 using eViSTool.Core.ModDb;
 using eViSTool.Core.Profiles;
@@ -499,6 +501,8 @@ public sealed partial class MainViewModel : ObservableObject
         _keepRemote.Start();
         _gameWatch.Tick += (_, _) => _ = CheckGameAsync();
         _gameWatch.Start();
+        _exeWatch.Tick += (_, _) => CheckExeOnDisk();
+        _exeWatch.Start();
         LoadErrorReport();
         _serverWatch.Tick += (_, _) => _ = CheckServersAsync();
         _serverWatch.Start();
@@ -507,6 +511,82 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     private readonly System.Windows.Threading.DispatcherTimer _keepRemote;
+
+    // ---------- eViSTool обновили на диске, пока окно открыто ----------
+
+    /// <summary>
+    /// Раз в 10 секунд — не лежит ли на месте exe этого окна версия новее запущенной. Так бывает после «Обновить на
+    /// сервере» с другого компьютера: агент подменил файлы и перезапустился, а открытое здесь окно жило бы старой версией
+    /// (видно на Windows-сервере по RDP). Нечего терять — перезапускаемся сами; есть несохранённое или идёт установка —
+    /// ссылка «перезапустить» в боковой панели, решает человек.
+    /// </summary>
+    private readonly System.Windows.Threading.DispatcherTimer _exeWatch = new() { Interval = TimeSpan.FromSeconds(10) };
+
+    /// <summary>Версия на диске, когда сам перезапуск отложен (есть несохранённое); null — перезапускать нечего.</summary>
+    [ObservableProperty] private string? _updatedOnDisk;
+    public bool HasUpdatedOnDisk => UpdatedOnDisk is not null;
+    public string UpdatedOnDiskText => UpdatedOnDisk is { } v ? Loc.T("shell.updatedOnDisk", v) : "";
+    partial void OnUpdatedOnDiskChanged(string? value)
+    {
+        OnPropertyChanged(nameof(HasUpdatedOnDisk));
+        OnPropertyChanged(nameof(UpdatedOnDiskText));
+    }
+
+    // какой exe был при запуске (время и размер): пока он тот же, версию не читаем
+    private (DateTime, long)? _exeStamp;
+
+    private void CheckExeOnDisk()
+    {
+        // не Environment.ProcessPath: обновление переименовывает работающий exe в .old, и Windows отдаёт уже его
+        var exe = MainExe;
+        if (About.UpdatedHere) return;
+        (DateTime, long) stamp;
+        try
+        {
+            var file = new FileInfo(exe);
+            if (!file.Exists) return;
+            stamp = (file.LastWriteTimeUtc, file.Length);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return; }
+        _exeStamp ??= stamp;
+        if (stamp == _exeStamp) return;
+
+        // версию читаем с копии: для пути загруженного exe Windows отдаёт ресурсы из памяти, то есть старую версию
+        var copy = Path.Combine(Path.GetTempPath(), $"evistool-version-{Environment.ProcessId}.exe");
+        string? onDisk;
+        try
+        {
+            File.Copy(exe, copy, overwrite: true);
+            onDisk = System.Diagnostics.FileVersionInfo.GetVersionInfo(copy).ProductVersion?.Split('+')[0];
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return; } // файл как раз дописывают
+        finally
+        {
+            try { File.Delete(copy); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
+        if (!Core.Versioning.ModVersion.TryParse(onDisk, out var disk)
+            || !Core.Versioning.ModVersion.TryParse(Core.Server.AgentProtocol.AppVersion, out var running)
+            || disk.CompareTo(running) <= 0)
+        {
+            _exeStamp = stamp; // тот же или старее — запоминаем и молчим
+            return;
+        }
+
+        // терять нечего — перезапуск сразу; иначе ждём человека (и проверяем снова: правки могли сохранить)
+        var busy = Mods.IsBusy || Server.Config.IsDirty || ModConfig.IsDirty;
+        UpdatedOnDisk = busy ? onDisk : null;
+        if (!busy) RestartUpdated();
+    }
+
+    private static string MainExe => Path.Combine(AppContext.BaseDirectory, Core.AppUpdate.AppUpdater.MainExe);
+
+    [RelayCommand]
+    private void RestartUpdated()
+    {
+        _exeWatch.Stop();
+        App.RestartAfterClose(MainExe);
+        if (Application.Current.MainWindow is { IsVisible: true }) _exeWatch.Start(); // закрытие отменили (есть вопрос «сохранить?»)
+    }
 
     private async Task KeepRemoteAgentsAsync()
     {

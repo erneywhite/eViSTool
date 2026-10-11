@@ -39,6 +39,9 @@ public sealed partial class AboutViewModel : ObservableObject
     private bool _isUpdating;
 
     public bool HasUpdate => AvailableUpdate is not null;
+
+    /// <summary>Обновление поставило само это окно (кнопкой в «О программе») — про перезапуск оно спрашивает само.</summary>
+    public bool UpdatedHere { get; private set; }
     public string UpdateButtonText => AvailableUpdate is { } r ? Loc.T("about.updateInstall", r.Version) : "";
     public string UpdateBadgeText => AvailableUpdate is { } r ? Loc.T("shell.updateAvailable", r.Version) : "";
 
@@ -105,6 +108,7 @@ public sealed partial class AboutViewModel : ObservableObject
             try { File.Delete(zip); } catch (IOException) { }
 
             AvailableUpdate = null;
+            UpdatedHere = true; // сами и спросим про перезапуск — наблюдатель за exe не перебивает
             UpdateStatus = Loc.T("about.updateInstalled", release.Version);
             // агенты без работающего сервера — на выход: новое окно поднимет агентов уже новой версии
             if (Profiles is { } profiles) await Core.Server.AgentLauncher.StopIdleAgentsAsync([.. profiles()]);

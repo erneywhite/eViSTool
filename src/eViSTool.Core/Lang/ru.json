@@ -1781,6 +1781,7 @@
   "shell.profileVersion": "Версия профиля",
   "shell.slogan": "Твой мир. Твои правила.",
   "shell.updateAvailable": "Доступно обновление {0}",
+  "shell.updatedOnDisk": "eViSTool обновлён до {0} — перезапустить",
   "shell.workspace": "РАБОЧЕЕ ПРОСТРАНСТВО",
   "shell.workspaceCrumb": "Рабочее пространство",
   "shots.browser": "Открыть в браузере",
