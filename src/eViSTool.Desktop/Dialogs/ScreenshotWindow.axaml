@@ -1,0 +1,70 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:local="using:eViSTool.Desktop"
+                      xmlns:ctl="using:eViSTool.Desktop.Controls"
+                      x:Class="eViSTool.Desktop.Dialogs.ScreenshotWindow"
+                      x:DataType="vm:ScreenshotViewerViewModel"
+                      Title="{Binding Title}" Background="#111111"
+                      Width="1100" Height="700">
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Left" Command="{Binding PreviousCommand}" />
+        <KeyBinding Gesture="Right" Command="{Binding NextCommand}" />
+    </Window.KeyBindings>
+
+    <Window.Resources>
+        <!-- стрелки поверх картинки: полупрозрачная плашка, при наведении темнее (шаблон свой, а не лесной кнопки: у неё
+             наведение подсвечивает светлым) -->
+        <ControlTheme x:Key="NavButton" TargetType="Button">
+            <Setter Property="Width" Value="56" />
+            <Setter Property="Height" Value="96" />
+            <Setter Property="FontSize" Value="36" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="#66000000" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ContentPresenter x:Name="PART_ContentPresenter" Background="{TemplateBinding Background}"
+                                      Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                <Setter Property="Background" Value="#99000000" />
+            </Style>
+            <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter">
+                <Setter Property="Background" Value="#B3000000" />
+            </Style>
+        </ControlTheme>
+    </Window.Resources>
+
+    <DockPanel>
+        <DockPanel DockPanel.Dock="Bottom" Background="#1C1C1C" Height="48">
+            <Button DockPanel.Dock="Right" Content="{local:Tr shots.close}" Click="Close_Click" Margin="8" Padding="12,4" Focusable="False"
+                    AutomationProperties.AutomationId="ScreenshotClose" />
+            <Button DockPanel.Dock="Right" Content="{local:Tr shots.browser}" Command="{Binding OpenInBrowserCommand}" Margin="8" Padding="12,4" Focusable="False"
+                    AutomationProperties.AutomationId="ScreenshotBrowser" />
+            <TextBlock Text="{Binding Counter}" Foreground="#CCFFFFFF" VerticalAlignment="Center" Margin="16,0"
+                       AutomationProperties.AutomationId="ScreenshotCounter" />
+            <TextBlock Text="{local:Tr shots.hint}" Foreground="#77FFFFFF" VerticalAlignment="Center" />
+        </DockPanel>
+
+        <Grid>
+            <Image x:Name="Picture" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" Margin="8"
+                   ctl:RemoteImage.Source="{Binding CurrentUrl}" AutomationProperties.AutomationId="ScreenshotPicture" />
+            <!-- пока картинка грузится — «Загрузка…», не загрузилась — причина; готова — ничего -->
+            <TextBlock Text="{local:Tr common.loading}" Foreground="#99FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       IsVisible="{Binding #Picture.(ctl:RemoteImage.IsLoading)}" AutomationProperties.AutomationId="ScreenshotLoading" />
+            <TextBlock Text="{local:Tr shots.loadFailed}" Foreground="#99FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       IsVisible="{Binding #Picture.(ctl:RemoteImage.Failed)}" AutomationProperties.AutomationId="ScreenshotFailed" />
+            <Button Content="‹" Theme="{StaticResource NavButton}" HorizontalAlignment="Left" Margin="12,0,0,0"
+                    Command="{Binding PreviousCommand}" IsVisible="{Binding HasSeveral}" AutomationProperties.AutomationId="ScreenshotPrev" />
+            <Button Content="›" Theme="{StaticResource NavButton}" HorizontalAlignment="Right" Margin="0,0,12,0"
+                    Command="{Binding NextCommand}" IsVisible="{Binding HasSeveral}" AutomationProperties.AutomationId="ScreenshotNext" />
+        </Grid>
+    </DockPanel>
+</dialogs:DialogWindow>
