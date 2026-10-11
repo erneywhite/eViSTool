@@ -1,6 +1,158 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="eViSTool.Desktop.Views.ServerAnnouncementsTab">
-    <!-- заглушка: вкладка «Объявления» раздела «Сервер» ещё переносится с окна на WPF -->
-    <TextBlock Text="Экран «Объявления» ещё переносится" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
+             xmlns:vm="using:eViSTool.Presentation.ViewModels"
+             xmlns:local="using:eViSTool.Desktop"
+             xmlns:ctl="using:eViSTool.Desktop.Controls"
+             xmlns:conv="using:eViSTool.Desktop.Converters"
+             x:Class="eViSTool.Desktop.Views.ServerAnnouncementsTab"
+             x:DataType="vm:ServerAnnouncementsViewModel">
+    <UserControl.Styles>
+        <!-- карточка вкладки -->
+        <Style Selector="Border.annCard">
+            <Setter Property="Padding" Value="20,16,20,18" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+        <!-- поле с неразобранным интервалом или временем: красная рамка. Стиль экрана сильнее стилей шаблона поля, поэтому
+             рамка остаётся красной и при наведении, и в фокусе -->
+        <Style Selector="TextBox.bad /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="{DynamicResource Forest.Danger}" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
+        <StackPanel Margin="0,0,14,0">
+            <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{DynamicResource Forest.Accent}" TextWrapping="Wrap" Margin="2,0,0,10"
+                       IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" AutomationProperties.AutomationId="AnnStatus" />
+            <TextBlock Text="{Binding ErrorText}" FontSize="12" Foreground="{DynamicResource Forest.Danger}" TextWrapping="Wrap" Margin="2,0,0,10"
+                       IsVisible="{Binding ErrorText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" AutomationProperties.AutomationId="AnnError" />
+
+            <!-- ===== сказать сейчас ===== -->
+            <Border Classes="card annCard">
+                <StackPanel>
+                    <TextBlock Text="{local:Tr ann.sayTitle}" Classes="cardTitle" />
+                    <TextBlock Text="{local:Tr ann.sayHint}" Classes="hint" />
+                    <DockPanel Margin="0,12,0,0">
+                        <Button DockPanel.Dock="Right" Classes="primary" Content="{local:Tr ann.say}" Command="{Binding SayCommand}"
+                                Margin="8,0,0,0" Padding="16,6" ToolTip.Tip="{local:Tr ann.sayTip}" ToolTip.ShowOnDisabled="True"
+                                AutomationProperties.AutomationId="AnnSay" />
+                        <TextBox x:Name="SayBox" Text="{Binding SayText}" VerticalContentAlignment="Center" MaxLength="400"
+                                 IsEnabled="{Binding CanSay}" AutomationProperties.AutomationId="AnnSayText" AutomationProperties.Name="{local:Tr ann.sayTitle}">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Enter" Command="{Binding SayCommand}" />
+                            </TextBox.KeyBindings>
+                        </TextBox>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ===== приветствие при входе: WelcomeMessage из конфига сервера, правится в «Конфигурации» ===== -->
+            <Border Classes="card annCard" AutomationProperties.AutomationId="AnnWelcome">
+                <StackPanel>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Command="{Binding EditWelcomeCommand}" Padding="12,6" VerticalAlignment="Top"
+                                AutomationProperties.AutomationId="AnnWelcomeEdit">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Classes="icon" Data="{StaticResource Icon.Edit}" Width="12" Height="12" Margin="0,0,7,0" />
+                                <TextBlock Text="{local:Tr ann.welcomeEdit}" />
+                            </StackPanel>
+                        </Button>
+                        <StackPanel Margin="0,0,16,0">
+                            <TextBlock Text="{local:Tr ann.welcomeTitle}" Classes="cardTitle" />
+                            <TextBlock Text="{local:Tr ann.welcomeHint}" Classes="hint" />
+                        </StackPanel>
+                    </DockPanel>
+                    <!-- текст приветствия; пустое — так и пишем -->
+                    <Border Background="{DynamicResource Forest.Raised}" CornerRadius="6" Padding="12,9" Margin="0,12,0,0"
+                            IsVisible="{Binding Config.State, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Loaded}">
+                        <Panel>
+                            <TextBlock Text="{Binding Config.WelcomeMessage}" FontSize="13" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap"
+                                       IsVisible="{Binding Config.WelcomeMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                       AutomationProperties.AutomationId="AnnWelcomeText" />
+                            <TextBlock Text="{local:Tr ann.welcomeEmpty}" FontSize="13" FontStyle="Italic" Foreground="{DynamicResource Forest.Muted}"
+                                       IsVisible="{Binding Config.WelcomeMessage, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                        </Panel>
+                    </Border>
+                    <TextBlock Text="{local:Tr srvcfg.loadingRemote}" Classes="hint" Margin="0,10,0,0"
+                               IsVisible="{Binding Config.State, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Loading}" />
+                    <TextBlock Text="{local:Tr ann.welcomeNoConfig}" Classes="hint" Margin="0,10,0,0"
+                               IsVisible="{Binding Config.State, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Missing}" />
+                    <TextBlock Text="{Binding Config.LoadError}" FontSize="12" Foreground="{DynamicResource Forest.Danger}" TextWrapping="Wrap" Margin="0,10,0,0"
+                               IsVisible="{Binding Config.State, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Failed}" />
+                </StackPanel>
+            </Border>
+
+            <!-- ===== по расписанию ===== -->
+            <Border Classes="card annCard">
+                <StackPanel>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Command="{Binding AddCommand}" IsEnabled="{Binding Loaded}" Padding="12,6" VerticalAlignment="Top"
+                                AutomationProperties.AutomationId="AnnAdd">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Classes="icon" Data="{StaticResource Icon.Plus}" Width="12" Height="12" Margin="0,0,7,0" />
+                                <TextBlock Text="{local:Tr ann.add}" />
+                            </StackPanel>
+                        </Button>
+                        <StackPanel Margin="0,0,16,0">
+                            <TextBlock Text="{local:Tr ann.listTitle}" Classes="cardTitle" />
+                            <TextBlock Text="{local:Tr ann.listHint}" Classes="hint" />
+                            <TextBlock Text="{Binding TimeNote}" FontSize="12" Foreground="{DynamicResource Forest.Warn}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                       IsVisible="{Binding TimeNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <Border Classes="row">
+                        <DockPanel>
+                            <CheckBox DockPanel.Dock="Right" Theme="{StaticResource Forest.Switch}" IsChecked="{Binding OnlyWithPlayers}" VerticalAlignment="Center"
+                                      IsEnabled="{Binding Loaded}" AutomationProperties.AutomationId="AnnOnlyWithPlayers"
+                                      AutomationProperties.Name="{local:Tr ann.onlyWithPlayers}" />
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{local:Tr ann.onlyWithPlayers}" FontSize="13" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap" />
+                                <TextBlock Text="{local:Tr ann.onlyWithPlayersHint}" Classes="hint" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <TextBlock Text="{local:Tr ann.empty}" Classes="hint" FontSize="12" Margin="0,14,0,0"
+                               IsVisible="{Binding !HasItems}" />
+
+                    <ItemsControl x:Name="AnnList" ItemsSource="{Binding Items}" Margin="0,6,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:AnnouncementRowViewModel">
+                                <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="0,10" Margin="0,4,0,0">
+                                    <DockPanel>
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                                            <!-- «каждые N мин» или «в 12:00, 18:00» -->
+                                            <ComboBox SelectedIndex="{Binding ModeIndex}" FontSize="12" MinWidth="96" VerticalAlignment="Center"
+                                                      ctl:WheelToParent.IsEnabled="True" AutomationProperties.Name="{local:Tr ann.mode}">
+                                                <ComboBoxItem Content="{local:Tr ann.every}" />
+                                                <ComboBoxItem Content="{local:Tr ann.at}" />
+                                            </ComboBox>
+                                            <TextBox Width="150" Margin="8,0,0,0" Text="{Binding TimesText}" Classes.bad="{Binding IntervalBad}"
+                                                     VerticalContentAlignment="Center" MaxLength="60" ToolTip.Tip="{local:Tr ann.timesTip}"
+                                                     AutomationProperties.Name="{local:Tr ann.at}" IsVisible="{Binding IsTimed}" />
+                                            <StackPanel Orientation="Horizontal" IsVisible="{Binding !IsTimed}">
+                                                <TextBox Width="96" Margin="8,0,0,0" Text="{Binding IntervalText}" Classes.bad="{Binding IntervalBad}"
+                                                         VerticalContentAlignment="Center" HorizontalContentAlignment="Center" MaxLength="4"
+                                                         AutomationProperties.Name="{local:Tr ann.every}" />
+                                                <TextBlock Text="{local:Tr ann.minutes}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" VerticalAlignment="Center"
+                                                           Margin="8,0,0,0" />
+                                            </StackPanel>
+                                            <CheckBox Theme="{StaticResource Forest.Switch}" IsChecked="{Binding Enabled}" VerticalAlignment="Center" Margin="22,0,0,0"
+                                                      ToolTip.Tip="{local:Tr ann.enabled}" AutomationProperties.Name="{local:Tr ann.enabled}" />
+                                            <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr ann.delete}" Foreground="{DynamicResource Forest.Danger}"
+                                                    Margin="22,0,0,0" VerticalAlignment="Center"
+                                                    Command="{Binding $parent[ItemsControl].((vm:ServerAnnouncementsViewModel)DataContext).DeleteCommand}"
+                                                    CommandParameter="{Binding}" />
+                                        </StackPanel>
+                                        <TextBox Text="{Binding Text}" VerticalContentAlignment="Center" MaxLength="400"
+                                                 AutomationProperties.Name="{local:Tr ann.text}" />
+                                    </DockPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>
