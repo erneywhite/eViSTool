@@ -89,7 +89,7 @@ public sealed class HistorySessionRow
     public ModHistorySession Session { get; }
     public IReadOnlyList<HistoryChangeRow> Changes { get; }
 
-    public HistorySessionRow(ModHistorySession session, IReadOnlyDictionary<string, string> installedNow, bool server, DateTime? undoneAt = null,
+    public HistorySessionRow(ModHistorySession session, IReadOnlyDictionary<string, string?> installedNow, bool server, DateTime? undoneAt = null,
         bool partly = false)
     {
         Session = session;
@@ -165,7 +165,7 @@ public sealed class HistorySessionRow
 public enum ChangeKind { Updated, Downgraded, Installed, Removed }
 
 /// <summary>Мод в сеансе: версия до и после, и что с ним сейчас, если с тех пор его меняли.</summary>
-public sealed class HistoryChangeRow(ModHistoryEntry change, IReadOnlyDictionary<string, string> installedNow)
+public sealed class HistoryChangeRow(ModHistoryEntry change, IReadOnlyDictionary<string, string?> installedNow)
 {
     public ModHistoryEntry Change { get; } = change;
     public string Title => Change.Title;

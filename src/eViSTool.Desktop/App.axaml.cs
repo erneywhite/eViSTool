@@ -6,7 +6,9 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using eViSTool.Core.Localization;
 using eViSTool.Desktop.Platform;
+using eViSTool.Desktop.Views;
 using eViSTool.Presentation;
+using eViSTool.Presentation.ViewModels;
 
 namespace eViSTool.Desktop;
 
@@ -35,14 +37,11 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.Exit += (_, _) => StartRestart();
-            // временное окно каркаса: главное окно и экраны переносятся на этапе 2
-            desktop.MainWindow = new Window
-            {
-                Title = "eViSTool",
-                Width = 900,
-                Height = 560,
-                Content = new TextBlock { Text = "eViSTool — каркас окна на Avalonia", Margin = new Thickness(24), FontSize = 22 },
-            };
+            var main = new MainWindow { DataContext = new MainViewModel() };
+            desktop.MainWindow = main;
+            // снимок для сверки с окном на WPF: экран → PNG → выход (см. Presentation.Snapshots)
+            if (Snapshots.FromEnvironment() is { } snapshot)
+                main.Opened += (_, _) => Dispatcher.UIThread.Post(() => _ = SnapshotRunner.RunAsync(desktop, snapshot), DispatcherPriority.ApplicationIdle);
         }
         base.OnFrameworkInitializationCompleted();
     }

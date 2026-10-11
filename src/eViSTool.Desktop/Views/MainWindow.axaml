@@ -1,0 +1,330 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:eViSTool.Presentation.ViewModels"
+        xmlns:local="using:eViSTool.Desktop"
+        xmlns:views="using:eViSTool.Desktop.Views"
+        x:Class="eViSTool.Desktop.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="eViSTool" Icon="avares://eViSTool.Desktop/Assets/eViSTool.ico"
+        Width="1400" Height="860" MinWidth="860" MinHeight="480" WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <!-- булавка в меню «Играть»: сервер по умолчанию -->
+        <ControlTheme x:Key="PinToggle" TargetType="ToggleButton">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="5" Padding="{TemplateBinding Padding}">
+                        <Path x:Name="Ic" Classes="icon" Data="{StaticResource Icon.Pin}" Width="14" Height="14" />
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^ /template/ Path#Ic">
+                <Setter Property="Stroke" Value="{DynamicResource Forest.Muted}" />
+            </Style>
+            <Style Selector="^:pointerover /template/ Border#Bd">
+                <Setter Property="Background" Value="{DynamicResource Forest.Base}" />
+            </Style>
+            <Style Selector="^:pointerover /template/ Path#Ic">
+                <Setter Property="Stroke" Value="{DynamicResource Forest.Text}" />
+            </Style>
+            <Style Selector="^:checked /template/ Path#Ic">
+                <Setter Property="Stroke" Value="{DynamicResource Forest.Accent}" />
+            </Style>
+        </ControlTheme>
+
+        <!-- строка меню без своей рамки: фон даёт строка-родитель (или наведение, если задан класс hover) -->
+        <ControlTheme x:Key="MenuRowButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ContentPresenter x:Name="PART_ContentPresenter" Background="{TemplateBinding Background}"
+                                      CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}"
+                                      Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^.hover:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                <Setter Property="Background" Value="{DynamicResource Forest.Raised}" />
+            </Style>
+        </ControlTheme>
+
+        <!-- строка меню «Играть»: значок, имя и подпись — «сыграть один раз»; булавка — при наведении (и у выбранного) -->
+        <DataTemplate x:Key="PlayMenuItem" x:DataType="vm:PlayMenuItemViewModel">
+            <Border Classes="playRow" Classes.def="{Binding IsDefault}" CornerRadius="7" Margin="0,1">
+                <DockPanel>
+                    <ToggleButton Classes="pin" Theme="{StaticResource PinToggle}" DockPanel.Dock="Right" IsChecked="{Binding IsDefault, Mode=OneWay}"
+                                  Margin="4,0,6,0" Padding="7" VerticalAlignment="Center" Click="PlayMenuPin_Click"
+                                  ToolTip.Tip="{local:Tr play.pinTip}" AutomationProperties.Name="{local:Tr play.pinTip}" />
+                    <Button Theme="{StaticResource MenuRowButton}" Click="PlayMenuItem_Click" Padding="12,8,8,8"
+                            AutomationProperties.Name="{Binding Name}">
+                        <DockPanel>
+                            <!-- значок по виду: см. стили Path.kind в Window.Styles -->
+                            <Path Classes="icon kind" Classes.none="{Binding IsNone}" Classes.own="{Binding IsOwn}"
+                                  Classes.pwd="{Binding HasPassword}" Classes.def="{Binding IsDefault}"
+                                  DockPanel.Dock="Left" Width="16" Height="16" Margin="0,1,12,0" VerticalAlignment="Top" />
+                            <StackPanel>
+                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,1,0,0"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding VersionNote}" FontSize="11" Foreground="{DynamicResource Forest.Warn}" TextWrapping="Wrap"
+                                           IsVisible="{Binding VersionNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Button>
+                </DockPanel>
+            </Border>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Window.Styles>
+        <!-- рекомендуемое обновление — тёплым цветом предупреждения, а не обычным акцентом -->
+        <Style Selector="Button.warn">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <!-- меню «Играть»: подсветка строки при наведении и у выбранного по умолчанию, булавка видна там же -->
+        <Style Selector="Border.playRow">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Border.playRow ToggleButton.pin">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Border.playRow:pointerover, Border.playRow.def">
+            <Setter Property="Background" Value="{DynamicResource Forest.Raised}" />
+        </Style>
+        <Style Selector="Border.playRow:pointerover ToggleButton.pin, Border.playRow.def ToggleButton.pin">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <!-- значок по виду: из избранного — звезда, без сервера — глобус, свой — сервер, с паролем — замок,
+             выбранный по умолчанию — зелёная галочка. Порядок стилей = приоритет (последний побеждает). -->
+        <Style Selector="Path.kind">
+            <Setter Property="Data" Value="{StaticResource Icon.Star}" />
+            <Setter Property="Stroke" Value="{DynamicResource Forest.Muted}" />
+        </Style>
+        <Style Selector="Path.kind.none">
+            <Setter Property="Data" Value="{StaticResource Icon.Globe}" />
+        </Style>
+        <Style Selector="Path.kind.own">
+            <Setter Property="Data" Value="{StaticResource Icon.Server}" />
+        </Style>
+        <Style Selector="Path.kind.pwd">
+            <Setter Property="Data" Value="{StaticResource Icon.Lock}" />
+        </Style>
+        <Style Selector="Path.kind.def">
+            <Setter Property="Data" Value="{StaticResource Icon.Check}" />
+            <Setter Property="Stroke" Value="{DynamicResource Forest.Good}" />
+        </Style>
+    </Window.Styles>
+
+    <Grid ColumnDefinitions="210,*" Background="{DynamicResource Forest.Base}">
+
+        <!-- ===== боковая колонка ===== -->
+        <DockPanel Background="{DynamicResource Forest.Side}">
+            <Border DockPanel.Dock="Right" Width="1" Background="{DynamicResource Forest.Line}" />
+
+            <!-- лого и слоган -->
+            <DockPanel DockPanel.Dock="Top" Margin="16,20,10,22">
+                <Image Source="avares://eViSTool.Desktop/Assets/logo256.png" Width="36" Height="36" VerticalAlignment="Top"
+                       RenderOptions.BitmapInterpolationMode="HighQuality" />
+                <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="eViSTool" FontSize="19" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />
+                    <TextBlock Text="{local:Tr shell.slogan}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- низ: новая версия программы, версия игры профиля, автор -->
+            <StackPanel DockPanel.Dock="Bottom" Margin="14,0,14,14">
+                <!-- ссылка-кнопка показывает только текст (шаблон — один TextBlock), поэтому без иконки -->
+                <Button Theme="{StaticResource Forest.LinkButton}" Classes.warn="{Binding About.IsRecommended}"
+                        Command="{Binding ShowAboutCommand}" HorizontalAlignment="Left" Margin="4,0,0,10"
+                        Content="{Binding About.UpdateBadgeText}" IsVisible="{Binding About.HasUpdate}"
+                        AutomationProperties.AutomationId="UpdateBadge" />
+                <!-- eViSTool обновили на диске (например, «Обновить на сервере» с другого компьютера), а перезапуск отложен -->
+                <Button Theme="{StaticResource Forest.LinkButton}" Command="{Binding RestartUpdatedCommand}" HorizontalAlignment="Left" Margin="4,0,0,10"
+                        Content="{Binding UpdatedOnDiskText}" IsVisible="{Binding HasUpdatedOnDisk}"
+                        AutomationProperties.AutomationId="UpdatedOnDisk" />
+                <Border Background="{DynamicResource Forest.Surface}" CornerRadius="8" Padding="10,8">
+                    <DockPanel>
+                        <Border Background="{DynamicResource Forest.Raised}" CornerRadius="6" Width="30" Height="30" Margin="0,0,10,0">
+                            <Panel>
+                                <!-- значок из установленной игры; игры на компьютере нет — буквы -->
+                                <Image x:Name="GameIconImage" Width="24" Height="24" RenderOptions.BitmapInterpolationMode="HighQuality"
+                                       IsVisible="{Binding $self.Source, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                <TextBlock Text="VS" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           IsVisible="{Binding #GameIconImage.Source, Converter={x:Static ObjectConverters.IsNull}}" />
+                            </Panel>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Vintage Story" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />
+                            <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap">
+                                <Run Text="{local:Tr shell.profileVersion}" /><Run Text=" · " /><Run Text="{Binding ActiveProfile.GameVersionText, Mode=OneWay}" />
+                            </TextBlock>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+                <Button Theme="{StaticResource Forest.LinkButton}" Foreground="{DynamicResource Forest.Muted}" FontSize="11" Margin="4,10,0,0"
+                        HorizontalAlignment="Left" ToolTip.Tip="https://github.com/erneywhite/eViSTool"
+                        Command="{Binding About.OpenUrlCommand}" CommandParameter="https://github.com/erneywhite/eViSTool"
+                        Content="{local:Tr shell.madeBy}" />
+            </StackPanel>
+
+            <!-- навигация: порядок пунктов = порядок разделов -->
+            <StackPanel Margin="12,0,12,0">
+                <TextBlock Text="{local:Tr shell.workspace}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Muted}"
+                           Margin="8,0,0,8" />
+                <ListBox x:Name="Nav" SelectedIndex="{Binding SelectedTab}" Background="Transparent" BorderThickness="0" Padding="0"
+                         ItemContainerTheme="{StaticResource Forest.NavItem}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBoxItem AutomationProperties.AutomationId="NavMods">
+                        <DockPanel>
+                            <Border DockPanel.Dock="Right" Background="{DynamicResource Forest.Raised}" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Mods.ModCount}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" />
+                            </Border>
+                            <Path Classes="icon" Data="{StaticResource Icon.Mods}" />
+                            <TextBlock Text="{local:Tr nav.mods}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+                        </DockPanel>
+                    </ListBoxItem>
+                    <ListBoxItem>
+                        <DockPanel>
+                            <Path Classes="icon" Data="{StaticResource Icon.Catalog}" />
+                            <TextBlock Text="{local:Tr nav.catalog}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+                        </DockPanel>
+                    </ListBoxItem>
+                    <ListBoxItem>
+                        <DockPanel>
+                            <Path Classes="icon" Data="{StaticResource Icon.ModConfig}" />
+                            <TextBlock Text="{local:Tr nav.modConfig}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+                        </DockPanel>
+                    </ListBoxItem>
+                    <ListBoxItem>
+                        <DockPanel>
+                            <Path Classes="icon" Data="{StaticResource Icon.Server}" />
+                            <TextBlock Text="{local:Tr nav.server}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+                        </DockPanel>
+                    </ListBoxItem>
+                    <ListBoxItem>
+                        <DockPanel>
+                            <Path Classes="icon" Data="{StaticResource Icon.Settings}" />
+                            <TextBlock Text="{local:Tr nav.settings}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+                        </DockPanel>
+                    </ListBoxItem>
+                    <ListBoxItem>
+                        <DockPanel>
+                            <Path Classes="icon" Data="{StaticResource Icon.About}" />
+                            <TextBlock Text="{local:Tr nav.about}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+                        </DockPanel>
+                    </ListBoxItem>
+                </ListBox>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- ===== основная часть ===== -->
+        <DockPanel Grid.Column="1">
+            <!-- полоса: раздел и активный профиль -->
+            <Border DockPanel.Dock="Top" Height="60" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1">
+                <DockPanel Margin="24,0,20,0">
+                    <!-- игра с активным клиентским профилем: его папка данных, его моды -->
+                    <!-- «Играть ▾»: большая часть — с сервером по умолчанию (или без сервера), стрелка — меню серверов -->
+                    <Button x:Name="PlayMenuButton" DockPanel.Dock="Right" Classes="primary splitArrow" Click="PlayMenu_Click"
+                            VerticalAlignment="Center" Height="36" MinHeight="0" Padding="0" Width="34" BorderThickness="0,1,1,1"
+                            ToolTip.Tip="{local:Tr play.menuTip}" IsVisible="{Binding CanPlay}"
+                            AutomationProperties.AutomationId="PlayMenuButton" AutomationProperties.Name="{local:Tr play.menuTip}">
+                        <!-- слева — тонкий разделитель между «Играть» и стрелкой -->
+                        <Panel Width="33" Height="34">
+                            <Rectangle Width="1" HorizontalAlignment="Left" Margin="0,7" Fill="{DynamicResource Forest.AccentInk}" Opacity="0.25" />
+                            <Path Classes="icon" Data="{StaticResource Icon.ChevronDown}" Width="12" Height="12" />
+                        </Panel>
+                    </Button>
+                    <Popup x:Name="PlayMenu" DockPanel.Dock="Right" PlacementTarget="{Binding #PlayMenuButton}" Placement="BottomEdgeAlignedRight"
+                           VerticalOffset="6" IsLightDismissEnabled="True">
+                        <Border Width="360" Background="{DynamicResource Forest.Surface}" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="1"
+                                CornerRadius="12" Padding="8">
+                            <StackPanel>
+                                <ContentControl Content="{Binding PlayNoServer}" ContentTemplate="{StaticResource PlayMenuItem}" Focusable="False" />
+
+                                <StackPanel IsVisible="{Binding HasPlayOwnServers}">
+                                    <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Margin="6,6,6,0" />
+                                    <TextBlock Text="{local:Tr play.ownServers}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="12,8,0,2" />
+                                    <ItemsControl ItemsSource="{Binding PlayOwnServers}" ItemTemplate="{StaticResource PlayMenuItem}" Focusable="False" />
+                                </StackPanel>
+
+                                <StackPanel IsVisible="{Binding HasPlayFavorites}">
+                                    <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Margin="6,6,6,0" />
+                                    <TextBlock Text="{local:Tr play.favorites}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="12,8,0,2" />
+                                    <ItemsControl ItemsSource="{Binding PlayFavorites}" ItemTemplate="{StaticResource PlayMenuItem}" Focusable="False" />
+                                    <TextBlock Text="{Binding PlayFavoritesMore}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="12,2,0,4"
+                                               IsVisible="{Binding PlayFavoritesMore, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                </StackPanel>
+
+                                <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Margin="6,6,6,2" />
+                                <!-- «Найти сервер…»: общий список и избранное целиком -->
+                                <Button Theme="{StaticResource MenuRowButton}" Classes="hover" Click="FindServer_Click" CornerRadius="7" Padding="12,8,8,8"
+                                        AutomationProperties.AutomationId="PlayFindServer">
+                                    <DockPanel>
+                                        <Path Classes="icon" DockPanel.Dock="Left" Data="{StaticResource Icon.Search}" Width="16" Height="16"
+                                              Margin="0,1,12,0" VerticalAlignment="Top" Stroke="{DynamicResource Forest.Muted}" />
+                                        <StackPanel>
+                                            <TextBlock Text="{local:Tr play.findServer}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />
+                                            <TextBlock Text="{local:Tr play.findServerHint}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,1,0,0" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Button>
+
+                                <TextBlock Text="{local:Tr play.menuHint}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap"
+                                           Margin="12,8,12,4" />
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                    <Button DockPanel.Dock="Right" Classes="primary splitMain" Command="{Binding PlayCommand}"
+                            VerticalAlignment="Center" Height="36" MinHeight="0" Padding="13,0" Margin="12,0,0,0" BorderThickness="1,1,0,1"
+                            ToolTip.Tip="{Binding PlayTip}" ToolTip.ShowOnDisabled="True"
+                            IsVisible="{Binding CanPlay}" AutomationProperties.AutomationId="PlayButton">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Classes="icon" Data="{StaticResource Icon.Play}" Width="13" Height="13" Margin="0,0,8,0" />
+                            <TextBlock Text="{Binding PlayText}" MaxWidth="260" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Button>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- моды профиля сыплют ошибками (игра работает, но лог пухнет и бывают фризы) — отчёт по кнопке -->
+                        <Button Command="{Binding ShowErrorsCommand}" ToolTip.Tip="{Binding ErrorBadgeTip}" Margin="0,0,10,0" Padding="10,4" MinHeight="0"
+                                IsVisible="{Binding HasErrorBadge}" AutomationProperties.AutomationId="ErrorBadge"
+                                Background="{DynamicResource Forest.Warn}" BorderBrush="{DynamicResource Forest.Warn}">
+                            <TextBlock Text="!" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource Forest.Base}" />
+                        </Button>
+                        <TextBlock Text="{local:Tr shell.activeProfile}" VerticalAlignment="Center" Margin="0,0,10,0"
+                                   Foreground="{DynamicResource Forest.Muted}" FontSize="12" />
+                        <ComboBox x:Name="ProfileCombo" ItemsSource="{Binding Profiles}" SelectedItem="{Binding ActiveProfile}" MinWidth="240"
+                                  AutomationProperties.AutomationId="ProfileCombo">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ProfileViewModel">
+                                    <TextBlock>
+                                        <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding KindText, Mode=OneWay}" Foreground="{DynamicResource Forest.Muted}" />
+                                    </TextBlock>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                    <TextBlock VerticalAlignment="Center" FontSize="13">
+                        <Run Text="{local:Tr shell.workspaceCrumb}" Foreground="{DynamicResource Forest.Muted}" /><Run Text="   /   " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding PageTitle, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />
+                    </TextBlock>
+                </DockPanel>
+            </Border>
+
+            <!-- разделы: все живут всё время (прокрутка и раскрытые блоки не сбрасываются), виден один — по SelectedTab -->
+            <Panel x:Name="Pages" Margin="16,12,16,12">
+                <views:ModsView DataContext="{Binding Mods}" />
+                <views:CatalogView DataContext="{Binding Catalog}" IsVisible="False" />
+                <views:ModConfigView DataContext="{Binding ModConfig}" IsVisible="False" />
+                <views:ServerView DataContext="{Binding Server}" IsVisible="False" />
+                <views:SettingsView IsVisible="False" />
+                <views:AboutView DataContext="{Binding About}" IsVisible="False" />
+            </Panel>
+        </DockPanel>
+    </Grid>
+</Window>
