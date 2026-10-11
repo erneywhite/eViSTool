@@ -17,7 +17,7 @@ public sealed class BackupRowViewModel(BackupEntry entry)
 {
     public BackupEntry Entry { get; } = entry;
     public string Name => Entry.Name;
-    public string TimeText { get; } = entry.Time.ToString("dd.MM.yyyy HH:mm");
+    public string TimeText { get; } = Dates.Stamp(entry.Time);
     public string SizeText { get; } = Sizes.Format(entry.Size + entry.ModDataSize);
 
     /// <summary>Рядом с копией мира — архив данных модов (Saves без миров, ModData).</summary>
@@ -511,7 +511,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     }
 
     private static string When(DateTime time) =>
-        time.Date == DateTime.Today ? Loc.T("sched.today", time.ToString("HH:mm")) : time.ToString("dd.MM.yyyy HH:mm");
+        time.Date == DateTime.Today ? Loc.T("sched.today", Dates.Clock(time)) : Dates.Stamp(time);
 
     [RelayCommand]
     private Task RefreshList() => RefreshListAsync();

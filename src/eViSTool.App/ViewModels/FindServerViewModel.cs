@@ -184,7 +184,7 @@ public sealed partial class FindServerViewModel : ObservableObject
                 All.Add(new ServerRowViewModel(this, s, null) { InFavorites = favorites.Contains(s.Address) });
             Sort();
             UpdateCounts();
-            StatusText = Loc.T("browse.loaded", MasterHost, DateTime.Now.ToString("HH:mm"));
+            StatusText = Loc.T("browse.loaded", MasterHost, Dates.Clock(DateTime.Now));
         }
         catch (InvalidOperationException ex)
         {

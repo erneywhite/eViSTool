@@ -19,7 +19,7 @@ public partial class ImportPackWindow : Window
         var m = plan.Manifest;
 
         PackName.Text = m.Name;
-        PackInfo.Text = Loc.T("packi.info", m.Mods.Count, m.GameVersion ?? "?", m.Created.ToLocalTime().ToString("d"), m.CreatedWith ?? "?");
+        PackInfo.Text = Loc.T("packi.info", m.Mods.Count, m.GameVersion ?? "?", Dates.Day(m.Created.ToLocalTime()), m.CreatedWith ?? "?");
         PackDescription.Text = m.Description ?? "";
         PackDescription.Visibility = string.IsNullOrWhiteSpace(m.Description) ? Visibility.Collapsed : Visibility.Visible;
 

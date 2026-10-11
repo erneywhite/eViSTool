@@ -96,16 +96,16 @@ public sealed class HistorySessionRow
         Changes = [.. session.Net.Select(c => new HistoryChangeRow(c, installedNow))];
         Title = TitleFor(Changes);
         var start = session.Start.ToLocalTime();
-        When = Day(start) + (session.End - session.Start >= TimeSpan.FromMinutes(1) ? "–" + session.End.ToLocalTime().ToString("HH:mm", Loc.Culture) : "");
+        When = Day(start) + (session.End - session.Start >= TimeSpan.FromMinutes(1) ? "–" + Dates.Clock(session.End.ToLocalTime()) : "");
         Closed = session.LaunchedAt is { } launched
-            ? Loc.T(server ? "hist.beforeServer" : "hist.beforeGame", launched.ToLocalTime().ToString("HH:mm", Loc.Culture))
+            ? Loc.T(server ? "hist.beforeServer" : "hist.beforeGame", Dates.Clock(launched.ToLocalTime()))
             : Loc.T("hist.notLaunched");
         if (undoneAt is { } undone)
-            Closed += " · " + Loc.T(partly ? "hist.undonePartlyAt" : "hist.undoneAt", undone.ToLocalTime().ToString("HH:mm", Loc.Culture));
+            Closed += " · " + Loc.T(partly ? "hist.undonePartlyAt" : "hist.undoneAt", Dates.Clock(undone.ToLocalTime()));
         Sources = string.Join(", ", session.Sources.Select(s => SourceText(s)));
         Summary = Changes.Count == 0 ? Loc.T("hist.noNet") : string.Join(" · ", Changes.Select(c => $"{c.Title} {c.Versions}"));
         Steps = [.. session.Changes.GroupBy(c => c.Op).Select(g =>
-            $"{g.First().At.ToLocalTime().ToString("HH:mm", Loc.Culture)}  {SourceText(g.First().Source)}: "
+            $"{Dates.Clock(g.First().At.ToLocalTime())}  {SourceText(g.First().Source)}: "
             + string.Join(", ", g.Select(c => $"{c.Title} {HistoryChangeRow.Arrow(c.From, c.To)}")))];
     }
 
@@ -159,13 +159,7 @@ public sealed class HistorySessionRow
         _ => Loc.T("hist.src.manual"),
     };
 
-    public static string Day(DateTime t)
-    {
-        var time = t.ToString("HH:mm", Loc.Culture);
-        if (t.Date == DateTime.Today) return Loc.T("stats.today", time);
-        if (t.Date == DateTime.Today.AddDays(-1)) return Loc.T("stats.yesterday", time);
-        return t.ToString("ddd dd.MM, ", Loc.Culture) + time;
-    }
+    public static string Day(DateTime t) => Dates.Relative(t);
 }
 
 public enum ChangeKind { Updated, Downgraded, Installed, Removed }

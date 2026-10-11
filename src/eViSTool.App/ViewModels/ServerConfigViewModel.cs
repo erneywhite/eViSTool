@@ -657,7 +657,7 @@ public sealed partial class ServerConfigViewModel : ObservableObject
             : _saveError.Length > 0 ? (Loc.T("srvcfg.statusSaveFailed", _saveError), RowTone.Danger)
             : ErrorCount > 0 ? (Loc.T("srvcfg.statusErrors", ErrorCount), RowTone.Danger)
             : IsDirty ? (Loc.T("srvcfg.statusDirty", ChangeCount), RowTone.Update)
-            : _savedAt is { } at ? (Loc.T("srvcfg.statusSaved", at.ToString("HH:mm")), RowTone.Good)
+            : _savedAt is { } at ? (Loc.T("srvcfg.statusSaved", Dates.Clock(at)), RowTone.Good)
             : (Loc.T("srvcfg.statusClean"), RowTone.Muted);
 
         SaveCommand.NotifyCanExecuteChanged();

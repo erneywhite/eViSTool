@@ -43,7 +43,7 @@ public sealed partial class PlayerRowViewModel : ObservableObject
 
     /// <summary>«в игре» или «заходил 07.10.2026 21:00».</summary>
     public string SeenText => IsOnline ? Loc.T("players.online")
-        : Player.LastJoin is { } last ? Loc.T("players.lastJoin", last.ToString("dd.MM.yyyy HH:mm")) : "";
+        : Player.LastJoin is { } last ? Loc.T("players.lastJoin", Dates.Stamp(last)) : "";
 
     /// <summary>«Бан до 09.10.2026 17:54 · griefing (Console)».</summary>
     public string BanText => Player.Ban is not { } ban ? "" : ServerPlayersViewModel.BanLine(ban);
@@ -82,7 +82,7 @@ public sealed class PlayerListRowViewModel(PlayerListEntry entry, bool isBan)
     /// <summary>«навсегда · друг (Console)» или «до 09.10.2026 17:54 · …».</summary>
     public string Details { get; } = string.Join("  ·  ", new[]
     {
-        entry.IsPermanent || entry.Until is null ? Loc.T("players.forever") : Loc.T("players.until", entry.Until.Value.ToString("dd.MM.yyyy HH:mm")),
+        entry.IsPermanent || entry.Until is null ? Loc.T("players.forever") : Loc.T("players.until", Dates.Stamp(entry.Until.Value)),
         entry.Reason is { Length: > 0 } r && r != "-" ? r : null,
         entry.IssuedBy is { Length: > 0 } by ? Loc.T("players.issuedBy", by) : null,
     }.Where(s => s is not null));
@@ -294,7 +294,7 @@ public sealed partial class ServerPlayersViewModel : ObservableObject
 
     internal static string BanLine(PlayerListEntry ban) => string.Join("  ·  ", new[]
     {
-        ban.IsPermanent || ban.Until is null ? Loc.T("players.bannedForever") : Loc.T("players.bannedUntil", ban.Until.Value.ToString("dd.MM.yyyy HH:mm")),
+        ban.IsPermanent || ban.Until is null ? Loc.T("players.bannedForever") : Loc.T("players.bannedUntil", Dates.Stamp(ban.Until.Value)),
         ban.Reason is { Length: > 0 } r && r != "-" ? r : null,
     }.Where(s => s is not null));
 

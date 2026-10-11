@@ -549,7 +549,7 @@ public sealed partial class ServerViewModel : ObservableObject
             }
         }
 
-        UptimeText = s.StartedAt is { } started && s.State != ServerState.Stopped ? FormatUptime(DateTime.Now - started) : "—";
+        UptimeText = s.StartedAt is { } started && s.State != ServerState.Stopped ? Dates.Uptime(DateTime.Now - started) : "—";
         MemoryText = s.MemoryMb is { } mb && s.State != ServerState.Stopped ? Loc.T("server.memoryMb", mb.ToString("N0")) : "—";
         PidText = s.ServerPid is { } pid && s.State != ServerState.Stopped ? pid.ToString() : "—";
         ShowPlayers(s.Players, running: s.State == ServerState.Running);
@@ -561,7 +561,7 @@ public sealed partial class ServerViewModel : ObservableObject
         Notify.ShowStatus(s);
         StateNote = s.RestartScheduledAt is { } at ? Loc.T("server.restartIn", Math.Max(0, (int)(at - DateTime.Now).TotalSeconds))
             : s.State == ServerState.Stopped && s.LastExitCode is { } code ? Loc.T("server.lastExit", code)
-            : s.NextRestartAt is { } planned ? Loc.T("server.restartPlanned", planned.ToString("HH:mm"))
+            : s.NextRestartAt is { } planned ? Loc.T("server.restartPlanned", Dates.Clock(planned))
             : "";
     }
 
@@ -589,11 +589,8 @@ public sealed partial class ServerViewModel : ObservableObject
         PlayersText = running ? players.Count.ToString() : "—";
         PlayerNames = !running ? "" : players.Count == 0 ? Loc.T("server.playersNone") : string.Join(" · ", players.Select(p => p.Name));
         PlayersTip = players.Count == 0 ? null : string.Join(Environment.NewLine,
-            players.Select(p => Loc.T("server.playerSince", p.Name, p.Since.ToString("HH:mm"), FormatUptime(DateTime.Now - p.Since))));
+            players.Select(p => Loc.T("server.playerSince", p.Name, Dates.Clock(p.Since), Dates.Uptime(DateTime.Now - p.Since))));
     }
-
-    private static string FormatUptime(TimeSpan t) =>
-        t.TotalDays >= 1 ? $"{(int)t.TotalDays}d {t.Hours}h {t.Minutes:00}m" : t.TotalHours >= 1 ? $"{(int)t.TotalHours}h {t.Minutes:00}m" : $"{t.Minutes}m {t.Seconds:00}s";
 
     private void Attach(AgentClient client, CancellationToken ct)
     {

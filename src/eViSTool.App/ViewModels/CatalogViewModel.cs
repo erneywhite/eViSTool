@@ -311,7 +311,7 @@ public sealed partial class CatalogViewModel : ObservableObject
             }
         }
 
-        var at = _catalog.LoadedAt?.ToLocalTime().ToString("dd.MM HH:mm") ?? "—";
+        var at = (_catalog.LoadedAt is { } loaded ? Dates.DayMonthClock(loaded.ToLocalTime()) : "—");
         StatusText = Loc.T("catalog.found", Results.Count, _catalog.Items.Count, at);
     }
 

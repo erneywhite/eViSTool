@@ -193,7 +193,7 @@ public sealed class StatsChart : FrameworkElement
                 lines.Add((Loc.T("stats.tipCpu", (p.Cpu ?? 0).ToString("0", CultureInfo.CurrentCulture)), Res("Forest.Warn", Brushes.Orange)));
             }
             var crashHere = r.Crashes.Where(c => c >= p.Time && c < p.Time + r.Step).ToList();
-            if (crashHere.Count > 0) lines.Add((Loc.T("stats.tipCrash", crashHere[0].ToString("HH:mm", CultureInfo.CurrentCulture)), danger));
+            if (crashHere.Count > 0) lines.Add((Loc.T("stats.tipCrash", Dates.Clock(crashHere[0])), danger));
             Tooltip(dc, lines, x, w);
         }
     }
@@ -269,29 +269,25 @@ public sealed class StatsChart : FrameworkElement
 
     private static IEnumerable<(DateTime, string)> TimeLabels(StatsReport r)
     {
-        var c = Loc.Culture;
         switch (r.Period)
         {
             case StatsPeriod.Day:
                 for (var t = r.From.Date.AddHours(r.From.Hour / 3 * 3 + 3); t < r.To; t = t.AddHours(3))
-                    yield return (t, t.ToString("HH:mm", c));
+                    yield return (t, Dates.Clock(t));
                 break;
             case StatsPeriod.Week:
                 for (var t = r.From.Date.AddDays(1); t < r.To; t = t.AddDays(1))
-                    yield return (t.AddHours(12), t.ToString("ddd", c));
+                    yield return (t.AddHours(12), Dates.Weekday(t));
                 break;
             default:
                 for (var t = r.From.Date.AddDays(1); t < r.To; t = t.AddDays(1))
-                    if ((r.To.Date - t).Days % 5 == 0) yield return (t, t.ToString("dd.MM", c));
+                    if ((r.To.Date - t).Days % 5 == 0) yield return (t, Dates.DayMonth(t));
                 break;
         }
     }
 
-    private static string TimeRange(DateTime t, TimeSpan step)
-    {
-        var c = Loc.Culture;
-        return $"{t.ToString("ddd dd.MM, HH:mm", c)}–{(t + step).ToString("HH:mm", c)}";
-    }
+    private static string TimeRange(DateTime t, TimeSpan step) =>
+        $"{Dates.Weekday(t)} {Dates.DayMonth(t)}, {Dates.Clock(t)}–{Dates.Clock(t + step)}";
 
     private FormattedText Format(string text, Brush brush, double size) =>
         new(text, Loc.Culture, FlowDirection.LeftToRight,

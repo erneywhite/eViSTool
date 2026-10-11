@@ -17,7 +17,7 @@ public sealed class WorldCopyRow(WorldCopy copy)
     public string Details => string.Join(" · ", new[]
     {
         Copy.IsBeforeRestore ? Loc.T("wcopy.asideLabel") : null,
-        Copy.CopiedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm"),
+        Dates.Stamp(Copy.CopiedAt.ToLocalTime()),
         WorldCopiesViewModel.SizeText(Copy.Size),
     }.Where(s => s is not null));
 }
@@ -81,7 +81,7 @@ public sealed partial class WorldCopiesViewModel : ObservableObject
         }
         var question = row.Copy.IsBeforeRestore
             ? Loc.T("wcopy.restoreAsideConfirm", row.Name)
-            : Loc.T("wcopy.restoreConfirm", row.Name, row.Copy.CopiedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm"));
+            : Loc.T("wcopy.restoreConfirm", row.Name, Dates.Stamp(row.Copy.CopiedAt.ToLocalTime()));
         if (Dialogs.Ask(question, MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
 
         Status = Loc.T("wcopy.restoring", row.Name);

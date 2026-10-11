@@ -215,11 +215,5 @@ public sealed partial class ServerStatsViewModel : ObservableObject
         t.TotalHours >= 1 ? Loc.T("stats.hoursMinutes", (int)t.TotalHours, t.Minutes.ToString("00")) : Loc.T("stats.minutes", (int)t.TotalMinutes);
 
     /// <summary>«сегодня, 21:14», «вчера, 23:48», «чт 08.10, 21:14».</summary>
-    public static string When(DateTime t)
-    {
-        var time = t.ToString("HH:mm", Loc.Culture);
-        if (t.Date == DateTime.Today) return Loc.T("stats.today", time);
-        if (t.Date == DateTime.Today.AddDays(-1)) return Loc.T("stats.yesterday", time);
-        return t.ToString("ddd dd.MM, ", Loc.Culture) + time;
-    }
+    public static string When(DateTime t) => Dates.Relative(t);
 }

@@ -24,7 +24,7 @@ public sealed partial class CleanupItemViewModel : ObservableObject
 
     public CleanupItem Item { get; }
     public string Title => Item.Title;
-    public string Details => (Item.ChangedUtc > DateTime.MinValue ? Item.ChangedUtc.ToLocalTime().ToString("dd.MM.yyyy") + " · " : "")
+    public string Details => (Item.ChangedUtc > DateTime.MinValue ? Dates.Day(Item.ChangedUtc.ToLocalTime()) + " · " : "")
                              + WorldCopiesViewModel.SizeText(Item.Size);
 
     [ObservableProperty] private bool _isChecked;

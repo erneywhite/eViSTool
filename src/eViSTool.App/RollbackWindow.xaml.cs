@@ -41,12 +41,12 @@ public partial class RollbackWindow : Window, INotifyPropertyChanged
         {
             var info = File.Exists(path) ? ModScanner.ReadZip(path).Info : null;
             var version = info?.Version ?? System.IO.Path.GetFileName(path);
-            list.Add(new VersionOption(version, Loc.T("rollback.savedCopy"), File.GetCreationTime(path).ToString("g"),
+            list.Add(new VersionOption(version, Loc.T("rollback.savedCopy"), Dates.Stamp(File.GetCreationTime(path)),
                 version == installedVersion ? Loc.T("rollback.installed") : "", path, null));
         }
         foreach (var r in releases)
         {
-            var date = DateTime.TryParse(r.Created, out var d) ? d.ToString("d") : r.Created ?? "";
+            var date = DateTime.TryParse(r.Created, out var d) ? Dates.Day(d) : r.Created ?? "";
             list.Add(new VersionOption(r.ModVersion ?? "?", "ModDB", date,
                 r.ModVersion == installedVersion ? Loc.T("rollback.installed") : "", null, r));
         }

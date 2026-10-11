@@ -28,7 +28,7 @@ public partial class ModErrorsWindow : Window
     {
         InitializeComponent();
         (_main, _profile, _report) = (main, profile, report);
-        Summary.Text = Loc.T("errs.summary", profile.Name, report.At.ToString("dd.MM HH:mm"), report.Total, report.Mods.Count)
+        Summary.Text = Loc.T("errs.summary", profile.Name, Dates.DayMonthClock(report.At), report.Total, report.Mods.Count)
                        + (report.Unattributed > 0 ? " " + Loc.T("errs.unattributed", report.Unattributed) : "");
         Rows.ItemsSource = report.Mods.Select(l => new ModErrorRow(l)).ToList();
     }

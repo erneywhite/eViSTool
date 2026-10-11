@@ -498,7 +498,7 @@ public sealed partial class ModsViewModel : ObservableObject
             if (_main.ActiveProfile != owner) return;
             _remote = remote;
             Rebuild();
-            StatusText = Loc.T("mods.checkedAt", DateTime.Now.ToString("HH:mm:ss"), game);
+            StatusText = Loc.T("mods.checkedAt", Dates.ClockSeconds(DateTime.Now), game);
         }
         catch (OperationCanceledException)
         {
