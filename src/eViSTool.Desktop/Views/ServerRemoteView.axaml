@@ -1,6 +1,100 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="eViSTool.Desktop.Views.ServerRemoteView">
-    <!-- заглушка: вкладка «Удалённый доступ» раздела «Сервер» ещё переносится с окна на WPF -->
-    <TextBlock Text="Экран «Удалённый доступ» ещё переносится" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
+             xmlns:vm="using:eViSTool.Presentation.ViewModels"
+             xmlns:local="using:eViSTool.Desktop"
+             x:Class="eViSTool.Desktop.Views.ServerRemoteView"
+             x:DataType="vm:ServerRemoteViewModel">
+    <UserControl.Styles>
+        <!-- подпись строки: здесь на 13 и без отступа сверху (в теме — 12 и с отступом, как у полей форм) -->
+        <Style Selector="TextBlock.label">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
+        <StackPanel Margin="0,0,14,0">
+            <Border Classes="card" Padding="20,16,20,18">
+                <StackPanel>
+                    <TextBlock Text="{local:Tr remote.title}" Classes="cardTitle" />
+                    <TextBlock Text="{local:Tr remote.hint}" Classes="hint" />
+
+                    <Border Classes="row">
+                        <DockPanel>
+                            <CheckBox DockPanel.Dock="Right" Theme="{StaticResource Forest.Switch}" IsChecked="{Binding Enabled}" VerticalAlignment="Center"
+                                      AutomationProperties.AutomationId="RemoteEnabled" AutomationProperties.Name="{local:Tr remote.enabled}" />
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{local:Tr remote.enabled}" Classes="label" />
+                                <!-- серый, пока не слушаем; зелёный, когда агент принимает подключения (тон good из темы) -->
+                                <TextBlock Text="{Binding StatusText}" Classes="tone" Classes.good="{Binding IsListening}"
+                                           Margin="0,4,0,0" AutomationProperties.AutomationId="RemoteStatus" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <StackPanel IsVisible="{Binding Enabled}">
+                        <!-- адрес, по которому до этой машины достучатся -->
+                        <Border Classes="row">
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Right" Width="260">
+                                    <ComboBox IsEditable="True" ItemsSource="{Binding Addresses}" Text="{Binding Host}" HorizontalAlignment="Stretch"
+                                              AutomationProperties.AutomationId="RemoteHost" AutomationProperties.Name="{local:Tr remote.host}" />
+                                    <TextBlock Classes="hint" Margin="2,6,0,0">
+                                        <Run Text="{local:Tr remote.port}" /><Run Text=" " /><Run Text="{Binding Port, Mode=OneWay}" FontWeight="SemiBold" />
+                                    </TextBlock>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock Text="{local:Tr remote.host}" Classes="label" />
+                                    <TextBlock Text="{local:Tr remote.hostHint}" Classes="hint" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <!-- код подключения: закрыт точками, пока не попросят показать -->
+                        <Border Classes="row">
+                            <StackPanel>
+                                <TextBlock Text="{local:Tr remote.code}" Classes="label" />
+                                <TextBlock Text="{local:Tr remote.codeHint}" Classes="hint" />
+                                <DockPanel Margin="0,10,0,0">
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="8,0,0,0">
+                                        <Button Content="{Binding RevealText}" Command="{Binding ToggleRevealCommand}" Margin="0,0,8,0"
+                                                AutomationProperties.AutomationId="RemoteReveal" />
+                                        <Button Classes="primary" Command="{Binding CopyCodeCommand}" AutomationProperties.AutomationId="RemoteCopy">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Path Classes="icon" Data="{StaticResource Icon.Copy}" Width="13" Height="13" Margin="0,0,8,0" />
+                                                <TextBlock Text="{local:Tr remote.copy}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                    <!-- закрытый код — точки из самой модели, поэтому системе (скринридерам) отдаётся не ключ, а точки -->
+                                    <TextBox Classes="mono" Text="{Binding CodeText, Mode=OneWay}" IsReadOnly="True" FontSize="12" VerticalContentAlignment="Center"
+                                             AutomationProperties.AutomationId="RemoteCode" />
+                                </DockPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button Content="{local:Tr remote.newKey}" Command="{Binding RegenerateKeyCommand}" Margin="0,0,8,0"
+                                            ToolTip.Tip="{local:Tr remote.newKeyTip}" />
+                                    <!-- правило брандмауэра ставит netsh: только Windows -->
+                                    <Button Content="{local:Tr remote.firewall}" Command="{Binding OpenFirewallCommand}" IsVisible="{Binding CanOpenFirewall}"
+                                            ToolTip.Tip="{local:Tr remote.firewallTip}" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding Message}" FontSize="12" Foreground="{DynamicResource Forest.Accent}" TextWrapping="Wrap" Margin="0,10,0,0"
+                                           IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                           AutomationProperties.AutomationId="RemoteMessage" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- безопасность: коротко и по делу -->
+            <Border Classes="warning" Margin="0,14,0,0">
+                <DockPanel>
+                    <Path Classes="icon" DockPanel.Dock="Left" Data="{StaticResource Icon.Warning}" Stroke="{DynamicResource Forest.Warn}"
+                          VerticalAlignment="Top" Margin="0,2,12,0" />
+                    <TextBlock Text="{local:Tr remote.warning}" Foreground="{DynamicResource Forest.Warn}" TextWrapping="Wrap" FontSize="12" />
+                </DockPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>
