@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -244,7 +245,7 @@ public sealed partial class ModsViewModel : ObservableObject
     private bool IsActive(ModTarget target) => target.ProfileId == _main.ActiveProfile?.Model.Id;
 
     // ---- своя машина: моды могли поменять в другом окне (удалённом или втором локальном) — перечитываем сами
-    private readonly DispatcherTimer _diskWatch = new() { Interval = TimeSpan.FromSeconds(2) };
+    private readonly IUiTimer _diskWatch = Ui.Timer(TimeSpan.FromSeconds(2));
     private DateTime? _diskStamp;
 
     /// <summary>Подзаголовок страницы: «Мой мир · клиент / Vintage Story 1.22.7».</summary>
@@ -568,7 +569,7 @@ public sealed partial class ModsViewModel : ObservableObject
             }
             else
             {
-                Shell.MoveToRecycleBin(row.Local.Path);
+                Ui.Platform.MoveToTrash(row.Local.Path);
                 if (row.Local.Info is { } gone)
                     ModHistory.Record(ModHistory.FileFor(target.ProfileId), gone.ModId, gone.Name, gone.Version, null);
                 // если других копий мода не осталось — чистим его и из списка выключенных
@@ -590,13 +591,8 @@ public sealed partial class ModsViewModel : ObservableObject
     [RelayCommand]
     private void AddFromFile()
     {
-        var dlg = new OpenFileDialog
-        {
-            Title = Loc.T("mods.pickZipTitle"),
-            Filter = Loc.T("mods.zipFilter") + " (*.zip)|*.zip",
-            Multiselect = true,
-        };
-        if (dlg.ShowDialog() == true) _ = AddFilesAsync(dlg.FileNames);
+        var files = Ui.Platform.PickFiles(Loc.T("mods.pickZipTitle"), [new FileFilter(Loc.T("mods.zipFilter"), "*.zip")], multiple: true);
+        if (files is not null) _ = AddFilesAsync(files);
     }
 
     /// <summary>Установка набора zip (кнопка или перетаскивание).</summary>
@@ -651,7 +647,7 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             var text = (installed.Count > 0 ? Loc.T("report.installed") + ":\n• " + string.Join("\n• ", installed) + "\n\n" : "")
                        + Loc.T("report.attention") + ":\n• " + string.Join("\n• ", problems);
-            MessageBox.Show(Application.Current.MainWindow, text, "eViSTool", MessageBoxButton.OK, MessageBoxImage.Warning);
+            Ui.Warn(text);
         }
     }
 
@@ -736,28 +732,33 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             // ставится строго в цель: свою папку или удалённый сервер (своё соединение), активный профиль не важен.
             // План приходит из фонового потока (после сканирования), а вопросы — окна: спрашиваем в потоке окна
-            var outcome = await ModTargets.InstallAsync(target, zip, plan => Application.Current.Dispatcher.Invoke(() =>
+            var outcome = await ModTargets.InstallAsync(target, zip, plan =>
             {
-                var info = plan.Incoming.Info!;
-                var old = plan.Replaces.FirstOrDefault()?.Info?.Version;
-                if (interactive && plan.IsSameVersion && !Confirm(Loc.T("mods.reinstallConfirm", info.Name, info.Version))) return false;
-                if (interactive && plan.IsDowngrade && !Confirm(Loc.T("mods.downgradeConfirm", info.Name, old, info.Version))) return false;
-                // мод требует игру новее — спрашиваем всегда, и при обновлении: модбаза помечает релизы веткой (1.22.x),
-                // а точное требование видно только в самом файле
-                if (plan.NeedsGame is { } need)
+                var go = false;
+                Ui.Invoke(() =>
                 {
-                    var question = old is null
-                        ? Loc.T("mods.needsGameConfirm", info.Name, info.Version, need, target.Profile.Name, plan.Game)
-                        : Loc.T("mods.needsGameUpdateConfirm", info.Name, info.Version, need, target.Profile.Name, plan.Game, old);
-                    if (!Confirm(question))
+                    var info = plan.Incoming.Info!;
+                    var old = plan.Replaces.FirstOrDefault()?.Info?.Version;
+                    if (interactive && plan.IsSameVersion && !Confirm(Loc.T("mods.reinstallConfirm", info.Name, info.Version))) return;
+                    if (interactive && plan.IsDowngrade && !Confirm(Loc.T("mods.downgradeConfirm", info.Name, old, info.Version))) return;
+                    // мод требует игру новее — спрашиваем всегда, и при обновлении: модбаза помечает релизы веткой (1.22.x),
+                    // а точное требование видно только в самом файле
+                    if (plan.NeedsGame is { } need)
                     {
-                        problems.Add(Loc.T("mods.needsGameSkipped", info.Name, info.Version, need, target.Profile.Name));
-                        return false;
+                        var question = old is null
+                            ? Loc.T("mods.needsGameConfirm", info.Name, info.Version, need, target.Profile.Name, plan.Game)
+                            : Loc.T("mods.needsGameUpdateConfirm", info.Name, info.Version, need, target.Profile.Name, plan.Game, old);
+                        if (!Confirm(question))
+                        {
+                            problems.Add(Loc.T("mods.needsGameSkipped", info.Name, info.Version, need, target.Profile.Name));
+                            return;
+                        }
                     }
-                }
-                if (target.IsRemote) StatusText = Loc.T("mods.uploading", info.Name, info.Version);
-                return true;
-            }));
+                    if (target.IsRemote) StatusText = Loc.T("mods.uploading", info.Name, info.Version);
+                    go = true;
+                });
+                return go;
+            });
             if (outcome is null) return false;
             installed.Add(outcome.Text);
             return true;
@@ -786,7 +787,7 @@ public sealed partial class ModsViewModel : ObservableObject
         if (problems.Count == 0) return;
         var text = (installed.Count > 0 ? $"{title}:\n• " + string.Join("\n• ", installed) + "\n\n" : "")
                    + Loc.T("report.attention") + ":\n• " + string.Join("\n• ", problems);
-        MessageBox.Show(Application.Current.MainWindow, text, "eViSTool", MessageBoxButton.OK, MessageBoxImage.Warning);
+        Ui.Warn(text);
     }
 
     private bool ConfirmIfRunning(ModTarget target) =>
@@ -964,7 +965,7 @@ public sealed partial class ModsViewModel : ObservableObject
                 {
                     // неожиданная ошибка не должна оставлять пункт «в работе» навсегда и останавливать очередь молча:
                     // пункт — «не удалось» с текстом ошибки, подробности — в журнал
-                    App.WriteCrashLog(ex);
+                    Ui.Platform.WriteCrashLog(ex);
                     problems.Add(Loc.T("dl.failed", item.Name, item.To, ex.Message));
                 }
 
@@ -1238,13 +1239,9 @@ public sealed partial class ModsViewModel : ObservableObject
         var dlg = new ExportPackWindow(profile.Profile.Name, enabled, disabled, hasConfig) { Owner = Application.Current.MainWindow };
         if (dlg.ShowDialog() != true || dlg.Options is not { } options) return;
 
-        var save = new SaveFileDialog
-        {
-            Title = Loc.T("packx.saveTitle"),
-            Filter = Loc.T("pack.filter") + $" (*{PackManifest.Extension})|*{PackManifest.Extension}",
-            FileName = string.Concat(options.Name.Split(Path.GetInvalidFileNameChars())) + PackManifest.Extension,
-        };
-        if (save.ShowDialog() != true) return;
+        var savePath = Ui.Platform.PickSaveFile(Loc.T("packx.saveTitle"), [new FileFilter(Loc.T("pack.filter"), "*" + PackManifest.Extension)],
+            string.Concat(options.Name.Split(Path.GetInvalidFileNameChars())) + PackManifest.Extension);
+        if (savePath is null) return;
 
         IsBusy = true;
         try
@@ -1259,10 +1256,10 @@ public sealed partial class ModsViewModel : ObservableObject
 
             StatusText = Loc.T("packx.building");
             var locals = _locals;
-            var manifest = await Task.Run(() => PackBuilder.Build(profile, locals, options, onModDb, save.FileName, $"eViSTool {AppVersion}"));
-            var size = new FileInfo(save.FileName).Length / 1024.0 / 1024.0;
-            StatusText = Loc.T("packx.done", manifest.Mods.Count, size.ToString("0.0"), save.FileName);
-            Shell.ShowInFolder(save.FileName);
+            var manifest = await Task.Run(() => PackBuilder.Build(profile, locals, options, onModDb, savePath, $"eViSTool {AppVersion}"));
+            var size = new FileInfo(savePath).Length / 1024.0 / 1024.0;
+            StatusText = Loc.T("packx.done", manifest.Mods.Count, size.ToString("0.0"), savePath);
+            Ui.ShowInFolder(savePath);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException)
         {
@@ -1277,12 +1274,8 @@ public sealed partial class ModsViewModel : ObservableObject
     [RelayCommand]
     private async Task ImportPackAsync()
     {
-        var dlg = new OpenFileDialog
-        {
-            Title = Loc.T("packi.openTitle"),
-            Filter = Loc.T("pack.filter") + $" (*{PackManifest.Extension})|*{PackManifest.Extension}",
-        };
-        if (dlg.ShowDialog() == true) await ImportPackFileAsync(dlg.FileName);
+        var files = Ui.Platform.PickFiles(Loc.T("packi.openTitle"), [new FileFilter(Loc.T("pack.filter"), "*" + PackManifest.Extension)], multiple: false);
+        if (files is { Count: > 0 }) await ImportPackFileAsync(files[0]);
     }
 
     public async Task ImportPackFileAsync(string path)
@@ -1334,9 +1327,12 @@ public sealed partial class ModsViewModel : ObservableObject
                 // в фоне: иначе при паке «всё внутри» импорт идёт синхронно, окно подвисает,
                 // а сообщения прогресса приходят уже после итога и затирают его
                 // файлы с модбазы, перезалитые авторами модов, — ставить ли (спрашиваем до любых изменений профиля)
-                bool AskChanged(IReadOnlyList<string> mods) => Application.Current.Dispatcher.Invoke(() =>
-                    MessageBox.Show(Application.Current.MainWindow!, Loc.T("pack.askChanged", string.Join("\n", mods.Select(x => "• " + x))),
-                        "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes);
+                bool AskChanged(IReadOnlyList<string> mods)
+                {
+                    var yes = false;
+                    Ui.Invoke(() => yes = Ui.Confirm(Loc.T("pack.askChanged", string.Join("\n", mods.Select(x => "• " + x))), byDefault: Answer.No, warning: true));
+                    return yes;
+                }
                 result = await Task.Run(() => target.IsRemote
                     ? importer.ApplyToRemoteAsync(pack, plan, target, mirror, applyConfig, progress, confirmChanged: AskChanged)
                     : importer.ApplyAsync(pack, plan, profile, mirror, applyConfig,
@@ -1425,24 +1421,24 @@ public sealed partial class ModsViewModel : ObservableObject
     [RelayCommand]
     private static void OpenPage(ModRowViewModel? row)
     {
-        if (row?.PageUrl is { } url) Shell.OpenUrl(url);
+        if (row?.PageUrl is { } url) Ui.OpenUrl(url);
     }
 
     [RelayCommand]
     private void ShowFile(ModRowViewModel? row)
     {
-        if (!IsRemote && row is not null && Path.Exists(row.FilePath)) Shell.ShowInFolder(row.FilePath);
+        if (!IsRemote && row is not null && Path.Exists(row.FilePath)) Ui.ShowInFolder(row.FilePath);
     }
 
     [RelayCommand]
     private void OpenModsFolder()
     {
-        if (!IsRemote && Profile?.InstallDir is { } dir && Directory.Exists(dir)) Shell.OpenFolder(dir);
+        if (!IsRemote && Profile?.InstallDir is { } dir && Directory.Exists(dir)) Ui.OpenFolder(dir);
     }
 
     private static bool Confirm(string text) =>
-        MessageBox.Show(Application.Current.MainWindow, text, "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+        Ui.Confirm(text);
 
     private static void Error(string text) =>
-        MessageBox.Show(Application.Current.MainWindow, text, "eViSTool", MessageBoxButton.OK, MessageBoxImage.Warning);
+        Ui.Warn(text);
 }

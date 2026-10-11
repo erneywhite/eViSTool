@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -186,7 +187,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
     {
         // ушли с файла с правками — спросить (здесь уже без «Отмены»: список выбор уже сменил); текст — тот, что в поле сейчас
         if (_switching || oldValue is null || !IsDirty) return;
-        if (Dialogs.Ask(Loc.T("mcfg.askSave", oldValue.File.FileName), MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+        if (Ui.Confirm(Loc.T("mcfg.askSave", oldValue.File.FileName)))
             _ = SaveAsync(oldValue, Text, _loadedChangedUtc);
     }
 
@@ -310,9 +311,9 @@ public sealed partial class ModConfigViewModel : ObservableObject
     public bool ConfirmLeave()
     {
         if (!IsDirty || Selected is not { } row) return true;
-        switch (Dialogs.Ask(Loc.T("mcfg.askSave", row.File.FileName), MessageBoxButton.YesNoCancel))
+        switch (Ui.Ask(Loc.T("mcfg.askSave", row.File.FileName), AskButtons.YesNoCancel))
         {
-            case MessageBoxResult.Yes:
+            case Answer.Yes:
                 // уйти можно только после записи: ждём её на месте, но не дольше 15 секунд (агент недоступен —
                 // ошибка, а не зависшее окно). Ошибку показываем здесь же: из фоновой задачи нельзя обратиться к окну,
                 // пока оно само её ждёт, — это была бы взаимная блокировка
@@ -325,10 +326,10 @@ public sealed partial class ModConfigViewModel : ObservableObject
                 }
                 catch (Exception ex) when (IsExpected(ex))
                 {
-                    Dialogs.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, ex.Message));
+                    Ui.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, ex.Message));
                     return false;
                 }
-            case MessageBoxResult.No:
+            case Answer.No:
                 _loadedText = Text; // отказались — больше не спрашиваем
                 return true;
             default:
@@ -348,8 +349,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
     private async Task SaveAsync(ModConfigRow row, string text, DateTime? stamp)
     {
         if (IsRunning()
-            && Dialogs.Ask(Loc.T(_profile!.Kind == ProfileKind.Server ? "mcfg.serverRunning" : "mcfg.gameRunning"),
-                   MessageBoxButton.YesNo) != MessageBoxResult.Yes)
+            && !Ui.Confirm(Loc.T(_profile!.Kind == ProfileKind.Server ? "mcfg.serverRunning" : "mcfg.gameRunning")))
             return;
         if (await SaveCoreAsync(row, text, stamp, interactive: true) is { } content) Finish(row, text, content);
     }
@@ -370,7 +370,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
             var result = await source.SaveAsync(new ModConfigSaveRequest(row.File.RelativePath, text, stamp), ct);
             if (result.Changed)
             {
-                if (interactive && Dialogs.Ask(Loc.T("mcfg.changedOutside", row.File.FileName), MessageBoxButton.YesNo) != MessageBoxResult.Yes)
+                if (interactive && !Ui.Confirm(Loc.T("mcfg.changedOutside", row.File.FileName)))
                     return null;
                 result = await source.SaveAsync(new ModConfigSaveRequest(row.File.RelativePath, text, null), ct);
             }
@@ -378,7 +378,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
         }
         catch (Exception ex) when (interactive && IsExpected(ex))
         {
-            Dialogs.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, ex.Message));
+            Ui.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, ex.Message));
             return null;
         }
     }
@@ -405,7 +405,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
     private async Task RestorePrevious()
     {
         if (Selected is not { } row || _source is not { } source) return;
-        if (IsDirty && Dialogs.Ask(Loc.T("mcfg.askDiscard"), MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        if (IsDirty && !Ui.Confirm(Loc.T("mcfg.askDiscard"))) return;
         try
         {
             var content = await source.UndoAsync(row.File.RelativePath);
@@ -415,7 +415,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
         }
         catch (Exception ex) when (IsExpected(ex))
         {
-            Dialogs.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, ex.Message));
+            Ui.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, ex.Message));
         }
     }
 
@@ -423,7 +423,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
     private async Task Reset()
     {
         if (Selected is not { } row || _source is not { } source) return;
-        if (Dialogs.Ask(Loc.T("mcfg.askReset", row.File.FileName), MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        if (!Ui.Confirm(Loc.T("mcfg.askReset", row.File.FileName))) return;
         try
         {
             var content = await source.ResetAsync(row.File.RelativePath);
@@ -433,7 +433,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
         }
         catch (Exception ex) when (IsExpected(ex))
         {
-            Dialogs.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, ex.Message));
+            Ui.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, ex.Message));
         }
     }
 
@@ -441,8 +441,8 @@ public sealed partial class ModConfigViewModel : ObservableObject
     private void OpenFolder()
     {
         if (_source is null) return;
-        if (Selected is { } row && _source.LocalPath(row.File.RelativePath) is { } path && File.Exists(path)) Shell.ShowInFolder(path);
-        else if (_source.LocalFolder is { } dir && Directory.Exists(dir)) Shell.OpenFolder(dir);
+        if (Selected is { } row && _source.LocalPath(row.File.RelativePath) is { } path && File.Exists(path)) Ui.ShowInFolder(path);
+        else if (_source.LocalFolder is { } dir && Directory.Exists(dir)) Ui.OpenFolder(dir);
     }
 
     [RelayCommand]

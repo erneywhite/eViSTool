@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.Net.Http;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -153,7 +154,7 @@ public sealed partial class ModCardViewModel : ObservableObject
     }
 
     private static bool Confirm(string text) =>
-        MessageBox.Show(Application.Current.MainWindow, text, "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+        Ui.Confirm(text);
 
     [RelayCommand]
     private void OpenScreenshot(string? url)

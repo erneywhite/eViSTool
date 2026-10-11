@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.IO;
 using System.Net.Http;
 using CommunityToolkit.Mvvm.Input;
@@ -135,7 +136,7 @@ public sealed partial class ModsViewModel
                 await agent.DeleteModAsync(mod.Path);
                 return;
             }
-            Shell.MoveToRecycleBin(mod.Path);
+            Ui.Platform.MoveToTrash(mod.Path);
             if (mod.Info is { } info)
             {
                 ModHistory.Record(ModHistory.FileFor(target.ProfileId), info.ModId, info.Name, info.Version, null);

@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
@@ -76,13 +77,13 @@ public sealed partial class WorldCopiesViewModel : ObservableObject
         // игра держит мир открытым и при выходе записала бы его поверх возвращённого
         if (GameProcess.IsRunning(_profile))
         {
-            Dialogs.Warn(Loc.T("wcopy.closeGame"));
+            Ui.Warn(Loc.T("wcopy.closeGame"));
             return;
         }
         var question = row.Copy.IsBeforeRestore
             ? Loc.T("wcopy.restoreAsideConfirm", row.Name)
             : Loc.T("wcopy.restoreConfirm", row.Name, Dates.Stamp(row.Copy.CopiedAt.ToLocalTime()));
-        if (Dialogs.Ask(question, MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        if (!Ui.Confirm(question)) return;
 
         Status = Loc.T("wcopy.restoring", row.Name);
         try
@@ -93,7 +94,7 @@ public sealed partial class WorldCopiesViewModel : ObservableObject
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             Status = "";
-            Dialogs.Warn(Loc.T("wcopy.restoreFailed", row.Name, ex.Message));
+            Ui.Warn(Loc.T("wcopy.restoreFailed", row.Name, ex.Message));
         }
         Refresh();
     }
@@ -102,6 +103,6 @@ public sealed partial class WorldCopiesViewModel : ObservableObject
     private void OpenFolder()
     {
         var dir = WorldCopies.DirFor(_dataDir);
-        if (Directory.Exists(dir)) Shell.OpenFolder(dir);
+        if (Directory.Exists(dir)) Ui.OpenFolder(dir);
     }
 }

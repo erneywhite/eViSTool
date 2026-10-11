@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.Collections.ObjectModel;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -180,14 +181,14 @@ public sealed partial class CleanupViewModel : ObservableObject
         CheckRunning();
         if (IsRunning)
         {
-            Dialogs.Warn(RunningText);
+            Ui.Warn(RunningText);
             return;
         }
         var chosen = Groups.SelectMany(g => g.Items).Where(i => i.IsChecked).Select(i => i.Item).ToList();
         var careful = Groups.Where(g => g.IsCareful && g.Items.Any(i => i.IsChecked)).Select(g => "• " + g.Title).ToList();
         var question = Loc.T("clean.confirm", chosen.Count, WorldCopiesViewModel.SizeText(chosen.Sum(i => i.Size)))
                        + (careful.Count > 0 ? "\n\n" + Loc.T("clean.confirmCareful") + "\n" + string.Join("\n", careful) : "");
-        if (Dialogs.Ask(question, System.Windows.MessageBoxButton.YesNo) != System.Windows.MessageBoxResult.Yes) return;
+        if (!Ui.Confirm(question)) return;
 
         IsBusy = true;
         Status = Loc.T("clean.removing");

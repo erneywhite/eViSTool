@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+﻿using eViSTool.Presentation;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -172,7 +173,7 @@ public sealed partial class MainViewModel : ObservableObject
     private bool CanPlayNow => !IsGameRunning && !IsLaunching;
 
     // раз в пару секунд: запущена ли игра активного клиентского профиля
-    private readonly System.Windows.Threading.DispatcherTimer _gameWatch = new() { Interval = TimeSpan.FromSeconds(2) };
+    private readonly IUiTimer _gameWatch = Ui.Timer(TimeSpan.FromSeconds(2));
     private bool _gameChecking;
 
     // наблюдение за запущенной игрой: её логи — с момента запуска; вылет или закрытие мира — окно с виновником.
@@ -314,7 +315,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             // проверка ответила раньше, чем показалось главное окно, — повторить, когда программа освободится
             if (++_updatePromptWaits <= 20)
-                System.Windows.Application.Current.Dispatcher.BeginInvoke(ShowUpdatePrompt, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                Ui.PostIdle(ShowUpdatePrompt);
             return;
         }
         _updatePromptShown = true;
@@ -342,7 +343,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     // ---- падения серверов: следим за всеми серверными профилями (свои — через их агентов, удалённые — по коду),
     // а не только за активным: сервер упал, пока открыт клиент, — оповещение всё равно приходит
-    private readonly System.Windows.Threading.DispatcherTimer _serverWatch = new() { Interval = TimeSpan.FromSeconds(15) };
+    private readonly IUiTimer _serverWatch = Ui.Timer(TimeSpan.FromSeconds(15));
     private readonly Dictionary<string, string?> _seenServerCrash = [];
     private readonly DateTime _startedAt = DateTime.Now;
     private bool _serverChecking;
@@ -430,7 +431,6 @@ public sealed partial class MainViewModel : ObservableObject
     private async Task LaunchAsync(PlayTarget? server)
     {
         if (ActiveProfile is not { Kind: ProfileKind.Client } profile) return;
-        var owner = System.Windows.Application.Current.MainWindow!;
 
         // вторая копия игры с той же папкой данных перезапишет настройки первой: кнопка в это время неактивна,
         // а здесь — на случай, если игру запустили только что (ярлык), а опрос ещё не заметил
@@ -446,8 +446,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is FileNotFoundException or InvalidOperationException or System.ComponentModel.Win32Exception)
         {
-            System.Windows.MessageBox.Show(owner, Loc.T("play.failed", ex.Message), "eViSTool",
-                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            Ui.Warn(Loc.T("play.failed", ex.Message));
             return;
         }
 
@@ -498,7 +497,7 @@ public sealed partial class MainViewModel : ObservableObject
         : Loc.T("settings.dataFallback", Core.AppPaths.Root);
 
     [RelayCommand]
-    private void OpenDataFolder() => Shell.OpenFolder(Core.AppPaths.Root);
+    private void OpenDataFolder() => Ui.OpenFolder(Core.AppPaths.Root);
 
     public MainViewModel()
     {
@@ -530,7 +529,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         // Удалённый доступ работает, пока открыто это окно (или пока работает сервер): держим агентов таких профилей
         // запущенными. Закрыли окно и сервер не работает — агент через пару минут выйдет, в системе ничего не остаётся.
-        _keepRemote = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        _keepRemote = Ui.Timer(TimeSpan.FromSeconds(30));
         _keepRemote.Tick += (_, _) => _ = KeepRemoteAgentsAsync();
         _keepRemote.Start();
         _gameWatch.Tick += (_, _) => _ = CheckGameAsync();
@@ -544,7 +543,7 @@ public sealed partial class MainViewModel : ObservableObject
         _ = KeepRemoteAgentsAsync();
     }
 
-    private readonly System.Windows.Threading.DispatcherTimer _keepRemote;
+    private readonly IUiTimer _keepRemote;
 
     // ---------- eViSTool обновили на диске, пока окно открыто ----------
 
@@ -554,7 +553,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// (видно на Windows-сервере по RDP). Нечего терять — перезапускаемся сами; есть несохранённое или идёт установка —
     /// ссылка «перезапустить» в боковой панели, решает человек.
     /// </summary>
-    private readonly System.Windows.Threading.DispatcherTimer _exeWatch = new() { Interval = TimeSpan.FromSeconds(10) };
+    private readonly IUiTimer _exeWatch = Ui.Timer(TimeSpan.FromSeconds(10));
 
     /// <summary>Версия на диске, когда сам перезапуск отложен (есть несохранённое); null — перезапускать нечего.</summary>
     [ObservableProperty] private string? _updatedOnDisk;
@@ -618,8 +617,8 @@ public sealed partial class MainViewModel : ObservableObject
     private void RestartUpdated()
     {
         _exeWatch.Stop();
-        App.RestartAfterClose(MainExe);
-        if (Application.Current.MainWindow is { IsVisible: true }) _exeWatch.Start(); // закрытие отменили (есть вопрос «сохранить?»)
+        Ui.Platform.RestartAfterClose(MainExe);
+        if (Ui.Platform.IsMainWindowVisible) _exeWatch.Start(); // закрытие отменили (есть вопрос «сохранить?»)
     }
 
     private async Task KeepRemoteAgentsAsync()
@@ -839,14 +838,12 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (profile is null || Profiles.Count <= 1) return; // последний профиль не удаляем
         var model = profile.Model;
-        var owner = System.Windows.Application.Current.MainWindow!;
         // удаляем активный — сначала правки его конфига (отмена — профиль не удаляем)
         if (profile == ActiveProfile && !Server.Config.ConfirmSwitch()) return;
 
         if (model.Kind == ProfileKind.Server && await IsServerRunningAsync(model))
         {
-            System.Windows.MessageBox.Show(owner, Loc.T("settings.removeRunning", model.Name), "eViSTool",
-                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            Ui.Warn(Loc.T("settings.removeRunning", model.Name));
             return;
         }
 
@@ -863,17 +860,14 @@ public sealed partial class MainViewModel : ObservableObject
         {
             var size = await Task.Run(() => FolderSize(dir!));
             // по умолчанию — «Нет»: случайный Enter не должен уносить мир
-            var answer = System.Windows.MessageBox.Show(owner, Loc.T("settings.removeAskData", model.Name, dir, Sizes.Format(size)), "eViSTool",
-                System.Windows.MessageBoxButton.YesNoCancel, System.Windows.MessageBoxImage.Warning, System.Windows.MessageBoxResult.No);
-            if (answer == System.Windows.MessageBoxResult.Cancel) return;
-            deleteData = answer == System.Windows.MessageBoxResult.Yes;
+            var answer = Ui.Ask(Loc.T("settings.removeAskData", model.Name, dir, Sizes.Format(size)), AskButtons.YesNoCancel, byDefault: Answer.No, warning: true);
+            if (answer == Answer.Cancel) return;
+            deleteData = answer == Answer.Yes;
         }
-        else if (System.Windows.MessageBox.Show(owner, users.Count > 0
+        else if (!Ui.Confirm(users.Count > 0
                          // папку используют другие профили — удалить её не предлагаем, объясняем почему
                          ? Loc.T("settings.removeAskShared", model.Name, dir, string.Join("\n", users.Select(u => "• " + u.Describe())))
-                         : Loc.T("settings.removeAsk", model.Name, string.IsNullOrWhiteSpace(dir) ? "—" : dir), "eViSTool",
-                     System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question, System.Windows.MessageBoxResult.No)
-                 != System.Windows.MessageBoxResult.Yes)
+                         : Loc.T("settings.removeAsk", model.Name, string.IsNullOrWhiteSpace(dir) ? "—" : dir), byDefault: Answer.No))
         {
             return;
         }
@@ -882,13 +876,12 @@ public sealed partial class MainViewModel : ObservableObject
         {
             try
             {
-                Shell.MoveToRecycleBin(dir!); // в Корзину, не насовсем: мир можно вернуть
+                Ui.Platform.MoveToTrash(dir!); // в Корзину, не насовсем: мир можно вернуть
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
             {
                 // папку убрать не удалось — профиль оставляем, чтобы можно было повторить
-                System.Windows.MessageBox.Show(owner, Loc.T("settings.removeDataFailed", dir, ex.Message), "eViSTool",
-                    System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                Ui.Warn(Loc.T("settings.removeDataFailed", dir, ex.Message));
                 return;
             }
         }

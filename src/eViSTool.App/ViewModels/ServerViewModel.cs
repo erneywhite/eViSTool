@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Net.Http;
@@ -431,7 +432,7 @@ public sealed partial class ServerViewModel : ObservableObject
             {
                 // неожиданная ошибка (битый ответ, файл занят, процесс не прочитать) не должна молча останавливать опрос:
                 // иначе вкладка застынет на старом состоянии. Пишем в журнал и пробуем снова
-                App.WriteCrashLog(ex);
+                Ui.Platform.WriteCrashLog(ex);
                 try { await Task.Delay(3000, ct); } catch (TaskCanceledException) { return; }
             }
         }
@@ -632,7 +633,7 @@ public sealed partial class ServerViewModel : ObservableObject
             {
                 if (ct.IsCancellationRequested) return;
                 // связь мигнула — обычное дело; что-то другое (битый ответ) — в журнал, но поток консоли не бросаем
-                if (ex is not (HttpRequestException or TaskCanceledException or InvalidOperationException or IOException)) App.WriteCrashLog(ex);
+                if (ex is not (HttpRequestException or TaskCanceledException or InvalidOperationException or IOException)) Ui.Platform.WriteCrashLog(ex);
                 await Task.Delay(1000, CancellationToken.None);
                 if (!ReferenceEquals(client, _client)) return;
             }
@@ -683,7 +684,7 @@ public sealed partial class ServerViewModel : ObservableObject
     {
         if (_client is not { } client) return;
         var question = _remoteServerUp ? Loc.T("selfupd.confirmRunning", AgentProtocol.AppVersion) : Loc.T("selfupd.confirm", AgentProtocol.AppVersion);
-        if (MessageBox.Show(Application.Current.MainWindow, question, "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (!Ui.Confirm(question))
             return;
         try
         {
@@ -713,8 +714,7 @@ public sealed partial class ServerViewModel : ObservableObject
     private Task Kill() => Do(async () =>
     {
         if (_client is null) return;
-        if (MessageBox.Show(Application.Current.MainWindow, Loc.T("server.killConfirm"), "eViSTool",
-                MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        if (!Ui.Confirm(Loc.T("server.killConfirm"), warning: true)) return;
         Apply(await _client.KillAsync());
     });
 
@@ -771,8 +771,7 @@ public sealed partial class ServerViewModel : ObservableObject
     private Task KillForeign() => Do(() =>
     {
         if (ForeignPid is not { } pid) return Task.CompletedTask;
-        if (MessageBox.Show(Application.Current.MainWindow, Loc.T("server.killConfirm"), "eViSTool",
-                MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return Task.CompletedTask;
+        if (!Ui.Confirm(Loc.T("server.killConfirm"), warning: true)) return Task.CompletedTask;
         try
         {
             using var p = System.Diagnostics.Process.GetProcessById(pid);
@@ -789,7 +788,7 @@ public sealed partial class ServerViewModel : ObservableObject
     private void OpenLogs()
     {
         if (_main.ActiveProfile?.Model.DataDir is { } data && Directory.Exists(Path.Combine(data, "Logs")))
-            Shell.OpenFolder(Path.Combine(data, "Logs"));
+            Ui.OpenFolder(Path.Combine(data, "Logs"));
     }
 }
 

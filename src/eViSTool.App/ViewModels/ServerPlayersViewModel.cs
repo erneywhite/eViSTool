@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -404,8 +405,7 @@ public sealed partial class ServerPlayersViewModel : ObservableObject
     private Task Kick(PlayerRowViewModel? row)
     {
         if (row is null) return Task.CompletedTask;
-        if (MessageBox.Show(Application.Current.MainWindow, Loc.T("players.kickConfirm", row.Name), "eViSTool",
-                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return Task.CompletedTask;
+        if (!Ui.Confirm(Loc.T("players.kickConfirm", row.Name))) return Task.CompletedTask;
         return ApplyAsync(() => [PlayerCommands.Kick(row.Name)], null);
     }
 

@@ -1,5 +1,6 @@
 using System.Windows;
 using eViSTool.App.ViewModels;
+using eViSTool.Presentation;
 using eViSTool.Core.Profiles;
 
 namespace eViSTool.App.Tests;
@@ -30,7 +31,7 @@ public sealed class WorldCopiesViewModelTests : IDisposable
     [Fact]
     public void ListsTheCopy_AndPutsItBackAfterYes() => Sta.Run(() =>
     {
-        using var dialogs = new ScriptedDialogs(MessageBoxResult.Yes);
+        using var dialogs = new ScriptedDialogs(Answer.Yes);
         var vm = new WorldCopiesViewModel(_profile);
         var row = Assert.Single(vm.Rows);
         Assert.Equal("Home", row.Name);
@@ -47,7 +48,7 @@ public sealed class WorldCopiesViewModelTests : IDisposable
     [Fact]
     public void No_ChangesNothing() => Sta.Run(() =>
     {
-        using var dialogs = new ScriptedDialogs(MessageBoxResult.No);
+        using var dialogs = new ScriptedDialogs(Answer.No);
         var vm = new WorldCopiesViewModel(_profile);
 
         Sta.Wait(vm.RestoreCommand.ExecuteAsync(vm.Rows[0]));

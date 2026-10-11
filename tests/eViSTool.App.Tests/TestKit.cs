@@ -1,11 +1,12 @@
 using System.Diagnostics;
 using System.Windows;
+using eViSTool.Presentation;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Server;
 using eViSTool.Core.Server.Remote;
 using Newtonsoft.Json.Linq;
 
-// вопросы пользователю подменяются глобально (Dialogs) — тесты этой сборки идут по одному
+// вопросы пользователю подменяются глобально (Ui.Platform) — тесты этой сборки идут по одному
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
 
 namespace eViSTool.App.Tests;
@@ -21,6 +22,7 @@ internal static class Sta
             // как в окне: продолжения после await возвращаются в этот поток (через его диспетчер)
             SynchronizationContext.SetSynchronizationContext(
                 new System.Windows.Threading.DispatcherSynchronizationContext(System.Windows.Threading.Dispatcher.CurrentDispatcher));
+            if (!Ui.IsSet) Ui.Platform = new WpfUiPlatform();
             try { body(); }
             catch (Exception ex) { error = ex; }
         });
@@ -59,25 +61,35 @@ internal static class Sta
 /// <summary>Ответы «пользователя» на вопросы по порядку; что спрашивали и о чём предупреждали — для проверок.</summary>
 internal sealed class ScriptedDialogs : IDisposable
 {
-    private readonly Queue<MessageBoxResult> _answers;
+    private readonly Queue<Answer> _answers;
     public List<string> Asked { get; } = [];
     public List<string> Warned { get; } = [];
 
-    public ScriptedDialogs(params MessageBoxResult[] answers)
+    public ScriptedDialogs(params Answer[] answers)
     {
-        _answers = new Queue<MessageBoxResult>(answers);
-        Dialogs.Ask = (text, _) =>
-        {
-            Asked.Add(text);
-            return _answers.Count > 0 ? _answers.Dequeue() : throw new InvalidOperationException("Неожиданный вопрос: " + text);
-        };
-        Dialogs.Warn = Warned.Add;
+        _answers = new Queue<Answer>(answers);
+        Ui.Platform = new ScriptedPlatform(this);
     }
 
-    public void Dispose()
+    public void Dispose() => Ui.Platform = new ScriptedPlatform(null);
+
+    internal Answer Next(string text)
     {
-        Dialogs.Ask = (text, _) => throw new InvalidOperationException("Вопрос без сценария: " + text);
-        Dialogs.Warn = text => throw new InvalidOperationException("Предупреждение без сценария: " + text);
+        Asked.Add(text);
+        return _answers.Count > 0 ? _answers.Dequeue() : throw new InvalidOperationException("Неожиданный вопрос: " + text);
+    }
+}
+
+/// <summary>Платформа с заранее заданными ответами; без сценария (null) любой вопрос или сообщение роняет тест.</summary>
+internal sealed class ScriptedPlatform(ScriptedDialogs? script) : WpfUiPlatform
+{
+    public override Answer Ask(string text, AskButtons buttons, Answer? byDefault = null, bool warning = false) =>
+        script is null ? throw new InvalidOperationException("Вопрос без сценария: " + text) : script.Next(text);
+
+    public override void Notify(string text, NoticeKind kind)
+    {
+        if (script is null) throw new InvalidOperationException("Предупреждение без сценария: " + text);
+        script.Warned.Add(text);
     }
 }
 

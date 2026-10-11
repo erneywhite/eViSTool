@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using eViSTool.Core.Profiles;
 using System.Net.Http;
 using System.Windows;
@@ -23,7 +24,7 @@ public sealed partial class CatalogViewModel : ObservableObject
     private readonly MainViewModel _main;
     private readonly ModDbClient _db;
     private readonly CatalogService _catalog;
-    private readonly DispatcherTimer _searchDelay;
+    private readonly IUiTimer _searchDelay;
     private bool _loaded;
     private CancellationTokenSource? _detailsCts;
 
@@ -137,7 +138,7 @@ public sealed partial class CatalogViewModel : ObservableObject
         BuildChoices();
 
         // поиск не на каждую букву, а после короткой паузы
-        _searchDelay = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        _searchDelay = Ui.Timer(TimeSpan.FromMilliseconds(250));
         _searchDelay.Tick += (_, _) => { _searchDelay.Stop(); ApplySearch(); };
 
         // поставили/удалили мод — обновить отметки «установлен»
@@ -256,7 +257,7 @@ public sealed partial class CatalogViewModel : ObservableObject
     }
 
     // ошибки поиска не должны теряться молча в фоновой задаче
-    private void ApplySearch() => ApplySearchAsync().ContinueWith(t => App.WriteCrashLog(t.Exception),
+    private void ApplySearch() => ApplySearchAsync().ContinueWith(t => Ui.Platform.WriteCrashLog(t.Exception!),
         CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
 
     private async Task ApplySearchAsync()
@@ -339,26 +340,22 @@ public sealed partial class CatalogViewModel : ObservableObject
         var id = details.ModId ?? release.ModIdStr;
         if (string.IsNullOrEmpty(id))
         {
-            MessageBox.Show(Application.Current.MainWindow, Loc.T("catalog.noModId"), "eViSTool");
+            Ui.Info(Loc.T("catalog.noModId"));
             return;
         }
         // клиентский мод выделенному серверу ни к чему (не загружает): спросить. Серверный у игрока нужен одиночной игре
         var kind = _main.ActiveProfile?.Model.Kind ?? ProfileKind.Client;
         var side = ModSides.Parse(details.Mod?.Side ?? details.RawSide);
         if (ModSides.IsUnneeded(side, kind)
-            && MessageBox.Show(Application.Current.MainWindow,
-                   Loc.T("catalog.clientOnlyAsk", details.Name),
-                   "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            && !Ui.Confirm(Loc.T("catalog.clientOnlyAsk", details.Name)))
             return;
         // релиз сверяется с версией игры профиля, куда сейчас поставим (её же запомнит установка как цель)
         var game = _main.Mods.GameVersion;
         if (!CatalogPick.Fits(release, game)
-            && MessageBox.Show(Application.Current.MainWindow,
-                   game is null
+            && !Ui.Confirm(game is null
                        ? Loc.T("catalog.unknownGameAsk", details.Name, release.ModVersion)
                        : Loc.T("catalog.otherGameAsk", details.Name, release.ModVersion,
-                           string.Join(", ", release.GameVersions.TakeLast(3)), game),
-                   "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
+                           string.Join(", ", release.GameVersions.TakeLast(3)), game), byDefault: Answer.No, warning: true))
             return;
 
         // мод нужен и в других профилях (сервер ↔ клиент) — предложить поставить заодно, каждому свою версию
@@ -578,13 +575,13 @@ public sealed partial class ModDetailsViewModel : ObservableObject
         var text = InstalledVersion is null
             ? Loc.T("catalog.installVersionConfirm", Name, v.Version)
             : Loc.T("mcard.installVersionConfirm", Name, v.Version, InstalledVersion);
-        if (MessageBox.Show(Application.Current.MainWindow, text, "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (!Ui.Confirm(text))
             return;
         await _owner.InstallAsync(this, release);
     }
 
     [RelayCommand]
-    private void OpenPage() => Shell.OpenUrl(PageUrl);
+    private void OpenPage() => Ui.OpenUrl(PageUrl);
 
     [RelayCommand]
     private void OpenScreenshot(string? url)

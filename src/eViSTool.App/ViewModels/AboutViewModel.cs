@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.IO;
 using System.Net.Http;
 using System.Reflection;
@@ -57,18 +58,18 @@ public sealed partial class AboutViewModel : ObservableObject
         : "";
 
     [RelayCommand]
-    private static void OpenKofi() => Shell.OpenUrl(KofiUrl);
+    private static void OpenKofi() => Ui.OpenUrl(KofiUrl);
 
     [RelayCommand]
     private static void OpenUrl(string? url)
     {
-        if (!string.IsNullOrEmpty(url)) Shell.OpenUrl(url);
+        if (!string.IsNullOrEmpty(url)) Ui.OpenUrl(url);
     }
 
     [RelayCommand]
     private void OpenReleaseNotes()
     {
-        if (AvailableUpdate?.PageUrl is { Length: > 0 } url) Shell.OpenUrl(url);
+        if (AvailableUpdate?.PageUrl is { Length: > 0 } url) Ui.OpenUrl(url);
     }
 
     /// <summary>Тихая проверка при запуске: ошибки (нет сети, GitHub недоступен) не показываем.</summary>
@@ -116,9 +117,8 @@ public sealed partial class AboutViewModel : ObservableObject
     private async Task InstallUpdate()
     {
         if (await InstallAsync() is { } release
-            && MessageBox.Show(Application.Current.MainWindow!, Loc.T("about.updateRestartAsk", release.Version), "eViSTool",
-                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
-            App.RestartAfterClose(Path.Combine(AppContext.BaseDirectory, AppUpdater.MainExe));
+            && Ui.Confirm(Loc.T("about.updateRestartAsk", release.Version), byDefault: Answer.Yes))
+            Ui.Platform.RestartAfterClose(Path.Combine(AppContext.BaseDirectory, AppUpdater.MainExe));
     }
 
     /// <summary>

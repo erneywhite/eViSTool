@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
@@ -27,7 +28,7 @@ public sealed record PlayerStatsRow(string Name, string PlayedText, double Share
 public sealed partial class ServerStatsViewModel : ObservableObject
 {
     private readonly ServerViewModel _server;
-    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(60) };
+    private readonly IUiTimer _timer = Ui.Timer(TimeSpan.FromSeconds(60));
     private GameProfile? _profile;
     private bool _active, _applying;
     private int _generation;
@@ -195,8 +196,7 @@ public sealed partial class ServerStatsViewModel : ObservableObject
     private async Task Clear()
     {
         if (Data is not { } data) return;
-        if (MessageBox.Show(Application.Current.MainWindow!, Loc.T("stats.clearAsk"), "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Warning,
-                MessageBoxResult.No) != MessageBoxResult.Yes)
+        if (!Ui.Confirm(Loc.T("stats.clearAsk"), byDefault: Answer.No, warning: true))
             return;
         try
         {

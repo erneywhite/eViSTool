@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
@@ -380,8 +381,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
             return;
         }
         var start = BackupDirText.Length > 0 && Directory.Exists(BackupDirText) ? BackupDirText : _dataDir;
-        var dlg = new Microsoft.Win32.OpenFolderDialog { Title = Loc.T("backupdir.pick"), InitialDirectory = start };
-        if (dlg.ShowDialog() == true) BackupDirText = dlg.FolderName;
+        if (Ui.Platform.PickFolder(Loc.T("backupdir.pick"), start) is { } picked) BackupDirText = picked;
     }
 
     [RelayCommand]
@@ -600,8 +600,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         if (row is null || _data is not { } data) return;
         var text = Loc.T("sched.restoreAsk", row.Name, row.TimeText, row.SizeText)
                    + (row.Entry.IsOwn ? "" : "\n\n" + Loc.T("sched.restoreForeign"));
-        if (MessageBox.Show(Application.Current.MainWindow!, text, "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No)
-            != MessageBoxResult.Yes)
+        if (!Ui.Confirm(text, byDefault: Answer.No, warning: true))
             return;
 
         IsBusy = true;
@@ -631,13 +630,13 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         if (_data is not LocalServerData local) return;
         var dir = local.Files.BackupsDir;
         Directory.CreateDirectory(dir);
-        Shell.OpenFolder(dir);
+        Ui.OpenFolder(dir);
     }
 
     [RelayCommand]
     private static void ShowInFolder(BackupRowViewModel? row)
     {
-        if (row?.Entry.LocalPath is { } path && File.Exists(path)) Shell.ShowInFolder(path);
+        if (row?.Entry.LocalPath is { } path && File.Exists(path)) Ui.ShowInFolder(path);
     }
 
     [RelayCommand]
@@ -645,8 +644,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     {
         if (row is null || _data is not { } data) return;
         var ask = Loc.T(data.IsRemote ? "sched.deleteAskRemote" : "sched.deleteAsk", row.Name);
-        if (MessageBox.Show(Application.Current.MainWindow!, ask, "eViSTool",
-                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
+        if (!Ui.Confirm(ask, byDefault: Answer.No))
             return;
         try
         {

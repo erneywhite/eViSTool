@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Net.Http;
@@ -88,8 +89,7 @@ public sealed partial class NotifyChannelsViewModel : ObservableObject
     private void DeleteChannel(NotifyChannelRowViewModel? row)
     {
         if (row is null) return;
-        if (MessageBox.Show(Application.Current.MainWindow, Loc.T("notify.deleteConfirm", row.Name), "eViSTool",
-                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        if (!Ui.Confirm(Loc.T("notify.deleteConfirm", row.Name))) return;
         try
         {
             Channels.Remove(row);

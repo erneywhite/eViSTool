@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.ComponentModel;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -171,21 +172,16 @@ public sealed partial class ConfigPathFieldViewModel(ServerConfigDocument doc, C
     {
         // «сохранить как»: файла мира может ещё не быть — сервер создаст его при запуске
         var world = Spec.Name == "SaveFileLocation";
-        var dlg = new SaveFileDialog
-        {
-            Title = Label,
-            OverwritePrompt = false,
-            Filter = world ? Loc.T("srvcfg.worldFileFilter") + $" (*{WorldExtension})|*{WorldExtension}" : Loc.T("srvcfg.anyFileFilter") + " (*.*)|*.*",
-            DefaultExt = world ? WorldExtension : "",
-            AddExtension = world,
-        };
+        var filter = world ? new FileFilter(Loc.T("srvcfg.worldFileFilter"), "*" + WorldExtension) : new FileFilter(Loc.T("srvcfg.anyFileFilter"), "*.*");
+        string? folder = null;
+        var suggestedName = "";
         try
         {
             var dir = System.IO.Path.GetDirectoryName(Text.Trim());
             if (Directory.Exists(dir))
             {
-                dlg.InitialDirectory = dir;
-                dlg.FileName = System.IO.Path.GetFileName(Text.Trim());
+                folder = dir;
+                suggestedName = System.IO.Path.GetFileName(Text.Trim());
             }
         }
         catch (ArgumentException)
@@ -193,7 +189,7 @@ public sealed partial class ConfigPathFieldViewModel(ServerConfigDocument doc, C
             // в поле не путь — диалог откроется там, где был в прошлый раз
         }
 
-        if (dlg.ShowDialog() == true) Text = dlg.FileName;
+        if (Ui.Platform.PickSaveFile(Label, [filter], suggestedName, folder, confirmOverwrite: false) is { } picked) Text = picked;
     }
 }
 

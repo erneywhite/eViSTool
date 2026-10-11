@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
@@ -26,7 +27,7 @@ public sealed partial class ServerRemoteViewModel : ObservableObject
     private string _fingerprint = "";
     private RemoteSettings _settings = new();
     // код открыт — через RevealFor закрывается сам; кнопка «Скрыть» при этом работает всегда
-    private readonly System.Windows.Threading.DispatcherTimer _hideTimer = new() { Interval = RevealFor };
+    private readonly IUiTimer _hideTimer = Ui.Timer(RevealFor);
 
     public ServerRemoteViewModel() => _hideTimer.Tick += (_, _) => Hide();
 
@@ -187,7 +188,7 @@ public sealed partial class ServerRemoteViewModel : ObservableObject
         if (Code is not { } code) return;
         try
         {
-            Clipboard.SetText(code);
+            Ui.Platform.SetClipboard(code);
             Message = Loc.T("remote.copied");
         }
         catch (System.Runtime.InteropServices.ExternalException ex)
@@ -200,8 +201,7 @@ public sealed partial class ServerRemoteViewModel : ObservableObject
     private void RegenerateKey()
     {
         if (_profile is null) return;
-        if (MessageBox.Show(Application.Current.MainWindow!, Loc.T("remote.newKeyAsk"), "eViSTool",
-                MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
+        if (!Ui.Confirm(Loc.T("remote.newKeyAsk"), byDefault: Answer.No, warning: true))
             return;
         _settings = RemoteAccess.RegenerateKey(_profile.Id);
         Hide();

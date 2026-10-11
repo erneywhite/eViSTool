@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -106,24 +107,19 @@ public sealed partial class ProfileViewModel : ObservableObject
     private void BrowseGameDir()
     {
         var exe = Kind == ProfileKind.Server ? "VintagestoryServer.exe" : "Vintagestory.exe";
-        var dlg = new OpenFolderDialog { Title = Loc.T("profile.pickGameDir", exe), InitialDirectory = GameDir };
-        if (dlg.ShowDialog() == true) GameDir = dlg.FolderName;
+        if (Ui.Platform.PickFolder(Loc.T("profile.pickGameDir", exe), GameDir) is { } picked) GameDir = picked;
     }
 
     [RelayCommand]
     private void BrowseDataDir()
     {
-        var dlg = new OpenFolderDialog
-        {
-            Title = Loc.T(Kind == ProfileKind.Server ? "profile.pickServerData" : "profile.pickClientData"),
-            InitialDirectory = DataDir,
-        };
-        if (dlg.ShowDialog() == true) DataDir = dlg.FolderName;
+        var title = Loc.T(Kind == ProfileKind.Server ? "profile.pickServerData" : "profile.pickClientData");
+        if (Ui.Platform.PickFolder(title, DataDir) is { } picked) DataDir = picked;
     }
 
     [RelayCommand]
     private void OpenDataDir()
     {
-        if (Directory.Exists(DataDir)) Shell.OpenFolder(DataDir);
+        if (Directory.Exists(DataDir)) Ui.OpenFolder(DataDir);
     }
 }

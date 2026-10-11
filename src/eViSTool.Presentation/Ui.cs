@@ -29,7 +29,9 @@ public interface IUiTimer
 public interface IUiPlatform
 {
     // ---- вопросы и сообщения (владелец — главное окно)
-    Answer Ask(string text, AskButtons buttons);
+    /// <param name="byDefault">Кнопка по умолчанию (Enter); null — первая. У опасных вопросов — «Нет».</param>
+    /// <param name="warning">Вопрос-предупреждение (жёлтый значок вместо вопросительного).</param>
+    Answer Ask(string text, AskButtons buttons, Answer? byDefault = null, bool warning = false);
     void Notify(string text, NoticeKind kind);
 
     // ---- поток окна
@@ -74,16 +76,21 @@ public static class Ui
 {
     private static IUiPlatform? _platform;
 
+    /// <summary>Платформа уже задана (тесты ставят свою, только если окно не поставило).</summary>
+    public static bool IsSet => _platform is not null;
+
     public static IUiPlatform Platform
     {
         get => _platform ?? throw new InvalidOperationException("Ui.Platform не задан: окно ставит его при запуске, тест — перед проверкой.");
         set => _platform = value;
     }
 
-    public static Answer Ask(string text, AskButtons buttons = AskButtons.YesNo) => Platform.Ask(text, buttons);
+    public static Answer Ask(string text, AskButtons buttons = AskButtons.YesNo, Answer? byDefault = null, bool warning = false) =>
+        Platform.Ask(text, buttons, byDefault, warning);
 
     /// <summary>«Да» на вопрос «да / нет».</summary>
-    public static bool Confirm(string text) => Platform.Ask(text, AskButtons.YesNo) == Answer.Yes;
+    public static bool Confirm(string text, Answer? byDefault = null, bool warning = false) =>
+        Platform.Ask(text, AskButtons.YesNo, byDefault, warning) == Answer.Yes;
 
     public static void Info(string text) => Platform.Notify(text, NoticeKind.Info);
     public static void Warn(string text) => Platform.Notify(text, NoticeKind.Warning);

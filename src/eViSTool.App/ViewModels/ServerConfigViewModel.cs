@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.Net.Http;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -69,7 +70,7 @@ public sealed partial class ServerConfigViewModel : ObservableObject
 
     // Свой сервер: пока вкладка открыта, файл могли поменять снаружи (правка с другого компьютера через агента, сервер,
     // вкладка «Моды») — раз в пару секунд сверяем отметку файла. У удалённого сервера о том же сообщает статус агента.
-    private readonly System.Windows.Threading.DispatcherTimer _diskWatch = new() { Interval = TimeSpan.FromSeconds(2) };
+    private readonly IUiTimer _diskWatch = Ui.Timer(TimeSpan.FromSeconds(2));
 
     public ServerConfigViewModel()
     {
@@ -179,7 +180,7 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     {
         if (string.Equals(PathFor(dataDir, remoteProfile), _path, StringComparison.OrdinalIgnoreCase)) return;
         if (_doc is not { IsDirty: true } doc) return;
-        if (Ask(Loc.T("srvcfg.askSaveOnSwitch", _profileName), MessageBoxButton.YesNo) == MessageBoxResult.Yes && !SaveOnLeave())
+        if (Ask(Loc.T("srvcfg.askSaveOnSwitch", _profileName), AskButtons.YesNo) == Answer.Yes && !SaveOnLeave())
             SaveDraft(doc);
         Unload();
     }
@@ -333,13 +334,13 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     private bool ConfirmLeave(string question)
     {
         if (_doc is not { IsDirty: true }) return true;
-        switch (Ask(question, MessageBoxButton.YesNoCancel))
+        switch (Ask(question, AskButtons.YesNoCancel))
         {
-            case MessageBoxResult.Yes:
+            case Answer.Yes:
                 if (CanSave) return TrySave();
                 Warn(Loc.T("srvcfg.cantSave"));
                 return false;
-            case MessageBoxResult.No:
+            case Answer.No:
                 return true;
             default:
                 return false;
@@ -356,7 +357,7 @@ public sealed partial class ServerConfigViewModel : ObservableObject
             Warn(Loc.T("srvcfg.notSavedRoleErrors", string.Join(Environment.NewLine, _roleErrors)));
             return false;
         }
-        if (ChangedExternally(doc) && Ask(Loc.T("srvcfg.askOverwrite"), MessageBoxButton.YesNo) != MessageBoxResult.Yes) return false;
+        if (ChangedExternally(doc) && Ask(Loc.T("srvcfg.askOverwrite"), AskButtons.YesNo) != Answer.Yes) return false;
         try
         {
             if (IsRemote) UploadRemoteAsync(doc, force: true, blocking: true).GetAwaiter().GetResult(); // о перезаписи уже спросили
@@ -835,11 +836,11 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     /// <summary>«Файл уже другой: перезаписать?» Да — перезаписать; Нет — перечитать и отбросить правки; Отмена — ничего.</summary>
     private bool AskOverwrite()
     {
-        switch (Ask(Loc.T("srvcfg.askChangedOnDisk"), MessageBoxButton.YesNoCancel))
+        switch (Ask(Loc.T("srvcfg.askChangedOnDisk"), AskButtons.YesNoCancel))
         {
-            case MessageBoxResult.Yes:
+            case Answer.Yes:
                 return true;
-            case MessageBoxResult.No:
+            case Answer.No:
                 Load();
                 return false;
             default:
@@ -862,7 +863,7 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     private void Reload()
     {
         if (_path is null) return;
-        if (_doc is { IsDirty: true } && Ask(Loc.T("srvcfg.askReload"), MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        if (_doc is { IsDirty: true } && Ask(Loc.T("srvcfg.askReload"), AskButtons.YesNo) != Answer.Yes) return;
         Load();
     }
 
@@ -870,8 +871,8 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     private void ShowFile()
     {
         if (_path is null) return;
-        if (File.Exists(_path)) Shell.ShowInFolder(_path);
-        else if (Path.GetDirectoryName(_path) is { } dir && Directory.Exists(dir)) Shell.OpenFolder(dir);
+        if (File.Exists(_path)) Ui.ShowInFolder(_path);
+        else if (Path.GetDirectoryName(_path) is { } dir && Directory.Exists(dir)) Ui.OpenFolder(dir);
     }
 
     partial void OnStateChanged(ConfigLoadState value)
@@ -883,7 +884,7 @@ public sealed partial class ServerConfigViewModel : ObservableObject
         GenerateCommand.NotifyCanExecuteChanged();
     }
 
-    private static MessageBoxResult Ask(string text, MessageBoxButton buttons) => Dialogs.Ask(text, buttons);
+    private static Answer Ask(string text, AskButtons buttons) => Ui.Ask(text, buttons);
 
-    private static void Warn(string text) => Dialogs.Warn(text);
+    private static void Warn(string text) => Ui.Warn(text);
 }

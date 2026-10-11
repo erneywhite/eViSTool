@@ -14,7 +14,7 @@ public class WpfUiPlatform : IUiPlatform
     /// <summary>Владелец окон сообщений: главное окно, если оно на экране (иначе сообщение без владельца).</summary>
     private static Window? Owner => Application.Current?.MainWindow is { IsVisible: true } main ? main : null;
 
-    public virtual Answer Ask(string text, AskButtons buttons)
+    public virtual Answer Ask(string text, AskButtons buttons, Answer? byDefault = null, bool warning = false)
     {
         var wpfButtons = buttons switch
         {
@@ -22,9 +22,18 @@ public class WpfUiPlatform : IUiPlatform
             AskButtons.OkCancel => MessageBoxButton.OKCancel,
             _ => MessageBoxButton.YesNo,
         };
+        var image = warning ? MessageBoxImage.Warning : MessageBoxImage.Question;
+        var preset = byDefault switch
+        {
+            Answer.Yes => MessageBoxResult.Yes,
+            Answer.No => MessageBoxResult.No,
+            Answer.Cancel => MessageBoxResult.Cancel,
+            Answer.Ok => MessageBoxResult.OK,
+            _ => MessageBoxResult.None,
+        };
         var result = Owner is { } owner
-            ? MessageBox.Show(owner, text, "eViSTool", wpfButtons, MessageBoxImage.Question)
-            : MessageBox.Show(text, "eViSTool", wpfButtons, MessageBoxImage.Question);
+            ? MessageBox.Show(owner, text, "eViSTool", wpfButtons, image, preset)
+            : MessageBox.Show(text, "eViSTool", wpfButtons, image, preset);
         return result switch
         {
             MessageBoxResult.Yes => Answer.Yes,

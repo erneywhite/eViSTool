@@ -1,5 +1,6 @@
 using System.Windows;
 using eViSTool.App.ViewModels;
+using eViSTool.Presentation;
 using eViSTool.Core.Server;
 using eViSTool.Core.Server.Remote;
 
@@ -98,7 +99,7 @@ public sealed class ConfigProfileSwitchTests : IClassFixture<TestServers>
         var (a, b) = (ByName(from), ByName(to));
         Sta.Run(() =>
         {
-            using var dialogs = new ScriptedDialogs(MessageBoxResult.Yes);
+            using var dialogs = new ScriptedDialogs(Answer.Yes);
             using var editor = new Editor();
             editor.Open(a);
             Assert.Equal(a.Name, editor.ServerName);
@@ -123,7 +124,7 @@ public sealed class ConfigProfileSwitchTests : IClassFixture<TestServers>
         var (a, b) = (ByName(from), ByName(to));
         Sta.Run(() =>
         {
-            using var dialogs = new ScriptedDialogs(MessageBoxResult.No);
+            using var dialogs = new ScriptedDialogs(Answer.No);
             using var editor = new Editor();
             editor.Open(a);
             editor.ServerName = "edited";
@@ -144,7 +145,7 @@ public sealed class ConfigProfileSwitchTests : IClassFixture<TestServers>
         var (a, b) = (ByName(from), ByName(to));
         Sta.Run(() =>
         {
-            using var dialogs = new ScriptedDialogs(MessageBoxResult.Cancel);
+            using var dialogs = new ScriptedDialogs(Answer.Cancel);
             using var editor = new Editor();
             editor.Open(a);
             editor.ServerName = "edited";
@@ -164,7 +165,7 @@ public sealed class ConfigProfileSwitchTests : IClassFixture<TestServers>
         var (a, b) = (_s.RemoteA, _s.LocalB);
         Sta.Run(() =>
         {
-            using var dialogs = new ScriptedDialogs(MessageBoxResult.Yes);
+            using var dialogs = new ScriptedDialogs(Answer.Yes);
             using var editor = new Editor();
             editor.Open(a);
             editor.ServerName = "edited";
@@ -191,7 +192,7 @@ public sealed class ConfigProfileSwitchTests : IClassFixture<TestServers>
         List<string> warned = [];
         Sta.Run(() =>
         {
-            using var dialogs = new ScriptedDialogs(MessageBoxResult.Yes);
+            using var dialogs = new ScriptedDialogs(Answer.Yes);
             using var editor = new Editor();
             editor.Open(a);
             editor.ServerName = "edited";

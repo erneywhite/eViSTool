@@ -1,3 +1,4 @@
+using eViSTool.Presentation;
 using System.Collections.ObjectModel;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -199,7 +200,7 @@ public sealed partial class RolesEditorViewModel : ObservableObject
         catch (InvalidOperationException ex)
         {
             // окно код уже проверило; сюда попадём, только если правила ядра строже
-            MessageBox.Show(Application.Current.MainWindow, ex.Message, "eViSTool", MessageBoxButton.OK, MessageBoxImage.Warning);
+            Ui.Warn(ex.Message);
         }
     }
 
@@ -221,8 +222,7 @@ public sealed partial class RolesEditorViewModel : ObservableObject
     {
         if (_selectedRole is not { } role) return;
         var question = Loc.T("roles.deleteConfirm", role.DisplayName, role.Entry.Code);
-        if (MessageBox.Show(Application.Current.MainWindow, question, "eViSTool", MessageBoxButton.YesNo, MessageBoxImage.Question)
-            == MessageBoxResult.Yes)
+        if (Ui.Confirm(question))
             Remove(role);
     }
 
