@@ -450,6 +450,7 @@
   "cfg.WorldConfig.WorldType.choice.standard": "Standard",
   "cfg.WorldConfig.WorldType.choice.superflat": "Superflat",
   "cfg.WorldConfig.WorldType.hint": "Terrain generator for a new world: normal landscape or flat.",
+  "cfg.busy": "{0} is being written by another window or the agent right now. Try again in a couple of seconds.",
   "cfg.group.antiabuse": "Anti-cheat and flood protection",
   "cfg.group.gameplay": "Gameplay",
   "cfg.group.hosting": "Hosting",

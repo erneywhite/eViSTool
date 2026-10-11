@@ -141,8 +141,11 @@ public sealed class ServerFiles(string profileId, string dataDir, string? backup
         var path = ConfigPath;
         var root = ModConfigEditor.Parse(request.Text);
         using var world = WorldLock.Take(dataDir, WorldLock.Config); // сервер не стартует на полузаписанном конфиге
-        if (!request.Force && StampOf(path) != request.ExpectedStamp) return new ConfigSaveResult(true, ReadConfig());
-        ModConfigEditor.Save(path, root);
+        using (ConfigFileLock.Take(path)) // проверка «не поменялся» и запись — одним действием: между ними никто не впишется
+        {
+            if (!request.Force && StampOf(path) != request.ExpectedStamp) return new ConfigSaveResult(true, ReadConfig());
+            ModConfigEditor.SaveLocked(path, root);
+        }
         return new ConfigSaveResult(false, ReadConfig());
     }
 

@@ -416,4 +416,22 @@ public sealed class ProfileClonerTests : IDisposable
     {
         public void Report(CloneProgress value) => action(value);
     }
+
+    [Fact]
+    public async Task WorldBusy_CloneIsRefused_AndServiceFilesAreNotCopied()
+    {
+        var to = Target("busy");
+        var plan = ProfileCloner.Plan(_source, new CloneOptions { Name = "Busy", TargetDir = to });
+
+        // мир источника занят (сервер работает или идёт восстановление) — сразу отказ, а не рассогласованная копия
+        using (Server.WorldLock.Take(_data, Server.WorldLock.Server))
+            await Assert.ThrowsAsync<Server.WorldBusyException>(() => ProfileCloner.ApplyAsync(plan));
+        Assert.False(Directory.Exists(to));
+
+        // освободился — клонируется; служебный замок мира в клон не попадает
+        plan = ProfileCloner.Plan(_source, new CloneOptions { Name = "Busy", TargetDir = to });
+        await ProfileCloner.ApplyAsync(plan);
+        Assert.False(File.Exists(Path.Combine(to, Server.WorldLock.FileName)));
+        Assert.True(File.Exists(Path.Combine(to, "servermagicnumbers.json")));
+    }
 }

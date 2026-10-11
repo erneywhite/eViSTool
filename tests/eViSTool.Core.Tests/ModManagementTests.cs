@@ -234,4 +234,18 @@ public sealed class ModManagementTests : IDisposable
         using (var zip = ZipFile.Open(bad, ZipArchiveMode.Create)) zip.CreateEntry("readme.txt");
         Assert.Throws<InvalidDataException>(() => ModInstaller.Plan(bad, p, []));
     }
+
+    [Fact]
+    public void ManyDisablesAtOnce_LoseNoChange()
+    {
+        // окно и агент выключают моды в одном serverconfig.json одновременно: без замка файла часть правок затиралась
+        var p = Server("""{ "ServerName": "S", "WorldConfig": { "DisabledMods": [] } }""");
+        var ids = Enumerable.Range(1, 16).Select(i => $"mod{i}").ToList();
+
+        Parallel.ForEach(ids, new ParallelOptions { MaxDegreeOfParallelism = 8 }, id => ModConfigEditor.SetEnabled(p, Mod(id), enabled: false));
+
+        var disabled = JObject.Parse(File.ReadAllText(p.ConfigPath!))["WorldConfig"]!["DisabledMods"]!.Values<string>();
+        Assert.Equal(ids.Order(), disabled.Order());
+        Assert.Equal(["serverconfig.json", "serverconfig.json.evistool.bak"], Directory.GetFiles(_data).Select(Path.GetFileName).Order());
+    }
 }

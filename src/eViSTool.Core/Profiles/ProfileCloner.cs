@@ -76,6 +76,12 @@ public static class ProfileCloner
     public const string MainConfig = "serverconfig.json";
 
     // не копируются никогда: журналы и кэш сервер создаст заново, а ServerProfiles и ClientProfiles — это папки других профилей
+    /// <summary>
+    /// Служебное eViSTool в папке данных: замок мира, временные папки восстановления и клонирования. Клону они не нужны,
+    /// а замок мира источника клонирование само держит монопольно — скопировать его и не вышло бы.
+    /// </summary>
+    private static bool IsEviSToolService(string name) => name.StartsWith(".evistool-", StringComparison.OrdinalIgnoreCase);
+
     private static readonly string[] AlwaysSkipped = ["Logs", "Cache", ServerProfileLayout.ContainerName, ClientProfileLayout.ContainerName];
     private const string ModsDir = "Mods";
     private static readonly string[] BackupDirs = ["Backups", "BackupSaves"];
@@ -136,6 +142,7 @@ public static class ProfileCloner
         foreach (var entry in Directory.EnumerateFileSystemEntries(from))
         {
             var name = Path.GetFileName(entry);
+            if (IsEviSToolService(name)) continue;
             if (Directory.Exists(entry))
             {
                 if (AlwaysSkipped.Contains(name, StringComparer.OrdinalIgnoreCase)) continue;
@@ -210,6 +217,9 @@ public static class ProfileCloner
         var from = Path.GetFullPath(plan.Source.DataDir!).TrimEnd('\\', '/');
         var to = Path.GetFullPath(plan.Options.TargetDir).TrimEnd('\\', '/');
 
+        // мир исходного профиля — занят на всё копирование: сервер (сторож, расписание) не запустится посреди него, а
+        // идущее восстановление или работающий сервер — отказ сразу, а не рассогласованная копия
+        using var world = Server.WorldLock.Take(from, Server.WorldLock.Copy);
         await StageAsync(to, async stage =>
         {
             await CopyAsync(plan.Files, plan.Directories, stage, progress, ct).ConfigureAwait(false);

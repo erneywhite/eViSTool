@@ -450,6 +450,7 @@
   "cfg.WorldConfig.WorldType.choice.standard": "Обычный",
   "cfg.WorldConfig.WorldType.choice.superflat": "Плоский",
   "cfg.WorldConfig.WorldType.hint": "Генератор местности для нового мира: обычный ландшафт или плоский.",
+  "cfg.busy": "Файл {0} сейчас записывает другое окно или агент. Попробуй ещё раз через пару секунд.",
   "cfg.group.antiabuse": "Защита от читов и флуда",
   "cfg.group.gameplay": "Игровой процесс",
   "cfg.group.hosting": "Хостинг",

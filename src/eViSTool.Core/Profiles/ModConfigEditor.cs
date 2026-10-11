@@ -21,6 +21,8 @@ public static class ModConfigEditor
                 ? Loc.T("cfg.noServerConfigRun")
                 : Loc.T("cfg.noClientConfigRun"));
 
+        // прочитать, поменять и записать — под замком файла: иначе одновременная запись из окна или агента затёрла бы правку
+        using var held = ConfigFileLock.Take(path);
         var root = Load(path);
         var list = GetOrCreateList(root, profile.Profile.Kind);
 
@@ -44,7 +46,7 @@ public static class ModConfigEditor
             changed = !plain || existing.Count > 1;
         }
 
-        if (changed) Save(path, root);
+        if (changed) SaveLocked(path, root);
         return changed;
     }
 
@@ -97,8 +99,16 @@ public static class ModConfigEditor
     /// <summary>
     /// Резервная копия предыдущего состояния рядом (*.evistool.bak) и атомарная запись. Переводы строк — как в прежнем
     /// файле: конфиг с Windows на Linux (и наоборот) не перекраивается целиком; нового файла — как принято в системе.
+    /// Под замком файла (<see cref="ConfigFileLock"/>); кто уже держит его — <see cref="SaveLocked"/>.
     /// </summary>
     internal static void Save(string path, JObject root)
+    {
+        using var held = ConfigFileLock.Take(path);
+        SaveLocked(path, root);
+    }
+
+    /// <summary>Записать, когда замок файла уже взят вызывающим (он же прочитал и проверил файл под ним).</summary>
+    internal static void SaveLocked(string path, JObject root)
     {
         var newLine = File.Exists(path) ? NewLineOf(path) : null;
         if (File.Exists(path)) File.Copy(path, path + ".evistool.bak", overwrite: true);
