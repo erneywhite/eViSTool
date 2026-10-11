@@ -404,17 +404,13 @@ public sealed partial class MainViewModel : ObservableObject
     /// Значок игры для блока «Vintage Story» внизу слева — из установленной игры активного профиля, а если у него
     /// своей нет (удалённый профиль) — из любого другого профиля. null — игры нет нигде: показываются буквы «VS».
     /// </summary>
-    public System.Windows.Media.ImageSource? GameIcon =>
-        global::eViSTool.App.GameIcon.From(new[] { ActiveProfile?.GameDir }.Concat(Profiles.Select(p => p.GameDir))
-            .Append(Core.Game.GameInstall.FindGameDir()));
-
-    public bool HasGameIcon => GameIcon is not null;
+    public IReadOnlyList<string?> IconSearchDirs =>
+        [.. new[] { ActiveProfile?.GameDir }.Concat(Profiles.Select(p => p.GameDir)).Append(Core.Game.GameInstall.FindGameDir())];
 
     private void NotifyPlay()
     {
         _ = CheckGameAsync(); // сменили профиль — у нового своя игра
-        OnPropertyChanged(nameof(GameIcon));
-        OnPropertyChanged(nameof(HasGameIcon));
+        OnPropertyChanged(nameof(IconSearchDirs));
         OnPropertyChanged(nameof(CanPlay));
         OnPropertyChanged(nameof(PlayText));
         OnPropertyChanged(nameof(PlayTip));

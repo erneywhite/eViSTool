@@ -46,11 +46,11 @@
 
         <!-- поля формы: по типу значения -->
         <DataTemplate DataType="{x:Type vm:GroupField}">
-            <TextBlock Text="{Binding Key}" Margin="{Binding Indent}" Padding="8,14,0,4" FontSize="13" FontWeight="SemiBold"
+            <TextBlock Text="{Binding Key}" Margin="{Binding IndentLeft, Converter={x:Static local:LeftMarginConverter.Instance}}" Padding="8,14,0,4" FontSize="13" FontWeight="SemiBold"
                        Foreground="{StaticResource Forest.Accent}" />
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:BoolField}">
-            <Border Style="{StaticResource FieldRow}" Margin="{Binding Indent}">
+            <Border Style="{StaticResource FieldRow}" Margin="{Binding IndentLeft, Converter={x:Static local:LeftMarginConverter.Instance}}">
                 <DockPanel Height="36">
                     <CheckBox DockPanel.Dock="Right" Style="{StaticResource Forest.Switch}" IsChecked="{Binding Value}" VerticalAlignment="Center"
                               AutomationProperties.Name="{Binding Key}" />
@@ -59,7 +59,7 @@
             </Border>
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:NumberField}">
-            <Border Style="{StaticResource FieldRow}" Margin="{Binding Indent}">
+            <Border Style="{StaticResource FieldRow}" Margin="{Binding IndentLeft, Converter={x:Static local:LeftMarginConverter.Instance}}">
                 <StackPanel>
                     <DockPanel MinHeight="36">
                         <TextBox DockPanel.Dock="Right" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Width="140" VerticalAlignment="Center"
@@ -71,7 +71,7 @@
             </Border>
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:TextField}">
-            <Border Style="{StaticResource FieldRow}" Margin="{Binding Indent}">
+            <Border Style="{StaticResource FieldRow}" Margin="{Binding IndentLeft, Converter={x:Static local:LeftMarginConverter.Instance}}">
                 <DockPanel MinHeight="36">
                     <TextBox DockPanel.Dock="Right" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Width="260" VerticalAlignment="Center"
                              ToolTip="{Binding Hint}" AutomationProperties.Name="{Binding Key}" />
@@ -80,7 +80,7 @@
             </Border>
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:JsonField}">
-            <Border Style="{StaticResource FieldRow}" Margin="{Binding Indent}" Padding="8,0,8,8">
+            <Border Style="{StaticResource FieldRow}" Margin="{Binding IndentLeft, Converter={x:Static local:LeftMarginConverter.Instance}}" Padding="8,0,8,8">
                 <StackPanel>
                     <TextBlock Text="{Binding Key}" Style="{StaticResource FieldKey}" Margin="0,8,0,4" />
                     <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" FontSize="12"
@@ -149,7 +149,7 @@
                         </TextBlock.Style>
                     </TextBlock>
                 </Grid>
-                <ListBox ItemsSource="{Binding RowsView}" SelectedItem="{Binding Selected}"
+                <ListBox ItemsSource="{Binding RowsView.Items}" SelectedItem="{Binding Selected}"
                          ItemContainerStyle="{StaticResource Forest.CardItem}" Background="Transparent" BorderThickness="0" Padding="0"
                          VirtualizingPanel.ScrollUnit="Pixel" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListBox.ItemTemplate>

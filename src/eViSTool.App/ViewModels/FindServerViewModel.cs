@@ -1,8 +1,8 @@
+using eViSTool.Presentation;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Net.Http;
-using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Game;
@@ -78,8 +78,8 @@ public sealed partial class FindServerViewModel : ObservableObject
         _client = client.Model;
         _clientVersion = client.Resolved.GameVersion?.ToString();
         MasterUrl = ServerBrowser.MasterUrl(_client.DataDir);
-        View = CollectionViewSource.GetDefaultView(All);
-        View.Filter = o => o is ServerRowViewModel r && Matches(r);
+        View = new FilteredList<ServerRowViewModel>(All);
+        View.Filter = Matches;
         _ = Task.Run(() =>
         {
             // моды профиля — для «у тебя есть N из M»; не прочитались — не беда
@@ -94,7 +94,7 @@ public sealed partial class FindServerViewModel : ObservableObject
     public string VersionChip => Loc.T("browse.myVersion", _clientVersion ?? "?");
 
     public ObservableCollection<ServerRowViewModel> All { get; } = [];
-    public ICollectionView View { get; }
+    public FilteredList<ServerRowViewModel> View { get; }
     public ObservableCollection<ServerRowViewModel> Favorites { get; } = [];
 
     [ObservableProperty] private bool _isFavoritesTab;
@@ -111,7 +111,7 @@ public sealed partial class FindServerViewModel : ObservableObject
     [ObservableProperty] private string _errorText = "";
     [ObservableProperty] private string _countText = "";
 
-    public string AllTabTitle => Loc.T("browse.tabAll", View.Cast<object>().Count());
+    public string AllTabTitle => Loc.T("browse.tabAll", View.Count);
     public string FavoritesTabTitle => Loc.T("browse.tabFavorites", Favorites.Count);
     public bool IsAllTab => !IsFavoritesTab;
 
@@ -156,15 +156,13 @@ public sealed partial class FindServerViewModel : ObservableObject
 
     private void Sort()
     {
-        View.SortDescriptions.Clear();
-        if (ByName) View.SortDescriptions.Add(new SortDescription(nameof(ServerRowViewModel.Name), ListSortDirection.Ascending));
-        // по игрокам — так список и приходит отсортированным ниже, при загрузке
-        View.Refresh();
+        // по игрокам — так список и приходит отсортированным ниже, при загрузке (порядок источника)
+        View.Sort = ByName ? (a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCulture) : null;
     }
 
     private void UpdateCounts()
     {
-        var shown = View.Cast<object>().Count();
+        var shown = View.Count;
         CountText = Loc.T("browse.shown", shown, All.Count);
         OnPropertyChanged(nameof(AllTabTitle));
     }

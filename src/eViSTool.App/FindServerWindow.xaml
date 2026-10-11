@@ -189,7 +189,7 @@
 
         <Grid Margin="0,6,0,0">
             <!-- общий список: тысячи строк — с виртуализацией -->
-            <ListBox ItemsSource="{Binding View}" ItemTemplate="{StaticResource ServerRow}" Background="Transparent" BorderThickness="0"
+            <ListBox ItemsSource="{Binding View.Items}" ItemTemplate="{StaticResource ServerRow}" Background="Transparent" BorderThickness="0"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.IsVirtualizing="True"
                      VirtualizingPanel.ScrollUnit="Pixel" Visibility="{Binding IsAllTab, Converter={StaticResource BoolToVis}}"
                      AutomationProperties.AutomationId="BrowseList">

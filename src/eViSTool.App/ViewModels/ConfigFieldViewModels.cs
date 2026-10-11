@@ -382,7 +382,7 @@ public sealed partial class WorldSettingRowViewModel : ObservableObject
     // значение подставлено из «по умолчанию» и пользователем не тронуто: сменится ключ — сменится и оно
     private bool _autoValue;
 
-    public WorldSettingRowViewModel(string key, string value, ICollectionView keyOptions,
+    public WorldSettingRowViewModel(string key, string value, IReadOnlyList<WorldSettingKeyOption> keyOptions,
         Action<WorldSettingRowViewModel> changed, Action<WorldSettingRowViewModel> remove)
     {
         _key = key;
@@ -393,8 +393,8 @@ public sealed partial class WorldSettingRowViewModel : ObservableObject
         ResolveKey();
     }
 
-    /// <summary>Известные ключи (общий список на все строки), сгруппированы по категориям.</summary>
-    public ICollectionView KeyOptions { get; }
+    /// <summary>Известные ключи (общий список на все строки); по категориям их группирует вид.</summary>
+    public IReadOnlyList<WorldSettingKeyOption> KeyOptions { get; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(KeyAutomationId), nameof(ValueAutomationId), nameof(RemoveAutomationId))]

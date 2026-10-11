@@ -3,7 +3,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Net.Http;
-using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Game;
@@ -32,7 +31,7 @@ public sealed partial class ModsViewModel : ObservableObject
     private IReadOnlyList<LocalMod> _locals = [];
 
     public ObservableCollection<ModRowViewModel> Rows { get; } = [];
-    public ICollectionView View { get; }
+    public FilteredList<ModRowViewModel> View { get; }
 
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private ModFilter _filter = ModFilter.All;
@@ -82,7 +81,7 @@ public sealed partial class ModsViewModel : ObservableObject
     public string DisabledLabel => Loc.Plural("mods.cntDisabled", DisabledCount);
     public string PinnedLabel => Loc.Plural("mods.cntPinned", PinnedCount);
     public string UnneededLabel => Loc.Plural("mods.cntUnneeded", UnneededCount);
-    public string ShownText => Loc.T("mods.shown", View.Cast<object>().Count(), Rows.Count);
+    public string ShownText => Loc.T("mods.shown", View.Count, Rows.Count);
 
     public IReadOnlyList<string> SortModes { get; } = [Loc.T("mods.sortImportant"), Loc.T("mods.sortName")];
 
@@ -132,9 +131,8 @@ public sealed partial class ModsViewModel : ObservableObject
         _db = db;
         _service = new ModUpdateService(db);
         _updater = new ModUpdater(db);
-        View = CollectionViewSource.GetDefaultView(Rows);
-        View.Filter = o => o is ModRowViewModel r
-            && Filter switch
+        View = new FilteredList<ModRowViewModel>(Rows);
+        View.Filter = r => Filter switch
             {
                 ModFilter.Updates => r.Kind == ModStatus.UpdateAvailable,
                 ModFilter.Problems => r.IsProblem,
@@ -201,12 +199,10 @@ public sealed partial class ModsViewModel : ObservableObject
 
     private void ApplySort()
     {
-        using (View.DeferRefresh())
-        {
-            View.SortDescriptions.Clear();
-            if (SortIndex == 0) View.SortDescriptions.Add(new SortDescription(nameof(ModRowViewModel.Importance), ListSortDirection.Ascending));
-            View.SortDescriptions.Add(new SortDescription(nameof(ModRowViewModel.Name), ListSortDirection.Ascending));
-        }
+        // по названию — как в WPF: с учётом языка системы; «Важность» (проблемы, обновления…) — сначала
+        View.Sort = SortIndex == 0
+            ? (a, b) => a.Importance != b.Importance ? a.Importance.CompareTo(b.Importance) : string.Compare(a.Name, b.Name, StringComparison.CurrentCulture)
+            : (a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCulture);
     }
 
     /// <summary>Моды берутся с диска этой машины или — у удалённого сервера — у его агента по сети.</summary>

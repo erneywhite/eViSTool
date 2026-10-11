@@ -2,7 +2,6 @@ using eViSTool.Presentation;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Net.Http;
-using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Game;
@@ -790,41 +789,30 @@ public sealed partial class ServerViewModel : ObservableObject
     }
 }
 
+/// <summary>Цвет строки консоли по смыслу; сам цвет выбирает вид.</summary>
+public enum ConsoleTint { Error, Warning, Input, System, Chat }
+
 /// <summary>Строка консоли с цветом по уровню.</summary>
 public sealed class ConsoleLineViewModel(ConsoleLine line)
 {
-    // лесная палитра: ошибки — розоватые, предупреждения — янтарь, ввод — песок, сообщения eViSTool — дымчато-голубые, чат — зелёный
-    private static readonly Brush ErrorBrush = Frozen(0xE8, 0x9B, 0x96);
-    private static readonly Brush WarningBrush = Frozen(0xED, 0xBF, 0x82);
-    private static readonly Brush InputBrush = Frozen(0xD4, 0xBD, 0x83);
-    private static readonly Brush SystemBrush = Frozen(0x9F, 0xB7, 0xC9);
-    private static readonly Brush ChatBrush = Frozen(0xB0, 0xC8, 0x98);
-
     // ответы сервера бывают с разметкой игры (/help) — показываем обычным текстом
     public string Text { get; } = line.Kind == ConsoleLineKind.Input ? "> " + line.Text : ConsoleMarkup.ToPlain(line.Text);
 
     /// <summary>null — обычный цвет текста темы.</summary>
-    public Brush? Foreground { get; } = line.Kind switch
+    public ConsoleTint? Tint { get; } = line.Kind switch
     {
-        ConsoleLineKind.Error => ErrorBrush,
-        ConsoleLineKind.Input => InputBrush,
-        ConsoleLineKind.System => SystemBrush,
+        ConsoleLineKind.Error => ConsoleTint.Error,
+        ConsoleLineKind.Input => ConsoleTint.Input,
+        ConsoleLineKind.System => ConsoleTint.System,
         _ => (line.Level?.Replace("Server ", "", StringComparison.Ordinal)) switch // в консоли уровни вида «Server Event»
         {
-            "Error" or "Fatal" => ErrorBrush,
-            "Warning" => WarningBrush,
-            "Chat" => ChatBrush,
+            "Error" or "Fatal" => ConsoleTint.Error,
+            "Warning" => ConsoleTint.Warning,
+            "Chat" => ConsoleTint.Chat,
             _ => null,
         },
     };
 
     public double Opacity { get; } = line.Kind == ConsoleLineKind.Output
                                      && line.Level?.EndsWith("Notification", StringComparison.Ordinal) == true ? 0.75 : 1;
-
-    private static Brush Frozen(byte r, byte g, byte b)
-    {
-        var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
-        brush.Freeze();
-        return brush;
-    }
 }

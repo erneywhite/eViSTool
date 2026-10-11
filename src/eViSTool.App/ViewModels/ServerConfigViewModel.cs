@@ -3,7 +3,6 @@ using System.Net.Http;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
-using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Localization;
@@ -76,9 +75,6 @@ public sealed partial class ServerConfigViewModel : ObservableObject
         _diskWatch.Tick += (_, _) => { if (!IsRemote) RefreshIfChangedOnDisk(); };
         Roles = new RolesEditorViewModel(OnRolesChanged) { IsReadOnly = true };
 
-        var keys = new ListCollectionView(_keyOptions);
-        keys.GroupDescriptions!.Add(new PropertyGroupDescription(nameof(WorldSettingKeyOption.Category)));
-        WorldSettingKeys = keys;
         WorldSettings.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasWorldSettings));
     }
 
@@ -135,7 +131,7 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     // редактируемый выпадающий список при смене ItemsSource стирает свой текст
     private readonly ObservableCollection<WorldSettingKeyOption> _keyOptions = [.. KnownWorldSettings()];
 
-    public ICollectionView WorldSettingKeys { get; }
+    public IReadOnlyList<WorldSettingKeyOption> WorldSettingKeys => _keyOptions;
 
     /// <summary>Ключи каталога: категории — в порядке каталога, внутри категории порядок тоже его (сортировка устойчивая).</summary>
     private static IEnumerable<WorldSettingKeyOption> KnownWorldSettings()

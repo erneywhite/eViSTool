@@ -121,7 +121,7 @@
                     <TextBlock Text="{local:Tr players.empty}" Style="{StaticResource Hint}" FontSize="12" Margin="0,14,0,0"
                                Visibility="{Binding HasPlayers, Converter={StaticResource InvertVis}}" />
 
-                    <ItemsControl x:Name="PlayersList" ItemsSource="{Binding PlayersView}" Margin="0,6,0,0" Focusable="False">
+                    <ItemsControl x:Name="PlayersList" ItemsSource="{Binding PlayersView.Items}" Margin="0,6,0,0" Focusable="False">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Border BorderBrush="{StaticResource Forest.Line}" BorderThickness="0,1,0,0" Padding="0,10" Margin="0,4,0,0">

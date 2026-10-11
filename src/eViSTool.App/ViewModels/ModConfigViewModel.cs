@@ -3,7 +3,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Net.Http;
-using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Game;
@@ -40,14 +39,14 @@ public sealed partial class ModConfigViewModel : ObservableObject
     public ModConfigViewModel(MainViewModel main)
     {
         _main = main;
-        RowsView = CollectionViewSource.GetDefaultView(Rows);
-        RowsView.Filter = o => o is ModConfigRow r && (Search.Length == 0
+        RowsView = new FilteredList<ModConfigRow>(Rows);
+        RowsView.Filter = r => (Search.Length == 0
             || r.Title.Contains(Search, StringComparison.CurrentCultureIgnoreCase)
             || r.File.RelativePath.Contains(Search, StringComparison.OrdinalIgnoreCase));
     }
 
     public ObservableCollection<ModConfigRow> Rows { get; } = [];
-    public ICollectionView RowsView { get; }
+    public FilteredList<ModConfigRow> RowsView { get; }
 
     [ObservableProperty] private string _search = "";
     partial void OnSearchChanged(string value) => RowsView.Refresh();

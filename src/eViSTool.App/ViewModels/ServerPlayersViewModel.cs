@@ -3,7 +3,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Net.Http;
-using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Localization;
@@ -109,12 +108,12 @@ public sealed partial class ServerPlayersViewModel : ObservableObject
     public ServerPlayersViewModel(ServerViewModel server)
     {
         _server = server;
-        PlayersView = CollectionViewSource.GetDefaultView(Players);
-        PlayersView.Filter = o => o is PlayerRowViewModel p && (Search.Length == 0 || p.Name.Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase));
+        PlayersView = new FilteredList<PlayerRowViewModel>(Players);
+        PlayersView.Filter = p => (Search.Length == 0 || p.Name.Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 
     public ObservableCollection<PlayerRowViewModel> Players { get; } = [];
-    public ICollectionView PlayersView { get; }
+    public FilteredList<PlayerRowViewModel> PlayersView { get; }
     public ObservableCollection<PlayerListRowViewModel> Whitelist { get; } = [];
     public ObservableCollection<PlayerListRowViewModel> Bans { get; } = [];
 

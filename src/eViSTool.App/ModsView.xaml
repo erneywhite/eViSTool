@@ -380,7 +380,7 @@
                 <!-- таблица -->
                 <Border Style="{StaticResource Forest.Card}" ClipToBounds="True"
                         Visibility="{Binding IsHistory, Converter={StaticResource InvertVis}}">
-                    <DataGrid x:Name="Grid" ItemsSource="{Binding View}" SelectedItem="{Binding Selected}" AutoGenerateColumns="False" IsReadOnly="True"
+                    <DataGrid x:Name="Grid" ItemsSource="{Binding View.Items}" SelectedItem="{Binding Selected}" AutoGenerateColumns="False" IsReadOnly="True"
                               HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource Forest.Line}"
                               SelectionMode="Single" CanUserResizeRows="False" RowHeight="54"
                               Background="Transparent" RowBackground="Transparent" BorderThickness="0"

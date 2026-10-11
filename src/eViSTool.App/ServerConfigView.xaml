@@ -248,7 +248,7 @@
                     <DockPanel Margin="0,0,24,0">
                         <Ellipse DockPanel.Dock="Left" Style="{StaticResource ModifiedDot}" Margin="-14,13,7,0" ToolTip="{local:Tr srvcfg.modified}"
                                  Visibility="{Binding IsModified, Converter={StaticResource BoolToVis}}" />
-                        <ComboBox IsEditable="True" IsSynchronizedWithCurrentItem="False" ItemsSource="{Binding KeyOptions}"
+                        <ComboBox IsEditable="True" IsSynchronizedWithCurrentItem="False" ItemsSource="{Binding KeyOptions, Converter={x:Static local:GroupByCategoryConverter.Instance}}"
                                   TextSearch.TextPath="Key" Text="{Binding Key, UpdateSourceTrigger=PropertyChanged}"
                                   IsEnabled="{Binding IsEditable}" HorizontalAlignment="Stretch" MaxDropDownHeight="420"
                                   ToolTip="{local:Tr srvcfg.wsKeyTip}"

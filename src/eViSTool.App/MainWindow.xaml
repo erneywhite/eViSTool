@@ -63,11 +63,11 @@
                         <Border Background="{StaticResource Forest.Raised}" CornerRadius="6" Width="30" Height="30" Margin="0,0,10,0">
                             <Grid>
                                 <!-- значок из установленной игры; игры на компьютере нет — буквы -->
-                                <Image Source="{Binding GameIcon}" Width="24" Height="24" RenderOptions.BitmapScalingMode="HighQuality"
-                                       Visibility="{Binding HasGameIcon, Converter={StaticResource BoolToVis}}" />
+                                <Image Source="{Binding IconSearchDirs, Converter={x:Static local:GameIconConverter.Instance}}" Width="24" Height="24" RenderOptions.BitmapScalingMode="HighQuality"
+                                       Visibility="{Binding IconSearchDirs, Converter={x:Static local:GameIconVisibilityConverter.Shown}}" />
                                 <TextBlock Text="VS" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Forest.Text}"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"
-                                           Visibility="{Binding HasGameIcon, Converter={StaticResource InvBoolToVis}}" />
+                                           Visibility="{Binding IconSearchDirs, Converter={x:Static local:GameIconVisibilityConverter.Hidden}}" />
                             </Grid>
                         </Border>
                         <StackPanel VerticalAlignment="Center">

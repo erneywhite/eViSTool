@@ -8,9 +8,25 @@ namespace eViSTool.App;
 /// <summary>Вкладка «Мои моды»: таблица модов профиля и карточка выбранного.</summary>
 public partial class ModsView : UserControl
 {
-    public ModsView() => InitializeComponent();
+    public ModsView()
+    {
+        InitializeComponent();
+        // выбрали порядок в списке «Сначала важное / По имени» — сортировка кликом по заголовку колонки уступает ему
+        DataContextChanged += (_, e) =>
+        {
+            if (e.OldValue is ModsViewModel old) old.PropertyChanged -= OnVmChanged;
+            if (e.NewValue is ModsViewModel now) now.PropertyChanged += OnVmChanged;
+        };
+    }
 
     private ModsViewModel? Vm => DataContext as ModsViewModel;
+
+    private void OnVmChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ModsViewModel.SortIndex)) return;
+        Grid.Items.SortDescriptions.Clear();
+        foreach (var column in Grid.Columns) column.SortDirection = null;
+    }
 
     // «Модпак ▾»: меню открывается обычным кликом
     private void PackMenu_Click(object sender, RoutedEventArgs e)

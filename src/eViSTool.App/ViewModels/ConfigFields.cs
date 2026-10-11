@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using eViSTool.Core.Localization;
 using Newtonsoft.Json;
@@ -16,7 +15,8 @@ public abstract partial class ConfigField(string key, int depth, Action changed)
 {
     public string Key { get; } = key;
     public int Depth { get; } = depth;
-    public Thickness Indent => new(Depth * 18, 0, 0, 0);
+    /// <summary>Отступ слева в пикселях (вид превращает его в поле).</summary>
+    public double IndentLeft => Depth * 18;
     protected Action Changed { get; } = changed;
 
     /// <summary>Что не так со значением (не число, сломанный JSON); пусто — в порядке. Пока есть ошибка — дерево не меняется.</summary>
