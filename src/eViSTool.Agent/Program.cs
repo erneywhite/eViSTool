@@ -550,6 +550,7 @@ var agentExitCode = 0; // 75 — обновился под systemd, служба
 async Task SelfUpdateAsync(eViSTool.Core.Versioning.ModVersion target)
 {
     var appDir = AppContext.BaseDirectory;
+    var wasRunning = false; // сервер работал до обновления — при сбое его надо поднять обратно
     try
     {
         host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("selfupd.started", version, target));
@@ -561,7 +562,7 @@ async Task SelfUpdateAsync(eViSTool.Core.Versioning.ModVersion target)
         var zip = await updater.DownloadAsync(release, Path.Combine(Path.GetTempPath(), "eViSTool-update"));
 
         // работающий сервер держит консоль агента — останавливаем (мир сохранится) и потом запускаем снова
-        var wasRunning = host.State != ServerState.Stopped;
+        wasRunning = host.State != ServerState.Stopped;
         if (wasRunning)
         {
             selfUpdate = "stop";
@@ -602,12 +603,25 @@ async Task SelfUpdateAsync(eViSTool.Core.Versioning.ModVersion target)
         await Task.Delay(TimeSpan.FromSeconds(1)); // окно успеет увидеть «перезапуск»
         shutdown.Cancel();
     }
-    catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or IOException or UnauthorizedAccessException
-                                   or TaskCanceledException or System.ComponentModel.Win32Exception or InvalidDataException)
+    catch (Exception ex)
     {
+        // любой сбой (нет места, битый архив, нет прав…) — файлы AppUpdater.Install вернул на место сам, а сервер,
+        // остановленный ради обновления, поднимаем: иначе на Linux-службе он стоял бы до ручного вмешательства
         selfUpdate = "failed";
         selfUpdateError = ex.Message;
         host.Console.Add(ConsoleLineKind.Error, eViSTool.Core.Localization.Loc.T("selfupd.failed", ex.Message));
+        if (wasRunning && host.State == ServerState.Stopped && !shutdown.IsCancellationRequested)
+        {
+            try
+            {
+                host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("selfupd.restartServer"));
+                await host.StartAsync();
+            }
+            catch (Exception startEx)
+            {
+                host.Console.Add(ConsoleLineKind.Error, startEx.Message);
+            }
+        }
     }
 }
 var lastActivity = DateTime.Now;

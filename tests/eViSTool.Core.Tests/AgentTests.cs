@@ -524,6 +524,50 @@ public sealed class AgentTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SelfUpdate_FailingAfterTheServerStopped_StartsTheServerAgain()
+    {
+        // «релиз» с верным отпечатком, но внутри не архив: скачивание пройдёт, сервер остановится, установка упадёт
+        var junk = "это не архив"u8.ToArray();
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(junk)).ToLowerInvariant();
+        int port;
+        using (var probe = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0)) { probe.Start(); port = ((System.Net.IPEndPoint)probe.LocalEndpoint).Port; }
+        var asset = "eViSTool-99.0.0" + eViSTool.Core.AppUpdate.AppUpdater.AssetSuffix;
+        var releases = "[{\"tag_name\":\"v99.0.0\",\"assets\":[{\"name\":\"" + asset + "\",\"browser_download_url\":\"http://127.0.0.1:"
+                       + port + "/" + asset + "\",\"digest\":\"sha256:" + hash + "\"}]}]";
+        using var web = new System.Net.HttpListener();
+        web.Prefixes.Add($"http://127.0.0.1:{port}/");
+        web.Start();
+        _ = Task.Run(async () =>
+        {
+            while (web.IsListening)
+            {
+                System.Net.HttpListenerContext ctx;
+                try { ctx = await web.GetContextAsync(); } catch (Exception) { return; }
+                var body = ctx.Request.Url!.AbsolutePath.EndsWith(".json") ? System.Text.Encoding.UTF8.GetBytes(releases) : junk;
+                await ctx.Response.OutputStream.WriteAsync(body);
+                ctx.Response.Close();
+            }
+        });
+
+        Environment.SetEnvironmentVariable("EVISTOOL_RELEASES_URL", $"http://127.0.0.1:{port}/releases.json");
+        try
+        {
+            _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: true, AgentExe, AgentsDir);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("EVISTOOL_RELEASES_URL", null);
+        }
+        await Until(async () => (await _client.StatusAsync()).State == ServerState.Running);
+        var firstPid = (await _client.StatusAsync()).ServerPid;
+
+        await _client.SelfUpdateAsync("99.0.0");
+        await Until(async () => (await _client.StatusAsync()).SelfUpdate == "failed", 30000);
+        await Until(async () => (await _client.StatusAsync()).State == ServerState.Running, 30000);
+        Assert.NotEqual(firstPid, (await _client.StatusAsync()).ServerPid); // его останавливали и запустили снова
+    }
+
+    [Fact]
     public async Task Notify_SavedThroughTheAgent_SecretEncryptedThere_ReturnedWithout()
     {
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);

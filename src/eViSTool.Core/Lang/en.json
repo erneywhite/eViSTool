@@ -1586,6 +1586,7 @@
   "selfupd.failed": "▸ The update did not work out, everything stays as it was: {0}",
   "selfupd.noRelease": "There is no eViSTool {0} release on GitHub.",
   "selfupd.outdated": "eViSTool on the server computer is version {0}, yours is {1}: some features may not work. It can be updated from here.",
+  "selfupd.restartServer": "The update failed — starting the server again on the previous version…",
   "selfupd.restarting": "▸ eViSTool {0} is installed, the agent restarts.",
   "selfupd.same": "This version is already installed.",
   "selfupd.started": "▸ Updating eViSTool on this computer: {0} → {1}…",
