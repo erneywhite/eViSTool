@@ -47,6 +47,68 @@ with the copyright line given below.
 | CommunityToolkit.Mvvm | © .NET Foundation and Contributors | https://github.com/CommunityToolkit/dotnet |
 | Newtonsoft.Json | © 2007 James Newton-King | https://github.com/JamesNK/Newtonsoft.Json |
 | Microsoft.Data.Sqlite | © .NET Foundation and Contributors | https://github.com/dotnet/efcore |
+| Avalonia, Avalonia.Controls.DataGrid (the window on Windows and Linux) | © AvaloniaUI OÜ | https://github.com/AvaloniaUI/Avalonia |
+| SkiaSharp, HarfBuzzSharp (drawing and text shaping in the Avalonia window) | © 2015-2016 Xamarin, Inc.; © 2017-2018 Microsoft Corporation | https://github.com/mono/SkiaSharp |
+| Tmds.DBus (file dialogs and the file manager on Linux) | © Tom Deseyn | https://github.com/tmds/Tmds.DBus |
+
+## Fonts
+
+The window ships its own fonts, so it looks the same on Windows and Linux. Both are licensed under the
+SIL Open Font License 1.1; the full license text is next to each font in `Assets/Fonts`.
+
+- **Noto Sans** — Copyright 2022 The Noto Project Authors, https://github.com/notofonts/latin-greek-cyrillic
+- **Cascadia Mono** — Copyright (c) 2019 - Present, Microsoft Corporation, with Reserved Font Name Cascadia Code,
+  https://github.com/microsoft/cascadia-code
+
+## Lucide icons
+
+The window icons (navigation, buttons, menus) are taken from Lucide.
+
+- Source: https://lucide.dev, https://github.com/lucide-icons/lucide
+- License: ISC; icons derived from Feather (check, chevron-down, download, info, lock, monitor, plus, search,
+  server, x among those used here) are also under MIT
+
+```
+ISC License
+
+Copyright (c) 2026 Lucide Icons and Contributors
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+```
+
+```
+The MIT License (MIT) (for the icons derived from Feather)
+
+Copyright (c) 2013-present Cole Bemis
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 ## SQLite
 
