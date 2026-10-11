@@ -250,6 +250,8 @@ public sealed class ServerHostTests : IAsyncLifetime
 
             foreign.Kill(entireProcessTree: true);
             await foreign.WaitForExitAsync();
+            // Windows ещё какое-то время показывает вышедший процесс в списке — ждём, пока он пропадёт (в CI это бывало)
+            await Until(() => GameProcess.FindServers(null).All(s => s.Pid != foreign.Id));
             await host.StartAsync(); // чужой ушёл — запускается
             await Until(() => host.State == ServerState.Running);
             await host.StopAsync();
