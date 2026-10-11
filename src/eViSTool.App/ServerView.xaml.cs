@@ -30,16 +30,10 @@ public partial class ServerView : UserControl
             }
         };
 
-        // окно закрывают с несохранёнными правками конфигурации — спросить (правки появляются только после
-        // захода в раздел, так что подписки при первом показе достаточно)
         Loaded += (_, _) =>
         {
             if (_window is not null || Window.GetWindow(this) is not { } window) return;
             _window = window;
-            window.Closing += (_, e) =>
-            {
-                if (!e.Cancel && _vm is not null && !_vm.Config.ConfirmClose()) e.Cancel = true;
-            };
             // подсказки — отдельное окно (Popup) и сами за окном не едут: окно сдвинули или растянули — переставить
             window.LocationChanged += (_, _) => RepositionSuggestions();
             window.SizeChanged += (_, _) => RepositionSuggestions();

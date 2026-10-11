@@ -60,6 +60,8 @@ public partial class MainWindow : Window
         l.Width = bounds.Width;
         l.Height = bounds.Height;
         Vm.SaveSettings();
+        // несохранённые правки конфигурации сервера и конфига мода — спросить; отказались — окно остаётся
+        if (!Vm.ConfirmExit()) e.Cancel = true;
     }
 
     // ---------- меню «Играть ▾»: собирается заново при каждом открытии (серверы могли запустить, избранное — поменять)

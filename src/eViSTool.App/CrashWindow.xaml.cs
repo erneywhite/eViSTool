@@ -113,14 +113,14 @@ public partial class CrashWindow : Window
     private void Show_Click(object sender, RoutedEventArgs e)
     {
         _show();
-        Application.Current.MainWindow?.Activate();
+        AppWindows.Current.ActivateMainWindow();
     }
 
     private void Catalog_Click(object sender, RoutedEventArgs e)
     {
         if (_view.ModId is not { } id) return;
         _ = _main.ShowInCatalogAsync(null, id, _view.ModName);
-        Application.Current.MainWindow?.Activate();
+        AppWindows.Current.ActivateMainWindow();
     }
 
     private void Copy_Click(object sender, RoutedEventArgs e)

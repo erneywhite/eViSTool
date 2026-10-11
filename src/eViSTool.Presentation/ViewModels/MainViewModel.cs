@@ -684,6 +684,13 @@ public sealed partial class MainViewModel : ObservableObject
         Server?.Schedule.SyncPolicy();
     }
 
+    /// <summary>
+    /// Перед закрытием программы: несохранённые правки конфигурации сервера, затем конфига мода — каждое
+    /// «Сохранить? Да / Нет / Отмена». false — остаться (отменили или сохранить не удалось). Раньше окна подписывались
+    /// на закрытие каждое само; теперь окно спрашивает один раз здесь.
+    /// </summary>
+    public bool ConfirmExit() => Server.Config.ConfirmClose() && ModConfig.ConfirmLeave();
+
     private void Save()
     {
         try { _store.Save(_settings); }

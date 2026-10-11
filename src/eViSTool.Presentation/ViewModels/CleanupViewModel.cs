@@ -201,6 +201,5 @@ public sealed partial class CleanupViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private static void OpenRecycleBin() =>
-        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", "shell:RecycleBinFolder") { UseShellExecute = true });
+    private static void OpenRecycleBin() => Ui.Platform.OpenTrash();
 }

@@ -1,4 +1,5 @@
 using eViSTool.Core.Diagnostics;
+using eViSTool.Core.Game;
 using eViSTool.Core.Notifications;
 using eViSTool.Core.Packs;
 using eViSTool.Core.Profiles;
@@ -28,6 +29,9 @@ public sealed record PackImportChoice(bool Mirror, bool ApplyConfig);
 /// <summary>Ответ окна «Установить также в»: Tag отмеченных профилей и «запомнить как связь».</summary>
 public sealed record AlsoInstallAnswer(IReadOnlyList<object> Chosen, bool Remember);
 
+/// <summary>Ответ окна «Сервер в избранном»: название, адрес (с портом или без) и пароль (null — без пароля).</summary>
+public sealed record FavoriteServerChoice(string Name, string Address, string? Password);
+
 /// <summary>
 /// Окна программы, которые открывают модели. Модальные возвращают ответ (null — закрыли без выбора), остальные просто
 /// показываются. Реализация — у окна (<c>WpfAppWindows</c>); модели знают только этот интерфейс.
@@ -44,6 +48,13 @@ public interface IAppWindows
     ConnectionCode? AskConnectionCode(string okText);
     void ShowCleanup(GameProfile profile);
     void ShowFindServer(FindServerViewModel model);
+    /// <summary>
+    /// Пароль сервера — перед входом или добавлением в избранное. null — отказались; пустая строка — «Ок» с пустым полем.
+    /// Владелец — то окно, из которого спросили (окно «Найти сервер»).
+    /// </summary>
+    string? AskServerPassword(string server);
+    /// <summary>Сервер в избранном игры: новый (existing = null) или правка записи. null — отказались. Владелец — как у <see cref="AskServerPassword"/>.</summary>
+    FavoriteServerChoice? EditFavoriteServer(PlayTarget? existing);
 
     // ---- моды
     VersionOption? PickVersion(string heading, IReadOnlyList<VersionOption> options);
@@ -68,6 +79,10 @@ public interface IAppWindows
     void ShowUpdatePrompt(AboutViewModel about, Action skip);
     void ShowGameCrash(MainViewModel main, GameProfile profile, CrashFinding finding);
     void ShowServerCrash(MainViewModel main, GameProfile profile, ServerCrashInfo crash);
+
+    // ---- главное окно
+    /// <summary>Вынести главное окно вперёд: из немодального окна (вылет, ошибки модов) перешли к чему-то в главном.</summary>
+    void ActivateMainWindow();
 }
 
 /// <summary>Доступ моделей к окнам программы. Окно ставит свою реализацию при запуске, тест — свою.</summary>

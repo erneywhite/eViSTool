@@ -11,6 +11,10 @@ internal static class Shell
 
     public static void OpenFolder(string dir) => Process.Start(new ProcessStartInfo(dir) { UseShellExecute = true });
 
+    /// <summary>Открыть Корзину в Проводнике.</summary>
+    public static void OpenRecycleBin() =>
+        Process.Start(new ProcessStartInfo("explorer.exe", "shell:RecycleBinFolder") { UseShellExecute = true });
+
     /// <summary>Удаление в Корзину (файл или папка распакованного мода).</summary>
     public static void MoveToRecycleBin(string path)
     {
