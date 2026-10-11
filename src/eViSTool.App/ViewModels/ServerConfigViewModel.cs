@@ -562,7 +562,34 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     {
         if (_building) return;
         if (field.Path == SaveFilePath) UpdateWorldExists();
+        if (field.Path == WelcomePath) OnPropertyChanged(nameof(WelcomeMessage));
         Touch();
+    }
+
+    // ---------- приветствие: его же показывает карточка во вкладке «Объявления» ----------
+
+    public const string WelcomePath = "WelcomeMessage";
+
+    /// <summary>Приветствие из конфига, как сейчас в редакторе (с несохранёнными правками); null — конфиг не загружен.</summary>
+    public string? WelcomeMessage => _doc?.Get(WelcomePath) is JValue { Value: string text } ? text : _doc is null ? null : "";
+
+    /// <summary>Конфиг ещё не читали — прочитать (вкладке «Объявления» нужно приветствие, а «Конфигурацию» не открывали).</summary>
+    public void EnsureLoaded()
+    {
+        if (State == ConfigLoadState.NotLoaded && _path is not null) Load();
+    }
+
+    /// <summary>Представлению: прокрутить к полю и поставить в него курсор.</summary>
+    public event Action<string>? FocusFieldRequested;
+
+    /// <summary>Открыть поле в редакторе: его вкладку («Основное», «Мир»…), потом — к самому полю.</summary>
+    public void FocusField(string path)
+    {
+        var field = _fields.FirstOrDefault(f => f.Path == path);
+        Tab = field?.Spec.Section == ConfigSections.World ? ConfigTab.World
+            : field is null || field.Spec.Section == ConfigSections.General ? ConfigTab.General
+            : ConfigTab.Advanced;
+        FocusFieldRequested?.Invoke(path);
     }
 
     private void OnRolesChanged()
@@ -849,6 +876,7 @@ public sealed partial class ServerConfigViewModel : ObservableObject
 
     partial void OnStateChanged(ConfigLoadState value)
     {
+        OnPropertyChanged(nameof(WelcomeMessage));
         SaveCommand.NotifyCanExecuteChanged();
         RevertCommand.NotifyCanExecuteChanged();
         AddWorldSettingCommand.NotifyCanExecuteChanged();

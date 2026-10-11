@@ -142,7 +142,22 @@ public sealed partial class ServerAnnouncementsViewModel : ObservableObject
     public void SetActive(bool active)
     {
         _active = active;
-        if (active) _ = LoadAsync();
+        if (!active) return;
+        _ = LoadAsync();
+        Config.EnsureLoaded(); // карточке «Приветствие» нужен текст из конфига сервера
+    }
+
+    /// <summary>
+    /// Конфиг сервера — источник приветствия при входе (WelcomeMessage): карточка показывает его, а «Изменить» ведёт
+    /// в «Конфигурацию» к этому полю. Одно поле — одно место правки.
+    /// </summary>
+    public ServerConfigViewModel Config => _server.Config;
+
+    [RelayCommand]
+    private void EditWelcome()
+    {
+        _server.Tab = ServerTab.Config;
+        Config.FocusField(ServerConfigViewModel.WelcomePath);
     }
 
     /// <summary>Статус агента: объявления поменяли (в другом окне) — перечитать; связь с удалённым появилась — прочитать.</summary>

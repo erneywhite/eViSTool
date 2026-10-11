@@ -6,6 +6,7 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <local:InvertBoolToVisibilityConverter x:Key="InvertVis" />
         <local:TextToVisibilityConverter x:Key="TextToVis" />
+        <local:EnumToVisibilityConverter x:Key="EnumVis" />
 
         <Style x:Key="CardTitle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="15" />
@@ -58,6 +59,52 @@
                             </TextBox.InputBindings>
                         </TextBox>
                     </DockPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ===== приветствие при входе: WelcomeMessage из конфига сервера, правится в «Конфигурации» ===== -->
+            <Border Style="{StaticResource AnnCard}" AutomationProperties.AutomationId="AnnWelcome">
+                <StackPanel>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Command="{Binding EditWelcomeCommand}" Padding="12,6" VerticalAlignment="Top"
+                                AutomationProperties.AutomationId="AnnWelcomeEdit">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource Icon.Edit}" Style="{StaticResource Forest.Icon}" Width="12" Height="12" Margin="0,0,7,0" />
+                                <TextBlock Text="{local:Tr ann.welcomeEdit}" />
+                            </StackPanel>
+                        </Button>
+                        <StackPanel Margin="0,0,16,0">
+                            <TextBlock Text="{local:Tr ann.welcomeTitle}" Style="{StaticResource CardTitle}" />
+                            <TextBlock Text="{local:Tr ann.welcomeHint}" Style="{StaticResource Hint}" />
+                        </StackPanel>
+                    </DockPanel>
+                    <!-- текст приветствия; пустое — так и пишем -->
+                    <Border Background="{StaticResource Forest.Raised}" CornerRadius="6" Padding="12,9" Margin="0,12,0,0"
+                            Visibility="{Binding Config.State, Converter={StaticResource EnumVis}, ConverterParameter=Loaded}">
+                        <Grid>
+                            <TextBlock Text="{Binding Config.WelcomeMessage}" FontSize="13" Foreground="{StaticResource Forest.Text}" TextWrapping="Wrap"
+                                       Visibility="{Binding Config.WelcomeMessage, Converter={StaticResource TextToVis}}"
+                                       AutomationProperties.AutomationId="AnnWelcomeText" />
+                            <TextBlock Text="{local:Tr ann.welcomeEmpty}" FontSize="13" FontStyle="Italic" Foreground="{StaticResource Forest.Muted}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Config.WelcomeMessage}" Value="">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </Border>
+                    <TextBlock Text="{local:Tr srvcfg.loadingRemote}" Style="{StaticResource Hint}" Margin="0,10,0,0"
+                               Visibility="{Binding Config.State, Converter={StaticResource EnumVis}, ConverterParameter=Loading}" />
+                    <TextBlock Text="{local:Tr ann.welcomeNoConfig}" Style="{StaticResource Hint}" Margin="0,10,0,0"
+                               Visibility="{Binding Config.State, Converter={StaticResource EnumVis}, ConverterParameter=Missing}" />
+                    <TextBlock Text="{Binding Config.LoadError}" FontSize="12" Foreground="{StaticResource Forest.Danger}" TextWrapping="Wrap" Margin="0,10,0,0"
+                               Visibility="{Binding Config.State, Converter={StaticResource EnumVis}, ConverterParameter=Failed}" />
                 </StackPanel>
             </Border>
 

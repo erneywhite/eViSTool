@@ -19,6 +19,60 @@ public partial class ServerConfigView : UserControl
         {
             if (e.NewValue is true) (DataContext as ServerConfigViewModel)?.RefreshIfChangedOnDisk();
         };
+        DataContextChanged += (_, e) =>
+        {
+            if (e.OldValue is ServerConfigViewModel old) old.FocusFieldRequested -= FocusField;
+            if (e.NewValue is ServerConfigViewModel now) now.FocusFieldRequested += FocusField;
+        };
+    }
+
+    /// <summary>
+    /// Прокрутить к полю и поставить в него курсор (пришли из «Объявлений» по «Изменить» у приветствия). Когда вкладка
+    /// и поля уже нарисованы: конфиг мог ещё грузиться — тогда ждём, пока поле появится, но не дольше нескольких секунд.
+    /// </summary>
+    private void FocusField(string path)
+    {
+        var until = DateTime.UtcNow.AddSeconds(5);
+        void Attempt()
+        {
+            if (FindField(this, path) is { } element)
+            {
+                element.BringIntoView();
+                if (FindDescendant<TextBox>(element) is { } box)
+                {
+                    box.Focus();
+                    box.CaretIndex = box.Text.Length;
+                }
+                return;
+            }
+            if (DateTime.UtcNow < until)
+                Dispatcher.BeginInvoke(Attempt, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        }
+        Dispatcher.BeginInvoke(Attempt, System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private static FrameworkElement? FindField(DependencyObject root, string path)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is FrameworkElement { DataContext: ConfigFieldViewModel field, IsVisible: true } element && field.Path == path
+                && element is ContentPresenter)
+                return element;
+            if (FindField(child, path) is { } found) return found;
+        }
+        return null;
+    }
+
+    private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match) return match;
+            if (FindDescendant<T>(child) is { } found) return found;
+        }
+        return null;
     }
 
     // Колесо над закрытым выпадающим списком меняло бы его значение (если он в фокусе) — в длинной форме это

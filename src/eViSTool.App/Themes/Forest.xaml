@@ -156,6 +156,8 @@
     <Geometry x:Key="Icon.Warning">M12,3 L22,21 H2 Z M12,9 V14 M12,17 V18</Geometry>
     <Geometry x:Key="Icon.Client">M3,4 H21 V16 H3 Z M8,20 H16 M12,16 V20</Geometry>
     <Geometry x:Key="Icon.Copy">M8,8 H20 V20 H8 Z M4,16 V4 H16</Geometry>
+    <!-- карандаш: «Изменить» -->
+    <Geometry x:Key="Icon.Edit">M4,20 L4,16 L15,5 L19,9 L8,20 Z M13,7 L17,11</Geometry>
     <Geometry x:Key="Icon.Search">M4,10 A6,6 0 1 1 16,10 A6,6 0 1 1 4,10 Z M15,15 L20,20</Geometry>
     <Geometry x:Key="Icon.Folder">M3,6 V19 H21 V8 H11 L9,6 Z</Geometry>
     <Geometry x:Key="Icon.Package">M12,3 L20,7 V17 L12,21 L4,17 V7 Z M4,7 L12,11 L20,7 M12,11 V21</Geometry>
