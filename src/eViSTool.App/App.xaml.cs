@@ -37,11 +37,20 @@ public partial class App : Application
             window.SizeToContent = SizeToContent.WidthAndHeight;
             content.Width = request.Width;   // содержимое — ровно нужного размера (без рамки окна), как ClientSize у Avalonia
             content.Height = request.Height;
-            Presentation.Snapshots.Navigate(main, request);
+            // окно программы (dialog.*) модальное: Navigate не вернётся, пока его не закроют, — поэтому переход отдельно,
+            // а снимок — по таймеру (вложенный цикл диспетчера его выполнит)
+            _ = Dispatcher.BeginInvoke(() => Presentation.Snapshots.Navigate(main, request));
             await Task.Delay(request.Wait);
-            content.UpdateLayout();
-            var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(request.Width, request.Height, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
-            bitmap.Render(content);
+            // у окна программы — его корень (рамка шаблона окна): в нём и фон окна, и вся область без заголовка
+            var target = Presentation.Snapshots.IsDialog(request)
+                         && Windows.OfType<Window>().LastOrDefault(w => w.IsVisible && w != window) is { } dialog
+                         && System.Windows.Media.VisualTreeHelper.GetChildrenCount(dialog) > 0
+                ? System.Windows.Media.VisualTreeHelper.GetChild(dialog, 0) as FrameworkElement ?? content
+                : content;
+            target.UpdateLayout();
+            var (w, h) = target == content ? (request.Width, request.Height) : ((int)Math.Ceiling(target.ActualWidth), (int)Math.Ceiling(target.ActualHeight));
+            var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(w, h, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+            bitmap.Render(target);
             var png = new System.Windows.Media.Imaging.PngBitmapEncoder();
             png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(request.OutPath))!);

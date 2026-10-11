@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using eViSTool.Presentation.ViewModels;
 
 namespace eViSTool.Presentation;
@@ -15,12 +16,17 @@ public sealed record SnapshotRequest(string Screen, string OutPath, int Width, i
 /// необязательно).
 /// Экраны: mods, mods.history, mods.card, catalog, catalog.card, modconfig[.&lt;modid&gt;], settings, about[.update], server[.console|players|stats|announcements|
 /// config[.general|world|roles|advanced]|schedule|remote|notify].
+/// Окна: dialog.&lt;имя&gt; — окно открывает метод с атрибутом <see cref="SnapshotDialogAttribute"/> (по файлу на окно в папке
+/// SnapshotDialogs); снимается верхнее окно, а не главное.
 /// </summary>
 public static class Snapshots
 {
     public const string Variable = "EVISTOOL_SNAPSHOT";
 
     public static SnapshotRequest? FromEnvironment() => Parse(Environment.GetEnvironmentVariable(Variable));
+
+    /// <summary>Снимок окна программы (dialog.*), а не экрана главного окна: снимать верхнее окно.</summary>
+    public static bool IsDialog(SnapshotRequest request) => request.Screen.StartsWith("dialog.", StringComparison.Ordinal);
 
     public static SnapshotRequest? Parse(string? text)
     {
@@ -46,6 +52,11 @@ public static class Snapshots
                                  ?? throw new ArgumentException($"Нет профиля для снимка: {name}");
         var screen = request.Screen;
         var path = screen.Split('.');
+        if (path[0] == "dialog")
+        {
+            OpenDialog(main, screen["dialog.".Length..]);
+            return;
+        }
         main.SelectedTab = path[0] switch
         {
             "mods" => AppTab.Mods,
@@ -66,4 +77,28 @@ public static class Snapshots
         if (main.Server.Tab == ServerTab.Config && path.Length > 2)
             main.Server.Config.Tab = Enum.Parse<ConfigTab>(path[2], ignoreCase: true);
     }
+
+    /// <summary>
+    /// Открыть окно по имени: метод static void (MainViewModel) с <see cref="SnapshotDialogAttribute"/>. Модальное окно
+    /// не вернётся, пока его не закроют, — окно-владелец снимает верхнее окно по таймеру, а потом закрывает программу.
+    /// </summary>
+    private static void OpenDialog(MainViewModel main, string name)
+    {
+        var opener = typeof(Snapshots).Assembly.GetTypes()
+                         .SelectMany(t => t.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                         .FirstOrDefault(m => m.GetCustomAttribute<SnapshotDialogAttribute>()?.Name == name)
+                     ?? throw new ArgumentException($"Неизвестное окно для снимка: {name}");
+        opener.Invoke(null, [main]);
+    }
+}
+
+/// <summary>
+/// Открывает окно для снимка dialog.&lt;Name&gt;: static void Метод(MainViewModel main) — вызвать окно через
+/// AppWindows.Current с примерными данными (или командой модели, которая его открывает). По файлу на окно в папке
+/// SnapshotDialogs, чтобы переносы окон не правили один файл.
+/// </summary>
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class SnapshotDialogAttribute(string name) : Attribute
+{
+    public string Name { get; } = name;
 }

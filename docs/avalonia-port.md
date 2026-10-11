@@ -77,6 +77,8 @@
 - Ответ возвращаем через `Close(ответ)` на `this`, открываем через `new XWindow { … }.ShowModal<TResult>()`. Модели ждут ответа на месте, как с `ShowDialog` в WPF: вложенный цикл диспетчера проверен на Windows и на Linux (Wayland).
 - Открывает окно метод `IAppWindows` в своём файле `Platform/AppWindows/AvaloniaAppWindows.<Метод>.cs`: заменить заглушку на настоящее окно. Другие файлы `AppWindows` не трогаем.
 - `DialogResult = true` становится `Close(результат)`, `IsCancel` — Escape (уже в базе), `IsDefault` у кнопки остаётся `IsDefault="True"`.
+- Логику из кода за окном WPF переносим в новую модель окна в `src/eViSTool.Presentation/ViewModels/` (`BanViewModel` и т. п.) с тестами. Окно на WPF не трогаем: оно уйдёт целиком, когда перенос закончится, а сравнивать с ним удобнее, пока оно как было.
+- Снимок окна: `pwsh build/snapshot.ps1 -Screens dialog.<имя>`. Окно открывает метод с атрибутом `[SnapshotDialog("<имя>")]` в своём файле `src/eViSTool.Presentation/SnapshotDialogs/<Окно>.cs`: вызывает `AppWindows.Current.<Метод>(…)` с примерными данными (образец — `SnapshotDialogs/Ban.cs`). Снимается верхнее окно, без заголовка. Окно на WPF откроется тем же вызовом, так что пара сравнима.
 
 ## Проверка
 
