@@ -1,5 +1,6 @@
 using System.Net;
 using System.Reflection;
+using eViSTool.Core.Localization;
 using Newtonsoft.Json;
 
 namespace eViSTool.Core.ModDb;
@@ -88,28 +89,64 @@ public sealed class ModDbClient : IDisposable
     }
 
     /// <summary>Скачивает файл (архив мода с CDN модбазы). Пишет во временный файл и переименовывает в конце.</summary>
+    /// <summary>Сколько ждать следующего куска файла: дольше — скачивание считается зависшим.</summary>
+    public TimeSpan StallTimeout { get; init; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// Файлы модов модбаза отдаёт с https://*.vintagestory.at (сейчас moddbcdn). Адрес приходит из её ответа, но
+    /// качать по нему что угодно откуда угодно (http, чужой хост) незачем — такой адрес отклоняем.
+    /// </summary>
+    public static bool IsModDbFileUrl(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps
+        && (uri.Host.Equals("vintagestory.at", StringComparison.OrdinalIgnoreCase)
+            || uri.Host.EndsWith(".vintagestory.at", StringComparison.OrdinalIgnoreCase));
+
     public async Task DownloadAsync(string url, string destPath, IProgress<double>? progress = null, CancellationToken ct = default)
     {
+        if (!IsModDbFileUrl(url)) throw new InvalidDataException(Loc.T("dl.badUrl", url));
         using var resp = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
         var total = resp.Content.Headers.ContentLength;
 
         Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
         var tmp = destPath + ".part";
-        await using (var src = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false))
-        await using (var dst = File.Create(tmp))
+        // тайм-аут HttpClient покрывает только заголовки: сервер, замолчавший посреди файла, держал бы установку вечно
+        using var stall = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        try
         {
-            var buffer = new byte[81920];
-            long read = 0;
-            int n;
-            while ((n = await src.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+            await using (var src = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false))
+            await using (var dst = File.Create(tmp))
             {
-                await dst.WriteAsync(buffer.AsMemory(0, n), ct).ConfigureAwait(false);
-                read += n;
-                if (total > 0) progress?.Report((double)read / total.Value);
+                var buffer = new byte[81920];
+                long read = 0;
+                int n;
+                while (true)
+                {
+                    stall.CancelAfter(StallTimeout);
+                    if ((n = await src.ReadAsync(buffer, stall.Token).ConfigureAwait(false)) <= 0) break;
+                    await dst.WriteAsync(buffer.AsMemory(0, n), ct).ConfigureAwait(false);
+                    read += n;
+                    if (total > 0) progress?.Report((double)read / total.Value);
+                }
             }
+            File.Move(tmp, destPath, overwrite: true);
         }
-        File.Move(tmp, destPath, overwrite: true);
+        catch (OperationCanceledException) when (stall.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            TryDelete(tmp);
+            throw new TimeoutException(Loc.T("dl.stalled", (int)StallTimeout.TotalSeconds));
+        }
+        catch
+        {
+            TryDelete(tmp); // недокачанный файл не оставляем
+            throw;
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { File.Delete(path); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     public void Dispose()

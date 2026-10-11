@@ -56,7 +56,7 @@ public sealed class ModUpdater(ModDbClient db, string? downloadDir = null)
         try
         {
             var dir = Path.GetDirectoryName(downloadedFile);
-            if (dir is not null && dir.StartsWith(DownloadDir, StringComparison.OrdinalIgnoreCase) && Directory.Exists(dir))
+            if (dir is not null && PathRules.IsUnder(dir, DownloadDir) && Directory.Exists(dir))
                 Directory.Delete(dir, recursive: true);
         }
         catch (IOException)

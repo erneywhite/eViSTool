@@ -32,8 +32,7 @@ public static class GameProcess
                 using (p)
                 {
                     if (Inspect(p, name) is not { } server) continue;
-                    if (dir is null || server.ServerFile is null
-                        || server.ServerFile.StartsWith(dir, StringComparison.OrdinalIgnoreCase))
+                    if (dir is null || server.ServerFile is null || PathRules.IsUnder(server.ServerFile, dir))
                         result.Add(server);
                 }
             }
@@ -116,8 +115,7 @@ public static class GameProcess
                 string? exe;
                 try { exe = p.MainModule?.FileName; }
                 catch (Exception ex) when (ex is Win32Exception or InvalidOperationException) { exe = null; }
-                if (exe is not null && !string.IsNullOrWhiteSpace(profile.GameDir)
-                    && !exe.StartsWith(Path.GetFullPath(profile.GameDir), StringComparison.OrdinalIgnoreCase))
+                if (exe is not null && !string.IsNullOrWhiteSpace(profile.GameDir) && !PathRules.IsUnder(exe, profile.GameDir))
                     continue;
                 if (ProcessCommandLine.GetArgs(p.Id) is not { } args)
                 {

@@ -387,7 +387,7 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
         {
             var rel = entry.FullName[PackManifest.ConfigFolder.Length..];
             var dest = System.IO.Path.GetFullPath(System.IO.Path.Combine(configDir, rel));
-            if (!dest.StartsWith(root, StringComparison.OrdinalIgnoreCase)) continue; // защита от ../ в чужом архиве
+            if (!dest.StartsWith(root, PathRules.Comparison)) continue; // защита от ../ в чужом архиве
             Directory.CreateDirectory(System.IO.Path.GetDirectoryName(dest)!);
             entry.ExtractToFile(dest, overwrite: true);
         }

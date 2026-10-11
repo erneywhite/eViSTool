@@ -40,6 +40,18 @@ public static class PathRules
             : null;
 
     /// <summary>
+    /// Лежит ли <paramref name="path"/> внутри папки <paramref name="dir"/> (не сама папка). Сравнение по полным путям и с
+    /// разделителем на конце: простой StartsWith принял бы «Vintagestory2» за папку «Vintagestory».
+    /// </summary>
+    public static bool IsUnder(string path, string dir)
+    {
+        var root = Path.GetFullPath(dir);
+        if (!Path.EndsInDirectorySeparator(root)) root += Path.DirectorySeparatorChar;
+        var full = Path.GetFullPath(path);
+        return full.Length > root.Length && full.StartsWith(root, Comparison);
+    }
+
+    /// <summary>
     /// Путь внутри папки, присланный окном («sub/x.json»), → полный путь на этой машине; выход за папку — null.
     /// «\» считается разделителем и на Linux: окно на Windows пишет пути с ним, и «..\x» должно значить то же, что там.
     /// Путь от корня («/etc/x», «\\сервер\x») и с диском Windows («C:/x») не принимается ни на какой системе.

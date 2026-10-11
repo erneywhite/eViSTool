@@ -72,7 +72,7 @@ public sealed class ServerModAutoUpdateTests : IDisposable
                         modid = 1, name = id, urlalias = id,
                         releases = new[]
                         {
-                            new { releaseid = 2, modidstr = id, modversion = rel.Version, mainfile = $"https://fake/files/{id}_{rel.Version}.zip",
+                            new { releaseid = 2, modidstr = id, modversion = rel.Version, mainfile = $"https://moddbcdn.vintagestory.at/files/{id}_{rel.Version}.zip",
                                   filename = $"{id}_{rel.Version}.zip", tags = new[] { $"v{Branch}.0" } },
                         },
                     },
