@@ -8,6 +8,10 @@
 # игры, поэтому у игроков он уже стоит. Агент (eViSTool.Agent.exe) — один файл с рантаймом внутри: ему нужен ещё
 # и ASP.NET Core, которого у игроков обычно нет, а агент должен запускаться и на голой машине с сервером.
 # Рантайм в агенте обрезан до того, что он использует (PublishTrimmed) — иначе exe весил бы ~50 МБ.
+#
+# Подпись: если в окружении есть EVISTOOL_SIGNING_KEY (закрытый ключ, PKCS#8 в base64), рядом с каждым архивом
+# появляется «.sig» — без неё окно и агент обновление не поставят. Ключ есть только у сборки релиза в CI (секрет
+# GitHub); собранное здесь без ключа годится для проверки, но не для выкладки.
 param([string]$Version)
 
 $ErrorActionPreference = 'Stop'
@@ -121,3 +125,18 @@ for ($i = 0; $i -lt $count; $i++) {
 $hash = (Get-FileHash $lzip -Algorithm SHA256).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText("$lzip.sha256", "$hash  $(Split-Path $lzip -Leaf)`n")
 Get-ChildItem $linuxOut, $tgz, "$tgz.sha256", $lzip, "$lzip.sha256" | Select-Object Name, @{ n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
+
+# ---- подпись архивов (ECDSA P-256 над SHA-256, как проверяет UpdateSignature) ----
+if ($env:EVISTOOL_SIGNING_KEY) {
+    $key = [Security.Cryptography.ECDsa]::Create()
+    $null = $key.ImportPkcs8PrivateKey([Convert]::FromBase64String($env:EVISTOOL_SIGNING_KEY), [ref]0)
+    foreach ($file in $zip, $tgz, $lzip) {
+        $stream = [IO.File]::OpenRead($file)
+        try { $signature = $key.SignData($stream, [Security.Cryptography.HashAlgorithmName]::SHA256) } finally { $stream.Dispose() }
+        [IO.File]::WriteAllText("$file.sig", [Convert]::ToBase64String($signature))
+    }
+    $key.Dispose()
+    Write-Host 'Архивы подписаны.'
+} else {
+    Write-Warning 'EVISTOOL_SIGNING_KEY не задан: архивы не подписаны, выкладывать их нельзя (обновление их не примет).'
+}

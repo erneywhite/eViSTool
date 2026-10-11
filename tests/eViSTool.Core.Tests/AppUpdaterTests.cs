@@ -158,10 +158,18 @@ public sealed class AppUpdaterTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => AppUpdater.Install(TarGz(("other", "x", exec)), _app));
     }
 
-    private sealed class FakeHandler(byte[] body) : HttpMessageHandler
+    /// <summary>Архив и его подпись («.sig»); signature: null — подписи нет (404).</summary>
+    private sealed class FakeHandler(byte[] body, Func<string?>? signature = null) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
-            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(body) });
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            if (!request.RequestUri!.AbsolutePath.EndsWith(".sig"))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(body) });
+            var sig = (signature ?? (() => TestSigning.Sign(body)))();
+            return Task.FromResult(sig is null
+                ? new HttpResponseMessage(HttpStatusCode.NotFound)
+                : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(sig) });
+        }
     }
 
     [Fact]
@@ -169,7 +177,7 @@ public sealed class AppUpdaterTests : IDisposable
     {
         var body = "archive bytes"u8.ToArray();
         var hash = Convert.ToHexStringLower(SHA256.HashData(body));
-        var updater = new AppUpdater(new HttpClient(new FakeHandler(body)));
+        var updater = new AppUpdater(new HttpClient(new FakeHandler(body)), TestSigning.PublicKey);
         AppRelease Release(string? sha) => new() { Version = V("0.2.0"), Tag = "v0.2.0", AssetName = "e-win-x64.zip", AssetUrl = "https://dl/e.zip", Sha256 = sha };
         var downloads = Path.Combine(_root, "dl");
 
@@ -179,6 +187,44 @@ public sealed class AppUpdaterTests : IDisposable
         await Assert.ThrowsAsync<InvalidOperationException>(() => updater.DownloadAsync(Release(new string('0', 64)), downloads));
         Assert.False(File.Exists(path)); // подменённый файл не остаётся
         await Assert.ThrowsAsync<InvalidOperationException>(() => updater.DownloadAsync(Release(null), downloads));
+    }
+
+    [Fact]
+    public async Task Download_WithoutSignature_OrSignedByAnotherKey_IsRefused()
+    {
+        var body = "archive bytes"u8.ToArray();
+        var release = new AppRelease
+        {
+            Version = V("0.2.0"), Tag = "v0.2.0", AssetName = "e-win-x64.zip", AssetUrl = "https://dl/e.zip",
+            Sha256 = Convert.ToHexStringLower(SHA256.HashData(body)),
+        };
+        var downloads = Path.Combine(_root, "dl-sig");
+
+        // подменили архив вместе с суммой, а подписать нечем: подписи нет
+        var unsigned = new AppUpdater(new HttpClient(new FakeHandler(body, () => null)), TestSigning.PublicKey);
+        var noSig = await Assert.ThrowsAsync<InvalidOperationException>(() => unsigned.DownloadAsync(release, downloads));
+        Assert.Contains(eViSTool.Core.Localization.Loc.T("update.noSignature"), noSig.Message);
+
+        // подписали своим ключом — программа ждёт ключ релизов
+        var (otherPrivate, _) = UpdateSignature.NewKeyPair();
+        var file = Path.Combine(_root, "body.bin");
+        File.WriteAllBytes(file, body);
+        var foreign = new AppUpdater(new HttpClient(new FakeHandler(body, () => UpdateSignature.Sign(file, otherPrivate))), TestSigning.PublicKey);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => foreign.DownloadAsync(release, downloads));
+
+        // мусор вместо подписи — тоже отказ, а не падение
+        var junk = new AppUpdater(new HttpClient(new FakeHandler(body, () => "не подпись")), TestSigning.PublicKey);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => junk.DownloadAsync(release, downloads));
+
+        Assert.Empty(Directory.EnumerateFiles(downloads)); // ни один неподтверждённый архив не остался
+    }
+
+    [Fact]
+    public void ReleaseKey_IsAValidP256PublicKey()
+    {
+        using var ecdsa = ECDsa.Create();
+        ecdsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(UpdateSignature.ReleaseKey), out _);
+        Assert.Equal(256, ecdsa.KeySize);
     }
 
     private const string Feed = """
@@ -228,7 +274,8 @@ public sealed class AppUpdaterTests : IDisposable
             url.StartsWith("https://api.github.com") ? new HttpResponseMessage(HttpStatusCode.Forbidden)
             : url.EndsWith("releases.atom") ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(Feed) }
             : url.EndsWith(".sha256") ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent((badSum ? new string('0', 64) : sum) + "  file.zip\n") }
-            : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(body) })));
+            : url.EndsWith(".sig") ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(TestSigning.Sign(body)) }
+            : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(body) })), TestSigning.PublicKey);
 
         // лимит API исчерпан — релизы из ленты: самый новый — стабильный 0.2.0
         var found = await updater.FindUpdateAsync(V("0.1.0-alpha.8"));

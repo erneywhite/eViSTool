@@ -27,18 +27,24 @@ public sealed class AppUpdaterDownloadTests : IDisposable
         AssetUrl = "https://dl/e.zip", Sha256 = Hash, AssetSize = Archive.Length,
     };
 
+    /// <summary>Архив — из body; подпись («.sig») — настоящая, тестовым ключом.</summary>
     private sealed class Handler(Func<Stream> body) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
-            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(body()) });
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = request.RequestUri!.AbsolutePath.EndsWith(".sig") ? new StringContent(TestSigning.Sign(Archive)) : new StreamContent(body()),
+            });
     }
+
+    private static AppUpdater Updater(Func<Stream> body) => new(new HttpClient(new Handler(body)), TestSigning.PublicKey);
 
     private bool LeftoverFiles() => Directory.Exists(_downloads) && Directory.EnumerateFiles(_downloads).Any();
 
     [Fact]
     public async Task TruncatedArchive_IsRefusedByTheHash_AndRemoved()
     {
-        var updater = new AppUpdater(new HttpClient(new Handler(() => new MemoryStream(Archive[..150_000]))));
+        var updater = Updater(() => new MemoryStream(Archive[..150_000]));
         await Assert.ThrowsAsync<InvalidOperationException>(() => updater.DownloadAsync(Release, _downloads));
         Assert.False(LeftoverFiles());
     }
@@ -46,7 +52,7 @@ public sealed class AppUpdaterDownloadTests : IDisposable
     [Fact]
     public async Task ConnectionDroppedMidway_LeavesNoPartialArchive()
     {
-        var updater = new AppUpdater(new HttpClient(new Handler(() => new BreakingStream(Archive, breakAfter: 100_000))));
+        var updater = Updater(() => new BreakingStream(Archive, breakAfter: 100_000));
         await Assert.ThrowsAsync<IOException>(() => updater.DownloadAsync(Release, _downloads));
         Assert.False(LeftoverFiles());
     }
@@ -54,7 +60,7 @@ public sealed class AppUpdaterDownloadTests : IDisposable
     [Fact]
     public async Task StalledServer_TimesOut_InsteadOfWaitingForever()
     {
-        var updater = new AppUpdater(new HttpClient(new Handler(() => new BreakingStream(Archive, breakAfter: 100_000, stall: true))))
+        var updater = new AppUpdater(new HttpClient(new Handler(() => new BreakingStream(Archive, breakAfter: 100_000, stall: true))), TestSigning.PublicKey)
         {
             StallTimeout = TimeSpan.FromMilliseconds(300),
         };
@@ -65,7 +71,7 @@ public sealed class AppUpdaterDownloadTests : IDisposable
     [Fact]
     public async Task Cancelled_LeavesNoPartialArchive()
     {
-        var updater = new AppUpdater(new HttpClient(new Handler(() => new BreakingStream(Archive, breakAfter: 100_000, stall: true))));
+        var updater = Updater(() => new BreakingStream(Archive, breakAfter: 100_000, stall: true));
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => updater.DownloadAsync(Release, _downloads, ct: cts.Token));
         Assert.False(LeftoverFiles());
@@ -74,7 +80,7 @@ public sealed class AppUpdaterDownloadTests : IDisposable
     [Fact]
     public async Task WholeArchive_Arrives()
     {
-        var updater = new AppUpdater(new HttpClient(new Handler(() => new MemoryStream(Archive))));
+        var updater = Updater(() => new MemoryStream(Archive));
         var path = await updater.DownloadAsync(Release, _downloads);
         Assert.Equal(Archive, await File.ReadAllBytesAsync(path));
     }

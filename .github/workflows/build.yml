@@ -1,11 +1,19 @@
 # Сборка и тесты на каждый пуш и pull request; заодно — релизные архивы тем же build/publish.ps1
 # и тесты агента на обрезанном релизном exe (артефакт запуска хранится две недели). Ядро и агент — ещё и на Linux:
 # там агент держит сервер без окна.
+#
+# Выпуск — тегом: поднять версию в Directory.Build.props, положить docs/moddb/changelog-<версия>.txt, закоммитить и
+#   git tag -a v0.10.5 -m "eViSTool 0.10.5"               — обычный выпуск
+#   git tag -a v0.10.5 -m "eViSTool 0.10.5 recommended"   — рекомендуемый (окно выделит обновление)
+#   git push origin v0.10.5
+# Когда сборка и тесты на обеих системах прошли, задание release собирает архивы, подписывает их ключом из секрета
+# UPDATE_SIGNING_KEY и выкладывает релиз с текстом из списка изменений.
 name: Build
 
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -76,3 +84,55 @@ jobs:
 
       - name: Test
         run: dotnet test tests/eViSTool.Core.Tests --no-build -c Debug --logger "console;verbosity=normal"
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, linux]
+    runs-on: windows-latest
+    timeout-minutes: 30
+    # только этому заданию — право выложить релиз; ключ подписи — только ему
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # аннотированный тег целиком: из его сообщения берётся пометка «recommended»
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Check the version
+        id: version
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $version = $tag.TrimStart('v')
+          $declared = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if ($declared -ne $version) { throw "Тег $tag, а в Directory.Build.props версия $declared" }
+          if (-not (Test-Path "docs/moddb/changelog-$version.txt")) { throw "Нет docs/moddb/changelog-$version.txt" }
+          git fetch --force origin "refs/tags/${tag}:refs/tags/${tag}"
+          $message = git tag -l --format='%(contents)' $tag
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "recommended=$([bool]($message -match 'recommended'))" >> $env:GITHUB_OUTPUT
+
+      - name: Build and sign
+        shell: pwsh
+        env:
+          EVISTOOL_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          if (-not $env:EVISTOOL_SIGNING_KEY) { throw 'Нет секрета UPDATE_SIGNING_KEY — неподписанный релиз никто не сможет поставить' }
+          ./build/publish.ps1 -Version ${{ steps.version.outputs.version }}
+          $notes = @{ Version = '${{ steps.version.outputs.version }}' }
+          if ('${{ steps.version.outputs.recommended }}' -eq 'True') { $notes.Recommended = $true }
+          ./build/release-notes.ps1 @notes
+
+      - name: Publish the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = '${{ steps.version.outputs.version }}'
+          $files = Get-ChildItem dist -File | Where-Object { $_.Name -like "eViSTool-$v-*" } | ForEach-Object { $_.FullName }
+          if (($files | Where-Object { $_ -like '*.sig' }).Count -ne 3) { throw 'Подписей должно быть три: win zip, linux tar.gz, linux zip' }
+          gh release create '${{ github.ref_name }}' --title "eViSTool $v" --notes-file "dist/notes-$v.md" --verify-tag @files

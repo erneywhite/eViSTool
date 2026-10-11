@@ -546,13 +546,17 @@ public sealed class AgentTests : IAsyncLifetime
             {
                 System.Net.HttpListenerContext ctx;
                 try { ctx = await web.GetContextAsync(); } catch (Exception) { return; }
-                var body = ctx.Request.Url!.AbsolutePath.EndsWith(".json") ? System.Text.Encoding.UTF8.GetBytes(releases) : junk;
+                var path = ctx.Request.Url!.AbsolutePath;
+                var body = path.EndsWith(".json") ? System.Text.Encoding.UTF8.GetBytes(releases)
+                    : path.EndsWith(".sig") ? System.Text.Encoding.UTF8.GetBytes(TestSigning.Sign(junk)) // подписан как надо, а внутри не архив
+                    : junk;
                 await ctx.Response.OutputStream.WriteAsync(body);
                 ctx.Response.Close();
             }
         });
 
         Environment.SetEnvironmentVariable("EVISTOOL_RELEASES_URL", $"http://127.0.0.1:{port}/releases.json");
+        Environment.SetEnvironmentVariable(eViSTool.Core.AppUpdate.UpdateSignature.KeyVariable, TestSigning.PublicKey);
         try
         {
             _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: true, AgentExe, AgentsDir);
@@ -560,6 +564,7 @@ public sealed class AgentTests : IAsyncLifetime
         finally
         {
             Environment.SetEnvironmentVariable("EVISTOOL_RELEASES_URL", null);
+            Environment.SetEnvironmentVariable(eViSTool.Core.AppUpdate.UpdateSignature.KeyVariable, null);
         }
         await Until(async () => (await _client.StatusAsync()).State == ServerState.Running);
         var firstPid = (await _client.StatusAsync()).ServerPid;

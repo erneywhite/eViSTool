@@ -56,9 +56,12 @@ public sealed class AppUpdater
     public static string MainExe { get; } = OperatingSystem.IsWindows() ? "eViSTool.exe" : Server.AgentProtocol.ExeName;
 
     private readonly HttpClient _http;
+    private readonly string _publicKey;
 
-    public AppUpdater(HttpClient? http = null)
+    /// <param name="publicKey">Чем проверять подпись архива; null — ключ релизов (или заданный в окружении, см. <see cref="UpdateSignature"/>).</param>
+    public AppUpdater(HttpClient? http = null, string? publicKey = null)
     {
+        _publicKey = publicKey ?? UpdateSignature.CurrentKey;
         _http = http ?? new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
         if (_http.DefaultRequestHeaders.UserAgent.Count == 0)
             _http.DefaultRequestHeaders.UserAgent.ParseAdd($"eViSTool (github: {Repo})"); // без User-Agent GitHub отвечает 403
@@ -244,6 +247,14 @@ public sealed class AppUpdater
             File.Delete(path);
             throw new InvalidOperationException(Loc.T("update.badHash"));
         }
+
+        // сумма лишь показывает, что файл дошёл целым; что его собрали мы, а не подменили на GitHub, — подпись
+        var signature = await ReadSignatureAsync(release.AssetUrl + UpdateSignature.Extension, ct).ConfigureAwait(false);
+        if (signature is null || !UpdateSignature.Verify(path, signature, _publicKey))
+        {
+            DeleteQuietly(path);
+            throw new InvalidOperationException(Loc.T(signature is null ? "update.noSignature" : "update.badSignature"));
+        }
         return path;
     }
 
@@ -254,6 +265,16 @@ public sealed class AppUpdater
         if (!response.IsSuccessStatusCode) return null;
         var first = (await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false)).Trim().Split(' ', '\t', '\n').FirstOrDefault() ?? "";
         return first.Length == 64 && first.All(Uri.IsHexDigit) ? first.ToLowerInvariant() : null;
+    }
+
+    /// <summary>Подпись архива (файл «.sig» рядом с ним); null — её нет.</summary>
+    private async Task<string?> ReadSignatureAsync(string url, CancellationToken ct)
+    {
+        using var response = await _http.GetAsync(url, ct).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        if (!response.IsSuccessStatusCode) throw new HttpRequestException(Loc.T("update.httpFailed", (int)response.StatusCode));
+        var text = (await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false)).Trim();
+        return text.Length is > 0 and < 1024 ? text : null;
     }
 
     private static void DeleteQuietly(string path)
