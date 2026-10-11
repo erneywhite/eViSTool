@@ -1,4 +1,6 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Platform;
 using Avalonia.Threading;
@@ -100,9 +102,13 @@ public class DialogWindow : Window
     }
 
     /// <summary>
-    /// Владелец нового окна: главное; открыто модальное окно — самое верхнее видимое (вложенные диалоги цепляются
-    /// друг за друга, иначе нижний остался бы доступным). null — главного окна ещё или уже нет.
+    /// Владелец нового окна: открыто модальное окно — самое верхнее видимое (вложенные диалоги цепляются друг за друга,
+    /// иначе нижний остался бы доступным); нет — активное окно (вопрос из немодального «Найти сервер» должен встать над
+    /// ним, а не над главным, как ActiveOwner в WPF); иначе главное. null — главного окна ещё или уже нет.
     /// </summary>
     private static Window? PickOwner() =>
-        (OpenModals.Count > 0 ? AvaloniaUiPlatform.TopWindow() : null) ?? AvaloniaUiPlatform.MainWindow;
+        (OpenModals.Count > 0 ? AvaloniaUiPlatform.TopWindow() : null)
+        ?? (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+            ? desktop.Windows.FirstOrDefault(w => w.IsActive && w.IsVisible) : null)
+        ?? AvaloniaUiPlatform.MainWindow;
 }
