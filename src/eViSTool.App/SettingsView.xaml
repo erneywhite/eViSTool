@@ -140,7 +140,8 @@
                             <TextBlock Text="{local:Tr settings.profileCardHint}" Style="{StaticResource Hint}" />
 
                             <TextBlock Text="{local:Tr settings.name}" Style="{StaticResource FieldLabel}" />
-                            <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0" MaxLength="60" />
+                            <!-- имя применяется, когда уходишь из поля: на каждую букву профиль пересохранялся бы и переподключался -->
+                            <TextBox Text="{Binding Name, UpdateSourceTrigger=LostFocus}" Margin="0,6,0,0" MaxLength="60" />
 
                             <TextBlock Text="{local:Tr settings.type}" Style="{StaticResource FieldLabel}" />
                             <!-- тип задаётся при создании профиля и не меняется: у клиента и сервера разные папки и файлы -->

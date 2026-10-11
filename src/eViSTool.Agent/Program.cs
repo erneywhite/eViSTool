@@ -1061,158 +1061,166 @@ try
     while (!shutdown.IsCancellationRequested)
     {
         await Task.Delay(TimeSpan.FromSeconds(5), shutdown.Token).ContinueWith(_ => { });
-
-        // статистика: замер раз в минуту, старые дни — раз в сутки
-        if (DateTime.Now >= nextSample)
+        try
         {
-            var at = DateTime.Now;
-            nextSample = at.AddMinutes(1);
-            var cpu = cpuMeter.Next(host.State == ServerState.Running ? host.ProcessorTime : null, at);
-            if (host.State == ServerState.Running && cpu is { } load && host.MemoryMb is { } memory)
+
+            // статистика: замер раз в минуту, старые дни — раз в сутки
+            if (DateTime.Now >= nextSample)
             {
-                foreach (var p in players.Players) Stat(new StatsEntry(at, StatsKind.Join, Name: p.Name)); // известных пропустит
-                Stat(new StatsEntry(at, StatsKind.Sample, players.Players.Count, memory, Math.Round(load, 1)));
-            }
-        }
-        if (DateTime.Now >= nextStatsPrune)
-        {
-            nextStatsPrune = DateTime.Now.AddHours(24);
-            try { stats.Prune(DateTime.Now); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
-        }
-
-        // мало места на диске с данными сервера — раз в 10 минут
-        if (DateTime.Now >= nextDiskCheck)
-        {
-            nextDiskCheck = DateTime.Now.AddMinutes(10);
-            if (LowDiskWatch.FreeBytes(opts.DataPath) is { } free && lowDisk.Check(free))
-                Notify(eViSTool.Core.Notifications.NotifyEvent.LowDisk, eViSTool.Core.Localization.Loc.T("notify.ev.lowDisk"),
-                    Line("▣", "notify.lbl.disk", eViSTool.Core.Localization.Loc.T("notify.ev.diskFree",
-                        Path.GetPathRoot(Path.GetFullPath(opts.DataPath)) ?? opts.DataPath, eViSTool.Core.Localization.SizeText.Format(free))));
-        }
-
-        // вышли обновления модов — раз в сутки, и только если это оповещение кому-то включено
-        if (DateTime.Now >= nextModCheck)
-        {
-            nextModCheck = DateTime.Now.AddHours(24);
-            _ = Task.Run(CheckModUpdatesAsync);
-        }
-
-        if (DateTime.Now >= nextErrorScan)
-        {
-            nextErrorScan = DateTime.Now.AddSeconds(30);
-            try { ScanModErrors(); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { }
-        }
-
-        // настройки расписания поменяли в окне — подхватываем
-        var stamp = File.Exists(automationFile) ? File.GetLastWriteTimeUtc(automationFile) : default;
-        if (stamp != automationStamp)
-        {
-            automationStamp = stamp;
-            automation = ServerAutomation.Load(opts.ProfileId, opts.AgentsDir);
-        }
-
-        // объявления по расписанию: правки подхватываем, в срок — /announce
-        var announcementsNow = ServerAnnouncements.ChangedAt(opts.ProfileId, opts.AgentsDir);
-        if (announcementsNow != announcementsStamp)
-        {
-            announcementsStamp = announcementsNow;
-            announcements = ServerAnnouncements.Load(opts.ProfileId, opts.AgentsDir);
-        }
-        if (announcer.Tick(announcements, DateTime.Now, host.State, host.StartedAt, players.Players.Count) is { } say)
-        {
-            try { await host.SendCommandAsync("/announce " + say); }
-            catch (Exception ex) when (ex is InvalidOperationException or IOException) { host.Console.Add(ConsoleLineKind.System, ex.Message); }
-        }
-
-        // перезапуск по расписанию: сначала предупреждения игрокам, в срок — сам перезапуск
-        if (restarts.Tick(automation, DateTime.Now, host.State, host.StartedAt) is { } step)
-        {
-            try
-            {
-                if (!step.Restart)
+                var at = DateTime.Now;
+                nextSample = at.AddMinutes(1);
+                var cpu = cpuMeter.Next(host.State == ServerState.Running ? host.ProcessorTime : null, at);
+                if (host.State == ServerState.Running && cpu is { } load && host.MemoryMb is { } memory)
                 {
-                    host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.warn", step.MinutesLeft));
-                    // оповещение — одно на перезапуск, по первому предупреждению (дальше игроков предупреждают каждую минуту)
-                    if (RestartScheduler.NextAt(automation, host.State, host.StartedAt) is { } restartAt && restartAt != restartNotified)
+                    foreach (var p in players.Players) Stat(new StatsEntry(at, StatsKind.Join, Name: p.Name)); // известных пропустит
+                    Stat(new StatsEntry(at, StatsKind.Sample, players.Players.Count, memory, Math.Round(load, 1)));
+                }
+            }
+            if (DateTime.Now >= nextStatsPrune)
+            {
+                nextStatsPrune = DateTime.Now.AddHours(24);
+                try { stats.Prune(DateTime.Now); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            }
+
+            // мало места на диске с данными сервера — раз в 10 минут
+            if (DateTime.Now >= nextDiskCheck)
+            {
+                nextDiskCheck = DateTime.Now.AddMinutes(10);
+                if (LowDiskWatch.FreeBytes(opts.DataPath) is { } free && lowDisk.Check(free))
+                    Notify(eViSTool.Core.Notifications.NotifyEvent.LowDisk, eViSTool.Core.Localization.Loc.T("notify.ev.lowDisk"),
+                        Line("▣", "notify.lbl.disk", eViSTool.Core.Localization.Loc.T("notify.ev.diskFree",
+                            Path.GetPathRoot(Path.GetFullPath(opts.DataPath)) ?? opts.DataPath, eViSTool.Core.Localization.SizeText.Format(free))));
+            }
+
+            // вышли обновления модов — раз в сутки, и только если это оповещение кому-то включено
+            if (DateTime.Now >= nextModCheck)
+            {
+                nextModCheck = DateTime.Now.AddHours(24);
+                _ = Task.Run(CheckModUpdatesAsync);
+            }
+
+            if (DateTime.Now >= nextErrorScan)
+            {
+                nextErrorScan = DateTime.Now.AddSeconds(30);
+                try { ScanModErrors(); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { }
+            }
+
+            // настройки расписания поменяли в окне — подхватываем
+            var stamp = File.Exists(automationFile) ? File.GetLastWriteTimeUtc(automationFile) : default;
+            if (stamp != automationStamp)
+            {
+                automationStamp = stamp;
+                automation = ServerAutomation.Load(opts.ProfileId, opts.AgentsDir);
+            }
+
+            // объявления по расписанию: правки подхватываем, в срок — /announce
+            var announcementsNow = ServerAnnouncements.ChangedAt(opts.ProfileId, opts.AgentsDir);
+            if (announcementsNow != announcementsStamp)
+            {
+                announcementsStamp = announcementsNow;
+                announcements = ServerAnnouncements.Load(opts.ProfileId, opts.AgentsDir);
+            }
+            if (announcer.Tick(announcements, DateTime.Now, host.State, host.StartedAt, players.Players.Count) is { } say)
+            {
+                try { await host.SendCommandAsync("/announce " + say); }
+                catch (Exception ex) when (ex is InvalidOperationException or IOException) { host.Console.Add(ConsoleLineKind.System, ex.Message); }
+            }
+
+            // перезапуск по расписанию: сначала предупреждения игрокам, в срок — сам перезапуск
+            if (restarts.Tick(automation, DateTime.Now, host.State, host.StartedAt) is { } step)
+            {
+                try
+                {
+                    if (!step.Restart)
                     {
-                        restartNotified = restartAt;
-                        Notify(eViSTool.Core.Notifications.NotifyEvent.RestartSoon,
-                            eViSTool.Core.Localization.Loc.T("notify.ev.restartSoon", step.MinutesLeft),
-                            Line("◷", "notify.lbl.time", restartAt.ToString("HH:mm")),
-                            Line("◦", "notify.lbl.online", players.Players.Count.ToString()));
+                        host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.warn", step.MinutesLeft));
+                        // оповещение — одно на перезапуск, по первому предупреждению (дальше игроков предупреждают каждую минуту)
+                        if (RestartScheduler.NextAt(automation, host.State, host.StartedAt) is { } restartAt && restartAt != restartNotified)
+                        {
+                            restartNotified = restartAt;
+                            Notify(eViSTool.Core.Notifications.NotifyEvent.RestartSoon,
+                                eViSTool.Core.Localization.Loc.T("notify.ev.restartSoon", step.MinutesLeft),
+                                Line("◷", "notify.lbl.time", restartAt.ToString("HH:mm")),
+                                Line("◦", "notify.lbl.online", players.Players.Count.ToString()));
+                        }
+                        await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.Plural("restart.announce", step.MinutesLeft));
                     }
-                    await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.Plural("restart.announce", step.MinutesLeft));
+                    else if (!automation.RestartBackup)
+                    {
+                        await RestartBySchedule();
+                    }
+                    else if (!scheduler.NeedsCopy(automation))
+                    {
+                        host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.backupSkipped"));
+                        await RestartBySchedule();
+                    }
+                    else
+                    {
+                        // сначала копия мира; перезапуск — когда сервер её закончит (файл копии готов — см. выше)
+                        restartAfterBackup = DateTime.Now + ServerAutomation.RestartBackupWait;
+                        host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.backupFirst"));
+                        await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.T("restart.announceBackup"));
+                        // копия уже идёт — ждём её; отметка старше получаса — сервер за копию так и не взялся, просим заново
+                        if (pendingBackup is null || DateTime.Now - pendingSince > BackupWaitOf()) await RequestBackup();
+                    }
                 }
-                else if (!automation.RestartBackup)
+                catch (Exception ex) when (ex is InvalidOperationException or IOException)
                 {
+                    host.Console.Add(ConsoleLineKind.System, ex.Message);
+                    if (restartAfterBackup is not null) restartAfterBackup = DateTime.Now; // копию запросить не вышло — не ждём её
+                }
+            }
+
+            // перезапуск ждёт копию: сервер за это время остановили — перезапускать нечего; копия не успела — идём без неё
+            if (restartAfterBackup is { } deadline)
+            {
+                if (host.State != ServerState.Running)
+                {
+                    restartAfterBackup = null;
+                }
+                else if (DateTime.Now >= deadline)
+                {
+                    restartAfterBackup = null;
+                    host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.backupFailed"));
+                    Notify(eViSTool.Core.Notifications.NotifyEvent.BackupFailed, eViSTool.Core.Localization.Loc.T("notify.ev.backupFailed"),
+                        Line("▣", "notify.lbl.backup", eViSTool.Core.Localization.Loc.T("notify.ev.backupBeforeRestart")));
                     await RestartBySchedule();
                 }
-                else if (!scheduler.NeedsCopy(automation))
+            }
+
+            await ApplyRemoteAsync();
+            scheduler.NotePlayers(players.Players.Count);
+            if (commandsDirty)
+            {
+                lock (commands)
                 {
-                    host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.backupSkipped"));
-                    await RestartBySchedule();
-                }
-                else
-                {
-                    // сначала копия мира; перезапуск — когда сервер её закончит (файл копии готов — см. выше)
-                    restartAfterBackup = DateTime.Now + ServerAutomation.RestartBackupWait;
-                    host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.backupFirst"));
-                    await host.SendCommandAsync("/announce " + eViSTool.Core.Localization.Loc.T("restart.announceBackup"));
-                    // копия уже идёт — ждём её; отметка старше получаса — сервер за копию так и не взялся, просим заново
-                    if (pendingBackup is null || DateTime.Now - pendingSince > BackupWaitOf()) await RequestBackup();
+                    commandsDirty = false;
+                    try { ServerCommands.Save(commandsFile, commands.Values); }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { commandsDirty = true; } // в следующий раз
                 }
             }
-            catch (Exception ex) when (ex is InvalidOperationException or IOException)
+            if (scheduler.IsDue(automation, DateTime.Now, host.State, host.StartedAt))
             {
-                host.Console.Add(ConsoleLineKind.System, ex.Message);
-                if (restartAfterBackup is not null) restartAfterBackup = DateTime.Now; // копию запросить не вышло — не ждём её
+                try
+                {
+                    host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.scheduled"));
+                    await RequestBackup();
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or IOException)
+                {
+                    host.Console.Add(ConsoleLineKind.System, ex.Message);
+                }
             }
+            var idle = host.State == ServerState.Stopped && host.RestartScheduledAt is null
+                       && DateTime.Now - lastActivity > opts.IdleExit;
+            if (idle) break;
         }
-
-        // перезапуск ждёт копию: сервер за это время остановили — перезапускать нечего; копия не успела — идём без неё
-        if (restartAfterBackup is { } deadline)
+        catch (Exception ex) when (!shutdown.IsCancellationRequested)
         {
-            if (host.State != ServerState.Running)
-            {
-                restartAfterBackup = null;
-            }
-            else if (DateTime.Now >= deadline)
-            {
-                restartAfterBackup = null;
-                host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("restart.backupFailed"));
-                Notify(eViSTool.Core.Notifications.NotifyEvent.BackupFailed, eViSTool.Core.Localization.Loc.T("notify.ev.backupFailed"),
-                    Line("▣", "notify.lbl.backup", eViSTool.Core.Localization.Loc.T("notify.ev.backupBeforeRestart")));
-                await RestartBySchedule();
-            }
+            // каждый шаг ловит свои ошибки; неожиданная не должна завершать цикл — иначе агент упадёт и уронит сервер
+            host.Console.Add(ConsoleLineKind.Error, eViSTool.Core.Localization.Loc.T("agent.tickFailed", ex.GetType().Name, ex.Message));
         }
-
-        await ApplyRemoteAsync();
-        scheduler.NotePlayers(players.Players.Count);
-        if (commandsDirty)
-        {
-            lock (commands)
-            {
-                commandsDirty = false;
-                try { ServerCommands.Save(commandsFile, commands.Values); }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { commandsDirty = true; } // в следующий раз
-            }
-        }
-        if (scheduler.IsDue(automation, DateTime.Now, host.State, host.StartedAt))
-        {
-            try
-            {
-                host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("backup.scheduled"));
-                await RequestBackup();
-            }
-            catch (Exception ex) when (ex is InvalidOperationException or IOException)
-            {
-                host.Console.Add(ConsoleLineKind.System, ex.Message);
-            }
-        }
-        var idle = host.State == ServerState.Stopped && host.RestartScheduledAt is null
-                   && DateTime.Now - lastActivity > opts.IdleExit;
-        if (idle) break;
     }
 }
 finally

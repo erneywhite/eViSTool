@@ -34,7 +34,7 @@ public sealed partial class ServerStatsViewModel : ObservableObject
 
     [ObservableProperty] private bool _enabled;
     [ObservableProperty] private bool _loaded;
-    [ObservableProperty] private StatsPeriod _period = StatsPeriod.Week;
+    [ObservableProperty] private StatsPeriod _period = StatsPeriod.Day; // сутки — то, что смотрят чаще всего
     [ObservableProperty] private StatsReport? _report;
     [ObservableProperty] private string _statusText = "";
 

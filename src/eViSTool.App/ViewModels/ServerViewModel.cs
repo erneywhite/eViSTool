@@ -375,55 +375,65 @@ public sealed partial class ServerViewModel : ObservableObject
     {
         while (!ct.IsCancellationRequested)
         {
-            var profile = _main.ActiveProfile?.Model;
-            if (profile is null) return;
-
-            if (profile.IsRemote)
+            try
             {
-                if (!await WatchRemoteAsync(profile, ct)) return;
-                continue;
-            }
+                var profile = _main.ActiveProfile?.Model;
+                if (profile is null) return;
 
-            if (_client is null && AgentClient.TryConnect(profile.Id) is { } found)
-                Attach(found, ct);
-
-            if (_client is not null)
-            {
-                try
+                if (profile.IsRemote)
                 {
-                    var status = await _client.StatusAsync(ct);
-                    Apply(status);
-                    // eViSTool обновили, а агент прежний: сервер стоит — меняем агента (нужен для удалённого доступа — сразу
-                    // запускаем новый; нет — новый появится при следующем запуске сервера)
-                    if (AgentProtocol.IsOutdated(status) && status.State == ServerState.Stopped && status.RestartScheduledAt is null && !IsBusy)
+                    if (!await WatchRemoteAsync(profile, ct)) return;
+                    continue;
+                }
+
+                if (_client is null && AgentClient.TryConnect(profile.Id) is { } found)
+                    Attach(found, ct);
+
+                if (_client is not null)
+                {
+                    try
                     {
-                        var old = _client;
-                        Detach();
-                        await AgentLauncher.ReplaceAsync(old, ct);
-                        if (Core.Server.Remote.RemoteAccess.Load(profile.Id).Enabled)
-                            using (await AgentLauncher.EnsureRunningAsync(profile, startServer: false, ct: ct)) { }
+                        var status = await _client.StatusAsync(ct);
+                        Apply(status);
+                        // eViSTool обновили, а агент прежний: сервер стоит — меняем агента (нужен для удалённого доступа — сразу
+                        // запускаем новый; нет — новый появится при следующем запуске сервера)
+                        if (AgentProtocol.IsOutdated(status) && status.State == ServerState.Stopped && status.RestartScheduledAt is null && !IsBusy)
+                        {
+                            var old = _client;
+                            Detach();
+                            await AgentLauncher.ReplaceAsync(old, ct);
+                            if (Core.Server.Remote.RemoteAccess.Load(profile.Id).Enabled)
+                                using (await AgentLauncher.EnsureRunningAsync(profile, startServer: false, ct: ct)) { }
+                        }
                     }
+                    catch (HttpRequestException)
+                    {
+                        Detach(); // агент ушёл (например, сам завершился после простоя)
+                    }
+                    catch (Exception ex) when (ex is TaskCanceledException or InvalidOperationException) { }
                 }
-                catch (HttpRequestException)
-                {
-                    Detach(); // агент ушёл (например, сам завершился после простоя)
-                }
-                catch (Exception ex) when (ex is TaskCanceledException or InvalidOperationException) { }
+
+                // чужой сервер: из папки игры профиля, но не наш
+                var ours = _client is not null ? State != ServerState.Stopped : false;
+                var pids = await Task.Run(() => GameProcess.FindServerPids(profile), ct);
+                if (ct.IsCancellationRequested) return; // профиль уже сменили — найденное относится не к нему
+                ForeignPid = pids.Where(pid => !(ours && pid == _serverPid)).Select(pid => (int?)pid).FirstOrDefault();
+
+                _stateKnown = true;
+                PushServerState();
+                Players.PollLocal(); // файлы игроков поменялись (сервер записал списки, правка в другом окне)
+                Announcements.PollLocal();
+                Notify.PollLocal();
+
+                try { await Task.Delay(1500, ct); } catch (TaskCanceledException) { return; }
             }
-
-            // чужой сервер: из папки игры профиля, но не наш
-            var ours = _client is not null ? State != ServerState.Stopped : false;
-            var pids = await Task.Run(() => GameProcess.FindServerPids(profile), ct);
-            if (ct.IsCancellationRequested) return; // профиль уже сменили — найденное относится не к нему
-            ForeignPid = pids.Where(pid => !(ours && pid == _serverPid)).Select(pid => (int?)pid).FirstOrDefault();
-
-            _stateKnown = true;
-            PushServerState();
-            Players.PollLocal(); // файлы игроков поменялись (сервер записал списки, правка в другом окне)
-            Announcements.PollLocal();
-            Notify.PollLocal();
-
-            try { await Task.Delay(1500, ct); } catch (TaskCanceledException) { return; }
+            catch (Exception ex) when (!ct.IsCancellationRequested && ex is not OperationCanceledException)
+            {
+                // неожиданная ошибка (битый ответ, файл занят, процесс не прочитать) не должна молча останавливать опрос:
+                // иначе вкладка застынет на старом состоянии. Пишем в журнал и пробуем снова
+                App.WriteCrashLog(ex);
+                try { await Task.Delay(3000, ct); } catch (TaskCanceledException) { return; }
+            }
         }
     }
 
@@ -621,9 +631,11 @@ public sealed partial class ServerViewModel : ObservableObject
                 while (Lines.Count > MaxLines) Lines.RemoveAt(0);
                 LinesAppended?.Invoke(first);
             }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException or IOException)
+            catch (Exception ex)
             {
                 if (ct.IsCancellationRequested) return;
+                // связь мигнула — обычное дело; что-то другое (битый ответ) — в журнал, но поток консоли не бросаем
+                if (ex is not (HttpRequestException or TaskCanceledException or InvalidOperationException or IOException)) App.WriteCrashLog(ex);
                 await Task.Delay(1000, CancellationToken.None);
                 if (!ReferenceEquals(client, _client)) return;
             }
