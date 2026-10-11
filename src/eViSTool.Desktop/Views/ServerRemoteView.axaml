@@ -1,0 +1,6 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="eViSTool.Desktop.Views.ServerRemoteView">
+    <!-- заглушка: вкладка «Удалённый доступ» раздела «Сервер» ещё переносится с окна на WPF -->
+    <TextBlock Text="Экран «Удалённый доступ» ещё переносится" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
+</UserControl>
