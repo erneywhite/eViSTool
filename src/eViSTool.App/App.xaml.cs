@@ -22,6 +22,36 @@ public partial class App : Application
         Core.AppPaths.MigrateLegacy(); // до первого чтения настроек
         Core.AppUpdate.AppUpdater.CleanupOld(AppContext.BaseDirectory); // хвосты прошлого обновления
         base.OnStartup(e);
+        // снимок для сверки с окном на Avalonia: главное окно к этому моменту уже создано и показано
+        if (Presentation.Snapshots.FromEnvironment() is { } snapshot)
+            Dispatcher.BeginInvoke(() => _ = SnapshotAsync(snapshot), DispatcherPriority.ApplicationIdle);
+    }
+
+    /// <summary>Снимок окна (EVISTOOL_SNAPSHOT, см. <see cref="Presentation.Snapshots"/>): экран → PNG → выход.</summary>
+    private async Task SnapshotAsync(Presentation.SnapshotRequest request)
+    {
+        try
+        {
+            if (MainWindow is not { Content: FrameworkElement content, DataContext: Presentation.ViewModels.MainViewModel main } window) return;
+            window.WindowState = WindowState.Normal;
+            window.SizeToContent = SizeToContent.WidthAndHeight;
+            content.Width = request.Width;   // содержимое — ровно нужного размера (без рамки окна), как ClientSize у Avalonia
+            content.Height = request.Height;
+            Presentation.Snapshots.Navigate(main, request);
+            await Task.Delay(request.Wait);
+            content.UpdateLayout();
+            var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(request.Width, request.Height, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+            bitmap.Render(content);
+            var png = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(request.OutPath))!);
+            using (var file = File.Create(request.OutPath)) png.Save(file);
+        }
+        catch (Exception ex)
+        {
+            WriteCrashLog(ex);
+        }
+        Shutdown();
     }
 
     private static string? _restartExe;
