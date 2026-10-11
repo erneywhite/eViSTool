@@ -1,0 +1,56 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+        Лесная палитра (дизайн eViSTool-forest, Erney White) — те же значения, что в Themes/Forest.xaml окна на WPF.
+        1) Токены дизайна: Forest.*.
+        2) Подмена системных цветов Fluent теми же цветами: стандартные элементы (списки, галочки, прокрутка, меню)
+           перекрашиваются сами.
+    -->
+
+    <!-- ===== токены ===== -->
+    <Color x:Key="Forest.BaseColor">#202822</Color>
+    <Color x:Key="Forest.SurfaceColor">#273129</Color>
+    <Color x:Key="Forest.RaisedColor">#303D32</Color>
+    <Color x:Key="Forest.SideColor">#19231D</Color>
+    <Color x:Key="Forest.TextColor">#E7E9DD</Color>
+    <Color x:Key="Forest.MutedColor">#A4B1A0</Color>
+    <Color x:Key="Forest.LineColor">#3B483B</Color>
+    <Color x:Key="Forest.AccentColor">#D4BD83</Color>
+    <Color x:Key="Forest.AccentInkColor">#2C2B1C</Color>
+    <Color x:Key="Forest.SelectedColor">#394432</Color>
+    <Color x:Key="Forest.GoodColor">#B0C898</Color>
+    <Color x:Key="Forest.WarnColor">#EDBF82</Color>
+    <Color x:Key="Forest.WarningBgColor">#3A3425</Color>
+    <Color x:Key="Forest.DangerColor">#E89B96</Color>
+
+    <SolidColorBrush x:Key="Forest.Base" Color="{StaticResource Forest.BaseColor}" />
+    <SolidColorBrush x:Key="Forest.Surface" Color="{StaticResource Forest.SurfaceColor}" />
+    <SolidColorBrush x:Key="Forest.Raised" Color="{StaticResource Forest.RaisedColor}" />
+    <SolidColorBrush x:Key="Forest.Side" Color="{StaticResource Forest.SideColor}" />
+    <SolidColorBrush x:Key="Forest.Text" Color="{StaticResource Forest.TextColor}" />
+    <SolidColorBrush x:Key="Forest.Muted" Color="{StaticResource Forest.MutedColor}" />
+    <SolidColorBrush x:Key="Forest.Line" Color="{StaticResource Forest.LineColor}" />
+    <SolidColorBrush x:Key="Forest.Accent" Color="{StaticResource Forest.AccentColor}" />
+    <SolidColorBrush x:Key="Forest.AccentInk" Color="{StaticResource Forest.AccentInkColor}" />
+    <SolidColorBrush x:Key="Forest.Selected" Color="{StaticResource Forest.SelectedColor}" />
+    <SolidColorBrush x:Key="Forest.Good" Color="{StaticResource Forest.GoodColor}" />
+    <SolidColorBrush x:Key="Forest.Warn" Color="{StaticResource Forest.WarnColor}" />
+    <SolidColorBrush x:Key="Forest.WarningBg" Color="{StaticResource Forest.WarningBgColor}" />
+    <SolidColorBrush x:Key="Forest.Danger" Color="{StaticResource Forest.DangerColor}" />
+
+    <!-- ===== системные цвета Fluent → лесная палитра ===== -->
+    <Color x:Key="SystemAccentColor">#D4BD83</Color>
+    <Color x:Key="SystemAccentColorDark1">#C8B177</Color>
+    <Color x:Key="SystemAccentColorDark2">#B39E68</Color>
+    <Color x:Key="SystemAccentColorLight1">#DCC794</Color>
+    <Color x:Key="SystemAccentColorLight2">#E4D2A6</Color>
+    <Color x:Key="SystemAltHighColor">#202822</Color>
+    <Color x:Key="SystemChromeMediumLowColor">#273129</Color>
+    <Color x:Key="SystemChromeMediumColor">#303D32</Color>
+    <Color x:Key="SystemChromeLowColor">#19231D</Color>
+    <Color x:Key="SystemChromeHighColor">#3B483B</Color>
+    <Color x:Key="SystemRegionColor">#202822</Color>
+    <Color x:Key="SystemBaseHighColor">#E7E9DD</Color>
+    <Color x:Key="SystemBaseMediumHighColor">#C9D1C3</Color>
+    <Color x:Key="SystemBaseMediumColor">#A4B1A0</Color>
+</ResourceDictionary>

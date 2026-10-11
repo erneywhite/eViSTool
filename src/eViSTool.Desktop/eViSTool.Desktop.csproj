@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Окно eViSTool на Avalonia — одно на Windows и Linux. Модели — eViSTool.Presentation (общие с окном на WPF, пока
+    оно не уйдёт). Шрифты вшиты (Noto Sans, Cascadia Mono — SIL OFL), чтобы окно выглядело одинаково на любой системе.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>eViSTool.Desktop</RootNamespace>
+    <AssemblyName>eViSTool.Desktop</AssemblyName>
+    <ApplicationIcon>Assets\eViSTool.ico</ApplicationIcon>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\eViSTool.Core\eViSTool.Core.csproj" />
+    <ProjectReference Include="..\eViSTool.Presentation\eViSTool.Presentation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="12.1.2" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+</Project>
