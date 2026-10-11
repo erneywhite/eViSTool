@@ -1,0 +1,38 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:local="using:eViSTool.Desktop"
+                      xmlns:ctl="using:eViSTool.Desktop.Controls"
+                      x:Class="eViSTool.Desktop.Dialogs.RollbackWindow"
+                      x:DataType="vm:RollbackViewModel"
+                      Title="{local:Tr rollback.title}"
+                      Width="624" Height="421" MinWidth="464" MinHeight="281">
+    <!-- размеры окна — клиентская область: Width/Height у окна на WPF (640×460) считают и рамку с заголовком (16 и 39 пикселей на Windows 11) -->
+    <DockPanel Margin="16">
+        <TextBlock DockPanel.Dock="Top" FontSize="16" FontWeight="SemiBold" Text="{Binding Heading}" />
+        <TextBlock DockPanel.Dock="Top" Margin="0,4,0,12" Opacity="0.7" TextWrapping="Wrap" Text="{local:Tr rollback.hint}" />
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Opacity="0.7" Margin="0,0,16,0" />
+            <Button Classes="primary" Content="{local:Tr rollback.install}" IsDefault="True" Command="{Binding InstallCommand}" Padding="16,6"
+                    AutomationProperties.AutomationId="RollbackInstall" />
+            <Button Content="{local:Tr common.cancel}" IsCancel="True" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,6"
+                    AutomationProperties.AutomationId="RollbackCancel" />
+        </StackPanel>
+
+        <!-- двойной щелчок по строке = «Установить» -->
+        <DataGrid x:Name="List" ItemsSource="{Binding Options}" SelectedItem="{Binding Selected}" AutoGenerateColumns="False" IsReadOnly="True"
+                  HeadersVisibility="Column" GridLinesVisibility="None" SelectionMode="Single" CanUserSortColumns="False" CanUserResizeColumns="True"
+                  RowHeight="42"
+                  ColumnHeaderTheme="{StaticResource Forest.ColumnHeader}" ctl:DoubleTap.Command="{Binding InstallCommand}"
+                  ctl:Focus.OnOpen="True" AutomationProperties.AutomationId="RollbackList">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="{local:Tr rollback.colVersion}" Width="130" Binding="{Binding Version, x:DataType=vm:VersionOption}" />
+                <DataGridTextColumn Header="{local:Tr rollback.colSource}" Width="170" Binding="{Binding Source, x:DataType=vm:VersionOption}" />
+                <DataGridTextColumn Header="{local:Tr rollback.colDate}" Width="150" Binding="{Binding Date, x:DataType=vm:VersionOption}" />
+                <DataGridTextColumn Header="" Width="120" Binding="{Binding Note, x:DataType=vm:VersionOption}" />
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</dialogs:DialogWindow>
