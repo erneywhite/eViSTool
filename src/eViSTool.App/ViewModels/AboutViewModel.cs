@@ -43,13 +43,18 @@ public sealed partial class AboutViewModel : ObservableObject
     /// <summary>Все версии новее этой, от новых к старым (первая — <see cref="AvailableUpdate"/>): что изменилось за пропущенные.</summary>
     public IReadOnlyList<AppRelease> MissedReleases { get; private set; } = [];
 
+    /// <summary>Среди пропущенных версий есть рекомендуемая — обновиться настоятельно советуем.</summary>
+    public bool IsRecommended => MissedReleases.Any(r => r.Recommended);
+
     /// <summary>Проверка нашла обновление (вызывается на потоке окна) — главное окно решает, показать ли «Вышла новая версия».</summary>
     public event Action? UpdateFound;
 
     /// <summary>Обновление поставило само это окно (кнопкой в «О программе») — про перезапуск оно спрашивает само.</summary>
     public bool UpdatedHere { get; private set; }
     public string UpdateButtonText => AvailableUpdate is { } r ? Loc.T("about.updateInstall", r.Version) : "";
-    public string UpdateBadgeText => AvailableUpdate is { } r ? Loc.T("shell.updateAvailable", r.Version) : "";
+    public string UpdateBadgeText => AvailableUpdate is { } r
+        ? Loc.T(IsRecommended ? "shell.updateRecommended" : "shell.updateAvailable", r.Version)
+        : "";
 
     [RelayCommand]
     private static void OpenKofi() => Shell.OpenUrl(KofiUrl);
@@ -99,6 +104,7 @@ public sealed partial class AboutViewModel : ObservableObject
     private void SetFound(IReadOnlyList<AppRelease> releases)
     {
         MissedReleases = releases;
+        OnPropertyChanged(nameof(IsRecommended)); // до AvailableUpdate: текст ссылки в боковой панели пересчитается уже с ним
         AvailableUpdate = releases.FirstOrDefault();
         if (AvailableUpdate is not null) UpdateFound?.Invoke();
     }

@@ -39,9 +39,21 @@
             <!-- низ: новая версия программы, версия игры профиля, автор -->
             <StackPanel DockPanel.Dock="Bottom" Margin="14,0,14,14">
                 <!-- ссылка-кнопка показывает только текст (шаблон — один TextBlock), поэтому без иконки -->
-                <Button Style="{StaticResource Forest.LinkButton}" Command="{Binding ShowAboutCommand}" HorizontalAlignment="Left" Margin="4,0,0,10"
+                <Button Command="{Binding ShowAboutCommand}" HorizontalAlignment="Left" Margin="4,0,0,10"
                         Content="{Binding About.UpdateBadgeText}" Visibility="{Binding About.HasUpdate, Converter={StaticResource BoolToVis}}"
-                        AutomationProperties.AutomationId="UpdateBadge" />
+                        AutomationProperties.AutomationId="UpdateBadge">
+                    <!-- рекомендуемое обновление — тёплым цветом предупреждения, а не обычным акцентом -->
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource Forest.LinkButton}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding About.IsRecommended}" Value="True">
+                                    <Setter Property="Foreground" Value="{StaticResource Forest.Warn}" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
                 <!-- eViSTool обновили на диске (например, «Обновить на сервере» с другого компьютера), а перезапуск отложен -->
                 <Button Style="{StaticResource Forest.LinkButton}" Command="{Binding RestartUpdatedCommand}" HorizontalAlignment="Left" Margin="4,0,0,10"
                         Content="{Binding UpdatedOnDiskText}" Visibility="{Binding HasUpdatedOnDisk, Converter={StaticResource BoolToVis}}"

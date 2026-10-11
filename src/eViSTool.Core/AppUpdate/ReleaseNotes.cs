@@ -14,6 +14,9 @@ public sealed partial record ReleaseNotes(string? Summary, IReadOnlyList<Release
 {
     public bool IsEmpty => Summary is null && Sections.Count == 0;
 
+    /// <summary>Есть ли в тексте релиза пометка «&lt;!-- evistool: recommended --&gt;» (в любой части, любым регистром).</summary>
+    public static bool IsRecommended(string? body) => body is not null && RecommendedMark().IsMatch(body);
+
     /// <param name="russian">Взять русскую часть (вторую после «---»), если она есть; иначе — английскую.</param>
     public static ReleaseNotes Parse(string? body, bool russian)
     {
@@ -33,7 +36,7 @@ public sealed partial record ReleaseNotes(string? Summary, IReadOnlyList<Release
         foreach (var raw in part)
         {
             var line = raw.Trim();
-            if (line.Length == 0) continue;
+            if (line.Length == 0 || line.StartsWith("<!--")) continue; // служебные пометки (recommended) — не для чтения
             if (line.StartsWith("- ") || line.StartsWith("* "))
             {
                 if (items is null) sections.Add(new ReleaseNotesSection(heading, items = []));
@@ -71,4 +74,7 @@ public sealed partial record ReleaseNotes(string? Summary, IReadOnlyList<Release
 
     [GeneratedRegex(@"^eViSTool\s+\S+:\s*", RegexOptions.IgnoreCase)]
     private static partial Regex ProductPrefix();
+
+    [GeneratedRegex(@"<!--\s*evistool\s*:\s*recommended\s*-->", RegexOptions.IgnoreCase)]
+    private static partial Regex RecommendedMark();
 }

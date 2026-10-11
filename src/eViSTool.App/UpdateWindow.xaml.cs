@@ -10,7 +10,7 @@ namespace eViSTool.App;
 
 /// <summary>Одна пропущенная версия в окне «Вышла новая версия»: номер, дата, итог и разделы списка изменений.</summary>
 public sealed record UpdateNotesItem(string Version, string Date, string? Summary, IReadOnlyList<ReleaseNotesSection> Sections, string PageUrl,
-    bool IsFirst)
+    bool IsFirst, bool Recommended)
 {
     public bool IsEmpty => Summary is null && Sections.Count == 0;
 
@@ -19,7 +19,7 @@ public sealed record UpdateNotesItem(string Version, string Date, string? Summar
         var notes = ReleaseNotes.Parse(release.Notes, russian);
         var culture = CultureInfo.GetCultureInfo(russian ? "ru-RU" : "en-US");
         var date = release.Published is { } at ? "  " + at.ToLocalTime().ToString(russian ? "d MMMM" : "MMMM d", culture) : "";
-        return new UpdateNotesItem(release.Version.ToString(), date, notes.Summary, notes.Sections, release.PageUrl, first);
+        return new UpdateNotesItem(release.Version.ToString(), date, notes.Summary, notes.Sections, release.PageUrl, first, release.Recommended);
     }
 }
 
@@ -43,6 +43,13 @@ public partial class UpdateWindow : Window
         NewVersion.Text = about.AvailableUpdate?.Version.ToString() ?? "";
         var russian = Loc.Instance.Language == "ru";
         Versions.ItemsSource = about.MissedReleases.Select((r, i) => UpdateNotesItem.From(r, russian, i == 0)).ToList();
+        if (about.IsRecommended)
+        {
+            // рекомендуемое не пропускают насовсем — только «Позже», и окно напомнит при следующем запуске
+            RecommendedBox.Visibility = Visibility.Visible;
+            SkipButton.Visibility = Visibility.Collapsed;
+            NewVersion.Foreground = (System.Windows.Media.Brush)FindResource("Forest.Warn");
+        }
         _about.PropertyChanged += OnAboutChanged;
         Closed += (_, _) => _about.PropertyChanged -= OnAboutChanged;
     }

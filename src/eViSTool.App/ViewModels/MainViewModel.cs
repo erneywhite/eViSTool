@@ -302,12 +302,12 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>
     /// Окно о новой версии — раз за запуск программы. Не поверх игры: пока она запущена или запускается, ждём её выхода.
-    /// Версию, которую попросили пропустить, не предлагаем (ссылка в боковой панели остаётся).
+    /// Версию, которую попросили пропустить, не предлагаем (ссылка в боковой панели остаётся) — кроме рекомендуемой.
     /// </summary>
     private void ShowUpdatePrompt()
     {
         if (_updatePromptShown || About.AvailableUpdate is not { } release || About.IsUpdating
-            || release.Version.ToString() == _settings.SkippedAppVersion
+            || (release.Version.ToString() == _settings.SkippedAppVersion && !About.IsRecommended)
             || IsGameRunning || IsLaunching || _sessionProfile is not null)
             return;
         if (System.Windows.Application.Current.MainWindow is not { IsVisible: true } owner)

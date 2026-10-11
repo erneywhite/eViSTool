@@ -67,6 +67,22 @@ public sealed class ReleaseNotesTests
     }
 
     [Theory]
+    [InlineData("<!-- evistool: recommended -->\n**eViSTool 1.0.0: big.**", true)]
+    [InlineData("- One.\n\n---\n\n<!--EViSTool:Recommended-->\n- Один.", true)]
+    [InlineData("**eViSTool 1.0.0: small.**\n- One.", false)]
+    [InlineData("<!-- recommended -->", false)]
+    [InlineData(null, false)]
+    public void RecommendedMark_IsFound(string? body, bool recommended) => Assert.Equal(recommended, ReleaseNotes.IsRecommended(body));
+
+    [Fact]
+    public void RecommendedMark_IsNotShownAsText()
+    {
+        var notes = ReleaseNotes.Parse("<!-- evistool: recommended -->\n**eViSTool 1.0.0: big release.**\n\n- One.", russian: false);
+        Assert.Equal("Big release", notes.Summary);
+        Assert.Equal(["One."], Assert.Single(notes.Sections).Items);
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("")]
     public void NoBody_IsEmpty(string? body) => Assert.True(ReleaseNotes.Parse(body, russian: false).IsEmpty);

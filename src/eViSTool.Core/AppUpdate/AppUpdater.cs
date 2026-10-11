@@ -19,6 +19,12 @@ public sealed record AppRelease
     public string PageUrl { get; init; } = "";
     public string Notes { get; init; } = "";
 
+    /// <summary>
+    /// Рекомендуемое обновление (крупные новые функции, важные исправления): в тексте релиза есть строка
+    /// «&lt;!-- evistool: recommended --&gt;». На странице GitHub её не видно, окно по ней выделяет обновление.
+    /// </summary>
+    public bool Recommended => ReleaseNotes.IsRecommended(Notes);
+
     /// <summary>Когда опубликован; null — неизвестно (лента релизов без даты).</summary>
     public DateTimeOffset? Published { get; init; }
 
