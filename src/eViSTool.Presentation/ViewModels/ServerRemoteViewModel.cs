@@ -27,8 +27,23 @@ public sealed partial class ServerRemoteViewModel : ObservableObject
     private RemoteSettings _settings = new();
     // код открыт — через RevealFor закрывается сам; кнопка «Скрыть» при этом работает всегда
     private readonly IUiTimer _hideTimer = Ui.Timer(RevealFor);
+    private readonly Func<bool> _isWindows;
+    private readonly Func<ProcessStartInfo, int?> _runElevated;
 
-    public ServerRemoteViewModel() => _hideTimer.Tick += (_, _) => Hide();
+    public ServerRemoteViewModel() : this(OperatingSystem.IsWindows, RunElevated)
+    {
+    }
+
+    /// <summary>
+    /// Для тестов: <paramref name="isWindows"/> — на какой системе мы «работаем» (правило брандмауэра есть только в Windows),
+    /// <paramref name="runElevated"/> — запуск команды с правами администратора, возвращает код выхода (null — не дождались).
+    /// </summary>
+    public ServerRemoteViewModel(Func<bool> isWindows, Func<ProcessStartInfo, int?> runElevated)
+    {
+        _isWindows = isWindows;
+        _runElevated = runElevated;
+        _hideTimer.Tick += (_, _) => Hide();
+    }
 
     [ObservableProperty] private bool _enabled;
     [ObservableProperty] private string _host = "";
@@ -43,6 +58,12 @@ public sealed partial class ServerRemoteViewModel : ObservableObject
     public IReadOnlyList<string> Addresses { get; private set; } = [];
     public int Port => _settings.Port;
     public bool HasProfile => _profile is not null;
+
+    /// <summary>
+    /// Правило брандмауэра ставит netsh — он есть только в Windows. На Linux кнопки нет, команда ничего не запускает
+    /// (там порт открывают сами: ufw, firewalld, правила хостера).
+    /// </summary>
+    public bool CanOpenFirewall => _isWindows();
 
     public string CodeText => !Enabled || Code is not { } code ? "" : Revealed ? code : new string('•', 40);
     public string RevealText => Loc.T(Revealed ? "remote.hide" : "remote.show");
@@ -214,7 +235,7 @@ public sealed partial class ServerRemoteViewModel : ObservableObject
     [RelayCommand]
     private void OpenFirewall()
     {
-        if (_settings.Port <= 0) return;
+        if (!CanOpenFirewall || _settings.Port <= 0) return;
         var rule = $"eViSTool agent {_settings.Port}";
         var psi = new ProcessStartInfo("cmd.exe")
         {
@@ -226,14 +247,20 @@ public sealed partial class ServerRemoteViewModel : ObservableObject
         };
         try
         {
-            using var p = Process.Start(psi);
-            p?.WaitForExit(15000);
-            Message = p is { HasExited: true, ExitCode: 0 } ? Loc.T("remote.firewallDone", _settings.Port) : Loc.T("remote.firewallFailed");
+            Message = _runElevated(psi) == 0 ? Loc.T("remote.firewallDone", _settings.Port) : Loc.T("remote.firewallFailed");
         }
         catch (System.ComponentModel.Win32Exception)
         {
             Message = Loc.T("remote.firewallCancelled"); // отказались в окне Windows
         }
+    }
+
+    /// <summary>Запустить команду (Windows спросит права администратора) и дождаться её; null — не закончилась за 15 секунд.</summary>
+    private static int? RunElevated(ProcessStartInfo psi)
+    {
+        using var p = Process.Start(psi);
+        p?.WaitForExit(15000);
+        return p is { HasExited: true } ? p.ExitCode : null;
     }
 
     public void OnLanguageChanged()
