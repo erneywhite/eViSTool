@@ -1,8 +1,120 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <!-- Стили лесной темы для элементов; наполняется на этапе основы (перенос Themes/Forest.xaml окна на WPF). -->
+    <!--
+        Стили лесной темы для элементов без шаблона — классы вместо стилей по ключу из окна на WPF:
+        Style="{StaticResource Forest.Card}" → Classes="card", Forest.Icon → Classes="icon" и т.д.
+        Общие подписи, которые в WPF повторялись локальными стилями в каждом экране (Hint, Label, CardTitle, Row,
+        ErrorText), тоже здесь. Отличие конкретного экрана — локальным значением или локальным стилем.
+        Важно: значение, которое меняет класс или состояние, задавать стилем, а не атрибутом — атрибут (локальное
+        значение) в Avalonia сильнее любого стиля.
+    -->
+
     <Style Selector="Window">
-        <Setter Property="Background" Value="{StaticResource Forest.Base}" />
-        <Setter Property="Foreground" Value="{StaticResource Forest.Text}" />
+        <Setter Property="Background" Value="{DynamicResource Forest.Base}" />
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+    </Style>
+
+    <!-- контурная иконка: Data = геометрия Icon.*, цвет линии — наследуемый цвет текста родителя -->
+    <Style Selector="Path.icon">
+        <Setter Property="Width" Value="18" />
+        <Setter Property="Height" Value="18" />
+        <Setter Property="Stretch" Value="Uniform" />
+        <Setter Property="StrokeThickness" Value="1.6" />
+        <Setter Property="StrokeLineCap" Value="Round" />
+        <Setter Property="StrokeJoin" Value="Round" />
+        <Setter Property="Stroke" Value="{Binding $self.(TextElement.Foreground)}" />
+    </Style>
+
+    <!-- ===== подписи ===== -->
+    <Style Selector="TextBlock.muted">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+    </Style>
+    <Style Selector="TextBlock.pageTitle">
+        <Setter Property="FontSize" Value="26" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+    </Style>
+    <!-- пояснение под полем (Hint) -->
+    <Style Selector="TextBlock.hint">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Margin" Value="0,2,0,0" />
+    </Style>
+    <!-- подпись поля (Label) -->
+    <Style Selector="TextBlock.label">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Margin" Value="0,16,0,0" />
+    </Style>
+    <!-- заголовок карточки (CardTitle) -->
+    <Style Selector="TextBlock.cardTitle">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <!-- ошибка под полем (ErrorText) -->
+    <Style Selector="TextBlock.error">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Danger}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Margin" Value="0,4,0,0" />
+    </Style>
+    <!-- моноширинный текст: версии, код, пути -->
+    <Style Selector="TextBlock.mono">
+        <Setter Property="FontFamily" Value="{DynamicResource Forest.Mono}" />
+    </Style>
+    <Style Selector="TextBox.mono">
+        <Setter Property="FontFamily" Value="{DynamicResource Forest.Mono}" />
+    </Style>
+
+    <!-- текст, который можно выделить и скопировать, но не править (Forest.SelectableText) -->
+    <Style Selector="SelectableTextBlock.selectable">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="SelectionBrush" Value="{DynamicResource Forest.Selection}" />
+    </Style>
+    <Style Selector="SelectableTextBlock">
+        <Setter Property="SelectionBrush" Value="{DynamicResource Forest.Selection}" />
+    </Style>
+
+    <!-- ===== панели ===== -->
+    <Style Selector="Border.card">
+        <Setter Property="Background" Value="{DynamicResource Forest.Surface}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Forest.Line}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <Style Selector="Border.warning">
+        <Setter Property="Background" Value="{DynamicResource Forest.WarningBg}" />
+        <Setter Property="BorderBrush" Value="#5A4C33" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="14,10" />
+    </Style>
+    <!-- строка настройки с линией сверху (Row) -->
+    <Style Selector="Border.row">
+        <Setter Property="BorderBrush" Value="{DynamicResource Forest.Line}" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="Margin" Value="0,14,0,0" />
+        <Setter Property="Padding" Value="0,14,0,0" />
+    </Style>
+
+    <!-- ===== служебные ===== -->
+    <!-- невидимый, но место занимает (Visibility=Hidden в WPF) -->
+    <Style Selector=":is(Control).hidden">
+        <Setter Property="Opacity" Value="0" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+        <Setter Property="Focusable" Value="False" />
+    </Style>
+    <!-- приглушённая строка (выключенный мод и т.п.) -->
+    <Style Selector=":is(Control).faded">
+        <Setter Property="Opacity" Value="0.5" />
+    </Style>
+
+    <!-- подсказки: не шире разумного, длинные переносятся -->
+    <Style Selector="ToolTip">
+        <Setter Property="MaxWidth" Value="420" />
     </Style>
 </Styles>

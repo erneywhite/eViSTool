@@ -5,13 +5,30 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- лесная палитра: токены Forest.* и подмена кистей Fluent теми же цветами -->
-                <ResourceInclude Source="avares://eViSTool.Desktop/Themes/ForestColors.axaml" />
+                <!-- лесная палитра: токены Forest.*, кисти элементов Fluent теми же цветами, иконки, шрифты -->
+                <ResourceInclude Source="avares://eViSTool.Desktop/Themes/ForestResources.axaml" />
+                <!-- шаблоны кнопок, вкладок, тумблеров, пунктов списков (ControlTheme) -->
+                <ResourceInclude Source="avares://eViSTool.Desktop/Themes/ForestControls.axaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
     <Application.Styles>
-        <FluentTheme />
+        <FluentTheme>
+            <FluentTheme.Palettes>
+                <!-- базовые цвета Fluent → лесные: от них Fluent строит фон, текст, рамки, наведение и акцент всех
+                     стандартных элементов. Полупрозрачные оттенки — от цвета текста и боковой колонки, как у Fluent от
+                     белого и чёрного. -->
+                <ColorPaletteResources x:Key="Dark"
+                                       Accent="#D4BD83" RegionColor="#202822" ErrorText="#E89B96"
+                                       AltHigh="#19231D" AltMediumHigh="#CC19231D" AltMedium="#9919231D" AltMediumLow="#6619231D" AltLow="#3319231D"
+                                       BaseHigh="#E7E9DD" BaseMediumHigh="#CCE7E9DD" BaseMedium="#99E7E9DD" BaseMediumLow="#66E7E9DD" BaseLow="#33E7E9DD"
+                                       ChromeAltLow="#E7E9DD" ChromeWhite="#E7E9DD" ChromeGray="#8A9786" ChromeHigh="#46523F"
+                                       ChromeMedium="#202822" ChromeMediumLow="#273129" ChromeLow="#19231D"
+                                       ChromeDisabledHigh="#303D32" ChromeDisabledLow="#6E7A6A"
+                                       ChromeBlackHigh="#0E1410" ChromeBlackMedium="#CC0E1410" ChromeBlackMediumLow="#660E1410" ChromeBlackLow="#330E1410"
+                                       ListLow="#19E7E9DD" ListMedium="#33E7E9DD" />
+            </FluentTheme.Palettes>
+        </FluentTheme>
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
         <StyleInclude Source="avares://eViSTool.Desktop/Themes/Forest.axaml" />
     </Application.Styles>
