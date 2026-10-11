@@ -1,0 +1,6 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="eViSTool.Desktop.Views.RolesView">
+    <!-- заглушка: подвкладка «Роли» конфигурации сервера ещё переносится с окна на WPF -->
+    <TextBlock Text="Экран «Роли» ещё переносится" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
+</UserControl>
