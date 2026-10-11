@@ -485,3 +485,6 @@ eViSTool-forest-*.zip
 
 # сборки для релиза (build/publish.ps1)
 dist/
+
+# рабочие заметки ревью — только локально
+docs/REVIEW-*.md
