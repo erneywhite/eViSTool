@@ -2,7 +2,6 @@ using eViSTool.Presentation;
 using System.IO;
 using System.Net.Http;
 using System.Reflection;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core;

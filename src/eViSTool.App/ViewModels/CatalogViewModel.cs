@@ -1,8 +1,6 @@
 using eViSTool.Presentation;
 using eViSTool.Core.Profiles;
 using System.Net.Http;
-using System.Windows;
-using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.ModDb;
@@ -384,7 +382,7 @@ public sealed partial class CatalogViewModel : ObservableObject
         var options = await Task.WhenAll(others.Select(x => AlsoInstall.EvaluateAsync(x.Target!, id, mod.Releases, release, cts.Token)));
         StatusText = "";
         var game = AlsoInstall.GameText(_main.Mods.GameVersion);
-        var chosen = AlsoInstallWindow.Choose(_main, active, Loc.T("also.hint", details.Name),
+        var chosen = AlsoInstallPicker.Choose(_main, active, Loc.T("also.hint", details.Name),
             Loc.T("also.thisProfile") + " · " + Loc.T("also.willInstall", game, release.ModVersion),
             [.. options.Select((o, i) => new AlsoChoice(others[i].Profile, o, o.Describe(), o.CanInstall,
                 o.State == AlsoInstallState.AlreadyThere, active.Model.IsLinkedTo(others[i].Profile.Model)))]);
@@ -561,7 +559,7 @@ public sealed partial class ModDetailsViewModel : ObservableObject
             return;
         }
         var releases = _game is null ? Mod.Releases : UpdateChecker.CompatibleReleases(Mod.Releases, _game);
-        Versions = RollbackWindow.BuildOptions(null, ModId ?? "", InstalledVersion, releases)
+        Versions = VersionOptions.Build(null, ModId ?? "", InstalledVersion, releases)
             .Select(o => new VersionRowViewModel(o, InstalledVersion ?? "")).ToList();
         VersionsStatus = Versions.Count == 0
             ? Loc.T("catalog.versionsNone")
@@ -588,6 +586,6 @@ public sealed partial class ModDetailsViewModel : ObservableObject
     {
         if (string.IsNullOrEmpty(url) || Screenshots.Count == 0) return;
         var index = Math.Max(0, Screenshots.ToList().IndexOf(url));
-        new ScreenshotWindow(Screenshots, index, Loc.T("shots.title", Name)) { Owner = Application.Current.MainWindow }.ShowDialog();
+        AppWindows.Current.ShowScreenshots(Screenshots, index, Loc.T("shots.title", Name));
     }
 }

@@ -3,7 +3,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Net.Http;
-using System.Windows;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -392,9 +391,8 @@ public sealed partial class ServerPlayersViewModel : ObservableObject
 
     private Task BanByName(string name)
     {
-        var dlg = new BanWindow(name) { Owner = Application.Current.MainWindow };
-        if (dlg.ShowDialog() != true) return Task.CompletedTask;
-        return ApplyAsync(() => [PlayerCommands.Ban(name, dlg.Amount, dlg.Unit, dlg.Reason)], null);
+        if (AppWindows.Current.Ban(name) is not { } ban) return Task.CompletedTask;
+        return ApplyAsync(() => [PlayerCommands.Ban(name, ban.Amount, ban.Unit, ban.Reason)], null);
     }
 
     [RelayCommand]

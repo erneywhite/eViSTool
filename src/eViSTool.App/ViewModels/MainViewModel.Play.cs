@@ -143,7 +143,7 @@ public sealed partial class MainViewModel
     public void OpenFindServer()
     {
         if (ActiveProfile is not { Kind: ProfileKind.Client } client) return;
-        new FindServerWindow(new FindServerViewModel(this, client)) { Owner = System.Windows.Application.Current.MainWindow }.Show();
+        AppWindows.Current.ShowFindServer(new FindServerViewModel(this, client));
     }
 
     /// <summary>Булавка: сделать сервером по умолчанию (повторно — снять, тогда «без сервера»).</summary>

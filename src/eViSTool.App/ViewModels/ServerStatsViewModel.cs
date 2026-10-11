@@ -3,8 +3,6 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Net.Http;
-using System.Windows;
-using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Localization;

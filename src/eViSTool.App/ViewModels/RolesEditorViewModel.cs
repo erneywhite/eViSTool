@@ -1,6 +1,5 @@
 using eViSTool.Presentation;
 using System.Collections.ObjectModel;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Localization;
@@ -187,15 +186,11 @@ public sealed partial class RolesEditorViewModel : ObservableObject
     private void Duplicate()
     {
         if (_document is null || _selectedRole is not { } source) return;
-        var dialog = new DuplicateRoleWindow(source.Entry.Code, source.DisplayName, [.. Roles.Select(r => r.Entry.Code)])
-        {
-            Owner = Application.Current.MainWindow,
-        };
-        if (dialog.ShowDialog() != true) return;
+        if (AppWindows.Current.DuplicateRole(source.Entry.Code, source.DisplayName, [.. Roles.Select(r => r.Entry.Code)]) is not { } copy) return;
 
         try
         {
-            DuplicateAs(source, dialog.RoleCode, dialog.RoleName);
+            DuplicateAs(source, copy.Code, copy.Name);
         }
         catch (InvalidOperationException ex)
         {

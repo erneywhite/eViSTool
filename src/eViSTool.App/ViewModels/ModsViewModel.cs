@@ -3,7 +3,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Net.Http;
-using System.Windows;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -12,11 +11,9 @@ using eViSTool.Core.ModDb;
 using eViSTool.Core.Mods;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Versioning;
-using Microsoft.Win32;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Packs;
 using eViSTool.Core.Server;
-using System.Windows.Threading;
 
 namespace eViSTool.App.ViewModels;
 
@@ -672,7 +669,7 @@ public sealed partial class ModsViewModel : ObservableObject
         StatusText = "";
 
         var names = string.Join(", ", files.Select(f => f.Item2.Name));
-        var chosen = AlsoInstallWindow.Choose(_main, active, Loc.T("also.hintFiles", names),
+        var chosen = AlsoInstallPicker.Choose(_main, active, Loc.T("also.hintFiles", names),
             Loc.T("also.thisProfile") + " · " + AlsoInstall.GameText(Profile?.GameVersion),
             [.. options.Select((o, i) => new AlsoChoice(others[i].Profile, o, o.Describe(), o.CanInstall,
                 o.Error is null && o.ToInstall.Count == 0, active.Model.IsLinkedTo(others[i].Profile.Model)))]);
@@ -1034,7 +1031,7 @@ public sealed partial class ModsViewModel : ObservableObject
             // без сети — только сохранённые копии
         }
         // прежние копии удалённого сервера лежат на той машине — отсюда предлагаем только релизы модбазы
-        return RollbackWindow.BuildOptions(IsRemote ? null : ModBackupStore.ForProfile(profile.Profile), info.ModId, info.Version, releases);
+        return VersionOptions.Build(IsRemote ? null : ModBackupStore.ForProfile(profile.Profile), info.ModId, info.Version, releases);
     }
 
     /// <summary>Поставить выбранную версию (через очередь).</summary>
@@ -1054,11 +1051,8 @@ public sealed partial class ModsViewModel : ObservableObject
         var options = await LoadVersionOptionsAsync(row);
         StatusText = "";
 
-        var dlg = new RollbackWindow(Loc.T("rollback.heading", row.Name, row.Installed), options)
-        {
-            Owner = Application.Current.MainWindow,
-        };
-        if (dlg.ShowDialog() == true && dlg.Selected is { } choice) InstallVersion(row, choice);
+        if (AppWindows.Current.PickVersion(Loc.T("rollback.heading", row.Name, row.Installed), options) is { } choice)
+            InstallVersion(row, choice);
     }
 
     // ---------- зависимости ----------
@@ -1236,8 +1230,7 @@ public sealed partial class ModsViewModel : ObservableObject
         }
 
         var hasConfig = profile.Profile.DataDir is { } data && Directory.Exists(Path.Combine(data, "ModConfig"));
-        var dlg = new ExportPackWindow(profile.Profile.Name, enabled, disabled, hasConfig) { Owner = Application.Current.MainWindow };
-        if (dlg.ShowDialog() != true || dlg.Options is not { } options) return;
+        if (AppWindows.Current.ExportPack(profile.Profile.Name, enabled, disabled, hasConfig) is not { } options) return;
 
         var savePath = Ui.Platform.PickSaveFile(Loc.T("packx.saveTitle"), [new FileFilter(Loc.T("pack.filter"), "*" + PackManifest.Extension)],
             string.Concat(options.Name.Split(Path.GetInvalidFileNameChars())) + PackManifest.Extension);
@@ -1307,8 +1300,7 @@ public sealed partial class ModsViewModel : ObservableObject
                 Error(Loc.T("mods.readFailed", ex.Message));
                 return;
             }
-            var dlg = new ImportPackWindow(plan) { Owner = Application.Current.MainWindow };
-            if (dlg.ShowDialog() != true) return;
+            if (AppWindows.Current.ConfirmPackImport(plan) is not { } packChoice) return;
             if (!ConfirmIfRunning(target)) return;
 
             IsBusy = true;
@@ -1323,7 +1315,7 @@ public sealed partial class ModsViewModel : ObservableObject
                 await CopyWorldsAsync(target, copyProblems);
                 var importer = new PackImporter(_db, _updater) { KeepInstalledIn = keep };
                 var progress = new Progress<string>(s => StatusText = s);
-                var (mirror, applyConfig) = (dlg.Mirror, dlg.ApplyConfig);
+                var (mirror, applyConfig) = (packChoice.Mirror, packChoice.ApplyConfig);
                 // в фоне: иначе при паке «всё внутри» импорт идёт синхронно, окно подвисает,
                 // а сообщения прогресса приходят уже после итога и затирают его
                 // файлы с модбазы, перезалитые авторами модов, — ставить ли (спрашиваем до любых изменений профиля)

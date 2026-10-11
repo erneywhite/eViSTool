@@ -3,7 +3,6 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Net.Http;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Localization;
@@ -373,11 +372,8 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         // сервер на другом компьютере (в том числе Linux): папки показывает его агент — стандартный диалог видит только эту машину
         if (_data is { IsRemote: true } remote)
         {
-            var picker = new RemoteFolderWindow(remote, BackupDirText.Length > 0 ? BackupDirText : null, Loc.T("backupdir.pick"))
-            {
-                Owner = Application.Current.MainWindow,
-            };
-            if (picker.ShowDialog() == true && picker.Selected is { } chosen) BackupDirText = chosen;
+            if (AppWindows.Current.PickRemoteFolder(remote, BackupDirText.Length > 0 ? BackupDirText : null, Loc.T("backupdir.pick")) is { } chosen)
+                BackupDirText = chosen;
             return;
         }
         var start = BackupDirText.Length > 0 && Directory.Exists(BackupDirText) ? BackupDirText : _dataDir;

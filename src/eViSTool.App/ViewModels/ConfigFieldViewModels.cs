@@ -5,7 +5,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Server.Config;
-using Microsoft.Win32;
 using Newtonsoft.Json.Linq;
 using Kind = eViSTool.Core.Server.Config.ConfigValueKind;
 

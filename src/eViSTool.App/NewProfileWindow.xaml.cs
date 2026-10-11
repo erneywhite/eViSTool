@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using eViSTool.App.ViewModels;
 using eViSTool.Core.Game;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;
@@ -20,13 +21,10 @@ public partial class NewProfileWindow : Window
     /// <summary>Папка данных нового серверного профиля (для клиентского — null).</summary>
     public string? DataDir { get; private set; }
 
-    /// <summary>Что делать с уже существующими данными сервера.</summary>
-    public enum ExistingMode { None, Import, UseInPlace, Remote }
-
     /// <summary>Для Remote: код подключения к серверу на другом компьютере.</summary>
     public Core.Server.Remote.ConnectionCode? RemoteCode { get; private set; }
 
-    public ExistingMode Existing { get; private set; }
+    public ExistingProfileMode Existing { get; private set; }
 
     /// <summary>Папка существующих данных сервера (для Import и UseInPlace).</summary>
     public string? ExistingDir { get; private set; }
@@ -82,16 +80,16 @@ public partial class NewProfileWindow : Window
         var dlg = new ConnectCodeWindow(Loc.T("newprofile.connectOk")) { Owner = this };
         if (dlg.ShowDialog() != true || dlg.Code is not { } code) return;
         ProfileName = name;
-        Existing = ExistingMode.Remote;
+        Existing = ExistingProfileMode.Remote;
         RemoteCode = code;
         DataDir = "";
         DialogResult = true;
     }
 
-    private void Import_Click(object sender, RoutedEventArgs e) => FinishExisting(ExistingMode.Import);
-    private void UseInPlace_Click(object sender, RoutedEventArgs e) => FinishExisting(ExistingMode.UseInPlace);
+    private void Import_Click(object sender, RoutedEventArgs e) => FinishExisting(ExistingProfileMode.Import);
+    private void UseInPlace_Click(object sender, RoutedEventArgs e) => FinishExisting(ExistingProfileMode.UseInPlace);
 
-    private void FinishExisting(ExistingMode mode)
+    private void FinishExisting(ExistingProfileMode mode)
     {
         var name = NameBox.Text.Trim();
         if (name.Length == 0) return;

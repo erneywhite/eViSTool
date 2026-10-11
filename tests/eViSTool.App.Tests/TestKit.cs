@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Windows;
+using eViSTool.App.ViewModels;
 using eViSTool.Presentation;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Server;
@@ -23,6 +24,7 @@ internal static class Sta
             SynchronizationContext.SetSynchronizationContext(
                 new System.Windows.Threading.DispatcherSynchronizationContext(System.Windows.Threading.Dispatcher.CurrentDispatcher));
             if (!Ui.IsSet) Ui.Platform = new WpfUiPlatform();
+            if (!AppWindows.IsSet) AppWindows.Current = new WpfAppWindows();
             try { body(); }
             catch (Exception ex) { error = ex; }
         });

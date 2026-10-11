@@ -2,7 +2,6 @@ using eViSTool.Presentation;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Net.Http;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core;
@@ -65,11 +64,8 @@ public sealed partial class NotifyChannelsViewModel : ObservableObject
 
     private void Edit(NotifyChannelRowViewModel? row, NotifyKind kind)
     {
-        var dlg = new NotifyChannelWindow(row?.Channel ?? new NotifyChannel { Kind = kind, Name = kind.ToString() }, isNew: row is null)
-        {
-            Owner = Application.Current.MainWindow,
-        };
-        if (dlg.ShowDialog() != true || dlg.Result is not { } result) return;
+        if (AppWindows.Current.EditNotifyChannel(row?.Channel ?? new NotifyChannel { Kind = kind, Name = kind.ToString() }, isNew: row is null)
+            is not { } result) return;
         try
         {
             var i = row is null ? -1 : Channels.IndexOf(row);

@@ -1,6 +1,5 @@
 using eViSTool.Presentation;
 using System.Net.Http;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Localization;
@@ -161,7 +160,7 @@ public sealed partial class ModCardViewModel : ObservableObject
     {
         if (string.IsNullOrEmpty(url) || Screenshots.Count == 0) return;
         var index = Math.Max(0, Screenshots.ToList().IndexOf(url));
-        new ScreenshotWindow(Screenshots, index, Loc.T("shots.title", Name)) { Owner = Application.Current.MainWindow }.ShowDialog();
+        AppWindows.Current.ShowScreenshots(Screenshots, index, Loc.T("shots.title", Name));
     }
 }
 

@@ -1,7 +1,6 @@
 ﻿using eViSTool.Presentation;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core;
@@ -125,8 +124,8 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanCleanupDisk))]
     private void CleanupDisk(ProfileViewModel? profile)
     {
-        if (profile is null || System.Windows.Application.Current.MainWindow is not { } owner) return;
-        CleanupWindow.Open(owner, profile.Model);
+        if (profile is null) return;
+        AppWindows.Current.ShowCleanup(profile.Model);
         WorldCopies?.Refresh();
     }
 
@@ -220,7 +219,7 @@ public sealed partial class MainViewModel : ObservableObject
     private void ShowErrors()
     {
         if (ActiveProfile is not { } p || ErrorReport is not { } r) return;
-        new ModErrorsWindow(this, p.Model, r) { Owner = System.Windows.Application.Current.MainWindow }.Show();
+        AppWindows.Current.ShowModErrors(this, p.Model, r);
     }
 
     /// <summary>Игра этого профиля сейчас запущена (по последней проверке).</summary>
@@ -311,7 +310,7 @@ public sealed partial class MainViewModel : ObservableObject
             || (release.Version.ToString() == _settings.SkippedAppVersion && !About.IsRecommended)
             || IsGameRunning || IsLaunching || _sessionProfile is not null)
             return;
-        if (System.Windows.Application.Current.MainWindow is not { IsVisible: true } owner)
+        if (!Ui.Platform.IsMainWindowVisible)
         {
             // проверка ответила раньше, чем показалось главное окно, — повторить, когда программа освободится
             if (++_updatePromptWaits <= 20)
@@ -319,19 +318,18 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
         _updatePromptShown = true;
-        var window = new UpdateWindow(About, () =>
+        // не модально: программой можно пользоваться, пока окно открыто
+        AppWindows.Current.ShowUpdatePrompt(About, () =>
         {
             _settings.SkippedAppVersion = release.Version.ToString();
             Save();
-        }) { Owner = owner };
-        window.Show(); // не модально: программой можно пользоваться, пока окно открыто
+        });
     }
 
     private void ShowCrash(GameProfile profile, Core.Diagnostics.CrashFinding finding)
     {
-        var window = CrashWindow.ForGame(this, profile, finding);
-        window.Show(); // не модально: игра (если мир закрылся, она открыта) и программа остаются доступны
-        window.Activate();
+        // не модально: игра (если мир закрылся, она открыта) и программа остаются доступны
+        AppWindows.Current.ShowGameCrash(this, profile, finding);
     }
 
     /// <summary>Сделать профиль активным и открыть вкладку (0 — «Мои моды», 2 — «Сервер»).</summary>
@@ -382,9 +380,7 @@ public sealed partial class MainViewModel : ObservableObject
                 _seenServerCrash[profile.Id] = crash?.Id;
                 if (crash is null || crash.Id == seen) continue;
                 if (first && crash.At < _startedAt) continue; // упал ещё до запуска окна — не тревожим задним числом
-                var window = CrashWindow.ForServer(this, profile, crash);
-                window.Show();
-                window.Activate();
+                AppWindows.Current.ShowServerCrash(this, profile, crash);
             }
         }
         finally
@@ -711,11 +707,8 @@ public sealed partial class MainViewModel : ObservableObject
                          GameDir = KnownGameDir(),
                          DataDir = GameInstall.DefaultDataDir,
                      };
-        var dlg = new ClientProfileWindow(source, clone: false, Loc.T("profile.newClient", Profiles.Count + 1))
-        {
-            Owner = System.Windows.Application.Current.MainWindow,
-        };
-        if (dlg.ShowDialog() == true && dlg.Result is { } created) AddProfile(created);
+        if (AppWindows.Current.ClientProfile(source, clone: false, Loc.T("profile.newClient", Profiles.Count + 1)) is { } created)
+            AddProfile(created);
     }
 
     [RelayCommand]
@@ -724,25 +717,24 @@ public sealed partial class MainViewModel : ObservableObject
         if (AskNewProfile(ProfileKind.Server, Loc.T("profile.newServer", Profiles.Count + 1)) is not { DataDir: { } dataDir } dlg) return;
 
         // сервер на другом компьютере: профиль без папок, код подключения — зашифрованным
-        if (dlg.Existing == NewProfileWindow.ExistingMode.Remote && dlg.RemoteCode is { } code)
+        if (dlg.Existing == ExistingProfileMode.Remote && dlg.RemoteCode is { } code)
         {
             AddProfile(new GameProfile { Name = dlg.ProfileName, Kind = ProfileKind.Server, RemoteCode = Core.Server.Remote.RemoteSecret.Protect(code) });
             return;
         }
 
         // данные сервера уже есть: взять папку как есть или скопировать её в профиль (как клон: мир, конфиги, данные модов и игроков)
-        if (dlg.Existing == NewProfileWindow.ExistingMode.UseInPlace && dlg.ExistingDir is { } inPlace)
+        if (dlg.Existing == ExistingProfileMode.UseInPlace && dlg.ExistingDir is { } inPlace)
         {
             AddProfile(new GameProfile { Name = dlg.ProfileName, Kind = ProfileKind.Server, GameDir = KnownGameDir(), DataDir = inPlace });
             return;
         }
-        if (dlg.Existing == NewProfileWindow.ExistingMode.Import && dlg.ExistingDir is { } from)
+        if (dlg.Existing == ExistingProfileMode.Import && dlg.ExistingDir is { } from)
         {
             var source = new GameProfile { Name = Path.GetFileName(from.TrimEnd('\\', '/')), Kind = ProfileKind.Server, GameDir = KnownGameDir(), DataDir = from };
             // сервер из этой папки игры работает — копия мира может получиться битой, окно не даст начать
             var running = GameProcess.FindServerPids(source).Count > 0;
-            var clone = new CloneProfileWindow(source, running, dlg.ProfileName) { Owner = System.Windows.Application.Current.MainWindow };
-            if (clone.ShowDialog() == true && clone.Result is { } imported) AddProfile(imported);
+            if (AppWindows.Current.CloneServerProfile(source, running, dlg.ProfileName) is { } imported) AddProfile(imported);
             return;
         }
 
@@ -761,11 +753,8 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     /// <summary>Спросить название нового профиля (у серверного от него зависит имя папки данных). null — отменили.</summary>
-    private static NewProfileWindow? AskNewProfile(ProfileKind kind, string suggestedName)
-    {
-        var dlg = new NewProfileWindow(kind, suggestedName) { Owner = System.Windows.Application.Current.MainWindow };
-        return dlg.ShowDialog() == true ? dlg : null;
-    }
+    private static NewProfileChoice? AskNewProfile(ProfileKind kind, string suggestedName) =>
+        AppWindows.Current.NewProfile(kind, suggestedName);
 
     /// <summary>Папка игры для нового профиля: как у текущего; нет — как у любого другого; нет и там — ищем установку.</summary>
     private string? KnownGameDir() =>
@@ -792,17 +781,13 @@ public sealed partial class MainViewModel : ObservableObject
         if (profile is null || profile.Model.IsRemote) return; // удалённый сервер клонируется на своём компьютере
         if (profile.Kind == ProfileKind.Client)
         {
-            var window = new ClientProfileWindow(profile.Model, clone: true, Loc.T("clone.copySuffix", profile.Name))
-            {
-                Owner = System.Windows.Application.Current.MainWindow,
-            };
-            if (window.ShowDialog() == true && window.Result is { } copy) AddProfile(copy);
+            if (AppWindows.Current.ClientProfile(profile.Model, clone: true, Loc.T("clone.copySuffix", profile.Name)) is { } copy)
+                AddProfile(copy);
             return;
         }
 
         var running = await IsServerRunningAsync(profile.Model);
-        var dlg = new CloneProfileWindow(profile.Model, running) { Owner = System.Windows.Application.Current.MainWindow };
-        if (dlg.ShowDialog() == true && dlg.Result is { } clone) AddProfile(clone);
+        if (AppWindows.Current.CloneServerProfile(profile.Model, running) is { } clone) AddProfile(clone);
     }
 
 

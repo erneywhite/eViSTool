@@ -3,7 +3,6 @@ using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Profiles;
-using Microsoft.Win32;
 using eViSTool.Core.Localization;
 
 namespace eViSTool.App.ViewModels;
@@ -46,8 +45,7 @@ public sealed partial class ProfileViewModel : ObservableObject
     [RelayCommand]
     private void ReplaceCode()
     {
-        var dlg = new ConnectCodeWindow(Loc.T("settings.remoteReplaceOk")) { Owner = System.Windows.Application.Current.MainWindow };
-        if (dlg.ShowDialog() != true || dlg.Code is not { } code) return;
+        if (AppWindows.Current.AskConnectionCode(Loc.T("settings.remoteReplaceOk")) is not { } code) return;
         Model.RemoteCode = Core.Server.Remote.RemoteSecret.Protect(code);
         OnPropertyChanged(nameof(RemoteTarget));
         _changed(this);

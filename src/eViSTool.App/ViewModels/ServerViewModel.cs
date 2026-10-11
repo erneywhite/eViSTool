@@ -2,7 +2,6 @@ using eViSTool.Presentation;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Net.Http;
-using System.Windows;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -200,8 +199,7 @@ public sealed partial class ServerViewModel : ObservableObject
     private void ShowCommands()
     {
         if (Commands.Count == 0) RequestCommandList(); // список ещё не знаем — сразу спросим у сервера
-        var dlg = new ServerCommandsWindow(this) { Owner = Application.Current.MainWindow };
-        if (dlg.ShowDialog() == true && dlg.Chosen is { } chosen)
+        if (AppWindows.Current.PickServerCommand(this) is { } chosen)
         {
             InsertCommand(chosen);
             CommandInserted?.Invoke(this, EventArgs.Empty);
