@@ -26,6 +26,9 @@ public sealed class AppSettings
     /// </summary>
     public bool CopyWorldsBeforeModChanges { get; set; } = true;
 
+    /// <summary>Версия eViSTool, про которую попросили не напоминать («Пропустить эту версию»); вышла новее — окно покажется снова.</summary>
+    public string? SkippedAppVersion { get; set; }
+
     /// <summary>Язык интерфейса (en, ru). По умолчанию английский.</summary>
     public string Language { get; set; } = "en";
 

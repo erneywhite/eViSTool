@@ -19,6 +19,9 @@ public sealed record AppRelease
     public string PageUrl { get; init; } = "";
     public string Notes { get; init; } = "";
 
+    /// <summary>Когда опубликован; null — неизвестно (лента релизов без даты).</summary>
+    public DateTimeOffset? Published { get; init; }
+
     public required string AssetName { get; init; }
     public required string AssetUrl { get; init; }
     public long AssetSize { get; init; }
@@ -63,7 +66,24 @@ public sealed class AppUpdater
         Environment.GetEnvironmentVariable("EVISTOOL_RELEASES_URL") is { Length: > 0 } url ? url : $"https://api.github.com/repos/{Repo}/releases?per_page=30";
 
     /// <summary>Новее ли что-то на GitHub. null — обновлений нет.</summary>
-    public async Task<AppRelease?> FindUpdateAsync(ModVersion current, CancellationToken ct = default)
+    public async Task<AppRelease?> FindUpdateAsync(ModVersion current, CancellationToken ct = default) =>
+        (await FindUpdatesAsync(current, ct).ConfigureAwait(false)).FirstOrDefault();
+
+    /// <summary>
+    /// Все релизы новее текущей версии, от новых к старым: первый — что ставить, все вместе — что изменилось за
+    /// пропущенные версии. Пусто — обновлений нет.
+    /// </summary>
+    public async Task<IReadOnlyList<AppRelease>> FindUpdatesAsync(ModVersion current, CancellationToken ct = default) =>
+        NewerReleases(await ReleasesAsync(ct).ConfigureAwait(false), current);
+
+    /// <summary>
+    /// Релиз ровно этой версии — агент на другом компьютере обновляется до версии окна, а не до самой свежей.
+    /// null — такого релиза на GitHub нет (например, окно собрано из исходников).
+    /// </summary>
+    public async Task<AppRelease?> FindReleaseAsync(ModVersion version, CancellationToken ct = default) =>
+        (await ReleasesAsync(ct).ConfigureAwait(false)).FirstOrDefault(r => r.Version.ToString() == version.ToString());
+
+    private async Task<IReadOnlyList<AppRelease>> ReleasesAsync(CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, ReleasesUrl);
         request.Headers.Accept.ParseAdd("application/vnd.github+json");
@@ -71,31 +91,10 @@ public sealed class AppUpdater
         // API без входа — 60 запросов в час на внешний адрес (у всех за одним роутером он общий): исчерпали — берём ленту
         // релизов с самого github.com, у неё такого лимита нет
         if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests)
-            return PickUpdate(await FeedReleasesAsync(ct).ConfigureAwait(false), current);
+            return await FeedReleasesAsync(ct).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
             throw new HttpRequestException(Loc.T("update.httpFailed", (int)response.StatusCode));
-        return PickUpdate(ParseReleases(await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false)), current);
-    }
-
-    /// <summary>
-    /// Релиз ровно этой версии — агент на другом компьютере обновляется до версии окна, а не до самой свежей.
-    /// null — такого релиза на GitHub нет (например, окно собрано из исходников).
-    /// </summary>
-    public async Task<AppRelease?> FindReleaseAsync(ModVersion version, CancellationToken ct = default)
-    {
-        IReadOnlyList<AppRelease> releases;
-        using (var request = new HttpRequestMessage(HttpMethod.Get, ReleasesUrl))
-        {
-            request.Headers.Accept.ParseAdd("application/vnd.github+json");
-            using var response = await _http.SendAsync(request, ct).ConfigureAwait(false);
-            if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests)
-                releases = await FeedReleasesAsync(ct).ConfigureAwait(false);
-            else if (!response.IsSuccessStatusCode)
-                throw new HttpRequestException(Loc.T("update.httpFailed", (int)response.StatusCode));
-            else
-                releases = ParseReleases(await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
-        }
-        return releases.FirstOrDefault(r => r.Version.ToString() == version.ToString());
+        return ParseReleases(await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
     }
 
     /// <summary>
@@ -151,9 +150,11 @@ public sealed class AppUpdater
     /// со стабильной версии — только стабильные.
     /// </summary>
     public static AppRelease? PickUpdate(IEnumerable<AppRelease> releases, ModVersion current) =>
-        releases.Where(r => r.Version > current && (current.IsPrerelease || !r.Prerelease))
-            .OrderByDescending(r => r.Version)
-            .FirstOrDefault();
+        NewerReleases(releases, current).FirstOrDefault();
+
+    /// <summary>Релизы новее текущей версии по тому же правилу, что <see cref="PickUpdate"/>, от новых к старым.</summary>
+    public static IReadOnlyList<AppRelease> NewerReleases(IEnumerable<AppRelease> releases, ModVersion current) =>
+        [.. releases.Where(r => r.Version > current && (current.IsPrerelease || !r.Prerelease)).OrderByDescending(r => r.Version)];
 
     /// <summary>Ответ GitHub → релизы с архивом программы (черновики и релизы без архива пропускаются).</summary>
     public static IReadOnlyList<AppRelease> ParseReleases(string json)
@@ -176,6 +177,7 @@ public sealed class AppUpdater
                 Prerelease = r.Value<bool?>("prerelease") == true || version.IsPrerelease,
                 PageUrl = r.Value<string>("html_url") ?? "",
                 Notes = r.Value<string>("body") ?? "",
+                Published = r.Value<DateTime?>("published_at") is { } at ? new DateTimeOffset(DateTime.SpecifyKind(at, DateTimeKind.Utc)) : null,
                 AssetName = asset.Value<string>("name")!,
                 AssetUrl = asset.Value<string>("browser_download_url") ?? "",
                 AssetSize = asset.Value<long?>("size") ?? 0,

@@ -40,6 +40,12 @@ public sealed partial class AboutViewModel : ObservableObject
 
     public bool HasUpdate => AvailableUpdate is not null;
 
+    /// <summary>Все версии новее этой, от новых к старым (первая — <see cref="AvailableUpdate"/>): что изменилось за пропущенные.</summary>
+    public IReadOnlyList<AppRelease> MissedReleases { get; private set; } = [];
+
+    /// <summary>Проверка нашла обновление (вызывается на потоке окна) — главное окно решает, показать ли «Вышла новая версия».</summary>
+    public event Action? UpdateFound;
+
     /// <summary>Обновление поставило само это окно (кнопкой в «О программе») — про перезапуск оно спрашивает само.</summary>
     public bool UpdatedHere { get; private set; }
     public string UpdateButtonText => AvailableUpdate is { } r ? Loc.T("about.updateInstall", r.Version) : "";
@@ -65,7 +71,7 @@ public sealed partial class AboutViewModel : ObservableObject
     {
         try
         {
-            if (ModVersion.ParseOrNull(AppVersion) is { } current) AvailableUpdate = await _updater.FindUpdateAsync(current);
+            if (ModVersion.ParseOrNull(AppVersion) is { } current) SetFound(await _updater.FindUpdatesAsync(current));
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or Newtonsoft.Json.JsonException)
         {
@@ -81,7 +87,7 @@ public sealed partial class AboutViewModel : ObservableObject
         UpdateStatus = Loc.T("about.updateChecking");
         try
         {
-            AvailableUpdate = await _updater.FindUpdateAsync(current);
+            SetFound(await _updater.FindUpdatesAsync(current));
             UpdateStatus = AvailableUpdate is { } r ? Loc.T("about.updateAvailable", r.Version) : Loc.T("about.updateNone");
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or Newtonsoft.Json.JsonException)
@@ -90,13 +96,32 @@ public sealed partial class AboutViewModel : ObservableObject
         }
     }
 
+    private void SetFound(IReadOnlyList<AppRelease> releases)
+    {
+        MissedReleases = releases;
+        AvailableUpdate = releases.FirstOrDefault();
+        if (AvailableUpdate is not null) UpdateFound?.Invoke();
+    }
+
     private bool CanInstall => AvailableUpdate is not null && !IsUpdating;
 
     /// <summary>Скачать, сверить, поставить и предложить перезапуск. Работающий сервер не трогаем.</summary>
     [RelayCommand(CanExecute = nameof(CanInstall))]
     private async Task InstallUpdate()
     {
-        if (AvailableUpdate is not { } release) return;
+        if (await InstallAsync() is { } release
+            && MessageBox.Show(Application.Current.MainWindow!, Loc.T("about.updateRestartAsk", release.Version), "eViSTool",
+                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
+            App.RestartAfterClose(Path.Combine(AppContext.BaseDirectory, AppUpdater.MainExe));
+    }
+
+    /// <summary>
+    /// Скачать, сверить и поставить найденное обновление; перезапуск — за вызывающим. null — не поставилось
+    /// (причина — в <see cref="UpdateStatus"/>) или ставить нечего.
+    /// </summary>
+    public async Task<AppRelease?> InstallAsync()
+    {
+        if (AvailableUpdate is not { } release || IsUpdating) return null;
         IsUpdating = true;
         try
         {
@@ -112,15 +137,13 @@ public sealed partial class AboutViewModel : ObservableObject
             UpdateStatus = Loc.T("about.updateInstalled", release.Version);
             // агенты без работающего сервера — на выход: новое окно поднимет агентов уже новой версии
             if (Profiles is { } profiles) await Core.Server.AgentLauncher.StopIdleAgentsAsync([.. profiles()]);
-            var owner = Application.Current.MainWindow!;
-            if (MessageBox.Show(owner, Loc.T("about.updateRestartAsk", release.Version), "eViSTool",
-                    MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
-                App.RestartAfterClose(Path.Combine(appDir, AppUpdater.MainExe));
+            return release;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException
                                        or InvalidOperationException or InvalidDataException)
         {
             UpdateStatus = Loc.T("about.updateFailed", ex.Message);
+            return null;
         }
         finally
         {

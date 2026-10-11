@@ -163,6 +163,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     partial void OnIsGameRunningChanged(bool value)
     {
+        if (!value) ShowUpdatePrompt(); // окно об обновлении ждало, пока закроют игру
         OnPropertyChanged(nameof(PlayText));
         PlayCommand.NotifyCanExecuteChanged();
         PlayOnCommand.NotifyCanExecuteChanged();
@@ -263,6 +264,7 @@ public sealed partial class MainViewModel : ObservableObject
                 {
                     (_session, _sessionProfile) = (null, null);
                     await RunPendingAsync(watched); // отложенное до выхода из игры (например, выключение мода из окна вылета)
+                    ShowUpdatePrompt();
                 }
                 if (finding is not null) ShowCrash(watched, finding);
             }
@@ -292,6 +294,37 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Отпечатки модов профиля — по чему узнавать их в логах.</summary>
     private static Core.Diagnostics.ModFingerprints Fingerprints(GameProfile profile) =>
         Core.Diagnostics.ModFingerprints.Build(Core.Mods.ModUpdateService.ScanLocal(ProfileResolver.Resolve(profile)));
+
+    // ---------- «Вышла новая версия eViSTool» ----------
+
+    private bool _updatePromptShown;
+    private int _updatePromptWaits;
+
+    /// <summary>
+    /// Окно о новой версии — раз за запуск программы. Не поверх игры: пока она запущена или запускается, ждём её выхода.
+    /// Версию, которую попросили пропустить, не предлагаем (ссылка в боковой панели остаётся).
+    /// </summary>
+    private void ShowUpdatePrompt()
+    {
+        if (_updatePromptShown || About.AvailableUpdate is not { } release || About.IsUpdating
+            || release.Version.ToString() == _settings.SkippedAppVersion
+            || IsGameRunning || IsLaunching || _sessionProfile is not null)
+            return;
+        if (System.Windows.Application.Current.MainWindow is not { IsVisible: true } owner)
+        {
+            // проверка ответила раньше, чем показалось главное окно, — повторить, когда программа освободится
+            if (++_updatePromptWaits <= 20)
+                System.Windows.Application.Current.Dispatcher.BeginInvoke(ShowUpdatePrompt, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            return;
+        }
+        _updatePromptShown = true;
+        var window = new UpdateWindow(About, () =>
+        {
+            _settings.SkippedAppVersion = release.Version.ToString();
+            Save();
+        }) { Owner = owner };
+        window.Show(); // не модально: программой можно пользоваться, пока окно открыто
+    }
 
     private void ShowCrash(GameProfile profile, Core.Diagnostics.CrashFinding finding)
     {
@@ -492,7 +525,8 @@ public sealed partial class MainViewModel : ObservableObject
         Save(); // перенос настроек старого формата сразу на диск
         Mods.OnProfileSwitched(); // список модов виден сразу, без сети
         Mods.SetActive(SelectedTab == 0); // и сам обновляется, если моды поменяли в другом окне
-        _ = About.CheckQuietlyAsync(); // новая версия программы — подсказка в боковой панели
+        About.UpdateFound += () => ShowUpdatePrompt();
+        _ = About.CheckQuietlyAsync(); // новая версия программы — окно «Вышла новая версия» и подсказка в боковой панели
 
         // Удалённый доступ работает, пока открыто это окно (или пока работает сервер): держим агентов таких профилей
         // запущенными. Закрыли окно и сервер не работает — агент через пару минут выйдет, в системе ничего не остаётся.
