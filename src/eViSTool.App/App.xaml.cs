@@ -18,7 +18,7 @@ public partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += (_, a) => WriteCrashLog(a.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, a) => { WriteCrashLog(a.Exception); a.SetObserved(); };
         Presentation.Ui.Platform = new WpfUiPlatform(); // модели спрашивают, открывают файлы и ставят таймеры через него
-        ViewModels.AppWindows.Current = new WpfAppWindows(); // модели открывают окна программы через него
+        Presentation.ViewModels.AppWindows.Current = new WpfAppWindows(); // модели открывают окна программы через него
         Core.AppPaths.MigrateLegacy(); // до первого чтения настроек
         Core.AppUpdate.AppUpdater.CleanupOld(AppContext.BaseDirectory); // хвосты прошлого обновления
         base.OnStartup(e);

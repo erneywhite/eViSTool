@@ -3,7 +3,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
-using eViSTool.App.ViewModels;
+using eViSTool.Presentation.ViewModels;
 using eViSTool.Core.ModDb;
 using eViSTool.Core.Mods;
 using eViSTool.Core.Localization;

@@ -1,5 +1,5 @@
 using System.Windows;
-using eViSTool.App.ViewModels;
+using eViSTool.Presentation.ViewModels;
 using eViSTool.Core.Diagnostics;
 using eViSTool.Core.Notifications;
 using eViSTool.Core.Packs;

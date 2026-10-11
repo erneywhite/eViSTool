@@ -1,5 +1,5 @@
 using System.Windows;
-using eViSTool.App.ViewModels;
+using eViSTool.Presentation.ViewModels;
 using eViSTool.Core.Diagnostics;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Mods;
@@ -15,13 +15,13 @@ namespace eViSTool.App;
 public partial class CrashWindow : Window
 {
     private readonly CrashView _view;
-    private readonly ViewModels.MainViewModel _main;
+    private readonly MainViewModel _main;
     private readonly Func<Task<string>>? _disable;
     private readonly Action _show;
 
     /// <param name="disable">Выключить мод-виновник; возвращает, что сказать (null — выключать нечего).</param>
     /// <param name="show">Перейти к моду или серверу в программе.</param>
-    public CrashWindow(ViewModels.MainViewModel main, CrashView view, Func<Task<string>>? disable, Action show, string showLabel)
+    public CrashWindow(MainViewModel main, CrashView view, Func<Task<string>>? disable, Action show, string showLabel)
     {
         InitializeComponent();
         (_main, _view, _disable, _show) = (main, view, disable, show);
@@ -54,7 +54,7 @@ public partial class CrashWindow : Window
     }
 
     /// <summary>Окно вылета игры профиля: выключение мода — сразу, а пока игра открыта — после её закрытия.</summary>
-    public static CrashWindow ForGame(ViewModels.MainViewModel main, GameProfile profile, CrashFinding finding)
+    public static CrashWindow ForGame(MainViewModel main, GameProfile profile, CrashFinding finding)
     {
         Func<Task<string>>? disable = null;
         if (finding.Culprit?.Mod is { } mod && ModTarget.For(profile) is { } target)
@@ -72,13 +72,13 @@ public partial class CrashWindow : Window
             };
         return new CrashWindow(main, CrashView.ForGame(profile, finding), disable, () =>
         {
-            main.SwitchTo(profile, tab: ViewModels.AppTab.Mods);
+            main.SwitchTo(profile, tab: AppTab.Mods);
             if (finding.Culprit is { } c) main.Mods.Search = c.ModId;
         }, Loc.T("crash.showInMods"));
     }
 
     /// <summary>Окно падения сервера: мод выключается в конфиге сервера (свой — на диске, удалённый — через агента).</summary>
-    public static CrashWindow ForServer(ViewModels.MainViewModel main, GameProfile profile, ServerCrashInfo crash)
+    public static CrashWindow ForServer(MainViewModel main, GameProfile profile, ServerCrashInfo crash)
     {
         Func<Task<string>>? disable = null;
         if (crash.ModPath is { } path && ModTarget.For(profile) is { } target)
@@ -90,7 +90,7 @@ public partial class CrashWindow : Window
                 if (main.ActiveProfile?.Model.Id == profile.Id) main.Mods.ReloadLocal();
                 return Loc.T("crash.disabledServer", crash.ModName ?? crash.ModId);
             };
-        return new CrashWindow(main, CrashView.ForServer(profile, crash), disable, () => main.SwitchTo(profile, tab: ViewModels.AppTab.Server),
+        return new CrashWindow(main, CrashView.ForServer(profile, crash), disable, () => main.SwitchTo(profile, tab: AppTab.Server),
             Loc.T("crash.showServer"));
     }
 

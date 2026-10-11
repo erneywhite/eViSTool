@@ -1,7 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using eViSTool.App.ViewModels;
+using eViSTool.Presentation.ViewModels;
 using eViSTool.Core.Game;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;

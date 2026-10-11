@@ -3,7 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
-using eViSTool.App.ViewModels;
+using eViSTool.Presentation.ViewModels;
 
 namespace eViSTool.App;
 

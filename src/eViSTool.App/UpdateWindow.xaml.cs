@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Windows;
-using eViSTool.App.ViewModels;
+using eViSTool.Presentation.ViewModels;
 using eViSTool.Core.AppUpdate;
 using eViSTool.Core.Localization;
 

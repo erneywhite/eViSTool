@@ -1,6 +1,6 @@
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
-using eViSTool.App.ViewModels;
+using eViSTool.Presentation.ViewModels;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Mods;
 

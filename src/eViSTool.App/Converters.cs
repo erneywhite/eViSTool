@@ -3,7 +3,7 @@ using System.Windows;
 using System.Runtime.CompilerServices;
 using System.Windows.Data;
 using System.Windows.Media;
-using eViSTool.App.ViewModels;
+using eViSTool.Presentation.ViewModels;
 
 namespace eViSTool.App;
 

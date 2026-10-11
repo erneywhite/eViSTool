@@ -1,5 +1,5 @@
 using System.Windows;
-using eViSTool.App.ViewModels;
+using eViSTool.Presentation.ViewModels;
 using eViSTool.Presentation;
 using eViSTool.Core.Profiles;
 

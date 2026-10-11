@@ -1,0 +1,885 @@
+using eViSTool.Presentation;
+using System.Net.Http;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.IO;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using eViSTool.Core.Localization;
+using eViSTool.Core.Profiles;
+using eViSTool.Core.Server;
+using eViSTool.Core.Server.Config;
+using eViSTool.Core.Server.Remote;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
+namespace eViSTool.Presentation.ViewModels;
+
+/// <summary>Что с файлом конфига: ещё не читали / файла нет / не читается / загружен.</summary>
+/// <summary>Состояние файла в редакторе; Loading — ждём конфиг от удалённого агента (окно при этом не замирает).</summary>
+public enum ConfigLoadState { NotLoaded, Loading, Missing, Failed, Loaded }
+
+/// <summary>Вкладки редактора.</summary>
+public enum ConfigTab { General, World, Roles, Advanced }
+
+/// <summary>
+/// Редактор serverconfig.json активного серверного профиля. Файл читается лениво — при первом открытии «Конфигурации»;
+/// вся работа с ним идёт через <see cref="ServerConfigDocument"/>. Пока сервер работает (или его состояние ещё
+/// неизвестно) — только чтение: работающий сервер держит конфиг в памяти и сам переписывает файл.
+/// </summary>
+public sealed partial class ServerConfigViewModel : ObservableObject
+{
+    private const string SaveFilePath = "WorldConfig.SaveFileLocation";
+    private const string RolesName = "Roles";
+
+    private ServerConfigDocument? _doc;
+    private string? _path;
+
+    // Удалённый сервер: редактор работает с копией конфига в кэше (файл _path), а читает и пишет через агента.
+    // _remoteStamp — версия файла на сервере, которую мы читали: по ней агент откажет, если файл успел поменяться.
+    private Func<AgentClient?>? _remote;
+    private string _remoteStamp = "-";
+    private DateTime? _remoteLoadedAt;  // когда менялся конфиг на сервере — на момент чтения
+    private DateTime? _remoteLatestAt;  // и по последнему статусу агента
+    private bool _remoteWorldExists;
+
+    /// <summary>Конфиг удалённого сервера (файла на этой машине нет — «Показать файл» не показываем).</summary>
+    [ObservableProperty] private bool _isRemote;
+    private string _profileName = "";
+    private string? _gameDir;
+
+    // вкладка «Конфигурация» сейчас открыта: только тогда файл читается и перечитывается
+    private bool _active;
+
+    // null — состояние сервера ещё не выяснили (сразу после смены профиля)
+    private bool? _serverRunning;
+
+    // идёт перестройка полей: их уведомления — не правки пользователя
+    private bool _building;
+
+    private List<ConfigFieldViewModel> _fields = [];
+    private IReadOnlyList<KeyValuePair<string, string>> _worldSettingsOriginal = [];
+    private JToken? _rolesOriginal;
+    private string? _defaultRoleOriginal;
+    private IReadOnlyList<string> _roleErrors = [];
+    private int _inputErrors;
+    private DateTime? _savedAt;
+    private string _saveError = "";
+
+    // Свой сервер: пока вкладка открыта, файл могли поменять снаружи (правка с другого компьютера через агента, сервер,
+    // вкладка «Моды») — раз в пару секунд сверяем отметку файла. У удалённого сервера о том же сообщает статус агента.
+    private readonly IUiTimer _diskWatch = Ui.Timer(TimeSpan.FromSeconds(2));
+
+    public ServerConfigViewModel()
+    {
+        _diskWatch.Tick += (_, _) => { if (!IsRemote) RefreshIfChangedOnDisk(); };
+        Roles = new RolesEditorViewModel(OnRolesChanged) { IsReadOnly = true };
+
+        WorldSettings.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasWorldSettings));
+    }
+
+    /// <summary>Вкладка «Роли» (её делает отдельная модель; здесь — только шов).</summary>
+    public RolesEditorViewModel Roles { get; }
+
+    [ObservableProperty] private ConfigLoadState _state = ConfigLoadState.NotLoaded;
+    [ObservableProperty] private ConfigTab _tab = ConfigTab.General;
+
+    /// <summary>Полный путь к serverconfig.json профиля; null — профиль не серверный.</summary>
+    [ObservableProperty] private string? _filePath;
+
+    /// <summary>Почему файл не прочитался.</summary>
+    [ObservableProperty] private string _loadError = "";
+
+    /// <summary>Сервер работает или его состояние ещё неизвестно — править нельзя.</summary>
+    [ObservableProperty] private bool _isReadOnly = true;
+
+    /// <summary>Сервер точно работает — показываем плашку.</summary>
+    [ObservableProperty] private bool _isServerRunning;
+
+    /// <summary>Документ отличается от сохранённого.</summary>
+    [ObservableProperty] private bool _isDirty;
+
+    [ObservableProperty] private int _changeCount;
+    [ObservableProperty] private int _errorCount;
+
+    // нижняя полоса
+    [ObservableProperty] private string _statusText = "";
+    [ObservableProperty] private RowTone _statusTone = RowTone.Muted;
+
+    /// <summary>Перечень ошибок — в подсказке к статусу; null — ошибок нет.</summary>
+    [ObservableProperty] private string? _statusTip;
+
+    // разделы: группы полей в порядке схемы
+    [ObservableProperty] private IReadOnlyList<ConfigGroupViewModel> _generalGroups = [];
+    [ObservableProperty] private IReadOnlyList<ConfigGroupViewModel> _worldGroups = [];
+    [ObservableProperty] private IReadOnlyList<ConfigGroupViewModel> _advancedGroups = [];
+
+    /// <summary>Поиск на «Дополнительно»: по подписи и имени поля.</summary>
+    [ObservableProperty] private string _search = "";
+
+    [ObservableProperty] private bool _searchEmpty;
+
+    /// <summary>Файл сохранения из WorldConfig.SaveFileLocation уже есть — мир создан.</summary>
+    [ObservableProperty] private bool _worldExists;
+
+    /// <summary>Настройки мира (WorldConfig.WorldConfiguration) строками таблицы.</summary>
+    public ObservableCollection<WorldSettingRowViewModel> WorldSettings { get; } = [];
+
+    public bool HasWorldSettings => WorldSettings.Count > 0;
+
+    // один список известных ключей на все строки; подписи обновляются на месте — заменять его нельзя,
+    // редактируемый выпадающий список при смене ItemsSource стирает свой текст
+    private readonly ObservableCollection<WorldSettingKeyOption> _keyOptions = [.. KnownWorldSettings()];
+
+    public IReadOnlyList<WorldSettingKeyOption> WorldSettingKeys => _keyOptions;
+
+    /// <summary>Ключи каталога: категории — в порядке каталога, внутри категории порядок тоже его (сортировка устойчивая).</summary>
+    private static IEnumerable<WorldSettingKeyOption> KnownWorldSettings()
+    {
+        var categories = WorldSettingCatalog.All.Select(s => s.Category).Distinct().ToList();
+        return WorldSettingCatalog.All.OrderBy(s => categories.IndexOf(s.Category)).Select(s => new WorldSettingKeyOption(s));
+    }
+
+    // ---------- связь с разделом «Сервер» ----------
+
+    /// <summary>
+    /// Активный профиль сменился или его правят в настройках (этот вызов приходит на каждую букву имени).
+    /// Пока путь к файлу тот же — документ не трогаем. dataDir = null — профиль не серверный.
+    /// </summary>
+    /// <summary>Файл конфига, с которым работает редактор для такого профиля (у удалённого — копия в кэше).</summary>
+    private static string? PathFor(string? dataDir, GameProfile? remoteProfile)
+    {
+        if (remoteProfile is not null) dataDir = Path.Combine(Core.AppPaths.Cache, "remote", remoteProfile.Id);
+        return string.IsNullOrWhiteSpace(dataDir) ? null : Path.Combine(dataDir, ProfileResolver.ServerConfigName);
+    }
+
+    /// <summary>
+    /// Можно ли уйти на другой профиль (выбор в списке, удаление профиля): «Сохранить правки? Да / Нет / Отмена».
+    /// Сохраняется в СТАРОМ контексте — свой файл или сервер через его агента, пока связь с ним не закрыта.
+    /// false — остаться: отменили или сохранить не удалось (правки на месте, ошибка видна в редакторе).
+    /// </summary>
+    public bool ConfirmSwitch()
+    {
+        if (_doc is not { IsDirty: true }) return true;
+        if (!ConfirmLeave(Loc.T("srvcfg.askSaveOnSwitch", _profileName))) return false;
+        if (_doc is { IsDirty: true }) Unload(); // «Нет» — правки отброшены, второй раз не спрашиваем
+        return true;
+    }
+
+    /// <summary>
+    /// Профиль вот-вот сменится так, что отменить нельзя (в настройках поменяли папку данных или код подключения):
+    /// правки сохраняются, пока старый контекст (и связь с его агентом) ещё жив. Не вышло — правки не пропадают молча:
+    /// текст — в черновик рядом с настройками программы. Вызывать ДО того, как закрыта связь со старым агентом.
+    /// </summary>
+    public void BeforeSwitch(string? dataDir, GameProfile? remoteProfile)
+    {
+        if (string.Equals(PathFor(dataDir, remoteProfile), _path, StringComparison.OrdinalIgnoreCase)) return;
+        if (_doc is not { IsDirty: true } doc) return;
+        if (Ask(Loc.T("srvcfg.askSaveOnSwitch", _profileName), AskButtons.YesNo) == Answer.Yes && !SaveOnLeave())
+            SaveDraft(doc);
+        Unload();
+    }
+
+    public void OnProfileSwitched(string? dataDir, string profileName, string? gameDir = null,
+        GameProfile? remoteProfile = null, Func<AgentClient?>? remoteClient = null)
+    {
+        // правки старого профиля к этому моменту уже сохранены или отброшены — см. ConfirmSwitch / BeforeSwitch
+        _remote = remoteProfile is null ? null : remoteClient;
+        IsRemote = remoteProfile is not null;
+        var path = PathFor(dataDir, remoteProfile);
+        _gameDir = gameDir;
+        GenerateCommand.NotifyCanExecuteChanged();
+        if (string.Equals(path, _path, StringComparison.OrdinalIgnoreCase))
+        {
+            _profileName = profileName;
+            return;
+        }
+        GenerateError = "";
+
+        _path = path;
+        _profileName = profileName;
+        FilePath = IsRemote ? Loc.T("srvcfg.remoteFile") : path;
+        _remoteStamp = "-";
+        _remoteLoadedAt = _remoteLatestAt = null;
+        _remoteWorldExists = false;
+        _serverRunning = null;
+        ApplyServerState();
+        Unload();
+        if (_active && path is not null) Load();
+    }
+
+    /// <summary>Открыли или закрыли вкладку «Конфигурация». Закрытие ничего не сбрасывает.</summary>
+    public void SetActive(bool active)
+    {
+        _active = active;
+        if (active) _diskWatch.Start();
+        else _diskWatch.Stop();
+        if (!active) return;
+        if (State == ConfigLoadState.NotLoaded)
+        {
+            if (_path is not null) Load();
+        }
+        else RefreshIfChangedOnDisk();
+    }
+
+    /// <summary>Состояние сервера выяснилось или сменилось. Остановился — файл перечитывается (сервер мог его переписать).</summary>
+    public void SetServerRunning(bool running)
+    {
+        if (_serverRunning == running) return;
+        _serverRunning = running;
+        ApplyServerState();
+        RefreshIfChangedOnDisk();
+    }
+
+    /// <summary>
+    /// Файл изменился на диске (сервер, выключение мода на вкладке «Моды»), а своих правок нет — показываем свежее.
+    /// С правками не перечитываем: о расхождении спросим при сохранении.
+    /// </summary>
+    public void RefreshIfChangedOnDisk()
+    {
+        if (!_active || _path is null) return;
+        switch (State)
+        {
+            case ConfigLoadState.Missing when IsRemote ? _remoteLatestAt is not null : File.Exists(_path):
+            case ConfigLoadState.Failed when !IsRemote || _remoteLatestAt is not null:
+            case ConfigLoadState.Loaded when _doc is { IsDirty: false } doc && _inputErrors == 0 && ChangedExternally(doc):
+                Load();
+                break;
+        }
+    }
+
+    /// <summary>Статус удалённого агента: когда менялся конфиг на сервере. Поменялся, а своих правок нет — перечитываем.</summary>
+    public void ShowRemoteStatus(AgentStatus status)
+    {
+        if (!IsRemote || status.ConfigChangedAt == _remoteLatestAt) return;
+        _remoteLatestAt = status.ConfigChangedAt;
+        RefreshIfChangedOnDisk();
+    }
+
+    /// <summary>Файл поменяли не мы: на этой машине — по отметке файла, у удалённого сервера — по статусу агента.</summary>
+    private bool ChangedExternally(ServerConfigDocument doc) => IsRemote ? _remoteLatestAt != _remoteLoadedAt : doc.ChangedOnDisk();
+
+    private AgentClient RemoteClient => _remote?.Invoke() ?? throw new InvalidOperationException(Loc.T("server.stateOffline"));
+
+    /// <summary>Сколько ждать удалённого агента: конфиг — несколько килобайт по локальной сети.</summary>
+    private static readonly TimeSpan RemoteTimeout = TimeSpan.FromSeconds(15);
+
+    /// <summary>
+    /// Запрос к удалённому агенту с ожиданием на месте — только там, где ответ нужен сразу (сохранение при уходе с
+    /// профиля или закрытии окна). Обычная загрузка и «Сохранить» идут асинхронно и окно не держат.
+    /// </summary>
+    private static T Sync<T>(Func<CancellationToken, Task<T>> call)
+    {
+        using var cts = new CancellationTokenSource(RemoteTimeout);
+        return Task.Run(() => call(cts.Token)).GetAwaiter().GetResult();
+    }
+
+    /// <summary>Конфиг, полученный от агента, — в копию в кэше; запомнить его версию.</summary>
+    private void ApplyRemote(RemoteConfigFile file)
+    {
+        if (_path is null) return;
+        Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+        if (file.Exists) File.WriteAllText(_path, file.Text);
+        else if (File.Exists(_path)) File.Delete(_path);
+        _remoteStamp = file.Stamp;
+        _remoteLoadedAt = _remoteLatestAt = file.ChangedAt;
+        _remoteWorldExists = file.WorldExists;
+    }
+
+    /// <summary>
+    /// Отправить документ удалённому агенту. false — файл на сервере уже другой, ничего не записано.
+    /// <paramref name="blocking"/> — ждать на месте (задача тогда уже завершена).
+    /// </summary>
+    private async Task<bool> UploadRemoteAsync(ServerConfigDocument doc, bool force, bool blocking)
+    {
+        var request = new ConfigSaveRequest(doc.Root.ToString(Newtonsoft.Json.Formatting.Indented), _remoteStamp, force);
+        ConfigSaveResult result;
+        if (blocking) result = Sync(ct => RemoteClient.SaveConfigAsync(request, ct));
+        else
+        {
+            using var cts = new CancellationTokenSource(RemoteTimeout);
+            result = await RemoteClient.SaveConfigAsync(request, cts.Token);
+        }
+        if (result.Conflict) return false;
+        _remoteStamp = result.File.Stamp;
+        _remoteLoadedAt = _remoteLatestAt = result.File.ChangedAt;
+        _remoteWorldExists = result.File.WorldExists;
+        return true;
+    }
+
+    /// <summary>Сменился язык: тексты, собранные в коде, — заново (модели полей не пересоздаются, правки остаются).</summary>
+    public void OnLanguageChanged()
+    {
+        foreach (var field in _fields) field.RefreshTexts();
+        foreach (var group in GeneralGroups.Concat(WorldGroups).Concat(AdvancedGroups)) group.RefreshTexts();
+        foreach (var option in _keyOptions) option.RefreshTexts();
+        foreach (var row in WorldSettings) row.RefreshTexts();
+        ApplySearch();
+        if (_doc is not null) AttachRoles(_doc); // подписи ролей и привилегий собраны в коде на прежнем языке
+        Recalculate();
+    }
+
+    /// <summary>Перед запуском сервера: он прочитает файл с диска, несохранённое в него не попадёт. false — запуск отменён.</summary>
+    public bool ConfirmBeforeServerStart() => ConfirmLeave(Loc.T("srvcfg.askSaveBeforeStart"));
+
+    /// <summary>Перед закрытием окна. false — не закрывать.</summary>
+    public bool ConfirmClose() => ConfirmLeave(Loc.T("srvcfg.askSaveOnClose"));
+
+    /// <summary>«Сохранить? Да / Нет / Отмена». true — можно продолжать (сохранено либо пользователь отказался сохранять).</summary>
+    private bool ConfirmLeave(string question)
+    {
+        if (_doc is not { IsDirty: true }) return true;
+        switch (Ask(question, AskButtons.YesNoCancel))
+        {
+            case Answer.Yes:
+                if (CanSave) return TrySave();
+                Warn(Loc.T("srvcfg.cantSave"));
+                return false;
+            case Answer.No:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>Сохранение при уходе с профиля: отменить уход уже нельзя, поэтому вопросы — только «да/нет». false — не сохранено.</summary>
+    private bool SaveOnLeave()
+    {
+        if (_doc is not { } doc) return true;
+        if (_roleErrors.Count > 0)
+        {
+            // роли с ошибками (пустой или повторяющийся код) серверу отдавать нельзя — он не запустится
+            Warn(Loc.T("srvcfg.notSavedRoleErrors", string.Join(Environment.NewLine, _roleErrors)));
+            return false;
+        }
+        if (ChangedExternally(doc) && Ask(Loc.T("srvcfg.askOverwrite"), AskButtons.YesNo) != Answer.Yes) return false;
+        try
+        {
+            if (IsRemote) UploadRemoteAsync(doc, force: true, blocking: true).GetAwaiter().GetResult(); // о перезаписи уже спросили
+            doc.Save();
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException or InvalidOperationException
+                                       or TaskCanceledException)
+        {
+            Warn(Loc.T("srvcfg.statusSaveFailed", IsRemote ? RemoteSecret.Describe(ex) : ex.Message));
+            return false;
+        }
+    }
+
+    /// <summary>Правки, которые не удалось сохранить при необратимом уходе с профиля, — в черновик; путь — пользователю.</summary>
+    private void SaveDraft(ServerConfigDocument doc)
+    {
+        try
+        {
+            var dir = Directory.CreateDirectory(Path.Combine(Core.AppPaths.Root, "drafts")).FullName;
+            var name = string.Concat(_profileName.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+            var path = Path.Combine(dir, $"serverconfig-{name}-{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.json");
+            File.WriteAllText(path, doc.Root.ToString(Formatting.Indented));
+            Warn(Loc.T("srvcfg.draftSaved", path));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Warn(Loc.T("srvcfg.draftFailed", ex.Message));
+        }
+    }
+
+    // ---------- загрузка ----------
+
+    /// <summary>Номер загрузки: ответ агента на прежнюю (профиль сменили, нажали «Перечитать») отбрасывается.</summary>
+    private int _loadGeneration;
+
+    private void Load()
+    {
+        var generation = ++_loadGeneration;
+        if (_path is null)
+        {
+            _savedAt = null;
+            _saveError = "";
+            Unload();
+            return;
+        }
+        // удалённый сервер: сначала свежую копию от агента — в фоне; открытый документ виден, пока она не пришла
+        if (IsRemote) _ = LoadRemoteAsync(generation, _path);
+        else ReadFile();
+    }
+
+    private async Task LoadRemoteAsync(int generation, string path)
+    {
+        if (State != ConfigLoadState.Loaded) Unload(ConfigLoadState.Loading);
+        RemoteConfigFile file;
+        try
+        {
+            using var cts = new CancellationTokenSource(RemoteTimeout);
+            file = await RemoteClient.GetConfigAsync(cts.Token);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
+        {
+            if (generation != _loadGeneration) return;
+            _savedAt = null;
+            _saveError = "";
+            Unload(ConfigLoadState.Failed);
+            LoadError = RemoteSecret.Describe(ex);
+            return;
+        }
+        if (generation != _loadGeneration || !string.Equals(path, _path, StringComparison.OrdinalIgnoreCase)) return;
+        try
+        {
+            ApplyRemote(file);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Unload(ConfigLoadState.Failed);
+            LoadError = ex.Message;
+            return;
+        }
+        ReadFile();
+    }
+
+    /// <summary>Прочитать файл (у удалённого сервера — копию в кэше, только что полученную от агента).</summary>
+    private void ReadFile()
+    {
+        _savedAt = null;
+        _saveError = "";
+        _doc = null;
+        try
+        {
+            if (!File.Exists(_path))
+            {
+                Unload(ConfigLoadState.Missing);
+                return;
+            }
+            _doc = ServerConfigDocument.Load(_path);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            Unload(ConfigLoadState.Missing);
+            return;
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            // битый JSON, занятый файл: показываем текст ошибки и ничего не перезаписываем
+            Unload(ConfigLoadState.Failed);
+            LoadError = ex.Message;
+            return;
+        }
+
+        LoadError = "";
+        Build();
+        State = ConfigLoadState.Loaded;
+    }
+
+    private void Unload(ConfigLoadState state = ConfigLoadState.NotLoaded)
+    {
+        _doc = null;
+        _savedAt = null;
+        _saveError = "";
+        _building = true;
+        try
+        {
+            _fields = [];
+            GeneralGroups = WorldGroups = AdvancedGroups = [];
+            WorldSettings.Clear();
+            _worldSettingsOriginal = [];
+            _rolesOriginal = null;
+            _defaultRoleOriginal = null;
+            Roles.Attach(null);
+            _roleErrors = [];
+            WorldExists = false;
+            SearchEmpty = false;
+        }
+        finally
+        {
+            _building = false;
+        }
+        LoadError = "";
+        State = state;
+        Recalculate();
+    }
+
+    /// <summary>
+    /// Построить поля по документу. Вызывается, когда документ равен файлу (загрузка, отмена правок, сохранение):
+    /// значения на этот момент становятся «исходными» для пометок «изменено».
+    /// </summary>
+    private void Build()
+    {
+        var doc = _doc!;
+        _building = true;
+        try
+        {
+            _fields = [.. ServerConfigSchema.FieldsFor(doc).Select(spec => ConfigFieldViewModel.Create(doc, spec, OnFieldChanged))];
+            foreach (var field in _fields) field.IsReadOnly = IsReadOnly;
+
+            GeneralGroups = GroupsOf(f => f.Spec.Section == ConfigSections.General);
+            WorldGroups = GroupsOf(f => f.Spec.Section == ConfigSections.World);
+            // раздел, которого редактор не знает, — тоже в «Дополнительно»: поле не должно пропасть
+            AdvancedGroups = GroupsOf(f => f.Spec.Section is not (ConfigSections.General or ConfigSections.World));
+            ApplySearch();
+
+            _worldSettingsOriginal = doc.WorldSettings;
+            WorldSettings.Clear();
+            foreach (var (key, value) in _worldSettingsOriginal) WorldSettings.Add(NewRow(key, value));
+
+            _rolesOriginal = doc.Root[RolesName]?.DeepClone();
+            _defaultRoleOriginal = doc.DefaultRoleCode;
+            AttachRoles(doc);
+            UpdateWorldExists();
+        }
+        finally
+        {
+            _building = false;
+        }
+        Recalculate();
+    }
+
+    private IReadOnlyList<ConfigGroupViewModel> GroupsOf(Func<ConfigFieldViewModel, bool> inSection) =>
+        [.. _fields.Where(inSection)
+            .GroupBy(f => f.Spec.Group)
+            .Select(g => new ConfigGroupViewModel(g.Key, g.First().Spec.GroupKey, [.. g]))];
+
+    private void AttachRoles(ServerConfigDocument doc)
+    {
+        var building = _building;
+        _building = true;
+        try
+        {
+            Roles.Attach(doc);
+            _roleErrors = Roles.Validate();
+        }
+        finally
+        {
+            _building = building;
+        }
+    }
+
+    // ---------- правки ----------
+
+    private void OnFieldChanged(ConfigFieldViewModel field)
+    {
+        if (_building) return;
+        if (field.Path == SaveFilePath) UpdateWorldExists();
+        if (field.Path == WelcomePath) OnPropertyChanged(nameof(WelcomeMessage));
+        Touch();
+    }
+
+    // ---------- приветствие: его же показывает карточка во вкладке «Объявления» ----------
+
+    public const string WelcomePath = "WelcomeMessage";
+
+    /// <summary>Приветствие из конфига, как сейчас в редакторе (с несохранёнными правками); null — конфиг не загружен.</summary>
+    public string? WelcomeMessage => _doc?.Get(WelcomePath) is JValue { Value: string text } ? text : _doc is null ? null : "";
+
+    /// <summary>Конфиг ещё не читали — прочитать (вкладке «Объявления» нужно приветствие, а «Конфигурацию» не открывали).</summary>
+    public void EnsureLoaded()
+    {
+        if (State == ConfigLoadState.NotLoaded && _path is not null) Load();
+    }
+
+    /// <summary>Представлению: прокрутить к полю и поставить в него курсор.</summary>
+    public event Action<string>? FocusFieldRequested;
+
+    /// <summary>Открыть поле в редакторе: его вкладку («Основное», «Мир»…), потом — к самому полю.</summary>
+    public void FocusField(string path)
+    {
+        var field = _fields.FirstOrDefault(f => f.Path == path);
+        Tab = field?.Spec.Section == ConfigSections.World ? ConfigTab.World
+            : field is null || field.Spec.Section == ConfigSections.General ? ConfigTab.General
+            : ConfigTab.Advanced;
+        FocusFieldRequested?.Invoke(path);
+    }
+
+    private void OnRolesChanged()
+    {
+        if (_building || _doc is null) return;
+        _roleErrors = Roles.Validate();
+        Touch();
+    }
+
+    private WorldSettingRowViewModel NewRow(string key, string value) =>
+        new(key, value, WorldSettingKeys, OnWorldSettingChanged, RemoveWorldSetting) { IsReadOnly = IsReadOnly };
+
+    private void OnWorldSettingChanged(WorldSettingRowViewModel row)
+    {
+        if (_building) return;
+        CommitWorldSettings();
+    }
+
+    private void RemoveWorldSetting(WorldSettingRowViewModel row)
+    {
+        if (IsReadOnly || !WorldSettings.Remove(row)) return;
+        CommitWorldSettings();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanEdit))]
+    private void AddWorldSetting() => WorldSettings.Add(NewRow("", ""));
+
+    /// <summary>Таблица настроек мира → документ. С ошибкой в таблице (повтор ключа, значение без ключа) документ не трогаем.</summary>
+    private void CommitWorldSettings()
+    {
+        if (_doc is not { } doc) return;
+
+        // игра сравнивает ключи без учёта регистра — повтор в другом регистре тоже повтор
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in WorldSettings)
+        {
+            var key = row.Key.Trim();
+            row.Problem = key.Length == 0
+                ? row.Value.Length > 0 ? WorldSettingProblem.NoKey : WorldSettingProblem.None
+                : seen.Add(key) ? WorldSettingProblem.None : WorldSettingProblem.Duplicate;
+        }
+
+        // строка без ключа и без значения — ещё не заполнена: в файл не идёт
+        if (WorldSettings.All(r => !r.HasError))
+            doc.SetWorldSettings(WorldSettings.Select(r => KeyValuePair.Create(r.Key, r.Value)));
+        Touch();
+    }
+
+    /// <summary>После правки: прошлые «сохранено» и ошибка записи уже неактуальны.</summary>
+    private void Touch()
+    {
+        _savedAt = null;
+        _saveError = "";
+        Recalculate();
+    }
+
+    private void Recalculate()
+    {
+        var doc = _doc;
+        var errors = new List<string>();
+        var changes = 0;
+
+        foreach (var field in _fields)
+        {
+            if (field.IsModified) changes++;
+            if (field.HasError) errors.Add($"{field.Label}: {field.Error}");
+        }
+
+        foreach (var row in WorldSettings)
+        {
+            var key = row.Key.Trim();
+            row.IsModified = key.Length > 0 && !_worldSettingsOriginal.Any(o => o.Key == key && o.Value == row.Value);
+            if (row.IsModified) changes++;
+            if (row.HasError) errors.Add($"{(key.Length > 0 ? key : Loc.T("srvcfg.wsTitle"))}: {row.Error}");
+        }
+        changes += _worldSettingsOriginal.Count(o => WorldSettings.All(r => r.Key.Trim() != o.Key)); // убранные
+
+        _inputErrors = errors.Count;
+        errors.AddRange(_roleErrors);
+
+        if (doc is not null
+            && (!JToken.DeepEquals(doc.Root[RolesName], _rolesOriginal) || doc.DefaultRoleCode != _defaultRoleOriginal))
+            changes++;
+
+        IsDirty = doc?.IsDirty == true;
+        ChangeCount = IsDirty ? Math.Max(1, changes) : changes;
+        ErrorCount = errors.Count;
+        StatusTip = errors.Count == 0 ? null : string.Join(Environment.NewLine, errors.Take(12));
+
+        (StatusText, StatusTone) =
+            doc is null ? ("", RowTone.Muted)
+            : _saveError.Length > 0 ? (Loc.T("srvcfg.statusSaveFailed", _saveError), RowTone.Danger)
+            : ErrorCount > 0 ? (Loc.T("srvcfg.statusErrors", ErrorCount), RowTone.Danger)
+            : IsDirty ? (Loc.T("srvcfg.statusDirty", ChangeCount), RowTone.Update)
+            : _savedAt is { } at ? (Loc.T("srvcfg.statusSaved", Dates.Clock(at)), RowTone.Good)
+            : (Loc.T("srvcfg.statusClean"), RowTone.Muted);
+
+        SaveCommand.NotifyCanExecuteChanged();
+        RevertCommand.NotifyCanExecuteChanged();
+        AddWorldSettingCommand.NotifyCanExecuteChanged();
+    }
+
+    private void UpdateWorldExists()
+    {
+        if (IsRemote)
+        {
+            WorldExists = _remoteWorldExists; // файл мира — на той машине, о нём знает агент
+            return;
+        }
+        var file = _doc?.Get(SaveFilePath) is JValue { Value: string text } ? text.Trim() : "";
+        if (file.Length > 0 && !Path.IsPathRooted(file) && Path.GetDirectoryName(_path) is { } dataDir)
+            file = Path.Combine(dataDir, file);
+        WorldExists = file.Length > 0 && File.Exists(file);
+    }
+
+    partial void OnSearchChanged(string value) => ApplySearch();
+
+    private void ApplySearch()
+    {
+        var search = Search.Trim();
+        foreach (var group in AdvancedGroups) group.ApplySearch(search);
+        SearchEmpty = AdvancedGroups.Count > 0 && AdvancedGroups.All(g => !g.IsVisible);
+    }
+
+    private void ApplyServerState()
+    {
+        IsServerRunning = _serverRunning == true;
+        IsReadOnly = _serverRunning != false;
+        GenerateCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsReadOnlyChanged(bool value)
+    {
+        foreach (var field in _fields) field.IsReadOnly = value;
+        foreach (var row in WorldSettings) row.IsReadOnly = value;
+        Roles.IsReadOnly = value;
+        SaveCommand.NotifyCanExecuteChanged();
+        AddWorldSettingCommand.NotifyCanExecuteChanged();
+    }
+
+    // ---------- создание конфига для нового профиля ----------
+
+    /// <summary>Идёт создание конфига (сервер на секунду запускается с «--setconfig»).</summary>
+    [ObservableProperty] private bool _isGenerating;
+    [ObservableProperty] private string _generateError = "";
+
+    private bool CanGenerate => State == ConfigLoadState.Missing && !IsGenerating && _serverRunning != true
+                                && _path is not null && (IsRemote || !string.IsNullOrWhiteSpace(_gameDir));
+
+    /// <summary>Файла ещё нет: попросить сервер записать конфиг по умолчанию — чтобы настроить профиль до первого запуска.</summary>
+    [RelayCommand(CanExecute = nameof(CanGenerate))]
+    private async Task Generate()
+    {
+        if (_path is not { } path || Path.GetDirectoryName(path) is not { } dataDir) return;
+        var exe = Path.Combine(_gameDir ?? "", "VintagestoryServer.exe");
+        IsGenerating = true;
+        GenerateError = "";
+        try
+        {
+            // удалённый сервер: конфиг по умолчанию запишет агент на той машине
+            if (IsRemote) ApplyRemote(await RemoteClient.GenerateConfigAsync());
+            else await ServerConfigGenerator.GenerateAsync(exe, dataDir);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException
+                                       or System.ComponentModel.Win32Exception or HttpRequestException or TaskCanceledException)
+        {
+            GenerateError = Loc.T("srvcfg.generateFailed", IsRemote ? RemoteSecret.Describe(ex) : ex.Message);
+        }
+        finally
+        {
+            IsGenerating = false;
+        }
+        // пока создавали, профиль могли сменить — тогда этот файл уже не наш
+        if (string.Equals(path, _path, StringComparison.OrdinalIgnoreCase) && _active) Load();
+        GenerateCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsGeneratingChanged(bool value) => GenerateCommand.NotifyCanExecuteChanged();
+
+    // ---------- команды ----------
+
+    private bool CanEdit => State == ConfigLoadState.Loaded && !IsReadOnly;
+    private bool CanSave => CanEdit && IsDirty && ErrorCount == 0 && !IsSaving;
+
+    /// <summary>Идёт сохранение удалённому агенту — второе нажатие «Сохранить» не нужно.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private bool _isSaving;
+
+    // отменить можно и при работающем сервере: правки, сделанные до запуска, иначе было бы не сбросить
+    private bool CanRevert => State == ConfigLoadState.Loaded && (IsDirty || _inputErrors > 0);
+
+    [RelayCommand(CanExecute = nameof(CanSave))]
+    private async Task Save()
+    {
+        IsSaving = true;
+        try { await TrySaveAsync(blocking: false); }
+        finally { IsSaving = false; }
+    }
+
+    /// <summary>Сохранить с ожиданием на месте — когда ответ нужен сразу («Сохранить?» перед уходом или запуском).</summary>
+    private bool TrySave() => TrySaveAsync(blocking: true).GetAwaiter().GetResult();
+
+    private async Task<bool> TrySaveAsync(bool blocking)
+    {
+        if (_doc is not { } doc) return false;
+
+        // файл уже не тот, что мы читали (сервер запускали, мод выключили на вкладке «Моды», правили с другого компьютера)
+        var force = false;
+        if (ChangedExternally(doc))
+        {
+            if (!AskOverwrite()) return false;
+            force = true;
+        }
+
+        try
+        {
+            // удалённый сервер: сначала агенту (он проверит, что файл тот же, что мы читали), потом — копия в кэше
+            if (IsRemote && !await UploadRemoteAsync(doc, force, blocking))
+            {
+                if (_doc != doc || !AskOverwrite()) return false;
+                await UploadRemoteAsync(doc, force: true, blocking);
+            }
+            if (_doc != doc) return false; // пока агент отвечал, профиль сменили — этот документ уже не на экране
+            doc.Save();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException or InvalidOperationException
+                                       or TaskCanceledException)
+        {
+            _saveError = IsRemote ? RemoteSecret.Describe(ex) : ex.Message;
+            Recalculate();
+            return false;
+        }
+
+        // поля строятся заново: сохранённое стало «исходным», пометки «изменено» сброшены
+        _saveError = "";
+        Build();
+        _savedAt = DateTime.Now;
+        Recalculate();
+        return true;
+    }
+
+    /// <summary>«Файл уже другой: перезаписать?» Да — перезаписать; Нет — перечитать и отбросить правки; Отмена — ничего.</summary>
+    private bool AskOverwrite()
+    {
+        switch (Ask(Loc.T("srvcfg.askChangedOnDisk"), AskButtons.YesNoCancel))
+        {
+            case Answer.Yes:
+                return true;
+            case Answer.No:
+                Load();
+                return false;
+            default:
+                return false;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRevert))]
+    private void Revert()
+    {
+        if (_doc is not { } doc) return;
+        doc.Revert();
+        _savedAt = null;
+        _saveError = "";
+        Build();
+    }
+
+    /// <summary>Перечитать с диска.</summary>
+    [RelayCommand]
+    private void Reload()
+    {
+        if (_path is null) return;
+        if (_doc is { IsDirty: true } && Ask(Loc.T("srvcfg.askReload"), AskButtons.YesNo) != Answer.Yes) return;
+        Load();
+    }
+
+    [RelayCommand]
+    private void ShowFile()
+    {
+        if (_path is null) return;
+        if (File.Exists(_path)) Ui.ShowInFolder(_path);
+        else if (Path.GetDirectoryName(_path) is { } dir && Directory.Exists(dir)) Ui.OpenFolder(dir);
+    }
+
+    partial void OnStateChanged(ConfigLoadState value)
+    {
+        OnPropertyChanged(nameof(WelcomeMessage));
+        SaveCommand.NotifyCanExecuteChanged();
+        RevertCommand.NotifyCanExecuteChanged();
+        AddWorldSettingCommand.NotifyCanExecuteChanged();
+        GenerateCommand.NotifyCanExecuteChanged();
+    }
+
+    private static Answer Ask(string text, AskButtons buttons) => Ui.Ask(text, buttons);
+
+    private static void Warn(string text) => Ui.Warn(text);
+}

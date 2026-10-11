@@ -1,5 +1,6 @@
 using System.Windows;
 using eViSTool.Core.Diagnostics;
+using eViSTool.Presentation.ViewModels;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Mods;
 using eViSTool.Core.Profiles;
@@ -20,11 +21,11 @@ public sealed class ModErrorRow(ModErrorLine line)
 /// </summary>
 public partial class ModErrorsWindow : Window
 {
-    private readonly ViewModels.MainViewModel _main;
+    private readonly MainViewModel _main;
     private readonly GameProfile _profile;
     private readonly ModErrorReport _report;
 
-    public ModErrorsWindow(ViewModels.MainViewModel main, GameProfile profile, ModErrorReport report)
+    public ModErrorsWindow(MainViewModel main, GameProfile profile, ModErrorReport report)
     {
         InitializeComponent();
         (_main, _profile, _report) = (main, profile, report);
