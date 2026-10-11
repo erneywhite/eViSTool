@@ -74,6 +74,8 @@ public partial class MainWindow : Window
         l.Width = size.Width;
         l.Height = size.Height;
         Vm.SaveSettings();
+        // несохранённые правки конфигурации сервера и конфига мода — спросить; отказались — окно остаётся
+        if (!Vm.ConfirmExit()) e.Cancel = true;
     }
 
     // тёмный заголовок окна в цвет боковой колонки (Windows 11; на Windows 10 — просто тёмный)

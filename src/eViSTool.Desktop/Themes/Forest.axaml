@@ -101,6 +101,73 @@
         <Setter Property="Padding" Value="0,14,0,0" />
     </Style>
 
+    <!-- ===== тон состояния: точка и текст; вариант — класс от EnumClass.Value="{Binding Tone}" ===== -->
+    <Style Selector="Ellipse.tone">
+        <Setter Property="Width" Value="6" />
+        <Setter Property="Height" Value="6" />
+        <Setter Property="Margin" Value="0,0,6,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Fill" Value="{DynamicResource Forest.Muted}" />
+    </Style>
+    <Style Selector="Ellipse.tone.good">
+        <Setter Property="Fill" Value="{DynamicResource Forest.Good}" />
+    </Style>
+    <Style Selector="Ellipse.tone.update">
+        <Setter Property="Fill" Value="{DynamicResource Forest.Accent}" />
+    </Style>
+    <Style Selector="Ellipse.tone.warn">
+        <Setter Property="Fill" Value="{DynamicResource Forest.Warn}" />
+    </Style>
+    <Style Selector="Ellipse.tone.danger">
+        <Setter Property="Fill" Value="{DynamicResource Forest.Danger}" />
+    </Style>
+    <Style Selector="TextBlock.tone">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+    </Style>
+    <Style Selector="TextBlock.tone.good">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Good}" />
+    </Style>
+    <Style Selector="TextBlock.tone.update">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
+    </Style>
+    <Style Selector="TextBlock.tone.warn">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
+    </Style>
+    <Style Selector="TextBlock.tone.danger">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Danger}" />
+    </Style>
+
+    <!-- ===== поле поиска: лупа слева (InnerLeftContent), подсказка — PlaceholderText ===== -->
+    <Style Selector="TextBox.search">
+        <Setter Property="Padding" Value="8,7,10,7" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBox.search Path.searchIcon">
+        <Setter Property="Width" Value="14" />
+        <Setter Property="Height" Value="14" />
+        <Setter Property="Margin" Value="12,0,0,0" />
+        <Setter Property="Stroke" Value="{DynamicResource Forest.Muted}" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+    </Style>
+
+    <!-- ===== разделитель колонок: прозрачная полоса, посередине — короткая ручка (как у Fluent в окне на WPF) ===== -->
+    <Style Selector="GridSplitter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{TemplateBinding Background}">
+                    <Border x:Name="Grip" Width="4" Height="24" CornerRadius="2" Background="{DynamicResource Forest.Muted}" Opacity="0.6"
+                            HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="GridSplitter:pointerover /template/ Border#Grip">
+        <Setter Property="Opacity" Value="1" />
+    </Style>
+
     <!-- ===== служебные ===== -->
     <!-- невидимый, но место занимает (Visibility=Hidden в WPF) -->
     <Style Selector=":is(Control).hidden">

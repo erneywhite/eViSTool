@@ -33,6 +33,7 @@ public partial class App : Application
         Core.AppUpdate.AppUpdater.CleanupOld(AppContext.BaseDirectory); // хвосты прошлого обновления
 
         Ui.Platform = new AvaloniaUiPlatform(); // модели спрашивают, открывают файлы и ставят таймеры через него
+        AppWindows.Current = new AvaloniaAppWindows(); // и открывают окна программы
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

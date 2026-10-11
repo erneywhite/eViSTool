@@ -22,10 +22,10 @@ public class AvaloniaUiPlatform : IUiPlatform
         Dispatcher.UIThread.CheckAccess() ? action() : Dispatcher.UIThread.Invoke(action);
 
     public virtual Answer Ask(string text, AskButtons buttons, Answer? byDefault = null, bool warning = false) =>
-        OnUiThread(() => Modal.Wait(() => MessageDialog.AskAsync(MainWindow, text, buttons, byDefault, warning)));
+        OnUiThread(() => Modal.Wait(() => MessageDialog.AskAsync(Owner, text, buttons, byDefault, warning)));
 
     public virtual void Notify(string text, NoticeKind kind) =>
-        OnUiThread(() => Modal.Wait(() => MessageDialog.NotifyAsync(MainWindow, text, kind)));
+        OnUiThread(() => Modal.Wait(() => MessageDialog.NotifyAsync(Owner, text, kind)));
 
     public bool IsUiThread => Dispatcher.UIThread.CheckAccess();
     public void Post(Action action) => Dispatcher.UIThread.Post(action);
@@ -58,7 +58,10 @@ public class AvaloniaUiPlatform : IUiPlatform
 
     // ---- выбор файлов и папок: StorageProvider главного окна
 
-    private static IStorageProvider? Storage => (MainWindow ?? TopWindow())?.StorageProvider;
+    private static IStorageProvider? Storage => Owner?.StorageProvider;
+
+    /// <summary>Чьим окном открыть вопрос или выбор файла: верхнее видимое (открытый диалог), иначе главное.</summary>
+    private static Window? Owner => TopWindow() ?? MainWindow;
 
     /// <summary>Самое верхнее из видимых окон (у диалогов поверх диалогов — владелец следующего).</summary>
     internal static Window? TopWindow() =>
@@ -115,7 +118,7 @@ public class AvaloniaUiPlatform : IUiPlatform
     public void SetClipboard(string text) =>
         OnUiThread(() => Modal.Wait(async () =>
         {
-            if ((MainWindow ?? TopWindow())?.Clipboard is { } clipboard) await clipboard.SetTextAsync(text);
+            if (Owner?.Clipboard is { } clipboard) await clipboard.SetTextAsync(text);
             return true;
         }));
 
