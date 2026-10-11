@@ -7,6 +7,8 @@ namespace eViSTool.Core.Tests;
 /// Агент без окна (так он работает на Linux): сам находит сервер, профиль «server», один на профиль.
 /// Сервер здесь не запускается — нужна только папка, похожая на папку игры, поэтому тесты идут и на Linux.
 /// </summary>
+// агент профиля по умолчанию «server»: на Windows замок профиля — Mutex на всю машину, вместе эти классы не идут
+[Collection(DefaultProfileAgents.Name)]
 public sealed class StandaloneAgentTests : IDisposable
 {
     private static readonly string Root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));

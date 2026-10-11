@@ -9,6 +9,8 @@ namespace eViSTool.Core.Tests;
 /// command» против настоящего агента с поддельным сервером. Агент запускается как отдельная программа — так же,
 /// как его зовёт человек в терминале.
 /// </summary>
+// агент профиля по умолчанию «server»: на Windows замок профиля — Mutex на всю машину, вместе эти классы не идут
+[Collection(DefaultProfileAgents.Name)]
 public sealed class AgentCliTests : IAsyncLifetime
 {
     private static readonly string Root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
