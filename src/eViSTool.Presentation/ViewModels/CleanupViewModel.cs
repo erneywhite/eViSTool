@@ -3,10 +3,8 @@ using System.Collections.ObjectModel;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using eViSTool.Core;
 using eViSTool.Core.Game;
 using eViSTool.Core.Localization;
-using eViSTool.Core.Mods;
 using eViSTool.Core.Profiles;
 
 namespace eViSTool.Presentation.ViewModels;
@@ -106,14 +104,43 @@ public sealed partial class CleanupGroupViewModel : ObservableObject
 /// </summary>
 public sealed partial class CleanupViewModel : ObservableObject
 {
+    /// <summary>Как часто открытое окно проверяет, не запустили ли (не закрыли ли) игру или сервер профиля.</summary>
+    public static readonly TimeSpan RunningCheckInterval = TimeSpan.FromSeconds(2);
+
     private readonly GameProfile _profile;
     private readonly string _dataDir;
+    private readonly CleanupServices _services;
+    private IUiTimer? _runningCheck;
 
-    public CleanupViewModel(GameProfile profile)
+    public CleanupViewModel(GameProfile profile) : this(profile, null)
+    {
+    }
+
+    /// <param name="services">Диск, корзина и процессы (тесты подменяют); null — настоящие.</param>
+    public CleanupViewModel(GameProfile profile, CleanupServices? services)
     {
         _profile = profile;
         _dataDir = string.IsNullOrWhiteSpace(profile.DataDir) ? GameInstall.DefaultDataDir : profile.DataDir;
+        _services = services ?? new CleanupServices();
     }
+
+    /// <summary>
+    /// Окно открылось: найти, что убрать, и следить, не запущены ли игра или сервер профиля (раз в
+    /// <see cref="RunningCheckInterval"/>): остановили сервер или закрыли игру — кнопка оживает сама, окно закрывать не нужно.
+    /// </summary>
+    public Task StartAsync()
+    {
+        if (_runningCheck is null)
+        {
+            _runningCheck = Ui.Timer(RunningCheckInterval);
+            _runningCheck.Tick += (_, _) => CheckRunning();
+        }
+        _runningCheck.Start();
+        return ScanAsync();
+    }
+
+    /// <summary>Окно закрылось: больше не проверять, запущены ли игра и сервер.</summary>
+    public void Stop() => _runningCheck?.Stop();
 
     public string Heading => Loc.T("clean.heading", _profile.Name);
     public ObservableCollection<CleanupGroupViewModel> Groups { get; } = [];
@@ -128,7 +155,7 @@ public sealed partial class CleanupViewModel : ObservableObject
     /// <summary>Игра или сервер профиля запущены — убирать нельзя (окно перепроверяет раз в пару секунд: <see cref="CheckRunning"/>).</summary>
     [ObservableProperty] private bool _isRunning;
 
-    public void CheckRunning() => IsRunning = GameProcess.IsRunning(_profile);
+    public void CheckRunning() => IsRunning = _services.IsRunning(_profile);
     partial void OnIsRunningChanged(bool value) => RemoveCommand.NotifyCanExecuteChanged();
     public string RunningText => Loc.T(_profile.Kind == ProfileKind.Server ? "clean.serverRunning" : "clean.gameRunning");
     public bool IsEmpty => !IsBusy && Groups.Count == 0;
@@ -142,11 +169,7 @@ public sealed partial class CleanupViewModel : ObservableObject
         Status = Loc.T("clean.scanning");
         try
         {
-            var groups = await Task.Run(() =>
-            {
-                var mods = ModUpdateService.ScanLocal(ProfileResolver.Resolve(_profile));
-                return DiskCleanup.Scan(_profile, _dataDir, mods, AppPaths.Root, DateTime.UtcNow);
-            });
+            var groups = await Task.Run(() => _services.Scan(_profile, _dataDir));
             Groups.Clear();
             foreach (var g in groups) Groups.Add(new CleanupGroupViewModel(g, Changed));
             Status = "";
@@ -192,7 +215,7 @@ public sealed partial class CleanupViewModel : ObservableObject
 
         IsBusy = true;
         Status = Loc.T("clean.removing");
-        var (freed, problems) = await Task.Run(() => DiskCleanup.Remove(chosen, eViSTool.Core.Server.RecycleBin.Send));
+        var (freed, problems) = await Task.Run(() => DiskCleanup.Remove(chosen, _services.Trash));
         IsBusy = false;
         HasRecycled |= freed > 0;
         await ScanAsync();
