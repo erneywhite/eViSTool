@@ -1,0 +1,33 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:local="using:eViSTool.Desktop"
+                      xmlns:ctl="using:eViSTool.Desktop.Controls"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      x:Class="eViSTool.Desktop.Dialogs.DuplicateRoleWindow"
+                      x:DataType="vm:DuplicateRoleViewModel"
+                      Title="{local:Tr roles.dupTitle}" Width="444" SizeToContent="Height" CanResize="False">
+    <!-- ширина без рамки: в WPF Width="460" считается вместе с рамкой окна, внутри остаётся 444 -->
+    <StackPanel Margin="24,20,24,22">
+        <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Classes="hint" Text="{local:Tr roles.dupIntro}" FontSize="12" Margin="0,4,0,0" />
+
+        <TextBlock Classes="label" Text="{local:Tr roles.dupCode}" />
+        <TextBlock Classes="hint" Text="{local:Tr roles.dupCodeHint}" Margin="0,2,0,6" />
+        <TextBox Classes="mono clearButton" Text="{Binding Code}" MaxLength="60" ctl:Focus.OnOpen="True" ctl:Focus.SelectAll="True"
+                 AutomationProperties.AutomationId="DuplicateCode" AutomationProperties.Name="{local:Tr roles.dupCode}" />
+        <!-- чем не годится код: пусто, занят, пробелы -->
+        <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+
+        <TextBlock Classes="label" Text="{local:Tr roles.dupName}" />
+        <TextBox Classes="clearButton" Text="{Binding Name}" Margin="0,6,0,0" MaxLength="80"
+                 AutomationProperties.AutomationId="DuplicateName" AutomationProperties.Name="{local:Tr roles.dupName}" />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Classes="primary" Content="{local:Tr roles.dupGo}" IsDefault="True" Command="{Binding GoCommand}" Padding="18,8"
+                    AutomationProperties.AutomationId="DuplicateOk" />
+            <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8"
+                    AutomationProperties.AutomationId="DuplicateCancel" />
+        </StackPanel>
+    </StackPanel>
+</dialogs:DialogWindow>
