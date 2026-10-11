@@ -109,6 +109,17 @@ public sealed partial class AboutViewModel : ObservableObject
         if (AvailableUpdate is not null) UpdateFound?.Invoke();
     }
 
+    /// <summary>
+    /// Принять готовый список новых версий (от новых к старым), как будто его нашла проверка, но без запроса к GitHub и
+    /// без события <see cref="UpdateFound"/>: для снимков окна «Вышла новая версия» и тестов его модели.
+    /// </summary>
+    public void UseReleases(IReadOnlyList<AppRelease> releases)
+    {
+        MissedReleases = releases;
+        OnPropertyChanged(nameof(IsRecommended));
+        AvailableUpdate = releases.FirstOrDefault();
+    }
+
     private bool CanInstall => AvailableUpdate is not null && !IsUpdating;
 
     /// <summary>Скачать, сверить, поставить и предложить перезапуск. Работающий сервер не трогаем.</summary>
