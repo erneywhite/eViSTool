@@ -1,0 +1,70 @@
+<!--
+  Все элементы так, как их пишут в разметке окна, на компилируемых привязках: собралось — значит, строки верные.
+  XamlUsageTests проверяет, что они ещё и работают.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:eViSTool.Desktop.Controls"
+             xmlns:conv="using:eViSTool.Desktop.Converters"
+             xmlns:t="using:eViSTool.Desktop.Tests"
+             x:Class="eViSTool.Desktop.Tests.XamlUsageView"
+             x:DataType="t:UsageModel">
+    <ScrollViewer x:Name="Page" Height="400">
+        <StackPanel>
+            <!-- логотип с буквами под ним: буквы видны, пока картинки нет (грузится, не загрузилась, адреса нет) -->
+            <Grid Width="46" Height="46">
+                <TextBlock x:Name="Initials" Text="{Binding Initials}"
+                           IsVisible="{Binding #Logo.Source, Converter={x:Static ObjectConverters.IsNull}}" />
+                <Image x:Name="Logo" c:RemoteImage.Source="{Binding Logo}" c:RemoteImage.DecodeWidth="92" Stretch="UniformToFill" />
+            </Grid>
+            <TextBlock x:Name="Loading" Text="Загрузка…" IsVisible="{Binding #Logo.(c:RemoteImage.IsLoading)}" />
+            <TextBlock x:Name="Failed" Text="Не загрузилось" IsVisible="{Binding #Logo.(c:RemoteImage.Failed)}" />
+
+            <Ellipse x:Name="Dot" Classes="tone" c:EnumClass.Value="{Binding Tone}" Width="8" Height="8" />
+
+            <RadioButton x:Name="LoadingChip" GroupName="state"
+                         IsChecked="{Binding State, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Loading}" />
+            <RadioButton x:Name="LoadedChip" GroupName="state"
+                         IsChecked="{Binding State, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Loaded}" />
+            <TextBlock x:Name="LoadedPanel" Text="готово"
+                       IsVisible="{Binding State, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Loaded}" />
+
+            <ListBox x:Name="List" ItemsSource="{Binding Items}" c:DoubleTap.Command="{Binding OpenCommand}" Height="100" />
+
+            <TextBox x:Name="NameBox" Text="Мой профиль" c:Focus.OnOpen="True" c:Focus.SelectAll="True" />
+
+            <!-- поле со списком и свободным вводом: объекты в списке, текст поля — их Name -->
+            <ComboBox x:Name="ColorBox" IsEditable="True" ItemsSource="{Binding Colors}" Text="{Binding ColorText}"
+                      TextSearch.TextBinding="{Binding Name, DataType=t:Choice}" c:WheelToParent.IsEnabled="True">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="t:Choice">
+                        <TextBlock Text="{Binding Name}" />
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <!-- без шаблона хватит DisplayMemberBinding (в WPF — DisplayMemberPath) -->
+            <ComboBox x:Name="ChatBox" IsEditable="True" ItemsSource="{Binding Colors}" DisplayMemberBinding="{Binding Name}" />
+
+            <Image x:Name="GameIconImage" Width="24" Height="24"
+                   Source="{Binding IconSearchDirs, Converter={x:Static conv:GameIconConverter.Instance}}" />
+            <TextBlock x:Name="GameLetters" Text="VS"
+                       IsVisible="{Binding #GameIconImage.Source, Converter={x:Static ObjectConverters.IsNull}}" />
+
+            <ItemsControl x:Name="Shots" ItemsSource="{Binding Items}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                        <Border Width="{Binding $parent[ItemsControl].Bounds.Width, Converter={x:Static conv:ScreenshotThumbConverter.Instance}, ConverterParameter=w}"
+                                Height="{Binding $parent[ItemsControl].Bounds.Width, Converter={x:Static conv:ScreenshotThumbConverter.Instance}, ConverterParameter=h}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Border Height="1000" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

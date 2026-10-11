@@ -30,4 +30,9 @@
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- тесты подменяют сеть и папку кэша у RemoteImage -->
+    <InternalsVisibleTo Include="eViSTool.Desktop.Tests" />
+  </ItemGroup>
+
 </Project>
