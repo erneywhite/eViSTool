@@ -1,6 +1,353 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="eViSTool.Desktop.Views.ServerView">
-    <!-- заглушка: экран «Сервер» ещё переносится с окна на WPF -->
-    <TextBlock Text="Экран «Сервер» ещё переносится" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
+             xmlns:vm="using:eViSTool.Presentation.ViewModels"
+             xmlns:srv="using:eViSTool.Core.Server"
+             xmlns:local="using:eViSTool.Desktop"
+             xmlns:views="using:eViSTool.Desktop.Views"
+             xmlns:ctl="using:eViSTool.Desktop.Controls"
+             xmlns:conv="using:eViSTool.Desktop.Converters"
+             x:Class="eViSTool.Desktop.Views.ServerView"
+             x:DataType="vm:ServerViewModel">
+    <UserControl.Styles>
+        <!-- плитка-показатель над консолью -->
+        <Style Selector="Border.tile">
+            <Setter Property="Padding" Value="16,12" />
+            <Setter Property="Margin" Value="0,0,12,0" />
+        </Style>
+        <Style Selector="TextBlock.tileLabel">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+        </Style>
+        <Style Selector="TextBlock.tileValue">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <!-- точка состояния сервера: цвет — от тона (Ellipse.tone в теме), размер крупнее -->
+        <Style Selector="Ellipse.tone.stateDot">
+            <Setter Property="Width" Value="9" />
+            <Setter Property="Height" Value="9" />
+            <Setter Property="Margin" Value="0,0,9,0" />
+        </Style>
+        <!-- кнопки поменьше: шапка консоли и строка про чужой сервер -->
+        <Style Selector="Button.small">
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <!-- консоль: строки плотно, с переносом; выделение — лесное (кисти выделения списков — в теме) -->
+        <Style Selector="ListBox.console ListBoxItem">
+            <Setter Property="Padding" Value="6,1" />
+            <Setter Property="MinHeight" Value="0" />
+        </Style>
+        <!-- цвет строки по смыслу (ConsoleTint): ошибки — розоватые, предупреждения — янтарь, ввод — песок,
+             сообщения eViSTool — дымчато-голубые, чат — зелёный; без оттенка — светлый текст консоли -->
+        <Style Selector="TextBlock.line">
+            <Setter Property="Foreground" Value="#D8DCCF" />
+        </Style>
+        <Style Selector="TextBlock.line.error">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Danger}" />
+        </Style>
+        <Style Selector="TextBlock.line.warning">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
+        </Style>
+        <Style Selector="TextBlock.line.input">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
+        </Style>
+        <Style Selector="TextBlock.line.system">
+            <Setter Property="Foreground" Value="#9FB7C9" />
+        </Style>
+        <Style Selector="TextBlock.line.chat">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Good}" />
+        </Style>
+
+        <!-- поле команды, пока сервер не запущен: как выключенное поле в окне на WPF — полупрозрачные заливка и рамка
+             поверх карточки (Forest.Disabled темы заметно темнее) -->
+        <Style Selector="TextBox.command:disabled /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#0BFFFFFF" />
+            <Setter Property="BorderBrush" Value="#12FFFFFF" />
+        </Style>
+
+        <!-- подсказки команд: пункты не берут фокус (он остаётся в поле ввода) -->
+        <Style Selector="ListBox.suggestions ListBoxItem">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Padding" Value="8,3" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel Margin="10,4,10,0">
+        <!-- ===== не серверный профиль ===== -->
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="520" IsVisible="{Binding !IsServerProfile}">
+            <Border Width="64" Height="64" CornerRadius="14" Background="{DynamicResource Forest.Surface}" BorderBrush="{DynamicResource Forest.Line}"
+                    BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,16">
+                <Path Classes="icon" Data="{StaticResource Icon.Server}" Stroke="{DynamicResource Forest.Accent}" Width="28" Height="28" />
+            </Border>
+            <TextBlock Text="{local:Tr server.notServerTitle}" FontSize="18" FontWeight="SemiBold" TextAlignment="Center" Foreground="{DynamicResource Forest.Text}" />
+            <TextBlock Text="{local:Tr server.notServerHint}" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,0" />
+            <Button Content="{local:Tr server.openSettings}" Command="{Binding OpenSettingsCommand}" HorizontalAlignment="Center" Margin="0,16,0,0" />
+        </StackPanel>
+
+        <DockPanel IsVisible="{Binding IsServerProfile}">
+            <!-- ===== заголовок и управление ===== -->
+            <DockPanel DockPanel.Dock="Top">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                    <Button Command="{Binding OpenServerModsCommand}" Margin="0,0,8,0" ToolTip.Tip="{local:Tr server.serverMods}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Classes="icon" Data="{StaticResource Icon.Mods}" Width="14" Height="14" Margin="0,0,8,0" />
+                            <TextBlock Text="{local:Tr server.serverMods}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding OpenLogsCommand}" Padding="10,8" Margin="0,0,16,0" ToolTip.Tip="{local:Tr server.logs}"
+                            IsVisible="{Binding !IsRemoteProfile}">
+                        <Path Classes="icon" Data="{StaticResource Icon.Folder}" Width="16" Height="16" />
+                    </Button>
+                    <Button Classes="primary" Content="{local:Tr server.start}" Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}"
+                            Padding="18,8" />
+                    <Button Content="{local:Tr server.stop}" Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}" Margin="8,0,0,0" />
+                    <Button Content="{local:Tr server.restart}" Command="{Binding RestartCommand}" IsEnabled="{Binding CanStop}" Margin="8,0,0,0" />
+                    <Button Classes="danger" Content="{local:Tr server.kill}" Command="{Binding KillCommand}" IsEnabled="{Binding CanStop}" Margin="8,0,0,0"
+                            ToolTip.Tip="{local:Tr server.killTip}" />
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock Classes="pageTitle" Text="{local:Tr nav.server}" />
+                    <TextBlock Text="{Binding HeaderSubtitle}" ToolTip.Tip="{Binding DataDir}" Foreground="{DynamicResource Forest.Accent}" FontSize="12"
+                               Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- ===== виды раздела: консоль, игроки, статистика, объявления, serverconfig.json, расписание, удалённый доступ, оповещения ===== -->
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,16,0,0">
+                <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr srvcfg.modeConsole}"
+                             IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Console}"
+                             AutomationProperties.AutomationId="SrvTabConsole" />
+                <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr players.tab}"
+                             IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Players}"
+                             AutomationProperties.AutomationId="SrvTabPlayers" />
+                <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr stats.tab}"
+                             IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Stats}"
+                             AutomationProperties.AutomationId="SrvTabStats" />
+                <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr ann.tab}"
+                             IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Announcements}"
+                             AutomationProperties.AutomationId="SrvTabAnnouncements" />
+                <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15"
+                             IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Config}"
+                             AutomationProperties.Name="{local:Tr srvcfg.modeConfig}" AutomationProperties.AutomationId="SrvTabConfig">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{local:Tr srvcfg.modeConfig}" />
+                        <!-- в конфигурации есть несохранённые правки -->
+                        <Ellipse Width="7" Height="7" Margin="7,2,0,0" VerticalAlignment="Center" Fill="{DynamicResource Forest.Accent}"
+                                 ToolTip.Tip="{local:Tr srvcfg.modified}" IsVisible="{Binding Config.IsDirty}" />
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr sched.tab}"
+                             IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Schedule}"
+                             AutomationProperties.AutomationId="SrvTabSchedule" />
+                <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr remote.tab}"
+                             IsVisible="{Binding !IsRemoteProfile}"
+                             IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Remote}"
+                             AutomationProperties.AutomationId="SrvTabRemote" />
+                <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr srvnotify.tab}"
+                             IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Notify}"
+                             AutomationProperties.AutomationId="SrvTabNotify" />
+            </StackPanel>
+
+            <!-- ===== показатели ===== -->
+            <Grid DockPanel.Dock="Top" Margin="0,18,-12,0" ColumnDefinitions="1.3*,*,*,*" IsVisible="{Binding IsConsoleTab}">
+                <Border Classes="card tile">
+                    <StackPanel>
+                        <TextBlock Classes="tileLabel" Text="{local:Tr server.tileState}" />
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <Ellipse Classes="tone stateDot" ctl:EnumClass.Value="{Binding StateTone}" />
+                            <TextBlock Classes="tileValue" Text="{Binding StateText}" Margin="0" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding StateNote}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0"
+                                   IsVisible="{Binding StateNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Classes="card tile">
+                    <StackPanel>
+                        <TextBlock Classes="tileLabel" Text="{local:Tr server.tileUptime}" />
+                        <TextBlock Classes="tileValue" Text="{Binding UptimeText}" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Classes="card tile">
+                    <StackPanel>
+                        <TextBlock Classes="tileLabel" Text="{local:Tr server.tileMemory}" />
+                        <TextBlock Classes="tileValue" Text="{Binding MemoryText}" />
+                        <!-- номер процесса сервера — мелко: нужен редко (диспетчер задач) -->
+                        <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0">
+                            <Run Text="PID" /><Run Text=" " /><Run Text="{Binding PidText, Mode=OneWay}" />
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+                <!-- кто на сервере: число, имена; подсказка — кто с какого времени -->
+                <Border Grid.Column="3" Classes="card tile" ToolTip.Tip="{Binding PlayersTip}" AutomationProperties.AutomationId="SrvPlayers">
+                    <StackPanel>
+                        <TextBlock Classes="tileLabel" Text="{local:Tr server.tilePlayers}" />
+                        <TextBlock Classes="tileValue" Text="{Binding PlayersText}" />
+                        <TextBlock Text="{Binding PlayerNames}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0"
+                                   TextTrimming="CharacterEllipsis" IsVisible="{Binding PlayerNames, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ===== сервер, запущенный не нами ===== -->
+            <Border DockPanel.Dock="Top" Classes="warning" Margin="0,14,0,0" IsVisible="{Binding HasForeign}">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center">
+                        <Button Classes="small" Content="{local:Tr server.stopForeign}" Command="{Binding StopForeignCommand}" Padding="12,5"
+                                ToolTip.Tip="{local:Tr server.stopForeignTip}" />
+                        <Button Classes="small danger" Content="{local:Tr server.kill}" Command="{Binding KillForeignCommand}" Padding="12,5" Margin="8,0,0,0" />
+                    </StackPanel>
+                    <Path Classes="icon" DockPanel.Dock="Left" Data="{StaticResource Icon.Warning}" Stroke="{DynamicResource Forest.Warn}"
+                          VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <TextBlock Text="{Binding ForeignText}" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource Forest.Warn}" FontSize="13" />
+                </DockPanel>
+            </Border>
+
+            <!-- ===== ошибка последнего действия ===== -->
+            <TextBlock DockPanel.Dock="Top" Text="{Binding ErrorText}" Foreground="{DynamicResource Forest.Danger}" TextWrapping="Wrap" Margin="0,12,0,0"
+                       IsVisible="{Binding ErrorText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <!-- агент старее окна: у удалённого — кнопка «Обновить там», ход обновления — в той же строке -->
+            <DockPanel DockPanel.Dock="Top" Margin="0,12,0,0" IsVisible="{Binding AgentNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <Button DockPanel.Dock="Right" Command="{Binding UpdateRemoteAgentCommand}" Margin="16,0,0,0" Padding="12,6" VerticalAlignment="Center"
+                        IsVisible="{Binding CanUpdateRemoteAgent}" AutomationProperties.AutomationId="UpdateRemoteAgent">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Classes="icon" Data="{StaticResource Icon.Download}" Width="13" Height="13" Margin="0,0,7,0" />
+                        <TextBlock Text="{local:Tr selfupd.button}" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Text="{Binding AgentNote}" Foreground="{DynamicResource Forest.Warn}" TextWrapping="Wrap" VerticalAlignment="Center"
+                           AutomationProperties.AutomationId="AgentNote" />
+            </DockPanel>
+
+            <!-- остаток места: консоль или вкладка раздела; все живут всё время, видна одна — по Tab -->
+            <Panel>
+                <!-- ===== конфигурация (вместо плиток и консоли) ===== -->
+                <Panel IsVisible="{Binding IsConfigTab}">
+                    <views:ServerConfigView DataContext="{Binding Config}" />
+                </Panel>
+
+                <!-- ===== игроки ===== -->
+                <Panel IsVisible="{Binding IsPlayersTab}">
+                    <views:ServerPlayersTab DataContext="{Binding Players}" />
+                </Panel>
+
+                <!-- ===== статистика ===== -->
+                <Panel IsVisible="{Binding IsStatsTab}">
+                    <views:ServerStatsTab DataContext="{Binding Stats}" />
+                </Panel>
+
+                <!-- ===== объявления ===== -->
+                <Panel IsVisible="{Binding IsAnnouncementsTab}">
+                    <views:ServerAnnouncementsTab DataContext="{Binding Announcements}" />
+                </Panel>
+
+                <!-- ===== оповещения ===== -->
+                <Panel IsVisible="{Binding IsNotifyTab}">
+                    <views:ServerNotifyTab DataContext="{Binding Notify}" />
+                </Panel>
+
+                <!-- ===== удалённый доступ ===== -->
+                <Panel IsVisible="{Binding IsRemoteTab}">
+                    <views:ServerRemoteView DataContext="{Binding Remote}" />
+                </Panel>
+
+                <!-- ===== расписание: резервные копии ===== -->
+                <Panel IsVisible="{Binding IsScheduleTab}">
+                    <views:ServerScheduleView DataContext="{Binding Schedule}" />
+                </Panel>
+
+                <!-- ===== консоль ===== -->
+                <Border Classes="card" Margin="0,14,0,12" ClipToBounds="True" IsVisible="{Binding IsConsoleTab}">
+                    <DockPanel>
+                        <DockPanel DockPanel.Dock="Top" Margin="16,10,10,8">
+                            <Button DockPanel.Dock="Right" Classes="small" Content="{local:Tr server.clear}" Command="{Binding ClearConsoleCommand}" />
+                            <Button DockPanel.Dock="Right" Classes="small" Content="{local:Tr cmds.button}" Command="{Binding ShowCommandsCommand}"
+                                    Margin="0,0,8,0" ToolTip.Tip="{local:Tr cmds.buttonTip}" AutomationProperties.AutomationId="SrvCommands" />
+                            <!-- копия мира сейчас — та же команда, что на вкладке «Расписание» -->
+                            <Button DockPanel.Dock="Right" Classes="small" Command="{Binding Schedule.BackupNowCommand}" Margin="0,0,8,0"
+                                    ToolTip.Tip="{local:Tr sched.nowTip}" ToolTip.ShowOnDisabled="True" AutomationProperties.AutomationId="SrvBackupNow">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Classes="icon" Data="{StaticResource Icon.Download}" Width="12" Height="12" Margin="0,0,7,0" />
+                                    <TextBlock Text="{local:Tr server.backupNow}" />
+                                </StackPanel>
+                            </Button>
+                            <TextBlock DockPanel.Dock="Left" Text="{local:Tr server.console}" Foreground="{DynamicResource Forest.Text}" FontWeight="SemiBold"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Schedule.StatusText}" FontSize="12" Foreground="{DynamicResource Forest.Accent}" VerticalAlignment="Center"
+                                       Margin="16,0,16,0" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Schedule.StatusText}" />
+                        </DockPanel>
+
+                        <!-- ввод команды: Enter — отправить, ↑/↓ — история (или подсказки, если они открыты), Tab — дописать команду -->
+                        <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="10">
+                            <DockPanel>
+                                <!-- что ждёт набранная команда: «/tp <source> <target> — Teleport…» -->
+                                <TextBlock DockPanel.Dock="Bottom" Classes="mono" Text="{Binding ArgsHint}" FontSize="11"
+                                           Foreground="{DynamicResource Forest.Muted}" Margin="29,6,0,0" TextTrimming="CharacterEllipsis"
+                                           ToolTip.Tip="{Binding ArgsHint}" IsVisible="{Binding ArgsHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                           AutomationProperties.AutomationId="SrvArgsHint" />
+                                <Button DockPanel.Dock="Right" Classes="primary" Content="{local:Tr server.send}" Command="{Binding SendCommandCommand}"
+                                        IsEnabled="{Binding CanCommand}" Margin="8,0,0,0" />
+                                <Panel>
+                                    <TextBox x:Name="CommandBox" Classes="mono command" Text="{Binding CommandText}" IsEnabled="{Binding CanCommand}"
+                                             VerticalContentAlignment="Center" Padding="28,7,10,7" ToolTip.Tip="{local:Tr server.commandTip}"
+                                             AutomationProperties.AutomationId="SrvCommandBox" />
+                                    <!-- подсказки команд — над полем: оно внизу окна; Popup едет за полем сам -->
+                                    <Popup x:Name="SuggestionPopup" IsOpen="{Binding ShowSuggestions}" PlacementTarget="{Binding #CommandBox}"
+                                           Placement="TopEdgeAlignedLeft" VerticalOffset="-4" IsLightDismissEnabled="False">
+                                        <Border Background="{DynamicResource Forest.Surface}" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="1"
+                                                CornerRadius="6" Padding="4" MinWidth="{Binding #CommandBox.Bounds.Width}" MaxWidth="900">
+                                            <ListBox x:Name="SuggestionList" Classes="suggestions" ItemsSource="{Binding Suggestions}"
+                                                     SelectedItem="{Binding SelectedSuggestion}" Background="Transparent" BorderThickness="0" Focusable="False"
+                                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.AutomationId="SrvSuggestions">
+                                                <ListBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="srv:ServerCommand">
+                                                        <DockPanel>
+                                                            <TextBlock DockPanel.Dock="Left" Classes="mono" Text="{Binding Usage}" FontSize="12"
+                                                                       Foreground="{DynamicResource Forest.Text}" />
+                                                            <TextBlock Text="{Binding Description}" FontSize="11" Foreground="{DynamicResource Forest.Muted}"
+                                                                       Margin="14,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                        </DockPanel>
+                                                    </DataTemplate>
+                                                </ListBox.ItemTemplate>
+                                            </ListBox>
+                                        </Border>
+                                    </Popup>
+                                    <TextBlock Text="›" FontSize="16" Foreground="{DynamicResource Forest.Accent}" Margin="12,0,0,1" VerticalAlignment="Center"
+                                               IsHitTestVisible="False" />
+                                    <!-- подсказка в пустом поле -->
+                                    <TextBlock Classes="mono" Text="{local:Tr server.commandPlaceholder}" Foreground="{DynamicResource Forest.Muted}" FontSize="12"
+                                               Margin="29,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" Opacity="0.8"
+                                               IsVisible="{Binding CommandText, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                                </Panel>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Background="#151C17" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="6,4">
+                            <!-- строки — виртуализированный список с переносом; выделение — несколько строк (Ctrl, Shift) -->
+                            <ListBox x:Name="ConsoleList" Classes="console" ItemsSource="{Binding Lines}" Background="Transparent" BorderThickness="0"
+                                     FontFamily="{DynamicResource Forest.Mono}" FontSize="12.5" SelectionMode="Multiple"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="{local:Tr server.copy}" Command="{Binding CopyLinesCommand}"
+                                                  CommandParameter="{Binding #ConsoleList.SelectedItems}" />
+                                    </ContextMenu>
+                                </ListBox.ContextMenu>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ConsoleLineViewModel">
+                                        <TextBlock Classes="line" ctl:EnumClass.Value="{Binding Tint}" Text="{Binding Text}" TextWrapping="Wrap"
+                                                   Opacity="{Binding Opacity}" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+                    </DockPanel>
+                </Border>
+            </Panel>
+        </DockPanel>
+    </Panel>
 </UserControl>
