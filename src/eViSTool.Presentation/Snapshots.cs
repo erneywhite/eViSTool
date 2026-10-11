@@ -13,7 +13,7 @@ public sealed record SnapshotRequest(string Screen, string OutPath, int Width, i
 /// данные и одну и ту же навигацию отсюда — снимки сравнимы один к одному.
 /// Формат: <c>screen=server.config.world;out=C:\snap\a.png;size=1400x860;wait=5;profile=Сервер</c> (size, wait, profile —
 /// необязательно).
-/// Экраны: mods, mods.history, mods.card, catalog, modconfig, settings, about, server[.console|players|stats|announcements|
+/// Экраны: mods, mods.history, mods.card, catalog, catalog.card, modconfig, settings, about, server[.console|players|stats|announcements|
 /// config[.general|world|roles|advanced]|schedule|remote|notify].
 /// </summary>
 public static class Snapshots
@@ -58,6 +58,7 @@ public static class Snapshots
         };
         if (path[0] == "mods" && path.Length > 1 && path[1] == "history") main.Mods.Filter = ModFilter.History;
         if (path[0] == "mods" && path.Length > 1 && path[1] == "card") main.Mods.Selected = main.Mods.View.Items.FirstOrDefault(); // карточка первого мода
+        if (path[0] == "catalog" && path.Length > 1 && path[1] == "card") main.Catalog.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(CatalogViewModel.Results) && main.Catalog.Selected is null) main.Catalog.Selected = main.Catalog.Results.FirstOrDefault(); }; // карточка первого найденного: список придёт из сети позже
         if (path[0] != "server" || path.Length < 2) return;
         main.Server.Tab = Enum.Parse<ServerTab>(path[1], ignoreCase: true);
         if (main.Server.Tab == ServerTab.Config && path.Length > 2)

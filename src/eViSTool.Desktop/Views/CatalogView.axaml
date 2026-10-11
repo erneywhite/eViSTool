@@ -1,6 +1,296 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="eViSTool.Desktop.Views.CatalogView">
-    <!-- заглушка: экран «Каталог модов» ещё переносится с окна на WPF -->
-    <TextBlock Text="Экран «Каталог модов» ещё переносится" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
+             xmlns:vm="using:eViSTool.Presentation.ViewModels"
+             xmlns:local="using:eViSTool.Desktop"
+             xmlns:ctl="using:eViSTool.Desktop.Controls"
+             xmlns:conv="using:eViSTool.Desktop.Converters"
+             x:Class="eViSTool.Desktop.Views.CatalogView"
+             x:DataType="vm:CatalogViewModel">
+    <UserControl.Styles>
+        <!-- фильтры над списком: ровной сеткой, во всю ширину ячейки -->
+        <Style Selector="ComboBox.filter">
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+
+        <!-- плашка «установлен» / «доступен» в плитке -->
+        <Style Selector="Border.stateBadge">
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="7,1" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Background" Value="{DynamicResource Forest.Raised}" />
+        </Style>
+        <Style Selector="Border.stateBadge.installed">
+            <Setter Property="Background" Value="{DynamicResource Forest.Selected}" />
+        </Style>
+        <Style Selector="TextBlock.stateBadgeText">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+        </Style>
+        <Style Selector="TextBlock.stateBadgeText.installed">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Good}" />
+        </Style>
+
+        <!-- строка «ключ — значение» в карточке -->
+        <Style Selector="TextBlock.cardKey">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="0,4,12,4" />
+        </Style>
+        <Style Selector="TextBlock.cardValue">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="0,4,0,4" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="TextAlignment" Value="Right" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <!-- прокрутка карточки: полоса тонкая, как у Fluent, но место под неё оставлено, а не поверх содержимого (как в окне на WPF) -->
+        <Style Selector="ScrollViewer.reserveBar /template/ ScrollContentPresenter#PART_ContentPresenter">
+            <Setter Property="Grid.ColumnSpan" Value="1" />
+        </Style>
+
+        <!-- кнопка поменьше: «Установить эту» в списке версий -->
+        <Style Selector="Button.small">
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+    </UserControl.Styles>
+
+    <DockPanel Margin="10,4,10,0">
+        <!-- ===== заголовок ===== -->
+        <DockPanel DockPanel.Dock="Top">
+            <Button DockPanel.Dock="Right" VerticalAlignment="Top" Command="{Binding RefreshCommand}" ToolTip.Tip="{local:Tr catalog.refreshTip}"
+                    IsEnabled="{Binding !IsLoading}">
+                <StackPanel Orientation="Horizontal">
+                    <Path Classes="icon" Data="{StaticResource Icon.Refresh}" Width="14" Height="14" Margin="0,0,8,0" />
+                    <TextBlock Text="{local:Tr catalog.refresh}" />
+                </StackPanel>
+            </Button>
+            <StackPanel>
+                <TextBlock Classes="pageTitle" Text="{local:Tr nav.catalog}" />
+                <TextBlock Text="{Binding HeaderSubtitle}" Foreground="{DynamicResource Forest.Accent}" FontSize="12" Margin="0,4,0,0"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </DockPanel>
+
+        <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1" Margin="0,14,0,0" />
+
+        <!-- ===== строка статуса ===== -->
+        <TextBlock DockPanel.Dock="Bottom" Margin="0,8,0,8" Text="{Binding StatusText}" Foreground="{DynamicResource Forest.Muted}" FontSize="12"
+                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding StatusText}" />
+
+        <Grid x:Name="Split" Margin="0,14,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="360" />
+                <ColumnDefinition Width="14" />
+                <!-- ширина карточки — из настроек (CatalogViewModel.DetailsWidth), её ставит и сохраняет код окна -->
+                <ColumnDefinition Width="760" MinWidth="340" />
+            </Grid.ColumnDefinitions>
+
+            <!-- разделитель: тяни, чтобы сделать карточку шире/уже (ширина запоминается) -->
+            <GridSplitter Grid.Column="1" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext"
+                          ToolTip.Tip="{local:Tr catalog.splitterTip}" DragCompleted="Splitter_DragCompleted" />
+
+            <!-- ===== поиск, фильтры, список ===== -->
+            <DockPanel>
+                <!-- поле поиска с лупой и подсказкой -->
+                <TextBox DockPanel.Dock="Top" Classes="search" Text="{Binding Search}" PlaceholderText="{local:Tr catalog.searchPlaceholder}"
+                         ToolTip.Tip="{local:Tr catalog.searchTip}">
+                    <TextBox.InnerLeftContent>
+                        <Path Classes="icon searchIcon" Data="{StaticResource Icon.Search}" />
+                    </TextBox.InnerLeftContent>
+                </TextBox>
+
+                <!-- фильтры ровной сеткой: три в ряд -->
+                <UniformGrid DockPanel.Dock="Top" Columns="3" Margin="0,12,-8,4">
+                    <ComboBox Classes="filter" ItemsSource="{Binding Branches}" SelectedItem="{Binding SelectedBranch}"
+                              ToolTip.Tip="{local:Tr catalog.branchTip}" />
+                    <ComboBox Classes="filter" ItemsSource="{Binding Tags}" SelectedItem="{Binding SelectedTag}" />
+                    <ComboBox Classes="filter" ItemsSource="{Binding Sides}" SelectedItem="{Binding SelectedSide}" />
+                    <ComboBox Classes="filter" ItemsSource="{Binding InstallFilters}" SelectedItem="{Binding SelectedInstallFilter}" />
+                    <ComboBox Classes="filter" ItemsSource="{Binding Sorts}" SelectedItem="{Binding SelectedSort}" />
+                </UniformGrid>
+
+                <!-- плитки: список виртуализирован — в модбазе тысячи модов; выбранная плитка прокручивается в поле зрения
+                     сама (AutoScrollToSelectedItem), в том числе когда мод выбрали из «Моих модов» -->
+                <ListBox x:Name="ModsList" ItemsSource="{Binding Results}" SelectedItem="{Binding Selected}"
+                         ItemContainerTheme="{StaticResource Forest.CardItem}" Background="Transparent" BorderThickness="0" Padding="0"
+                         AutoScrollToSelectedItem="True" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CatalogItemViewModel">
+                            <DockPanel>
+                                <!-- логотип; под ним буквы — пока картинки нет, она грузится или не загрузилась -->
+                                <Border DockPanel.Dock="Left" Width="46" Height="46" CornerRadius="6" Margin="0,0,14,0" ClipToBounds="True"
+                                        Background="{DynamicResource Forest.Raised}" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="1"
+                                        VerticalAlignment="Top">
+                                    <Panel>
+                                        <TextBlock IsVisible="{Binding #Logo1.Source, Converter={x:Static ObjectConverters.IsNull}}" Text="{Binding Initials}"
+                                                   FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Image x:Name="Logo1" ctl:RemoteImage.Source="{Binding Logo}" ctl:RemoteImage.DecodeWidth="92" Stretch="UniformToFill"
+                                               RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                    </Panel>
+                                </Border>
+                                <Border DockPanel.Dock="Right" Classes="stateBadge" Classes.installed="{Binding IsInstalled}" Margin="10,0,0,0">
+                                    <TextBlock Classes="stateBadgeText" Classes.installed="{Binding IsInstalled}" Text="{Binding InstalledText}" />
+                                </Border>
+                                <StackPanel>
+                                    <TextBlock TextTrimming="CharacterEllipsis">
+                                        <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" FontSize="14" Foreground="{DynamicResource Forest.Text}" /><Run Text=" " /><Run Text="{Binding Author, Mode=OneWay}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" />
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding Summary}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap"
+                                               MaxLines="2" TextTrimming="CharacterEllipsis" Margin="0,3,0,0" />
+                                    <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,6,0,0" TextTrimming="CharacterEllipsis">
+                                        <Run Text="{Binding Tag, Mode=OneWay}" Foreground="{DynamicResource Forest.Accent}" /><Run Text="     " /><Run Text="{Binding Stats, Mode=OneWay}" /><Run Text="     " /><Run Text="{Binding NoVersionText, Mode=OneWay}" Foreground="{DynamicResource Forest.Warn}" />
+                                    </TextBlock>
+                                </StackPanel>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+
+            <!-- ===== инспектор выбранного мода ===== -->
+            <Border Grid.Column="2" Classes="card">
+                <Panel>
+                    <TextBlock Text="{local:Tr catalog.pickMod}" Foreground="{DynamicResource Forest.Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsVisible="{Binding Details, Converter={x:Static ObjectConverters.IsNull}}" />
+
+                    <ScrollViewer Classes="reserveBar" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                  IsVisible="{Binding Details, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <ContentControl Content="{Binding Details}">
+                            <ContentControl.ContentTemplate>
+                                <DataTemplate x:DataType="vm:ModDetailsViewModel">
+                                    <StackPanel>
+                                        <!-- шапка: логотип или буквы, тег -->
+                                        <Border Background="{DynamicResource Forest.Raised}" CornerRadius="8,8,0,0" Height="150" ClipToBounds="True">
+                                            <Panel>
+                                                <!-- буквы под картинкой: логотипа нет, он грузится или не загрузился — видно их -->
+                                                <TextBlock IsVisible="{Binding #Logo2.Source, Converter={x:Static ObjectConverters.IsNull}}" Text="{Binding Initials}"
+                                                           FontSize="40" FontWeight="Bold" Foreground="{DynamicResource Forest.Accent}"
+                                                           Margin="20,0,0,0" VerticalAlignment="Center" Opacity="0.85" />
+                                                <!-- логотип целиком, по краям — он же, размытый. Размытый — во всю ширину и прижат к верху,
+                                                     низ обрезает шапка (как в окне на WPF): Image у Avalonia обрезает UniformToFill по центру
+                                                     своих границ, а в StackPanel её высоту ничто не ограничивает -->
+                                                <StackPanel>
+                                                    <Image ctl:RemoteImage.Source="{Binding Logo}" Stretch="UniformToFill" Opacity="0.35">
+                                                        <Image.Effect>
+                                                            <BlurEffect Radius="24" />
+                                                        </Image.Effect>
+                                                    </Image>
+                                                </StackPanel>
+                                                <Image x:Name="Logo2" ctl:RemoteImage.Source="{Binding Logo}" Stretch="Uniform"
+                                                       RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                                <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,12,0" Padding="8,2" CornerRadius="4"
+                                                        Background="#CC19231D" IsVisible="{Binding Tag, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                    <TextBlock Text="{Binding Tag}" FontSize="11" Foreground="{DynamicResource Forest.Accent}" />
+                                                </Border>
+                                            </Panel>
+                                        </Border>
+
+                                        <StackPanel Margin="18,14,18,16">
+                                            <TextBlock Text="{Binding Name}" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Author}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0" />
+
+                                            <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1" Margin="0,14,0,0">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="CatalogTab" Content="{local:Tr mcard.tabOverview}"
+                                                                 IsChecked="{Binding !IsVersionsTab, Mode=OneWay}" />
+                                                    <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="CatalogTab" Content="{local:Tr mcard.tabVersions}"
+                                                                 IsChecked="{Binding IsVersionsTab}" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- ===== «Обзор» ===== -->
+                                            <StackPanel IsVisible="{Binding !IsVersionsTab}">
+                                                <Grid Margin="0,12,0,0" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                                                    <TextBlock Grid.Row="0" Classes="cardKey" Text="{local:Tr mcard.compat}" />
+                                                    <TextBlock Grid.Row="0" Grid.Column="1" Classes="cardValue" Text="{Binding Compatibility}" />
+                                                    <TextBlock Grid.Row="1" Classes="cardKey" Text="{local:Tr mcard.installed}" />
+                                                    <TextBlock Grid.Row="1" Grid.Column="1" Classes="cardValue mono" Text="{Binding InstalledVersion, TargetNullValue=—}" />
+                                                    <TextBlock Grid.Row="2" Classes="cardKey" Text="{local:Tr mcard.side}" />
+                                                    <TextBlock Grid.Row="2" Grid.Column="1" Classes="cardValue" Text="{Binding Side}" />
+                                                    <TextBlock Grid.Row="3" Classes="cardKey" Text="{local:Tr catalog.popularity}" />
+                                                    <TextBlock Grid.Row="3" Grid.Column="1" Classes="cardValue" Text="{Binding Stats}" />
+                                                </Grid>
+
+                                                <Button Classes="primary" Margin="0,14,0,0" HorizontalAlignment="Stretch"
+                                                        Command="{Binding InstallCommand}" IsEnabled="{Binding CanInstall}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Path Classes="icon" Data="{StaticResource Icon.Download}" Width="14" Height="14" Margin="0,0,8,0" />
+                                                        <TextBlock Text="{Binding InstallText}" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <WrapPanel Margin="0,12,0,0">
+                                                    <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr mcard.modDb}" Margin="0,0,14,4"
+                                                            Command="{Binding OpenPageCommand}" />
+                                                </WrapPanel>
+
+                                                <!-- скриншоты и описание -->
+                                                <ItemsControl ItemsSource="{Binding Screenshots}" Margin="0,14,0,0">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <WrapPanel />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="x:String">
+                                                            <Button Padding="0" Margin="0,0,6,6" MinHeight="0" ToolTip.Tip="{local:Tr card.screenshotTip}"
+                                                                    Command="{Binding $parent[ItemsControl].((vm:ModDetailsViewModel)DataContext).OpenScreenshotCommand}"
+                                                                    CommandParameter="{Binding}">
+                                                                <Image ctl:RemoteImage.Source="{Binding}" ctl:RemoteImage.DecodeWidth="400" Stretch="UniformToFill"
+                                                                       RenderOptions.BitmapInterpolationMode="HighQuality"
+                                                                       Width="{Binding $parent[ItemsControl].Bounds.Width, Converter={x:Static conv:ScreenshotThumbConverter.Instance}, ConverterParameter=w}"
+                                                                       Height="{Binding $parent[ItemsControl].Bounds.Width, Converter={x:Static conv:ScreenshotThumbConverter.Instance}, ConverterParameter=h}" />
+                                                            </Button>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <TextBlock Text="{local:Tr mcard.about}" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" FontSize="13" Margin="0,10,0,0" />
+                                                <TextBlock Text="{Binding Description}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Forest.Muted}" Margin="0,6,0,0" />
+                                            </StackPanel>
+
+                                            <!-- ===== «Версии» ===== -->
+                                            <StackPanel IsVisible="{Binding IsVersionsTab}" Margin="0,12,0,0">
+                                                <TextBlock Text="{Binding VersionsStatus}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap"
+                                                           Margin="0,0,0,8" IsVisible="{Binding VersionsStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                                <ItemsControl ItemsSource="{Binding Versions}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:VersionRowViewModel">
+                                                            <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1" Padding="0,9">
+                                                                <DockPanel>
+                                                                    <Button DockPanel.Dock="Right" Classes="small" Content="{local:Tr mcard.installThis}" VerticalAlignment="Center"
+                                                                            Command="{Binding $parent[ItemsControl].((vm:ModDetailsViewModel)DataContext).InstallVersionCommand}"
+                                                                            CommandParameter="{Binding}" IsVisible="{Binding !IsInstalled}" />
+                                                                    <Border DockPanel.Dock="Right" CornerRadius="4" Padding="8,2" VerticalAlignment="Center"
+                                                                            Background="{DynamicResource Forest.Selected}" IsVisible="{Binding IsInstalled}">
+                                                                        <TextBlock Text="{local:Tr mcard.installedBadge}" FontSize="11" Foreground="{DynamicResource Forest.Good}" />
+                                                                    </Border>
+                                                                    <StackPanel VerticalAlignment="Center">
+                                                                        <TextBlock>
+                                                                            <Run Text="{Binding Version, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" FontSize="13" Foreground="{DynamicResource Forest.Text}" /><Run Text=" " /><Run Text="{Binding PreText, Mode=OneWay}" FontSize="11" Foreground="{DynamicResource Forest.Warn}" />
+                                                                        </TextBlock>
+                                                                        <TextBlock Text="{Binding Meta}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2,8,0" />
+                                                                    </StackPanel>
+                                                                </DockPanel>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ContentControl.ContentTemplate>
+                        </ContentControl>
+                    </ScrollViewer>
+                </Panel>
+            </Border>
+        </Grid>
+    </DockPanel>
 </UserControl>
