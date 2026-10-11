@@ -26,7 +26,7 @@ public sealed class DatesTests
             Assert.Equal("16:58", Dates.Clock(t));
             Assert.Equal("11.10", Dates.DayMonth(t));
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
-            Assert.Equal("4:58 PM", Dates.Clock(t));
+            Assert.Equal("4:58 PM", Spaces(Dates.Clock(t))); // ICU на Linux ставит перед PM узкий неразрывный пробел
             Assert.Equal("10/11", Dates.DayMonth(t));
         }
         finally
@@ -34,6 +34,8 @@ public sealed class DatesTests
             CultureInfo.CurrentCulture = saved;
         }
     }
+
+    private static string Spaces(string text) => text.Replace('\u202F', ' ').Replace('\u00A0', ' ');
 
     [Theory]
     [InlineData("ru", 2, 3, 5, 7, "2 д 3 ч 05 мин")]
