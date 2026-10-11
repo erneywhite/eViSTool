@@ -177,6 +177,17 @@ public sealed partial class ServerViewModel : ObservableObject
         if (_client is { } client && CanCommand) _ = client.CommandAsync("/help");
     }
 
+    /// <summary>
+    /// Задать список команд сервера (обычно его присылает агент в ответ на /help, см. <see cref="LoadCommandsAsync"/>):
+    /// подсказки в консоли и окно «Команды» обновляются. Нужен тестам и снимкам окна, где агента нет.
+    /// </summary>
+    public void SetCommands(IReadOnlyList<ServerCommand> list)
+    {
+        Commands = list;
+        OnPropertyChanged(nameof(Commands));
+        if (!_quietText) UpdateSuggestions(CommandText);
+    }
+
     private async Task LoadCommandsAsync(AgentClient client)
     {
         try
