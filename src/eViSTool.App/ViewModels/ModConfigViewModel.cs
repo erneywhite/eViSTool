@@ -313,10 +313,21 @@ public sealed partial class ModConfigViewModel : ObservableObject
         switch (Dialogs.Ask(Loc.T("mcfg.askSave", row.File.FileName), MessageBoxButton.YesNoCancel))
         {
             case MessageBoxResult.Yes:
-                // уйти можно только после записи: ждём её (у удалённого — короткий запрос к агенту)
+                // уйти можно только после записи: ждём её на месте, но не дольше 15 секунд (агент недоступен —
+                // ошибка, а не зависшее окно). Ошибку показываем здесь же: из фоновой задачи нельзя обратиться к окну,
+                // пока оно само её ждёт, — это была бы взаимная блокировка
                 var (text, stamp) = (Text, _loadedChangedUtc);
-                var content = Task.Run(() => SaveCoreAsync(row, text, stamp, interactive: false)).GetAwaiter().GetResult();
-                return content is not null && Finish(row, text, content);
+                try
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                    var content = Task.Run(() => SaveCoreAsync(row, text, stamp, interactive: false, cts.Token)).GetAwaiter().GetResult();
+                    return content is not null && Finish(row, text, content);
+                }
+                catch (Exception ex) when (IsExpected(ex))
+                {
+                    Dialogs.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, ex.Message));
+                    return false;
+                }
             case MessageBoxResult.No:
                 _loadedText = Text; // отказались — больше не спрашиваем
                 return true;
@@ -347,23 +358,27 @@ public sealed partial class ModConfigViewModel : ObservableObject
     /// Записать. Файл поменяли с момента открытия — спросить, перезаписать ли (interactive = false — уходим с файла:
     /// перезаписываем, решение «сохранить» уже принято). Ошибка — предупреждение, null.
     /// </summary>
-    private async Task<ModConfigContent?> SaveCoreAsync(ModConfigRow row, string text, DateTime? stamp, bool interactive)
+    /// <param name="interactive">
+    /// Из окна (кнопка «Сохранить»): спрашивает и показывает ошибку само. Иначе — без вопросов, ошибка уходит вызывающему.
+    /// </param>
+    private async Task<ModConfigContent?> SaveCoreAsync(ModConfigRow row, string text, DateTime? stamp, bool interactive,
+        CancellationToken ct = default)
     {
         if (_source is not { } source) return null;
         try
         {
-            var result = await source.SaveAsync(new ModConfigSaveRequest(row.File.RelativePath, text, stamp));
+            var result = await source.SaveAsync(new ModConfigSaveRequest(row.File.RelativePath, text, stamp), ct);
             if (result.Changed)
             {
                 if (interactive && Dialogs.Ask(Loc.T("mcfg.changedOutside", row.File.FileName), MessageBoxButton.YesNo) != MessageBoxResult.Yes)
                     return null;
-                result = await source.SaveAsync(new ModConfigSaveRequest(row.File.RelativePath, text, null));
+                result = await source.SaveAsync(new ModConfigSaveRequest(row.File.RelativePath, text, null), ct);
             }
             return result.Content;
         }
-        catch (Exception ex) when (IsExpected(ex))
+        catch (Exception ex) when (interactive && IsExpected(ex))
         {
-            Application.Current?.Dispatcher.Invoke(() => Dialogs.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, ex.Message)));
+            Dialogs.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, ex.Message));
             return null;
         }
     }

@@ -17,7 +17,8 @@ using Newtonsoft.Json.Linq;
 namespace eViSTool.App.ViewModels;
 
 /// <summary>Что с файлом конфига: ещё не читали / файла нет / не читается / загружен.</summary>
-public enum ConfigLoadState { NotLoaded, Missing, Failed, Loaded }
+/// <summary>Состояние файла в редакторе; Loading — ждём конфиг от удалённого агента (окно при этом не замирает).</summary>
+public enum ConfigLoadState { NotLoaded, Loading, Missing, Failed, Loaded }
 
 /// <summary>Вкладки редактора.</summary>
 public enum ConfigTab { General, World, Roles, Advanced }
@@ -264,13 +265,16 @@ public sealed partial class ServerConfigViewModel : ObservableObject
 
     private AgentClient RemoteClient => _remote?.Invoke() ?? throw new InvalidOperationException(Loc.T("server.stateOffline"));
 
+    /// <summary>Сколько ждать удалённого агента: конфиг — несколько килобайт по локальной сети.</summary>
+    private static readonly TimeSpan RemoteTimeout = TimeSpan.FromSeconds(15);
+
     /// <summary>
-    /// Запрос к удалённому агенту из синхронного кода редактора: конфиг — несколько килобайт по локальной сети,
-    /// ждём не дольше 15 секунд (связи нет — ошибка, а не зависшее окно).
+    /// Запрос к удалённому агенту с ожиданием на месте — только там, где ответ нужен сразу (сохранение при уходе с
+    /// профиля или закрытии окна). Обычная загрузка и «Сохранить» идут асинхронно и окно не держат.
     /// </summary>
     private static T Sync<T>(Func<CancellationToken, Task<T>> call)
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        using var cts = new CancellationTokenSource(RemoteTimeout);
         return Task.Run(() => call(cts.Token)).GetAwaiter().GetResult();
     }
 
@@ -286,11 +290,20 @@ public sealed partial class ServerConfigViewModel : ObservableObject
         _remoteWorldExists = file.WorldExists;
     }
 
-    /// <summary>Отправить документ удалённому агенту. false — файл на сервере уже другой, ничего не записано.</summary>
-    private bool UploadRemote(ServerConfigDocument doc, bool force)
+    /// <summary>
+    /// Отправить документ удалённому агенту. false — файл на сервере уже другой, ничего не записано.
+    /// <paramref name="blocking"/> — ждать на месте (задача тогда уже завершена).
+    /// </summary>
+    private async Task<bool> UploadRemoteAsync(ServerConfigDocument doc, bool force, bool blocking)
     {
-        var text = doc.Root.ToString(Newtonsoft.Json.Formatting.Indented);
-        var result = Sync(ct => RemoteClient.SaveConfigAsync(new ConfigSaveRequest(text, _remoteStamp, force), ct));
+        var request = new ConfigSaveRequest(doc.Root.ToString(Newtonsoft.Json.Formatting.Indented), _remoteStamp, force);
+        ConfigSaveResult result;
+        if (blocking) result = Sync(ct => RemoteClient.SaveConfigAsync(request, ct));
+        else
+        {
+            using var cts = new CancellationTokenSource(RemoteTimeout);
+            result = await RemoteClient.SaveConfigAsync(request, cts.Token);
+        }
         if (result.Conflict) return false;
         _remoteStamp = result.File.Stamp;
         _remoteLoadedAt = _remoteLatestAt = result.File.ChangedAt;
@@ -346,7 +359,7 @@ public sealed partial class ServerConfigViewModel : ObservableObject
         if (ChangedExternally(doc) && Ask(Loc.T("srvcfg.askOverwrite"), MessageBoxButton.YesNo) != MessageBoxResult.Yes) return false;
         try
         {
-            if (IsRemote) UploadRemote(doc, force: true); // о перезаписи уже спросили
+            if (IsRemote) UploadRemoteAsync(doc, force: true, blocking: true).GetAwaiter().GetResult(); // о перезаписи уже спросили
             doc.Save();
             return true;
         }
@@ -377,33 +390,70 @@ public sealed partial class ServerConfigViewModel : ObservableObject
 
     // ---------- загрузка ----------
 
+    /// <summary>Номер загрузки: ответ агента на прежнюю (профиль сменили, нажали «Перечитать») отбрасывается.</summary>
+    private int _loadGeneration;
+
     private void Load()
+    {
+        var generation = ++_loadGeneration;
+        if (_path is null)
+        {
+            _savedAt = null;
+            _saveError = "";
+            Unload();
+            return;
+        }
+        // удалённый сервер: сначала свежую копию от агента — в фоне; открытый документ виден, пока она не пришла
+        if (IsRemote) _ = LoadRemoteAsync(generation, _path);
+        else ReadFile();
+    }
+
+    private async Task LoadRemoteAsync(int generation, string path)
+    {
+        if (State != ConfigLoadState.Loaded) Unload(ConfigLoadState.Loading);
+        RemoteConfigFile file;
+        try
+        {
+            using var cts = new CancellationTokenSource(RemoteTimeout);
+            file = await RemoteClient.GetConfigAsync(cts.Token);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
+        {
+            if (generation != _loadGeneration) return;
+            _savedAt = null;
+            _saveError = "";
+            Unload(ConfigLoadState.Failed);
+            LoadError = RemoteSecret.Describe(ex);
+            return;
+        }
+        if (generation != _loadGeneration || !string.Equals(path, _path, StringComparison.OrdinalIgnoreCase)) return;
+        try
+        {
+            ApplyRemote(file);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Unload(ConfigLoadState.Failed);
+            LoadError = ex.Message;
+            return;
+        }
+        ReadFile();
+    }
+
+    /// <summary>Прочитать файл (у удалённого сервера — копию в кэше, только что полученную от агента).</summary>
+    private void ReadFile()
     {
         _savedAt = null;
         _saveError = "";
         _doc = null;
-        if (_path is null)
-        {
-            Unload();
-            return;
-        }
-
         try
         {
-            // удалённый сервер: сначала свежую копию от агента
-            if (IsRemote) ApplyRemote(Sync(ct => RemoteClient.GetConfigAsync(ct)));
             if (!File.Exists(_path))
             {
                 Unload(ConfigLoadState.Missing);
                 return;
             }
             _doc = ServerConfigDocument.Load(_path);
-        }
-        catch (Exception ex) when (IsRemote && ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
-        {
-            Unload(ConfigLoadState.Failed);
-            LoadError = RemoteSecret.Describe(ex);
-            return;
         }
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
         {
@@ -695,15 +745,28 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     // ---------- команды ----------
 
     private bool CanEdit => State == ConfigLoadState.Loaded && !IsReadOnly;
-    private bool CanSave => CanEdit && IsDirty && ErrorCount == 0;
+    private bool CanSave => CanEdit && IsDirty && ErrorCount == 0 && !IsSaving;
+
+    /// <summary>Идёт сохранение удалённому агенту — второе нажатие «Сохранить» не нужно.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private bool _isSaving;
 
     // отменить можно и при работающем сервере: правки, сделанные до запуска, иначе было бы не сбросить
     private bool CanRevert => State == ConfigLoadState.Loaded && (IsDirty || _inputErrors > 0);
 
     [RelayCommand(CanExecute = nameof(CanSave))]
-    private void Save() => TrySave();
+    private async Task Save()
+    {
+        IsSaving = true;
+        try { await TrySaveAsync(blocking: false); }
+        finally { IsSaving = false; }
+    }
 
-    private bool TrySave()
+    /// <summary>Сохранить с ожиданием на месте — когда ответ нужен сразу («Сохранить?» перед уходом или запуском).</summary>
+    private bool TrySave() => TrySaveAsync(blocking: true).GetAwaiter().GetResult();
+
+    private async Task<bool> TrySaveAsync(bool blocking)
     {
         if (_doc is not { } doc) return false;
 
@@ -718,11 +781,12 @@ public sealed partial class ServerConfigViewModel : ObservableObject
         try
         {
             // удалённый сервер: сначала агенту (он проверит, что файл тот же, что мы читали), потом — копия в кэше
-            if (IsRemote && !UploadRemote(doc, force))
+            if (IsRemote && !await UploadRemoteAsync(doc, force, blocking))
             {
-                if (!AskOverwrite()) return false;
-                UploadRemote(doc, force: true);
+                if (_doc != doc || !AskOverwrite()) return false;
+                await UploadRemoteAsync(doc, force: true, blocking);
             }
+            if (_doc != doc) return false; // пока агент отвечал, профиль сменили — этот документ уже не на экране
             doc.Save();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException or InvalidOperationException

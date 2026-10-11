@@ -32,7 +32,11 @@ public sealed class ConfigProfileSwitchTests : IClassFixture<TestServers>
             Client = s.Code is { } code ? AgentClient.ForRemote(code) : null;
             Show(s);
             Vm.SetActive(true);
+            WaitLoaded();
         }
+
+        /// <summary>Конфиг удалённого сервера приходит от агента в фоне — ждём, как ждал бы человек.</summary>
+        private void WaitLoaded() => Sta.WaitFor(() => Vm.State != ConfigLoadState.Loading);
 
         private void Show(TestServer s)
         {
@@ -56,6 +60,7 @@ public sealed class ConfigProfileSwitchTests : IClassFixture<TestServers>
             Client = next.Code is { } code ? AgentClient.ForRemote(code) : null;
             _current = next;
             Show(next);
+            WaitLoaded();
         }
 
         public string ServerName
@@ -209,5 +214,26 @@ public sealed class ConfigProfileSwitchTests : IClassFixture<TestServers>
         {
             File.Delete(draft);
         }
+    }
+
+    [Fact]
+    public void UnreachableAgent_DoesNotHoldTheWindow_AndShowsTheError()
+    {
+        var a = _s.RemoteA;
+        Sta.Run(() =>
+        {
+            using var dialogs = new ScriptedDialogs();
+            var vm = new ServerConfigViewModel();
+            using var client = AgentClient.ForRemote(a.Code! with { Port = 1 }); // на этом порту никто не слушает
+            vm.OnProfileSwitched(null, a.Name, null, a.View, () => client);
+            vm.SetServerRunning(false);
+
+            vm.SetActive(true);
+            Assert.Equal(ConfigLoadState.Loading, vm.State); // вызов вернулся сразу, запрос идёт в фоне
+
+            Sta.WaitFor(() => vm.State != ConfigLoadState.Loading);
+            Assert.Equal(ConfigLoadState.Failed, vm.State);
+            Assert.NotEmpty(vm.LoadError);
+        });
     }
 }

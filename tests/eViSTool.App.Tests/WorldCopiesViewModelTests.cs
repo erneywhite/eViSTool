@@ -36,7 +36,7 @@ public sealed class WorldCopiesViewModelTests : IDisposable
         Assert.Equal("Home", row.Name);
         Assert.False(vm.IsEmpty);
 
-        vm.RestoreCommand.ExecuteAsync(row).GetAwaiter().GetResult();
+        Sta.Wait(vm.RestoreCommand.ExecuteAsync(row));
 
         Assert.Contains("Home", Assert.Single(dialogs.Asked));
         Assert.Equal("good", File.ReadAllText(_world));
@@ -50,7 +50,7 @@ public sealed class WorldCopiesViewModelTests : IDisposable
         using var dialogs = new ScriptedDialogs(MessageBoxResult.No);
         var vm = new WorldCopiesViewModel(_profile);
 
-        vm.RestoreCommand.ExecuteAsync(vm.Rows[0]).GetAwaiter().GetResult();
+        Sta.Wait(vm.RestoreCommand.ExecuteAsync(vm.Rows[0]));
 
         Assert.Equal("broken", File.ReadAllText(_world));
         Assert.Single(vm.Rows);

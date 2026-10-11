@@ -261,6 +261,7 @@ public sealed partial class ModsViewModel : ObservableObject
     /// <summary>Сменился профиль или его настройки — перечитываем моды с диска, ответ модбазы про другой набор сбрасываем.</summary>
     public void OnProfileSwitched()
     {
+        if (CheckCommand.IsRunning) CheckCancelCommand.Execute(null); // проверка прежнего профиля новому не нужна
         _remote = new(StringComparer.OrdinalIgnoreCase);
         _remoteResolved = null;
         _remoteStamp = null;
@@ -284,25 +285,36 @@ public sealed partial class ModsViewModel : ObservableObject
     }
 
     /// <summary>Перечитать папки модов (без сети) и перестроить таблицу с уже известными статусами.</summary>
-    public void ReloadLocal()
+    public void ReloadLocal() => _ = ReloadAsync();
+
+    /// <summary>Номер чтения папок модов: результат прежнего (профиль сменили, начали новое) отбрасывается.</summary>
+    private int _scanGeneration;
+
+    /// <summary>
+    /// Папки модов своей машины — в фоне: сотня zip-архивов читается секунду-другую, окно в это время не замирает.
+    /// </summary>
+    private async Task ReloadLocalAsync()
     {
-        if (IsRemote)
-        {
-            _ = ReloadAsync();
-            return;
-        }
         if (_main.ActiveProfile is not { } profile) return;
         profile.Refresh(notify: false); // игра могла поменять свои настройки
+        var resolved = profile.Resolved;
+        var generation = ++_scanGeneration;
+        // отметка — до чтения: иначе наблюдатель за папками, не дождавшись, запускал бы его снова и снова
+        _diskStamp = ServerMods.StampOf(resolved);
+        IReadOnlyList<LocalMod> locals;
+        string? error = null;
         try
         {
-            _locals = ModUpdateService.ScanLocal(profile.Resolved);
+            locals = await Task.Run(() => ModUpdateService.ScanLocal(resolved));
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            _locals = [];
-            StatusText = Loc.T("mods.readFailed", ex.Message);
+            locals = [];
+            error = ex.Message;
         }
-        _diskStamp = ServerMods.StampOf(profile.Resolved);
+        if (generation != _scanGeneration || _main.ActiveProfile != profile) return;
+        _locals = locals;
+        if (error is not null) StatusText = Loc.T("mods.readFailed", error);
         Rebuild();
         LocalModsChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -312,7 +324,7 @@ public sealed partial class ModsViewModel : ObservableObject
     {
         if (!IsRemote)
         {
-            ReloadLocal();
+            await ReloadLocalAsync();
             return;
         }
         if (_main.Server.RemoteClient is not { } agent) return; // нет связи — список обновится, когда она появится
@@ -469,18 +481,22 @@ public sealed partial class ModsViewModel : ObservableObject
     [RelayCommand(IncludeCancelCommand = true)]
     private async Task CheckAsync(CancellationToken ct)
     {
-        if (Profile is null) return;
+        if (Profile is null || _main.ActiveProfile is not { } owner) return;
 
         try
         {
             await ReloadAsync();
+            if (_main.ActiveProfile != owner) return; // пока читали папки, профиль сменили — проверка уже не про него
             if (Profile?.GameVersion is not { } game)
             {
                 StatusText = Loc.T("mods.noGameVersion");
                 return;
             }
-            var progress = new Progress<string>(s => StatusText = s);
-            _remote = await _service.FetchRemoteAsync(_locals, progress, ct);
+            var progress = new Progress<string>(s => { if (_main.ActiveProfile == owner) StatusText = s; });
+            var remote = await _service.FetchRemoteAsync(_locals, progress, ct);
+            // ответ модбазы — про моды того профиля, с которого начали; на другом он показал бы чужие обновления
+            if (_main.ActiveProfile != owner) return;
+            _remote = remote;
             Rebuild();
             StatusText = Loc.T("mods.checkedAt", DateTime.Now.ToString("HH:mm:ss"), game);
         }

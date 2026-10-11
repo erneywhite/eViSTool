@@ -417,6 +417,11 @@
                            TextWrapping="Wrap" Margin="0,10,0,0" Visibility="{Binding GenerateError, Converter={StaticResource TextToVis}}" />
             </StackPanel>
 
+            <!-- ===== ждём конфиг от агента на компьютере с сервером ===== -->
+            <TextBlock Text="{local:Tr srvcfg.loadingRemote}" Foreground="{StaticResource Forest.Muted}" FontSize="13"
+                       VerticalAlignment="Center" HorizontalAlignment="Center" AutomationProperties.AutomationId="CfgLoading"
+                       Visibility="{Binding State, Converter={StaticResource EnumVis}, ConverterParameter=Loading}" />
+
             <!-- ===== файл не читается: ничего не перезаписываем ===== -->
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="620"
                         Visibility="{Binding State, Converter={StaticResource EnumVis}, ConverterParameter=Failed}">

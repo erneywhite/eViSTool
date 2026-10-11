@@ -18,6 +18,9 @@ internal static class Sta
         Exception? error = null;
         var thread = new Thread(() =>
         {
+            // как в окне: продолжения после await возвращаются в этот поток (через его диспетчер)
+            SynchronizationContext.SetSynchronizationContext(
+                new System.Windows.Threading.DispatcherSynchronizationContext(System.Windows.Threading.Dispatcher.CurrentDispatcher));
             try { body(); }
             catch (Exception ex) { error = ex; }
         });
@@ -25,6 +28,31 @@ internal static class Sta
         thread.Start();
         thread.Join();
         if (error is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error).Throw();
+    }
+
+    /// <summary>
+    /// Крутить очередь диспетчера, пока не выполнится условие: модель что-то делает в фоне (запрос к агенту) и
+    /// продолжает в потоке окна. Не дождались за 20 секунд — тест падает.
+    /// </summary>
+    /// <summary>Дождаться команды модели: её продолжения идут через этот же поток, поэтому просто блокировать его нельзя.</summary>
+    public static void Wait(Task task)
+    {
+        WaitFor(() => task.IsCompleted);
+        task.GetAwaiter().GetResult(); // ошибка команды — в тест
+    }
+
+    public static void WaitFor(Func<bool> done)
+    {
+        var until = DateTime.UtcNow.AddSeconds(20);
+        while (!done())
+        {
+            if (DateTime.UtcNow > until) throw new TimeoutException("Не дождались условия в потоке окна");
+            var frame = new System.Windows.Threading.DispatcherFrame();
+            System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Background, () => frame.Continue = false);
+            System.Windows.Threading.Dispatcher.PushFrame(frame);
+            Thread.Sleep(10);
+        }
     }
 }
 
