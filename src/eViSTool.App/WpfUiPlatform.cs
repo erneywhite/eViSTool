@@ -120,6 +120,7 @@ public class WpfUiPlatform : IUiPlatform
     public void OpenFolder(string dir) => Shell.OpenFolder(dir);
     public void ShowInFolder(string path) => Shell.ShowInFolder(path);
     public void MoveToTrash(string path) => Shell.MoveToRecycleBin(path);
+    public virtual void OpenTrash() => Shell.OpenRecycleBin();
 
     public bool IsMainWindowVisible => Application.Current?.MainWindow is { IsVisible: true };
     public void RestartAfterClose(string exe) => App.RestartAfterClose(exe);

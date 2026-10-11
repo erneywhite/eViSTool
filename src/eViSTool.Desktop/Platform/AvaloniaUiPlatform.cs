@@ -60,7 +60,8 @@ public class AvaloniaUiPlatform : IUiPlatform
 
     private static IStorageProvider? Storage => (MainWindow ?? TopWindow())?.StorageProvider;
 
-    private static Window? TopWindow() =>
+    /// <summary>Самое верхнее из видимых окон (у диалогов поверх диалогов — владелец следующего).</summary>
+    internal static Window? TopWindow() =>
         Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.Windows.LastOrDefault(w => w.IsVisible) : null;
 
     private static List<FilePickerFileType> Types(IReadOnlyList<FileFilter> filters) =>
@@ -122,6 +123,7 @@ public class AvaloniaUiPlatform : IUiPlatform
     public void OpenFolder(string dir) => SystemShell.OpenFolder(dir);
     public void ShowInFolder(string path) => SystemShell.ShowInFolder(path);
     public void MoveToTrash(string path) => SystemShell.MoveToTrash(path);
+    public void OpenTrash() => SystemShell.OpenTrash();
 
     // ---- программа
 

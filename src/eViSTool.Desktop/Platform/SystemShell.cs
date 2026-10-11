@@ -45,6 +45,36 @@ internal static class SystemShell
         else FreedesktopTrash.Send(path);
     }
 
+    /// <summary>
+    /// Открыть Корзину системы. Менеджер файлов не ждём: окно Корзины живёт, пока его не закроют. Не запустился —
+    /// в журнал ошибок, окно программы не страдает.
+    /// </summary>
+    public static void OpenTrash()
+    {
+        try
+        {
+            if (OperatingSystem.IsWindows())
+                Process.Start(new ProcessStartInfo("explorer.exe", "shell:RecycleBinFolder") { UseShellExecute = true })?.Dispose(); // как в окне на WPF
+            else
+            {
+                try { Start("gio", "open", "trash:///"); }
+                catch (System.ComponentModel.Win32Exception) { Start("xdg-open", "trash:///"); } // нет gio — xdg-open
+            }
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            CrashLog.Write(ex);
+        }
+    }
+
+    /// <summary>Запустить и не ждать (Linux). Нет такой программы — Win32Exception.</summary>
+    private static void Start(string exe, params string[] args)
+    {
+        var psi = new ProcessStartInfo(exe) { UseShellExecute = false };
+        foreach (var a in args) psi.ArgumentList.Add(a);
+        using var process = Process.Start(psi); // Dispose отпускает только описатель, сам процесс живёт дальше
+    }
+
     /// <summary>Запустить и дождаться (до 5 с); false — не запустилось или вышло с ошибкой.</summary>
     private static bool Run(string exe, params string[] args)
     {

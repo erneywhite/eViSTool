@@ -1,6 +1,7 @@
 using System.Windows;
 using eViSTool.Presentation.ViewModels;
 using eViSTool.Core.Diagnostics;
+using eViSTool.Core.Game;
 using eViSTool.Core.Notifications;
 using eViSTool.Core.Packs;
 using eViSTool.Core.Profiles;
@@ -35,6 +36,13 @@ public sealed class WpfAppWindows : IAppWindows
             : null;
     }
 
+    /// <summary>
+    /// Владелец окон, которые открывает окно «Найти сервер»: окно, из которого спросили (оно активно — нажали кнопку в
+    /// нём); нет активного — главное.
+    /// </summary>
+    private static Window? ActiveOwner =>
+        Application.Current?.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive) ?? Owner;
+
     public ConnectionCode? AskConnectionCode(string okText)
     {
         var dlg = new ConnectCodeWindow(okText) { Owner = Owner };
@@ -48,6 +56,18 @@ public sealed class WpfAppWindows : IAppWindows
     }
 
     public void ShowFindServer(FindServerViewModel model) => new FindServerWindow(model) { Owner = Owner }.Show();
+
+    public string? AskServerPassword(string server)
+    {
+        var dlg = new ServerPasswordWindow(server) { Owner = ActiveOwner };
+        return dlg.ShowDialog() == true ? dlg.Password : null;
+    }
+
+    public FavoriteServerChoice? EditFavoriteServer(PlayTarget? existing)
+    {
+        var dlg = new FavoriteServerWindow(existing) { Owner = ActiveOwner };
+        return dlg.ShowDialog() == true ? new FavoriteServerChoice(dlg.ServerName, dlg.Address, dlg.Password) : null;
+    }
 
     public VersionOption? PickVersion(string heading, IReadOnlyList<VersionOption> options)
     {
@@ -125,4 +145,6 @@ public sealed class WpfAppWindows : IAppWindows
         window.Show();
         window.Activate();
     }
+
+    public void ActivateMainWindow() => Application.Current?.MainWindow?.Activate();
 }

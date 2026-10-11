@@ -24,11 +24,7 @@ public partial class FindServerWindow : Window
 
     private void SortPlayers_Checked(object sender, RoutedEventArgs e) => _vm.ByName = false;
 
-    private string? AskPassword(string server)
-    {
-        var dlg = new ServerPasswordWindow(server) { Owner = this };
-        return dlg.ShowDialog() == true ? dlg.Password : null;
-    }
+    private static string? AskPassword(string server) => AppWindows.Current.AskServerPassword(server);
 
     private async void Play_Click(object sender, RoutedEventArgs e)
     {
@@ -36,11 +32,8 @@ public partial class FindServerWindow : Window
         if (await _vm.PlayAsync(row, AskPassword)) Close();
     }
 
-    private (string Name, string Address, string? Password)? EditServer(Core.Game.PlayTarget? old)
-    {
-        var dlg = new FavoriteServerWindow(old) { Owner = this };
-        return dlg.ShowDialog() == true ? (dlg.ServerName, dlg.Address, dlg.Password) : null;
-    }
+    private static (string Name, string Address, string? Password)? EditServer(Core.Game.PlayTarget? old) =>
+        AppWindows.Current.EditFavoriteServer(old) is { } c ? (c.Name, c.Address, c.Password) : null;
 
     private void AddManual_Click(object sender, RoutedEventArgs e) => _vm.SaveFavorite(null, EditServer);
 

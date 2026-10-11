@@ -58,6 +58,8 @@ public interface IUiPlatform
     void ShowInFolder(string path);
     /// <summary>В корзину (файл или папку).</summary>
     void MoveToTrash(string path);
+    /// <summary>Открыть Корзину системы в файловом менеджере.</summary>
+    void OpenTrash();
 
     // ---- программа
     /// <summary>Главное окно на экране (не закрыто и не закрывается).</summary>

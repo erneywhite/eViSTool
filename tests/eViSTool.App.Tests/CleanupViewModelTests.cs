@@ -27,6 +27,15 @@ public sealed class CleanupViewModelTests
         Assert.True(changes >= 3);
     }
 
+    // Корзину открывает платформа окна (на WPF — Проводник, на Linux — файловый менеджер), а не сама модель
+    [Fact]
+    public void OpenRecycleBin_GoesThroughPlatform() => Sta.Run(() =>
+    {
+        using var script = new ScriptedDialogs();
+        new CleanupViewModel(new GameProfile { Id = "clean-test", Name = "clean-test", Kind = ProfileKind.Client }).OpenRecycleBinCommand.Execute(null);
+        Assert.Equal(1, script.TrashOpened);
+    });
+
     [Theory]
     [InlineData(0, "0")]
     [InlineData(5_000, "4")]                 // КБ

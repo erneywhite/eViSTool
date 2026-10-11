@@ -66,6 +66,8 @@ internal sealed class ScriptedDialogs : IDisposable
     private readonly Queue<Answer> _answers;
     public List<string> Asked { get; } = [];
     public List<string> Warned { get; } = [];
+    /// <summary>Сколько раз модель просила открыть Корзину.</summary>
+    public int TrashOpened { get; set; }
 
     public ScriptedDialogs(params Answer[] answers)
     {
@@ -92,6 +94,12 @@ internal sealed class ScriptedPlatform(ScriptedDialogs? script) : WpfUiPlatform
     {
         if (script is null) throw new InvalidOperationException("Предупреждение без сценария: " + text);
         script.Warned.Add(text);
+    }
+
+    // настоящая Корзина в тесте не нужна — только запоминаем, что её просили открыть
+    public override void OpenTrash()
+    {
+        if (script is not null) script.TrashOpened++;
     }
 }
 
