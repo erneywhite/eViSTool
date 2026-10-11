@@ -187,11 +187,11 @@
 
     <!-- ===== иконки (контуры из макета, viewBox 24×24); рисуются как Path с классом icon ===== -->
     <StreamGeometry x:Key="Icon.Mods">M4 3 H9 A1 1 0 0 1 10 4 V9 A1 1 0 0 1 9 10 H4 A1 1 0 0 1 3 9 V4 A1 1 0 0 1 4 3 Z M15 3 H20 A1 1 0 0 1 21 4 V9 A1 1 0 0 1 20 10 H15 A1 1 0 0 1 14 9 V4 A1 1 0 0 1 15 3 Z M15 14 H20 A1 1 0 0 1 21 15 V20 A1 1 0 0 1 20 21 H15 A1 1 0 0 1 14 20 V15 A1 1 0 0 1 15 14 Z M4 14 H9 A1 1 0 0 1 10 15 V20 A1 1 0 0 1 9 21 H4 A1 1 0 0 1 3 20 V15 A1 1 0 0 1 4 14 Z</StreamGeometry>
-    <StreamGeometry x:Key="Icon.Catalog">m21 21 l-4.34 -4.34 M3 11 A8 8 0 1 0 19 11 A8 8 0 1 0 3 11 Z</StreamGeometry>
+    <StreamGeometry x:Key="Icon.Catalog">M21 21 l-4.34 -4.34 M3 11 A8 8 0 1 0 19 11 A8 8 0 1 0 3 11 Z</StreamGeometry>
     <StreamGeometry x:Key="Icon.Check">M20 6 L9 17 l-5 -5</StreamGeometry>
     <StreamGeometry x:Key="Icon.Star">M11.525 2.295 a.53 .53 0 0 1 .95 0 l2.31 4.679 a2.12 2.12 0 0 0 1.595 1.16 l5.166 .756 a.53 .53 0 0 1 .294 .904 l-3.736 3.638 a2.12 2.12 0 0 0 -.611 1.878 l.882 5.14 a.53 .53 0 0 1 -.771 .56 l-4.618 -2.428 a2.12 2.12 0 0 0 -1.973 0 L6.396 21.01 a.53 .53 0 0 1 -.77 -.56 l.881 -5.139 a2.12 2.12 0 0 0 -.611 -1.879 L2.16 9.795 a.53 .53 0 0 1 .294 -.906 l5.165 -.755 a2.12 2.12 0 0 0 1.597 -1.16 z</StreamGeometry>
     <StreamGeometry x:Key="Icon.Lock">M5 11 H19 A2 2 0 0 1 21 13 V20 A2 2 0 0 1 19 22 H5 A2 2 0 0 1 3 20 V13 A2 2 0 0 1 5 11 Z M7 11 V7 a5 5 0 0 1 10 0 v4</StreamGeometry>
-    <StreamGeometry x:Key="Icon.ChevronDown">m6 9 l6 6 l6 -6</StreamGeometry>
+    <StreamGeometry x:Key="Icon.ChevronDown">M6 9 l6 6 l6 -6</StreamGeometry>
     <StreamGeometry x:Key="Icon.Pin">M12 17 v5 M9 10.76 a2 2 0 0 1 -1.11 1.79 l-1.78 .9 A2 2 0 0 0 5 15.24 V16 a1 1 0 0 0 1 1 h12 a1 1 0 0 0 1 -1 v-.76 a2 2 0 0 0 -1.11 -1.79 l-1.78 -.9 A2 2 0 0 1 15 10.76 V7 a1 1 0 0 1 1 -1 a2 2 0 0 0 0 -4 H8 a2 2 0 0 0 0 4 a1 1 0 0 1 1 1 z</StreamGeometry>
     <StreamGeometry x:Key="Icon.Globe">M2 12 A10 10 0 1 0 22 12 A10 10 0 1 0 2 12 Z M12 2 a14.5 14.5 0 0 0 0 20 a14.5 14.5 0 0 0 0 -20 M2 12 h20</StreamGeometry>
     <StreamGeometry x:Key="Icon.Server">M4 2 H20 A2 2 0 0 1 22 4 V8 A2 2 0 0 1 20 10 H4 A2 2 0 0 1 2 8 V4 A2 2 0 0 1 4 2 Z M4 14 H20 A2 2 0 0 1 22 16 V20 A2 2 0 0 1 20 22 H4 A2 2 0 0 1 2 20 V16 A2 2 0 0 1 4 14 Z M6 6 h.01 M6 18 h.01</StreamGeometry>
@@ -203,13 +203,13 @@
     <StreamGeometry x:Key="Icon.History">M3 12 a9 9 0 1 0 9 -9 a9.75 9.75 0 0 0 -6.74 2.74 L3 8 M3 3 v5 h5 m4 -1 v5 l4 2</StreamGeometry>
     <StreamGeometry x:Key="Icon.Play">M5 5 a2 2 0 0 1 3.008 -1.728 l11.997 6.998 a2 2 0 0 1 .003 3.458 l-12 7 A2 2 0 0 1 5 19 z</StreamGeometry>
     <StreamGeometry x:Key="Icon.Plus">M5 12 h14 m-7 -7 v14</StreamGeometry>
-    <StreamGeometry x:Key="Icon.Download">M12 15 V3 m9 12 v4 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 v-4 m7 10 l5 5 l5 -5</StreamGeometry>
-    <StreamGeometry x:Key="Icon.Warning">m21.73 18 l-8 -14 a2 2 0 0 0 -3.48 0 l-8 14 A2 2 0 0 0 4 21 h16 a2 2 0 0 0 1.73 -3 M12 9 v4 m0 4 h.01</StreamGeometry>
+    <StreamGeometry x:Key="Icon.Download">M12 15 V3 m9 12 v4 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 v-4 M7 10 l5 5 l5 -5</StreamGeometry>
+    <StreamGeometry x:Key="Icon.Warning">M21.73 18 l-8 -14 a2 2 0 0 0 -3.48 0 l-8 14 A2 2 0 0 0 4 21 h16 a2 2 0 0 0 1.73 -3 M12 9 v4 m0 4 h.01</StreamGeometry>
     <StreamGeometry x:Key="Icon.Client">M4 3 H20 A2 2 0 0 1 22 5 V15 A2 2 0 0 1 20 17 H4 A2 2 0 0 1 2 15 V5 A2 2 0 0 1 4 3 Z M8 21 h8 m-4 -4 v4</StreamGeometry>
     <StreamGeometry x:Key="Icon.Copy">M10 8 H20 A2 2 0 0 1 22 10 V20 A2 2 0 0 1 20 22 H10 A2 2 0 0 1 8 20 V10 A2 2 0 0 1 10 8 Z M4 16 c-1.1 0 -2 -.9 -2 -2 V4 c0 -1.1 .9 -2 2 -2 h10 c1.1 0 2 .9 2 2</StreamGeometry>
     <!-- карандаш: «Изменить» -->
     <StreamGeometry x:Key="Icon.Edit">M21.174 6.812 a1 1 0 0 0 -3.986 -3.987 L3.842 16.174 a2 2 0 0 0 -.5 .83 l-1.321 4.352 a.5 .5 0 0 0 .623 .622 l4.353 -1.32 a2 2 0 0 0 .83 -.497 z M15 5 l4 4</StreamGeometry>
-    <StreamGeometry x:Key="Icon.Search">m21 21 l-4.34 -4.34 M3 11 A8 8 0 1 0 19 11 A8 8 0 1 0 3 11 Z</StreamGeometry>
+    <StreamGeometry x:Key="Icon.Search">M21 21 l-4.34 -4.34 M3 11 A8 8 0 1 0 19 11 A8 8 0 1 0 3 11 Z</StreamGeometry>
     <StreamGeometry x:Key="Icon.Folder">M20 20 a2 2 0 0 0 2 -2 V8 a2 2 0 0 0 -2 -2 h-7.9 a2 2 0 0 1 -1.69 -.9 L9.6 3.9 A2 2 0 0 0 7.93 3 H4 a2 2 0 0 0 -2 2 v13 a2 2 0 0 0 2 2 Z</StreamGeometry>
     <StreamGeometry x:Key="Icon.Package">M11 21.73 a2 2 0 0 0 2 0 l7 -4 A2 2 0 0 0 21 16 V8 a2 2 0 0 0 -1 -1.73 l-7 -4 a2 2 0 0 0 -2 0 l-7 4 A2 2 0 0 0 3 8 v8 a2 2 0 0 0 1 1.73 z m1 .27 V12 M3.29 7 L12 12 l8.71 -5 M7.5 4.27 l9 5.15</StreamGeometry>
     <StreamGeometry x:Key="Icon.Close">M18 6 L6 18 M6 6 l12 12</StreamGeometry>
