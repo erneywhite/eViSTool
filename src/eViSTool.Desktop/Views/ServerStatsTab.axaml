@@ -1,6 +1,205 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="eViSTool.Desktop.Views.ServerStatsTab">
-    <!-- заглушка: вкладка «Статистика» раздела «Сервер» ещё переносится с окна на WPF -->
-    <TextBlock Text="Экран «Статистика» ещё переносится" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
+             xmlns:vm="using:eViSTool.Presentation.ViewModels"
+             xmlns:local="using:eViSTool.Desktop"
+             xmlns:ctl="using:eViSTool.Desktop.Controls"
+             xmlns:conv="using:eViSTool.Desktop.Converters"
+             x:Class="eViSTool.Desktop.Views.ServerStatsTab"
+             x:DataType="vm:ServerStatsViewModel">
+    <UserControl.Styles>
+        <!-- карточка вкладки (StatsCard) -->
+        <Style Selector="Border.statsCard">
+            <Setter Property="Padding" Value="20,16,20,18" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+        <!-- плитка-показатель. Те же имена классов, что у плиток над консолью в ServerView, и стили там действуют и
+             здесь, поэтому все четыре объявлены у себя (ближние сильнее): промежутки между плитками — колонки сетки,
+             своего отступа справа у плитки нет. -->
+        <Style Selector="Border.tile">
+            <Setter Property="Padding" Value="16,12" />
+            <Setter Property="Margin" Value="0" />
+        </Style>
+        <Style Selector="TextBlock.tileLabel">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+        </Style>
+        <Style Selector="TextBlock.tileValue">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <!-- были вылеты — число красным -->
+        <Style Selector="TextBlock.tileValue.danger">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Danger}" />
+        </Style>
+        <Style Selector="TextBlock.tileNote">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+            <Setter Property="Margin" Value="0,2,0,0" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <!-- таблица игроков: заголовки колонок и ячейки; «сейчас в игре» — зелёным -->
+        <Style Selector="TextBlock.colHead">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+        </Style>
+        <Style Selector="TextBlock.cell">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+        </Style>
+        <Style Selector="TextBlock.cell.online">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Good}" />
+        </Style>
+        <!-- подпись легенды графика -->
+        <Style Selector="TextBlock.legend">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
+        <StackPanel Margin="0,0,14,0">
+            <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{DynamicResource Forest.Danger}" TextWrapping="Wrap" Margin="2,0,0,10"
+                       IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" AutomationProperties.AutomationId="StatsStatus" />
+
+            <!-- ===== тумблер сбора ===== -->
+            <Border Classes="card statsCard">
+                <DockPanel>
+                    <CheckBox DockPanel.Dock="Right" Theme="{StaticResource Forest.Switch}" IsChecked="{Binding Enabled}" IsEnabled="{Binding Loaded}"
+                              VerticalAlignment="Center" Margin="16,0,0,0"
+                              AutomationProperties.AutomationId="StatsEnabled" AutomationProperties.Name="{local:Tr stats.collect}" />
+                    <StackPanel>
+                        <TextBlock Classes="cardTitle" Text="{local:Tr stats.collect}" />
+                        <TextBlock Classes="hint" Text="{local:Tr stats.collectHint}" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- ===== срок и плитки ===== -->
+            <DockPanel Margin="0,0,0,12" IsVisible="{Binding HasData}">
+                <Button DockPanel.Dock="Right" Content="{local:Tr stats.clear}" Command="{Binding ClearCommand}" Padding="12,6"
+                        AutomationProperties.AutomationId="StatsClear" />
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <RadioButton Theme="{StaticResource Forest.Chip}" GroupName="StatsPeriod" Content="{local:Tr stats.day}"
+                                 IsChecked="{Binding Period, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Day}"
+                                 AutomationProperties.AutomationId="StatsDay" />
+                    <RadioButton Theme="{StaticResource Forest.Chip}" GroupName="StatsPeriod" Content="{local:Tr stats.week}"
+                                 IsChecked="{Binding Period, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Week}"
+                                 AutomationProperties.AutomationId="StatsWeek" />
+                    <RadioButton Theme="{StaticResource Forest.Chip}" GroupName="StatsPeriod" Content="{local:Tr stats.month}"
+                                 IsChecked="{Binding Period, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Month}"
+                                 AutomationProperties.AutomationId="StatsMonth" />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- пока собирать нечего: включено, но данных ещё нет -->
+            <Border Classes="card statsCard" IsVisible="{Binding !HasData}">
+                <TextBlock Classes="hint" Text="{Binding EmptyText}" FontSize="12" Margin="0" />
+            </Border>
+
+            <StackPanel IsVisible="{Binding HasData}">
+                <Grid Margin="0,0,0,14" ColumnDefinitions="*,12,*,12,*,12,*,12,*,12,*">
+                    <Border Classes="card tile">
+                        <StackPanel>
+                            <TextBlock Classes="tileLabel" Text="{local:Tr stats.played}" />
+                            <TextBlock Classes="tileValue" Text="{Binding TotalPlayedText}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="2" Classes="card tile">
+                        <StackPanel>
+                            <TextBlock Classes="tileLabel" Text="{local:Tr stats.peak}" />
+                            <TextBlock Classes="tileValue" Text="{Binding PeakText}" />
+                            <TextBlock Classes="tileNote" Text="{Binding PeakAtText}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="4" Classes="card tile">
+                        <StackPanel>
+                            <TextBlock Classes="tileLabel" Text="{local:Tr stats.uptime}" />
+                            <TextBlock Classes="tileValue" Text="{Binding UptimeText}" />
+                            <TextBlock Classes="tileNote" Text="{Binding RestartsText}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="6" Classes="card tile">
+                        <StackPanel>
+                            <TextBlock Classes="tileLabel" Text="{local:Tr stats.crashes}" />
+                            <TextBlock Classes="tileValue" Classes.danger="{Binding HasCrashes}" Text="{Binding CrashesText}" />
+                            <TextBlock Classes="tileNote" Text="{Binding LastCrashText}" />
+                        </StackPanel>
+                    </Border>
+                    <!-- расход сервера: в среднем / в пике (пока он работал) -->
+                    <Border Grid.Column="8" Classes="card tile" ToolTip.Tip="{local:Tr stats.loadTip}">
+                        <StackPanel>
+                            <TextBlock Classes="tileLabel" Text="{local:Tr stats.memoryTile}" />
+                            <TextBlock Classes="tileValue" Text="{Binding MemoryText}" />
+                            <TextBlock Classes="tileNote" Text="{Binding MemoryPeakText}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="10" Classes="card tile" ToolTip.Tip="{local:Tr stats.loadTip}">
+                        <StackPanel>
+                            <TextBlock Classes="tileLabel" Text="{local:Tr stats.cpuTile}" />
+                            <TextBlock Classes="tileValue" Text="{Binding CpuText}" />
+                            <TextBlock Classes="tileNote" Text="{Binding CpuPeakText}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- ===== графики ===== -->
+                <Border Classes="card statsCard">
+                    <StackPanel>
+                        <TextBlock Classes="cardTitle" Text="{local:Tr stats.chartPlayers}" />
+                        <ctl:StatsChart Report="{Binding Report}" Kind="Players" Height="150" Margin="0,10,0,0"
+                                        AutomationProperties.AutomationId="StatsChartPlayers" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="card statsCard">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Classes="cardTitle" Text="{local:Tr stats.chartResources}" />
+                            <Rectangle Width="14" Height="2" Fill="{DynamicResource Forest.Good}" Margin="16,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock Classes="legend" Text="{local:Tr stats.memory}" />
+                            <Rectangle Width="14" Height="2" Fill="{DynamicResource Forest.Warn}" Margin="14,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock Classes="legend" Text="{local:Tr stats.cpu}" />
+                        </StackPanel>
+                        <ctl:StatsChart Report="{Binding Report}" Kind="Resources" Height="130" Margin="0,10,0,0"
+                                        AutomationProperties.AutomationId="StatsChartResources" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ===== игроки ===== -->
+                <Border Classes="card statsCard">
+                    <StackPanel>
+                        <TextBlock Classes="cardTitle" Text="{Binding PlayersTitle}" />
+                        <TextBlock Classes="hint" Text="{local:Tr stats.noPlayers}" FontSize="12" Margin="0,8,0,0" IsVisible="{Binding !HasPlayers}" />
+                        <Grid Margin="0,12,0,6" ColumnDefinitions="2*,*,*,1.4*" IsVisible="{Binding HasPlayers}">
+                            <TextBlock Classes="colHead" Text="{local:Tr stats.colPlayer}" />
+                            <TextBlock Grid.Column="1" Classes="colHead" Text="{local:Tr stats.colPlayed}" />
+                            <TextBlock Grid.Column="2" Classes="colHead" Text="{local:Tr stats.colSessions}" />
+                            <TextBlock Grid.Column="3" Classes="colHead" Text="{local:Tr stats.colLast}" />
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding Players}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PlayerStatsRow">
+                                    <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="0,9">
+                                        <Grid ColumnDefinitions="2*,*,*,1.4*">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Classes="cell" Text="{Binding Name}" VerticalAlignment="Center" />
+                                                <!-- полоса наигранного: у лучшего игрока — 90 px -->
+                                                <Border Width="{Binding BarWidth}" Height="5" CornerRadius="2.5" Background="{DynamicResource Forest.Accent}"
+                                                        Margin="10,0,0,0" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Classes="cell" Text="{Binding PlayedText}" />
+                                            <TextBlock Grid.Column="2" Classes="cell" Text="{Binding Sessions}" />
+                                            <TextBlock Grid.Column="3" Classes="cell" Classes.online="{Binding Online}" Text="{Binding LastSeenText}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>
