@@ -929,6 +929,8 @@ web.MapPost("/self-update", async (HttpContext ctx) =>
     if (await ReadBody<SelfUpdateRequest>(ctx) is not { } request
         || !eViSTool.Core.Versioning.ModVersion.TryParse(request.Version, out var target)) return Results.BadRequest();
     if (request.Version == version) return Problem(eViSTool.Core.Localization.Loc.T("selfupd.same"), StatusCodes.Status400BadRequest);
+    if (!request.AllowDowngrade && eViSTool.Core.Versioning.ModVersion.TryParse(version, out var current) && target < current)
+        return Problem(eViSTool.Core.Localization.Loc.T("selfupd.downgrade", target, version), StatusCodes.Status400BadRequest);
     if (selfUpdate is not (null or "failed")) return Problem(eViSTool.Core.Localization.Loc.T("selfupd.busy"));
     selfUpdate = "download";
     selfUpdateError = null;

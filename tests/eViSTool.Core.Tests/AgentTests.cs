@@ -520,6 +520,9 @@ public sealed class AgentTests : IAsyncLifetime
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => _client.SelfUpdateAsync(version));
         await Assert.ThrowsAsync<InvalidOperationException>(() => _client.SelfUpdateAsync("not a version"));
+        // старше своей — отказ без явного разрешения: окно так не делает, значит запрос не от него
+        var older = await Assert.ThrowsAsync<InvalidOperationException>(() => _client.SelfUpdateAsync("0.1.0"));
+        Assert.Contains("0.1.0", older.Message);
         Assert.Null((await _client.StatusAsync()).SelfUpdate);
     }
 

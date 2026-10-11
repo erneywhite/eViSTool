@@ -44,8 +44,15 @@ public sealed class ServerConsole(int capacity = 5000)
 
     private TaskCompletionSource _newLine = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    /// <summary>
+    /// Самая длинная строка, которую консоль хранит целиком. Мод, выводящий в лог мегабайты одной строкой, иначе раздул бы
+    /// память агента и каждый ответ на опрос консоли; хвост такой строки заменяется на «…».
+    /// </summary>
+    public const int MaxLineLength = 16 * 1024;
+
     public ConsoleLine Add(ConsoleLineKind kind, string text)
     {
+        if (text.Length > MaxLineLength) text = string.Concat(text.AsSpan(0, MaxLineLength), "…");
         ConsoleLine line;
         TaskCompletionSource signal;
         lock (_lock)

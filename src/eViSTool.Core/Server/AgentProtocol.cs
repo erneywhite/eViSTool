@@ -63,11 +63,9 @@ public static class AgentProtocol
             var existing = File.ReadAllText(path).Trim();
             if (existing.Length >= 32) return existing;
         }
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var key = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24)).ToLowerInvariant();
-        File.WriteAllText(path, key);
         // на Linux ключ — только владельцу (rw-------): с ним любой пользователь машины управлял бы сервером через агента
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        Platform.OwnerOnlyFile.WriteText(path, key);
         return key;
     }
 }
@@ -111,7 +109,11 @@ public sealed record ServerCrashInfo
 }
 
 /// <summary>Просьба окна обновить агента (и eViSTool на его компьютере) до версии окна.</summary>
-public sealed record SelfUpdateRequest(string Version);
+/// <summary>
+/// Обновить агента до версии <paramref name="Version"/>. Старше, чем у агента, — только с <paramref name="AllowDowngrade"/>:
+/// окно предлагает обновление, лишь когда агент отстал, а откат на старую версию должен быть осознанным.
+/// </summary>
+public sealed record SelfUpdateRequest(string Version, bool AllowDowngrade = false);
 
 public sealed record AgentStatus
 {

@@ -54,21 +54,9 @@ public static class RemoteAccess
 
     public static void Save(string profileId, RemoteSettings settings, string? agentsDir = null)
     {
-        var path = FileFor(profileId, agentsDir);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var tmp = path + ".tmp";
-        File.WriteAllText(tmp, JsonConvert.SerializeObject(settings, Formatting.Indented));
-        OwnerOnly(tmp);
-        File.Move(tmp, path, overwrite: true);
-    }
-
-    /// <summary>
-    /// На Linux ключ удалённого доступа и сертификат — только владельцу (rw-------), как ключ профиля: папку data
-    /// может создать и сам человек, с правами, открытыми всем пользователям машины.
-    /// </summary>
-    private static void OwnerOnly(string path)
-    {
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        // на Linux ключ удалённого доступа и сертификат — только владельцу (rw-------), как ключ профиля: папку data
+        // может создать и сам человек, с правами, открытыми всем пользователям машины
+        Platform.OwnerOnlyFile.WriteText(FileFor(profileId, agentsDir), JsonConvert.SerializeObject(settings, Formatting.Indented));
     }
 
     /// <summary>Включить: при первом включении — случайный свободный порт, ключ и сертификат; дальше они те же.</summary>
@@ -140,9 +128,7 @@ public static class RemoteAccess
         request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, critical: false));
         request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid("1.3.6.1.5.5.7.3.1")], critical: false)); // проверка подлинности сервера
         using var created = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(20));
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllBytes(path, created.Export(X509ContentType.Pfx));
-        OwnerOnly(path);
+        Platform.OwnerOnlyFile.Write(path, created.Export(X509ContentType.Pfx));
         return X509CertificateLoader.LoadPkcs12FromFile(path, null);
     }
 

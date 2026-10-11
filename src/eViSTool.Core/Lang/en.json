@@ -1589,6 +1589,7 @@
   "selfupd.confirm": "Update eViSTool on the server computer to {0}? It downloads the release from GitHub and restarts the agent; the connection drops for a few seconds.",
   "selfupd.confirmRunning": "Update eViSTool on the server computer to {0}? The server will be stopped (the world is saved, players are warned in chat) and started again in about a minute.",
   "selfupd.done": "▸ eViSTool is updated to {0}.",
+  "selfupd.downgrade": "Version {0} is older than the one installed here ({1}). Not rolling the agent back.",
   "selfupd.failed": "▸ The update did not work out, everything stays as it was: {0}",
   "selfupd.noRelease": "There is no eViSTool {0} release on GitHub.",
   "selfupd.outdated": "eViSTool on the server computer is version {0}, yours is {1}: some features may not work. It can be updated from here.",
