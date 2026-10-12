@@ -1,0 +1,21 @@
+eViSTool 0.10.6: fixes from your comments.
+
+Fixes
+- Right-clicking a column header in My mods no longer opens the mod menu. Before, its actions went to the mod selected earlier.
+- Turning on, turning off, installing or deleting a client-only mod (shaders, interface) no longer makes world copies: such a mod does not change the world.
+- A server config moved from Linux to Windows or back could list a mod folder from the other system. eViSTool now skips such a folder with a warning and installs mods into the data folder's Mods.
+- Double-clicking eViSTool.Agent.exe now says it is a helper part and you need to open eViSTool.exe, instead of flashing a console window.
+
+Update from About; then update the agent on the server computer with Update on the server.
+
+---
+
+eViSTool 0.10.6: исправления по вашим комментариям.
+
+Исправления
+- Правый щелчок по заголовку колонки в «Моих модах» больше не открывает меню мода. Раньше его действия применялись к моду, выбранному до этого.
+- Включение, выключение, установка и удаление мода только для клиента (шейдеры, интерфейс) больше не делают копии миров: такой мод мир не меняет.
+- В конфиге сервера, перенесённом с Linux на Windows или обратно, могла остаться папка модов из другой системы. Теперь eViSTool пропускает её с предупреждением и ставит моды в папку Mods данных.
+- eViSTool.Agent.exe, запущенный двойным щелчком, теперь пишет, что это служебная часть и открывать надо eViSTool.exe, а не мигает консолью.
+
+Обнови из «О программе», потом обнови агента на компьютере с сервером кнопкой «Обновить на сервере».

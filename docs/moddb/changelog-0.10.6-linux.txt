@@ -1,0 +1,15 @@
+eViSTool 0.10.6 for Linux: mod folders from Windows configs.
+
+- A server config moved from Windows could list a mod folder like C:\Users\…\Mods. On Linux the agent used to glue it to the game folder: the server's mods were not found, and new ones went into a folder with backslashes in its name. Now such a folder is skipped with a warning, and mods go into the data folder's Mods. Fix the mod folder list in the config (Configuration → Advanced → Mod folders) so the game loads them too.
+- The Windows app: client-only mods (shaders, interface) no longer make world copies, and right-clicking a column header in My mods no longer opens the mod menu.
+
+Update the Windows app from About, then press Update on the server in it.
+
+---
+
+eViSTool 0.10.6 для Linux: папки модов из конфигов с Windows.
+
+- В конфиге сервера, перенесённом с Windows, могла остаться папка модов вроде C:\Users\…\Mods. На Linux агент склеивал её с папкой игры: моды сервера не находились, а новые ставились в папку с обратными слэшами в имени. Теперь такая папка пропускается с предупреждением, а моды ставятся в папку Mods данных. Поправь список папок модов в конфиге («Конфигурация» → «Дополнительно» → «Папки модов»), чтобы их загружала и игра.
+- В программе на Windows: моды только для клиента (шейдеры, интерфейс) больше не делают копии миров, а правый щелчок по заголовку колонки в «Моих модах» больше не открывает меню мода.
+
+Обнови программу на Windows из «О программе», потом нажми в ней «Обновить на сервере».
