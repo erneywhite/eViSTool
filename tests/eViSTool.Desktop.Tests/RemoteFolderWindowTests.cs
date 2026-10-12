@@ -22,17 +22,17 @@ public sealed class RemoteFolderWindowTests : IDisposable
 {
     private readonly ResourceInclude _resources = new(new Uri("avares://eViSTool.Desktop.Tests"))
     {
-        Source = new Uri("avares://eViSTool.Desktop/Themes/ForestResources.axaml"),
+        Source = new Uri("avares://eViSTool/Themes/ForestResources.axaml"),
     };
 
     private readonly ResourceInclude _controls = new(new Uri("avares://eViSTool.Desktop.Tests"))
     {
-        Source = new Uri("avares://eViSTool.Desktop/Themes/ForestControls.axaml"),
+        Source = new Uri("avares://eViSTool/Themes/ForestControls.axaml"),
     };
 
     private readonly StyleInclude _styles = new(new Uri("avares://eViSTool.Desktop.Tests"))
     {
-        Source = new Uri("avares://eViSTool.Desktop/Themes/Forest.axaml"),
+        Source = new Uri("avares://eViSTool/Themes/Forest.axaml"),
     };
 
     public RemoteFolderWindowTests()

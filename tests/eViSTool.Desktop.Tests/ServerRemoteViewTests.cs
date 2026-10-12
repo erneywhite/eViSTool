@@ -29,9 +29,9 @@ public sealed class ServerRemoteViewTests
     {
         var baseUri = new Uri("avares://eViSTool.Desktop.Tests");
         var window = new Window { Width = 1100, Height = 760, RequestedThemeVariant = ThemeVariant.Dark, DataContext = model, Content = new ServerRemoteView { DataContext = model } };
-        window.Resources.MergedDictionaries.Add(new ResourceInclude(baseUri) { Source = new Uri("avares://eViSTool.Desktop/Themes/ForestResources.axaml") });
-        window.Resources.MergedDictionaries.Add(new ResourceInclude(baseUri) { Source = new Uri("avares://eViSTool.Desktop/Themes/ForestControls.axaml") });
-        window.Styles.Add(new StyleInclude(baseUri) { Source = new Uri("avares://eViSTool.Desktop/Themes/Forest.axaml") });
+        window.Resources.MergedDictionaries.Add(new ResourceInclude(baseUri) { Source = new Uri("avares://eViSTool/Themes/ForestResources.axaml") });
+        window.Resources.MergedDictionaries.Add(new ResourceInclude(baseUri) { Source = new Uri("avares://eViSTool/Themes/ForestControls.axaml") });
+        window.Styles.Add(new StyleInclude(baseUri) { Source = new Uri("avares://eViSTool/Themes/Forest.axaml") });
         window.Show();
         Dispatcher.UIThread.RunJobs();
         return window;

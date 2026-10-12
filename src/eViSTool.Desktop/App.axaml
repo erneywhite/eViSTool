@@ -6,9 +6,9 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <!-- лесная палитра: токены Forest.*, кисти элементов Fluent теми же цветами, иконки, шрифты -->
-                <ResourceInclude Source="avares://eViSTool.Desktop/Themes/ForestResources.axaml" />
+                <ResourceInclude Source="avares://eViSTool/Themes/ForestResources.axaml" />
                 <!-- шаблоны кнопок, вкладок, тумблеров, пунктов списков (ControlTheme) -->
-                <ResourceInclude Source="avares://eViSTool.Desktop/Themes/ForestControls.axaml" />
+                <ResourceInclude Source="avares://eViSTool/Themes/ForestControls.axaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
@@ -30,6 +30,6 @@
             </FluentTheme.Palettes>
         </FluentTheme>
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
-        <StyleInclude Source="avares://eViSTool.Desktop/Themes/Forest.axaml" />
+        <StyleInclude Source="avares://eViSTool/Themes/Forest.axaml" />
     </Application.Styles>
 </Application>

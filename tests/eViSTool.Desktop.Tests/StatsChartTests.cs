@@ -57,7 +57,7 @@ public sealed class StatsChartTests : IDisposable
         // кисти Forest.* и шрифт окна — как в программе
         window.Resources.MergedDictionaries.Add(new ResourceInclude(new Uri("avares://eViSTool.Desktop.Tests"))
         {
-            Source = new Uri("avares://eViSTool.Desktop/Themes/ForestResources.axaml"),
+            Source = new Uri("avares://eViSTool/Themes/ForestResources.axaml"),
         });
         TextElement.SetFontFamily(window, new FontFamily(Program.UiFont));
         window.Show();

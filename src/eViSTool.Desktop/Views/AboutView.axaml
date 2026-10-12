@@ -71,7 +71,7 @@
                 <!-- ===== программа и обновления ===== -->
                 <Border Classes="card about" Padding="20">
                     <DockPanel>
-                        <Image DockPanel.Dock="Left" Source="avares://eViSTool.Desktop/Assets/logo256.png" Width="96" Height="96" Margin="0,0,20,0"
+                        <Image DockPanel.Dock="Left" Source="avares://eViSTool/Assets/logo256.png" Width="96" Height="96" Margin="0,0,20,0"
                                RenderOptions.BitmapInterpolationMode="HighQuality" />
                         <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Margin="20,0,0,0" MinWidth="200">
                             <Button Command="{Binding CheckAppUpdateCommand}" HorizontalAlignment="Right">
@@ -112,7 +112,7 @@
                         <!-- официальная кнопка Ko-fi (картинка вшита в программу) -->
                         <Button DockPanel.Dock="Right" Theme="{StaticResource ImageButton}" Command="{Binding OpenKofiCommand}" Margin="16,0,0,0"
                                 VerticalAlignment="Center" ToolTip.Tip="ko-fi.com/erneywhite" AutomationProperties.Name="Ko-fi">
-                            <Image Source="avares://eViSTool.Desktop/Assets/kofi.png" Height="44" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                            <Image Source="avares://eViSTool/Assets/kofi.png" Height="44" RenderOptions.BitmapInterpolationMode="HighQuality" />
                         </Button>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="{local:Tr about.supportTitle}" FontWeight="SemiBold" FontSize="15" Foreground="{DynamicResource Forest.Text}" />

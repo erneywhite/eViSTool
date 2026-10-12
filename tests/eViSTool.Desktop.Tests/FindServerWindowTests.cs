@@ -65,9 +65,9 @@ public sealed class FindServerWindowTests : IDisposable
     {
         var app = Application.Current!;
         var baseUri = new Uri("avares://eViSTool.Desktop.Tests");
-        var resources = new ResourceInclude(baseUri) { Source = new Uri("avares://eViSTool.Desktop/Themes/ForestResources.axaml") };
-        var controls = new ResourceInclude(baseUri) { Source = new Uri("avares://eViSTool.Desktop/Themes/ForestControls.axaml") };
-        var styles = new StyleInclude(baseUri) { Source = new Uri("avares://eViSTool.Desktop/Themes/Forest.axaml") };
+        var resources = new ResourceInclude(baseUri) { Source = new Uri("avares://eViSTool/Themes/ForestResources.axaml") };
+        var controls = new ResourceInclude(baseUri) { Source = new Uri("avares://eViSTool/Themes/ForestControls.axaml") };
+        var styles = new StyleInclude(baseUri) { Source = new Uri("avares://eViSTool/Themes/Forest.axaml") };
         app.Resources.MergedDictionaries.Add(resources);
         app.Resources.MergedDictionaries.Add(controls);
         app.Styles.Add(styles);

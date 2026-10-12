@@ -43,9 +43,9 @@ $fixture = Join-Path $root 'tests/snapshots/fixture'
 if (-not $IsWindows -and $Only -ne 'Avalonia') { $Only = 'Avalonia' } # окна на WPF есть только на Windows
 
 $apps = @()
-if ($Only -in 'Both', 'Wpf') { $apps += @{ Name = 'wpf'; Project = 'src/eViSTool.App'; Exe = 'eViSTool.exe' } }
+if ($Only -in 'Both', 'Wpf') { $apps += @{ Name = 'wpf'; Project = 'src/eViSTool.App'; Exe = 'eViSTool.Wpf.exe' } }
 if ($Only -in 'Both', 'Avalonia') {
-    $apps += @{ Name = 'avalonia'; Project = 'src/eViSTool.Desktop'; Exe = $(if ($IsWindows) { 'eViSTool.Desktop.exe' } else { 'eViSTool.Desktop' }) }
+    $apps += @{ Name = 'avalonia'; Project = 'src/eViSTool.Desktop'; Exe = $(if ($IsWindows) { 'eViSTool.exe' } else { 'eViSTool' }) }
 }
 
 New-Item -ItemType Directory -Force $work, $Out | Out-Null

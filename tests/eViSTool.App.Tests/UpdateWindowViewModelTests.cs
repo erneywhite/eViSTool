@@ -268,7 +268,7 @@ public sealed class UpdateWindowViewModelTests
 
         // сначала окно закрывается, потом программа перезапускается — ровно один раз и главным exe из папки программы
         Assert.Equal(["close", "restart"], probe.Log);
-        Assert.Equal([Path.Combine(AppContext.BaseDirectory, AppUpdater.MainExe)], probe.Restarted);
+        Assert.Equal([Path.Combine(AppContext.BaseDirectory, AppUpdater.WindowExe)], probe.Restarted);
         Assert.Equal(UpdateWindowViewModel.MainExePath, probe.Restarted.Single());
         Assert.Equal(1, probe.Installs);
     }

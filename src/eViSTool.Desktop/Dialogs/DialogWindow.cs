@@ -16,7 +16,7 @@ namespace eViSTool.Desktop.Dialogs;
 /// </summary>
 public class DialogWindow : Window
 {
-    private static readonly Uri IconUri = new("avares://eViSTool.Desktop/Assets/eViSTool.ico");
+    private static readonly Uri IconUri = new("avares://eViSTool/Assets/eViSTool.ico");
     private static WindowIcon? _icon;
 
     /// <summary>Окна, открытые модально прямо сейчас: пока есть хоть одно, новые цепляются к самому верхнему окну.</summary>

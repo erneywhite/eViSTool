@@ -50,7 +50,7 @@
 
     <!-- ===== шрифты ===== -->
     <!-- основной (Noto Sans) задан шрифтом по умолчанию в Program.cs; здесь — моноширинный для версий, кода, консоли -->
-    <FontFamily x:Key="Forest.Mono">avares://eViSTool.Desktop/Assets/Fonts#Cascadia Mono</FontFamily>
+    <FontFamily x:Key="Forest.Mono">avares://eViSTool/Assets/Fonts#Cascadia Mono</FontFamily>
 
     <!-- ===== формы: скругления как у Fluent в окне на WPF ===== -->
     <CornerRadius x:Key="ControlCornerRadius">4</CornerRadius>

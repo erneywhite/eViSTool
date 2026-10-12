@@ -603,7 +603,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (!busy) RestartUpdated();
     }
 
-    private static string MainExe => Path.Combine(AppContext.BaseDirectory, Core.AppUpdate.AppUpdater.MainExe);
+    private static string MainExe => Path.Combine(AppContext.BaseDirectory, Core.AppUpdate.AppUpdater.WindowExe);
 
     [RelayCommand]
     private void RestartUpdated()

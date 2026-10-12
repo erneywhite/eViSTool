@@ -128,7 +128,7 @@ public sealed partial class AboutViewModel : ObservableObject
     {
         if (await InstallAsync() is { } release
             && Ui.Confirm(Loc.T("about.updateRestartAsk", release.Version), byDefault: Answer.Yes))
-            Ui.Platform.RestartAfterClose(Path.Combine(AppContext.BaseDirectory, AppUpdater.MainExe));
+            Ui.Platform.RestartAfterClose(Path.Combine(AppContext.BaseDirectory, AppUpdater.WindowExe));
     }
 
     /// <summary>

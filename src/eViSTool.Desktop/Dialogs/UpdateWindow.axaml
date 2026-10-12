@@ -61,7 +61,7 @@
                             AutomationProperties.AutomationId="UpdateWindowSkip" />
                 </StackPanel>
                 <StackPanel Grid.Row="0">
-                    <Image Source="avares://eViSTool.Desktop/Assets/logo256.png" Width="96" Height="96" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                    <Image Source="avares://eViSTool/Assets/logo256.png" Width="96" Height="96" RenderOptions.BitmapInterpolationMode="HighQuality" />
                     <TextBlock Text="{local:Tr updwin.title}" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}"
                                TextAlignment="Center" TextWrapping="Wrap" Margin="0,12,0,0" />
                     <!-- в окне на WPF Run шли с новой строки: между ними по пробелу -->

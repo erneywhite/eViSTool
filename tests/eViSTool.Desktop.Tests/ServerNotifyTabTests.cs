@@ -55,11 +55,11 @@ public sealed class ServerNotifyTabTests : IDisposable
         var app = Application.Current!;
         foreach (var name in new[] { "ForestResources", "ForestControls" })
         {
-            var include = new ResourceInclude(new Uri("avares://eViSTool.Desktop.Tests")) { Source = new Uri($"avares://eViSTool.Desktop/Themes/{name}.axaml") };
+            var include = new ResourceInclude(new Uri("avares://eViSTool.Desktop.Tests")) { Source = new Uri($"avares://eViSTool/Themes/{name}.axaml") };
             _theme.Add(include);
             app.Resources.MergedDictionaries.Add(include);
         }
-        _themeStyles = new StyleInclude(new Uri("avares://eViSTool.Desktop.Tests")) { Source = new Uri("avares://eViSTool.Desktop/Themes/Forest.axaml") };
+        _themeStyles = new StyleInclude(new Uri("avares://eViSTool.Desktop.Tests")) { Source = new Uri("avares://eViSTool/Themes/Forest.axaml") };
         app.Styles.Add(_themeStyles);
     }
 

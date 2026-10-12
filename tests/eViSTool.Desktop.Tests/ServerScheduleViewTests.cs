@@ -30,9 +30,9 @@ public sealed class ServerScheduleViewTests
         var model = new ServerViewModel(null!).Schedule;
         var window = new Window { Width = 1000, Height = 900, RequestedThemeVariant = ThemeVariant.Dark };
         var host = new Uri("avares://eViSTool.Desktop.Tests");
-        window.Resources.MergedDictionaries.Add(new ResourceInclude(host) { Source = new Uri("avares://eViSTool.Desktop/Themes/ForestResources.axaml") });
-        window.Resources.MergedDictionaries.Add(new ResourceInclude(host) { Source = new Uri("avares://eViSTool.Desktop/Themes/ForestControls.axaml") });
-        window.Styles.Add(new StyleInclude(host) { Source = new Uri("avares://eViSTool.Desktop/Themes/Forest.axaml") });
+        window.Resources.MergedDictionaries.Add(new ResourceInclude(host) { Source = new Uri("avares://eViSTool/Themes/ForestResources.axaml") });
+        window.Resources.MergedDictionaries.Add(new ResourceInclude(host) { Source = new Uri("avares://eViSTool/Themes/ForestControls.axaml") });
+        window.Styles.Add(new StyleInclude(host) { Source = new Uri("avares://eViSTool/Themes/Forest.axaml") });
         var view = new ServerScheduleView { DataContext = model };
         window.Content = view;
         window.Show();

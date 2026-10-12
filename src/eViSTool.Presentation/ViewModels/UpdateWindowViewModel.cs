@@ -72,7 +72,7 @@ public sealed partial class UpdateWindowViewModel : ObservableObject, IDisposabl
     }
 
     /// <summary>Какой exe запустить после обновления: главный файл программы в её папке (его подменила установка).</summary>
-    public static string MainExePath => Path.Combine(AppContext.BaseDirectory, AppUpdater.MainExe);
+    public static string MainExePath => Path.Combine(AppContext.BaseDirectory, AppUpdater.WindowExe);
 
     /// <summary>Эта версия программы.</summary>
     public string OldVersion { get; }

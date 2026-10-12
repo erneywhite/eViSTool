@@ -4,8 +4,8 @@
 #   pwsh build/publish.ps1                 — версия из Directory.Build.props
 #   pwsh build/publish.ps1 -Version 0.1.0-alpha.2
 #
-# Окно (eViSTool.exe) — один файл без рантайма внутри: ему нужен .NET 10 Desktop Runtime, тот же, что и клиенту
-# игры, поэтому у игроков он уже стоит. Агент (eViSTool.Agent.exe) — один файл с рантаймом внутри: ему нужен ещё
+# Окно (eViSTool.exe, Avalonia) — один файл без рантайма внутри: ему нужен .NET 10, тот же, что и клиенту игры,
+# поэтому у игроков он уже стоит. Агент (eViSTool.Agent.exe) — один файл с рантаймом внутри: ему нужен ещё
 # и ASP.NET Core, которого у игроков обычно нет, а агент должен запускаться и на голой машине с сервером.
 # Рантайм в агенте обрезан до того, что он использует (PublishTrimmed) — иначе exe весил бы ~50 МБ.
 #
@@ -33,8 +33,8 @@ Get-ChildItem (Join-Path $root 'src') -Directory | ForEach-Object {
 $common = @('-c', 'Release', '-r', 'win-x64', "-p:Version=$Version", '-p:PublishSingleFile=true', '-p:DebugType=None', '-p:DebugSymbols=false',
     '-p:IncludeNativeLibrariesForSelfExtract=true')
 
-dotnet publish (Join-Path $root 'src/eViSTool.App') @common --self-contained false -o $out
-if ($LASTEXITCODE) { throw "publish eViSTool.App: $LASTEXITCODE" }
+dotnet publish (Join-Path $root 'src/eViSTool.Desktop') @common --self-contained false -o $out
+if ($LASTEXITCODE) { throw "publish eViSTool.Desktop: $LASTEXITCODE" }
 
 dotnet publish (Join-Path $root 'src/eViSTool.Agent') @common --self-contained true `
     '-p:EnableCompressionInSingleFile=true' `
@@ -54,7 +54,8 @@ $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText("$zip.sha256", "$hash  $(Split-Path $zip -Leaf)`n")
 Get-ChildItem $out, $zip, "$zip.sha256" | Select-Object Name, @{ n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
 
-# ---- Linux: только агент (окна там нет) — так же один файл с обрезанным рантаймом внутри, .NET на машине не нужен.
+# ---- Linux: окно и агент, оба одним файлом с рантаймом внутри — .NET на машине не нужен (на Linux его ставят редко).
+# Агент обрезан, как и на Windows; окно — нет: Avalonia после обрезки ломается на привязках и стилях.
 # Архив — tar.gz, распаковывается в отдельную папку рядом с сервером (папку игры обновляют через rm -rf).
 $linuxOut = Join-Path $dist "$name-linux-x64"
 $tgz = Join-Path $dist "$name-linux-x64.tar.gz"
@@ -67,13 +68,19 @@ dotnet publish (Join-Path $root 'src/eViSTool.Agent') -c Release -r linux-x64 "-
     '-p:PublishTrimmed=true' '-p:TrimMode=full' '-p:EnableTrimAnalyzer=false' -o $linuxOut
 if ($LASTEXITCODE) { throw "publish eViSTool.Agent linux-x64: $LASTEXITCODE" }
 
-Get-ChildItem $linuxOut -File | Where-Object { $_.Name -ne 'eViSTool.Agent' } | Remove-Item -Force
+dotnet publish (Join-Path $root 'src/eViSTool.Desktop') -c Release -r linux-x64 "-p:Version=$Version" `
+    '-p:PublishSingleFile=true' '-p:DebugType=None' '-p:DebugSymbols=false' '-p:IncludeNativeLibrariesForSelfExtract=true' `
+    --self-contained true '-p:EnableCompressionInSingleFile=true' -o $linuxOut
+if ($LASTEXITCODE) { throw "publish eViSTool.Desktop linux-x64: $LASTEXITCODE" }
+
+$linuxExe = 'eViSTool', 'eViSTool.Agent'
+Get-ChildItem $linuxOut -File | Where-Object { $_.Name -notin $linuxExe } | Remove-Item -Force
 Get-ChildItem $linuxOut -Directory | Remove-Item -Recurse -Force
 foreach ($doc in 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'README.md', 'README.ru.md') {
     if (Test-Path (Join-Path $root $doc)) { Copy-Item (Join-Path $root $doc) $linuxOut }
 }
 
-# tar собираем сами (System.Formats.Tar из .NET, на котором работает pwsh), с правами Unix в каждой записи: агент —
+# tar собираем сами (System.Formats.Tar из .NET, на котором работает pwsh), с правами Unix в каждой записи: программы —
 # rwxr-xr-x, остальное — rw-r--r--. У файлов на Windows этих прав нет, и ни Compress-Archive, ни tar.exe их не поставят,
 # а распаковать архив и получить «Permission denied» на первом же запуске — плохое начало
 $stream = [IO.File]::Create($tgz)
@@ -82,7 +89,7 @@ try {
     $tar = [Formats.Tar.TarWriter]::new($gz, [Formats.Tar.TarEntryFormat]::Ustar, $true)
     foreach ($file in Get-ChildItem $linuxOut -File | Sort-Object Name) {
         $entry = [Formats.Tar.UstarTarEntry]::new([Formats.Tar.TarEntryType]::RegularFile, $file.Name)
-        $entry.Mode = [IO.UnixFileMode][Convert]::ToInt32($(if ($file.Name -eq 'eViSTool.Agent') { '755' } else { '644' }), 8)
+        $entry.Mode = [IO.UnixFileMode][Convert]::ToInt32($(if ($file.Name -in $linuxExe) { '755' } else { '644' }), 8)
         $entry.ModificationTime = [DateTimeOffset]$file.LastWriteTimeUtc
         $data = $file.OpenRead()
         try {
@@ -99,12 +106,12 @@ $hash = (Get-FileHash $tgz -Algorithm SHA256).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText("$tgz.sha256", "$hash  $(Split-Path $tgz -Leaf)`n")
 
 # zip для ModDB: те же файлы и права Unix в каждой записи. .NET пишет права (ExternalAttributes), но помечает архив как
-# созданный на Windows, и unzip их тогда не читает — агент распакуется без «исполняемый». Поэтому после записи в
+# созданный на Windows, и unzip их тогда не читает — программы распакуются без «исполняемый». Поэтому после записи в
 # оглавлении у каждой записи ставим «создан на Unix» (старший байт «version made by» = 3)
 $archive = [IO.Compression.ZipFile]::Open($lzip, [IO.Compression.ZipArchiveMode]::Create)
 try {
     foreach ($file in Get-ChildItem $linuxOut -File | Sort-Object Name) {
-        $mode = if ($file.Name -eq 'eViSTool.Agent') { 0x81ED } else { 0x81A4 } # обычный файл, 755 / 644
+        $mode = if ($file.Name -in $linuxExe) { 0x81ED } else { 0x81A4 } # обычный файл, 755 / 644
         $entry = [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $file.FullName, $file.Name, [IO.Compression.CompressionLevel]::Optimal)
         $entry.ExternalAttributes = $mode -shl 16
     }

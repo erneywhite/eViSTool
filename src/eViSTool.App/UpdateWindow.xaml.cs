@@ -71,7 +71,7 @@ public partial class UpdateWindow : Window
             return;
         }
         Close();
-        App.RestartAfterClose(Path.Combine(AppContext.BaseDirectory, AppUpdater.MainExe));
+        App.RestartAfterClose(Path.Combine(AppContext.BaseDirectory, AppUpdater.WindowExe));
     }
 
     private void Later_Click(object sender, RoutedEventArgs e) => Close();

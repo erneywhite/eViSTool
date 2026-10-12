@@ -49,11 +49,17 @@ public sealed class AppUpdater
 {
     public const string Repo = "erneywhite/eViSTool";
 
-    /// <summary>Архив релиза для этой системы: на Windows — zip с окном и агентом, на Linux — tar.gz с одним агентом.</summary>
+    /// <summary>Архив релиза для этой системы: на Windows — zip, на Linux — tar.gz; в обоих окно и агент.</summary>
     public static string AssetSuffix { get; } = OperatingSystem.IsWindows() ? "-win-x64.zip" : "-linux-x64.tar.gz";
 
-    /// <summary>Главная программа в архиве — по ней узнаём архив eViSTool. На Linux окна нет, главная там — агент.</summary>
+    /// <summary>
+    /// Программа, по которой узнаём архив eViSTool. На Linux это агент: до 0.11 окна в архиве для Linux не было,
+    /// а агент есть в архивах всех версий.
+    /// </summary>
     public static string MainExe { get; } = OperatingSystem.IsWindows() ? "eViSTool.exe" : Server.AgentProtocol.ExeName;
+
+    /// <summary>Окно eViSTool: его перезапускаем после обновления.</summary>
+    public static string WindowExe { get; } = OperatingSystem.IsWindows() ? "eViSTool.exe" : "eViSTool";
 
     private readonly HttpClient _http;
     private readonly string _publicKey;

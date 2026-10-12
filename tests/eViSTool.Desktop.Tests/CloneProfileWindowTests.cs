@@ -50,8 +50,8 @@ public sealed class CloneProfileWindowTests : IDisposable
             var baseUri = new Uri("avares://eViSTool.Desktop.Tests");
             _resources =
             [
-                new ResourceInclude(baseUri) { Source = new Uri("avares://eViSTool.Desktop/Themes/ForestResources.axaml") },
-                new ResourceInclude(baseUri) { Source = new Uri("avares://eViSTool.Desktop/Themes/ForestControls.axaml") },
+                new ResourceInclude(baseUri) { Source = new Uri("avares://eViSTool/Themes/ForestResources.axaml") },
+                new ResourceInclude(baseUri) { Source = new Uri("avares://eViSTool/Themes/ForestControls.axaml") },
             ];
             foreach (var include in _resources) Application.Current!.Resources.MergedDictionaries.Add(include);
         }

@@ -6,7 +6,7 @@
         xmlns:conv="using:eViSTool.Desktop.Converters"
         x:Class="eViSTool.Desktop.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Title="eViSTool" Icon="avares://eViSTool.Desktop/Assets/eViSTool.ico"
+        Title="eViSTool" Icon="avares://eViSTool/Assets/eViSTool.ico"
         Width="1400" Height="860" MinWidth="860" MinHeight="480" WindowStartupLocation="CenterScreen">
 
     <Window.Resources>
@@ -131,7 +131,7 @@
 
             <!-- лого и слоган -->
             <DockPanel DockPanel.Dock="Top" Margin="16,20,10,22">
-                <Image Source="avares://eViSTool.Desktop/Assets/logo256.png" Width="36" Height="36" VerticalAlignment="Top"
+                <Image Source="avares://eViSTool/Assets/logo256.png" Width="36" Height="36" VerticalAlignment="Top"
                        RenderOptions.BitmapInterpolationMode="HighQuality" />
                 <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
                     <TextBlock Text="eViSTool" FontSize="19" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />

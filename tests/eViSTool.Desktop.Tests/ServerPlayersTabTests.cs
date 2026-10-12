@@ -64,9 +64,9 @@ public sealed class ServerPlayersTabTests
             Window = new Window { Width = 1100, Height = 1000, Content = Tab };
             // тема окна: шаблоны и ключи, на которые ссылается разметка вкладки (в тестовом приложении только Fluent)
             var host = new Uri("avares://eViSTool.Desktop.Tests");
-            Window.Resources.MergedDictionaries.Add(new ResourceInclude(host) { Source = new Uri("avares://eViSTool.Desktop/Themes/ForestResources.axaml") });
-            Window.Resources.MergedDictionaries.Add(new ResourceInclude(host) { Source = new Uri("avares://eViSTool.Desktop/Themes/ForestControls.axaml") });
-            Window.Styles.Add(new StyleInclude(host) { Source = new Uri("avares://eViSTool.Desktop/Themes/Forest.axaml") });
+            Window.Resources.MergedDictionaries.Add(new ResourceInclude(host) { Source = new Uri("avares://eViSTool/Themes/ForestResources.axaml") });
+            Window.Resources.MergedDictionaries.Add(new ResourceInclude(host) { Source = new Uri("avares://eViSTool/Themes/ForestControls.axaml") });
+            Window.Styles.Add(new StyleInclude(host) { Source = new Uri("avares://eViSTool/Themes/Forest.axaml") });
             Window.Show();
             Model.SetActive(true);
         }
