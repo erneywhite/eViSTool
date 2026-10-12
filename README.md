@@ -28,7 +28,8 @@ eViSTool keeps your Vintage Story mods up to date, lets you browse and install m
 and runs your dedicated server from one window: console, players, configuration, backups, scheduled restarts,
 notifications and statistics.
 A server on another computer is managed the same way, with a single connection code.
-The server can run on Linux too: there eViSTool works as a service without a window, and you control it from the window on Windows.
+It works on Windows and Linux: the same window on both, with the game installed from the archive or from Flatpak.
+On a Linux server eViSTool runs as a service without a window, and you control it from the window on your computer.
 
 It is portable: unzip it anywhere and run. Nothing is installed into the system — no services, no autostart.
 
@@ -55,14 +56,16 @@ It is portable: unzip it anywhere and run. Nothing is installed into the system 
 ## Getting started
 
 1. Download `eViSTool-<version>-win-x64.zip` from the [ModDB page](https://mods.vintagestory.at/evistoolwin) or from [Releases](https://github.com/erneywhite/eViSTool/releases) — it is the same file.
-   For a server on Linux there is a separate archive, see [Server on Linux](#server-on-linux).
-2. Unzip it into any folder you like (not into the game folder) and run `eViSTool.exe`.
+   On Linux take `eViSTool-<version>-linux-x64.tar.gz` (or the zip from the [ModDB page for Linux](https://mods.vintagestory.at/evistoollinux)).
+2. Unzip it into any folder you like (not into the game folder) and run `eViSTool.exe` (on Linux, `eViSTool`).
+   On Linux the first start also adds eViSTool to the applications menu.
 3. eViSTool finds the game and your mods by itself and opens **My mods**.
    If the game is installed somewhere unusual, set its folder in **Settings**.
 
-**Requirements:** Windows 10 or 11 (x64) and the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
-The game client needs the same runtime, so it is already there if you play Vintage Story.
+**Requirements:** Windows 10 or 11 (x64) and [.NET 10](https://dotnet.microsoft.com/download/dotnet/10.0).
+The game client needs it too, so it is already there if you play Vintage Story.
 On a machine with only a dedicated server, Windows offers to download the runtime on the first start.
+On Linux (x64) nothing extra is needed: eViSTool ships with its own runtime. Tested on Ubuntu 24.04 with GNOME.
 
 > **"Windows protected your PC"?** eViSTool is not code-signed yet (see [Code signing policy](#code-signing-policy)),
 > so SmartScreen may warn about an unknown publisher on the first start. Click **More info → Run anyway**.
@@ -408,8 +411,8 @@ and nothing is exposed to the internet.
 
 Dedicated Vintage Story servers often live on Linux. eViSTool goes there next to the server: an agent without a window
 starts the server, brings it back after a crash, makes scheduled backups and restarts, sends notifications and records
-statistics. You control it from eViSTool on Windows with a connection code, like any remote server: console, mods,
-configuration, players, schedule — everything you have on Windows.
+statistics. You control it from the eViSTool window on your computer with a connection code, like any remote server:
+console, mods, configuration, players, schedule — everything you have for a local server.
 
 In short, if the server is installed the official way, with `server.sh`:
 
@@ -424,7 +427,8 @@ sudo -u vintagestory ./eViSTool.Agent remote code                    # connectio
 sudo ./eViSTool.Agent service install                                # systemd service
 ```
 
-Paste the code in the Windows window: **Settings → + Server → Server on another computer? → Connect by code…**.
+Paste the code in the window: **Settings → + Server → Server on another computer? → Connect by code…**.
+The archive also contains the window (`eViSTool`); a server without a desktop doesn't need it, it just lies there.
 
 Good to know:
 
@@ -432,7 +436,7 @@ Good to know:
   with it.
 - The `eViSTool-<version>-linux-x64.tar.gz` archive is in [Releases](https://github.com/erneywhite/eViSTool/releases); the same files as a zip are there and on the [ModDB page for Linux](https://mods.vintagestory.at/evistoollinux) (unpack with `sudo unzip … -d /home/vintagestory/evistool`).
   The agent doesn't need .NET, it ships with its own runtime. Tested on Ubuntu Server 24.04.
-- The agent is updated with **Update on the server** from the Windows window; systemd starts the new version by itself.
+- The agent is updated with **Update on the server** from the window; systemd starts the new version by itself.
 - Scheduled restart and announcement times are typed by your own clock; the window converts them to the server's
   and shows what that is there.
 
@@ -502,7 +506,8 @@ pwsh build/publish.ps1   # release build and zip in dist/
 ```
 
 Projects: `eViSTool.Core` — mods, ModDB, profiles, configs, backups, remote access; `eViSTool.Agent` — background agent that owns
-the server process; `eViSTool.App` — WPF interface; `tests/eViSTool.Core.Tests` and `tests/eViSTool.App.Tests` — tests.
+the server process; `eViSTool.Presentation` — window models; `eViSTool.Desktop` — the window (Avalonia, Windows and Linux);
+`eViSTool.App` — the former WPF window, kept for screen comparison until it is removed; `tests/` — tests.
 
 ## Code signing policy
 

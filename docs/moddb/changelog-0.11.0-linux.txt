@@ -1,0 +1,11 @@
+eViSTool 0.11.0 for Linux: now with a window.
+
+- The archive now has the eViSTool window next to the agent: the same program as on Windows. Run ./eViSTool on a desktop machine to manage your mods and servers. It finds the game installed from the archive (install.sh) or from Flatpak, launches it, and adds itself to the applications menu on the first start. Nothing extra to install: the window ships with its own runtime. Tested on Ubuntu 24.04 with GNOME.
+- On a server without a desktop nothing changes: the agent works as before, and the window just lies in the folder. Update the agent with Update on the server from the window.
+
+---
+
+eViSTool 0.11.0 для Linux: теперь с окном.
+
+- В архиве рядом с агентом теперь лежит окно eViSTool, та же программа, что и на Windows. На машине с рабочим столом запусти ./eViSTool, чтобы управлять модами и серверами. Окно находит игру из архива (install.sh) или из Flatpak, запускает её и при первом запуске само добавляется в меню приложений. Ставить ничего не нужно: окно собрано вместе со своей средой. Проверено на Ubuntu 24.04 с GNOME.
+- На сервере без рабочего стола ничего не меняется: агент работает как раньше, а окно просто лежит в папке. Агента обновляй кнопкой «Обновить на сервере» из окна.
