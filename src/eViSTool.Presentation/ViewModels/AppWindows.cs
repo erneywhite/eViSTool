@@ -60,6 +60,10 @@ public interface IAppWindows
     VersionOption? PickVersion(string heading, IReadOnlyList<VersionOption> options);
     PackExportOptions? ExportPack(string defaultName, int enabledCount, int disabledCount, bool hasModConfig);
     PackImportChoice? ConfirmPackImport(PackImportPlan plan);
+    /// <summary>Вставить код набора модов («EV1-…»); null — закрыли. Ответ — разобранный код (моды, выпуски, версия игры).</summary>
+    ModCodeSet? AskModCode();
+    /// <summary>Показать готовый код набора: блоком, который копируется щелчком (в буфер он уже положен).</summary>
+    void ShowModCode(ModCodeShare share);
     /// <summary>«Установить также в»: сам вопрос; правила «без вопроса» и «запомнить» — в <see cref="AlsoInstallPicker"/>.</summary>
     AlsoInstallAnswer? AskAlsoInstall(string hint, string currentName, string currentKind, string currentDetail, IReadOnlyList<AlsoChoice> others);
     void ShowScreenshots(IReadOnlyList<string> urls, int index, string title);

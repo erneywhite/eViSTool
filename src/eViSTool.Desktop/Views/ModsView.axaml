@@ -212,6 +212,10 @@
                                 <MenuFlyout Placement="BottomEdgeAlignedLeft">
                                     <MenuItem Header="{local:Tr pack.export}" Command="{Binding ExportPackCommand}" IsVisible="{Binding IsLocalProfile}" />
                                     <MenuItem Header="{local:Tr pack.import}" Command="{Binding ImportPackCommand}" />
+                                    <Separator />
+                                    <!-- код набора: строка в чат вместо файла — только моды с модбазы, с точными версиями -->
+                                    <MenuItem Header="{local:Tr modcode.menuCopy}" Command="{Binding CopyModCodeCommand}" />
+                                    <MenuItem Header="{local:Tr modcode.menuPaste}" Command="{Binding PasteModCodeCommand}" />
                                 </MenuFlyout>
                             </Button.Flyout>
                             <StackPanel Orientation="Horizontal">

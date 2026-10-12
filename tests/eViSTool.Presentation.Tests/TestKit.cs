@@ -86,13 +86,26 @@ internal sealed class UiThread : SynchronizationContext
 
     public override SynchronizationContext CreateCopy() => this;
 
-    /// <summary>Выполнить всё, что накопилось; true — что-то было.</summary>
+    // таймеры живут в самой очереди, как у диспетчера окна: срабатывают, когда поток её крутит, — без пула потоков
+    private readonly List<QueueTimer> _timers = [];
+
+    internal void AddTimer(QueueTimer timer) { lock (_timers) if (!_timers.Contains(timer)) _timers.Add(timer); }
+    internal void RemoveTimer(QueueTimer timer) { lock (_timers) _timers.Remove(timer); }
+
+    /// <summary>Выполнить всё, что накопилось, и подошедшие таймеры; true — что-то было.</summary>
     public bool RunPending()
     {
         var any = false;
         while (_queue.TryDequeue(out var item))
         {
             item.Callback(item.State);
+            any = true;
+        }
+        List<QueueTimer> due;
+        lock (_timers) due = [.. _timers.Where(t => t.IsDue)];
+        foreach (var timer in due)
+        {
+            timer.Fire();
             any = true;
         }
         return any;
@@ -116,7 +129,7 @@ internal class TestUiPlatform : IUiPlatform
     public void Post(Action action) => UiQueue.Post(_ => action(), null);
     public void PostIdle(Action action) => UiQueue.Post(_ => action(), null);
     public void Invoke(Action action) => UiQueue.Send(_ => action(), null);
-    public IUiTimer CreateTimer(TimeSpan interval) => new QueueTimer(interval);
+    public IUiTimer CreateTimer(TimeSpan interval) => new QueueTimer(UiQueue, interval);
 
     public IReadOnlyList<string>? PickFiles(string title, IReadOnlyList<FileFilter> filters, bool multiple) => null;
     public string? PickSaveFile(string title, IReadOnlyList<FileFilter> filters, string suggestedName, string? folder = null, bool confirmOverwrite = true) => null;
@@ -135,27 +148,6 @@ internal class TestUiPlatform : IUiPlatform
     public void RestartAfterClose(string exe) { }
     public string WriteCrashLog(Exception ex) => "";
 
-    /// <summary>Таймер, как у окна: Tick приходит в поток окна (через его очередь), пока таймер включён.</summary>
-    private sealed class QueueTimer(TimeSpan interval) : IUiTimer
-    {
-        private Timer? _timer;
-        public TimeSpan Interval { get; set; } = interval;
-        public bool IsEnabled => _timer is not null;
-        public event EventHandler? Tick;
-
-        public void Start()
-        {
-            Stop();
-            var queue = UiQueue;
-            _timer = new Timer(_ => queue.Post(_ => { if (_timer is not null) Tick?.Invoke(this, EventArgs.Empty); }, null), null, Interval, Interval);
-        }
-
-        public void Stop()
-        {
-            _timer?.Dispose();
-            _timer = null;
-        }
-    }
 }
 
 /// <summary>Ответы «пользователя» на вопросы по порядку; что спрашивали и о чём предупреждали — для проверок.</summary>
@@ -290,5 +282,36 @@ public sealed class TestServers : IAsyncLifetime
             catch (ArgumentException) { }
         }
         try { Directory.Delete(_tmp, recursive: true); } catch (IOException) { }
+    }
+}
+
+/// <summary>Таймер, как у окна: Tick приходит в поток окна, когда тест крутит его очередь, — пока таймер включён.</summary>
+internal sealed class QueueTimer(UiThread queue, TimeSpan interval) : IUiTimer
+{
+    private DateTime _due;
+
+    public TimeSpan Interval { get; set; } = interval;
+    public bool IsEnabled { get; private set; }
+    public event EventHandler? Tick;
+
+    internal bool IsDue => IsEnabled && DateTime.UtcNow >= _due;
+
+    public void Start()
+    {
+        _due = DateTime.UtcNow + Interval;
+        IsEnabled = true;
+        queue.AddTimer(this);
+    }
+
+    public void Stop()
+    {
+        IsEnabled = false;
+        queue.RemoveTimer(this);
+    }
+
+    internal void Fire()
+    {
+        _due = DateTime.UtcNow + Interval; // как DispatcherTimer: следующий — через интервал после этого
+        Tick?.Invoke(this, EventArgs.Empty);
     }
 }
