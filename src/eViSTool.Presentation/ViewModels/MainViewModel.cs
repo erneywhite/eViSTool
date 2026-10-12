@@ -703,13 +703,7 @@ public sealed partial class MainViewModel : ObservableObject
         // новый профиль — со своей папкой данных (…\ClientProfiles\имя) на основе существующего клиентского:
         // текущего, если он клиентский, иначе первого; нет ни одного — на основе стандартной папки игры
         var source = (ActiveProfile is { Kind: ProfileKind.Client } ? ActiveProfile : Profiles.FirstOrDefault(p => p.Kind == ProfileKind.Client))?.Model
-                     ?? new GameProfile
-                     {
-                         Name = Loc.T("profile.defaultClientName"),
-                         Kind = ProfileKind.Client,
-                         GameDir = KnownGameDir(),
-                         DataDir = GameInstall.DefaultDataDir,
-                     };
+                     ?? ProfileResolver.DefaultClient(KnownGameDir());
         if (AppWindows.Current.ClientProfile(source, clone: false, Loc.T("profile.newClient", Profiles.Count + 1)) is { } created)
             AddProfile(created);
     }

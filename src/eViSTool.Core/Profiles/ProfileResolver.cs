@@ -159,19 +159,41 @@ public static class ProfileResolver
     {
         gameDir ??= GameInstall.FindGameDir();
         var serverOnly = LooksLikeServerData(GameInstall.DefaultDataDir)
-                         || (!string.IsNullOrWhiteSpace(gameDir) && !File.Exists(Path.Combine(gameDir, "Vintagestory.exe"))
+                         || (!string.IsNullOrWhiteSpace(gameDir) && !File.Exists(Path.Combine(gameDir, GameLauncher.ClientExeName))
                              && File.Exists(ServerExecutable.PathIn(gameDir)));
         return serverOnly
             ? new GameProfile { Name = Loc.T("profile.defaultServerName"), Kind = ProfileKind.Server, GameDir = gameDir, DataDir = GameInstall.DefaultDataDir }
             : DefaultClient(gameDir);
     }
 
-    /// <summary>Профиль клиента по умолчанию — для первого запуска.</summary>
-    public static GameProfile DefaultClient(string? gameDir = null) => new()
+    /// <summary>
+    /// Профили первого запуска: основной (<see cref="DefaultProfile"/>) и, если рядом стоит ещё и игра из Flatpak, —
+    /// отдельный профиль на неё: у Flatpak свои моды и миры, а сам путь к нему человек вряд ли найдёт.
+    /// </summary>
+    public static List<GameProfile> DefaultProfiles(string? gameDir = null)
     {
-        Name = Loc.T("profile.defaultClientName"),
-        Kind = ProfileKind.Client,
-        GameDir = gameDir ?? GameInstall.FindGameDir(),
-        DataDir = GameInstall.DefaultDataDir,
-    };
+        var main = DefaultProfile(gameDir);
+        var result = new List<GameProfile> { main };
+        if (!GameInstall.IsFlatpak(main.GameDir)
+            && GameInstall.FlatpakGameDirs().FirstOrDefault(d => File.Exists(Path.Combine(d, GameLauncher.ClientExeName))) is { } flatpak)
+        {
+            var client = DefaultClient(flatpak);
+            client.Name = Loc.T("profile.flatpakClientName");
+            result.Add(client);
+        }
+        return result;
+    }
+
+    /// <summary>Профиль клиента по умолчанию — для первого запуска.</summary>
+    public static GameProfile DefaultClient(string? gameDir = null)
+    {
+        gameDir ??= GameInstall.FindGameDir();
+        return new()
+        {
+            Name = Loc.T("profile.defaultClientName"),
+            Kind = ProfileKind.Client,
+            GameDir = gameDir,
+            DataDir = GameInstall.DefaultDataDirFor(gameDir),
+        };
+    }
 }

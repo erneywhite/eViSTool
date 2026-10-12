@@ -10,7 +10,8 @@ namespace eViSTool.Core.Game;
 /// </summary>
 public static class GameLauncher
 {
-    public const string ClientExeName = "Vintagestory.exe";
+    /// <summary>Клиент игры в её папке: на Linux — запускатель без расширения (его же зовёт run.sh из архива).</summary>
+    public static string ClientExeName { get; } = OperatingSystem.IsWindows() ? "Vintagestory.exe" : "Vintagestory";
 
     public static string ClientExe(GameProfile profile) => Path.Combine(profile.GameDir ?? "", ClientExeName);
 
@@ -25,8 +26,24 @@ public static class GameLauncher
         if (string.IsNullOrWhiteSpace(profile.GameDir) || !File.Exists(exe))
             throw new FileNotFoundException(Loc.T("play.noExe", ClientExeName, profile.GameDir ?? "—"), exe);
 
-        var psi = new ProcessStartInfo(exe) { WorkingDirectory = Path.GetDirectoryName(Path.GetFullPath(exe))!, UseShellExecute = false };
-        if (DataPathFor(profile) is { } dataPath)
+        var dataPath = DataPathFor(profile);
+        ProcessStartInfo psi;
+        if (GameInstall.IsFlatpak(profile.GameDir))
+        {
+            // игра в песочнице видит только свою папку данных: чужую (профиль со своими данными) открываем ей явно
+            psi = new ProcessStartInfo("flatpak") { UseShellExecute = false };
+            psi.ArgumentList.Add("run");
+            if (dataPath is not null) psi.ArgumentList.Add("--filesystem=" + dataPath);
+            psi.ArgumentList.Add(GameInstall.FlatpakAppId);
+        }
+        else
+        {
+            psi = new ProcessStartInfo(exe) { WorkingDirectory = Path.GetDirectoryName(Path.GetFullPath(exe))!, UseShellExecute = false };
+            // на Linux игра грузит свои шрифты через fontconfig — run.sh из архива ставит этот путь, ставим и мы
+            var fonts = Path.Combine(psi.WorkingDirectory, "fonts.conf");
+            if (!OperatingSystem.IsWindows() && File.Exists(fonts)) psi.Environment["FONTCONFIG_FILE"] = fonts;
+        }
+        if (dataPath is not null)
         {
             psi.ArgumentList.Add("--dataPath");
             psi.ArgumentList.Add(dataPath);
@@ -49,7 +66,7 @@ public static class GameLauncher
     {
         if (string.IsNullOrWhiteSpace(profile.DataDir)) return null;
         var dir = Normalize(profile.DataDir);
-        return string.Equals(dir, Normalize(GameInstall.DefaultDataDir), StringComparison.OrdinalIgnoreCase) ? null : dir;
+        return string.Equals(dir, Normalize(GameInstall.DefaultDataDirFor(profile.GameDir)), StringComparison.OrdinalIgnoreCase) ? null : dir;
     }
 
     /// <summary>Запустить игру. Возвращает PID; игра живёт сама по себе — закрытие eViSTool её не трогает.</summary>

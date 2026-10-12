@@ -30,11 +30,37 @@ public static class GameInstall
         return null;
     }
 
-    /// <summary>Папка данных клиента по умолчанию: %APPDATA%\VintagestoryData.</summary>
+    /// <summary>Папка данных клиента по умолчанию: %APPDATA%\VintagestoryData, на Linux — ~/.config/VintagestoryData.</summary>
     public static string DefaultDataDir =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VintagestoryData");
 
     public static string DefaultModsDir => Path.Combine(DefaultDataDir, "Mods");
+
+    /// <summary>Игра из Flatpak (Linux): тот же архив игры внутри, но запуск — через flatpak run, данные — в его папке.</summary>
+    public const string FlatpakAppId = "at.vintagestory.VintageStory";
+
+    // путь «current/active» не меняется при обновлениях Flatpak, в отличие от папки с хэшем версии, куда он ведёт
+    private static readonly string FlatpakGameSubdir = Path.Combine("app", FlatpakAppId, "current", "active", "files", "extra", "vintagestory");
+
+    /// <summary>Где лежит игра из Flatpak: установка для пользователя (--user) и для всей системы.</summary>
+    public static IEnumerable<string> FlatpakGameDirs()
+    {
+        if (OperatingSystem.IsWindows()) yield break;
+        if (Platform.XdgDirs.DataHome() is { } home) yield return Path.Combine(home, "flatpak", FlatpakGameSubdir);
+        yield return Path.Combine("/var/lib/flatpak", FlatpakGameSubdir);
+    }
+
+    /// <summary>Папка данных игры из Flatpak: ~/.var/app/&lt;id&gt;/config/VintagestoryData.</summary>
+    public static string FlatpakDataDir => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".var", "app", FlatpakAppId, "config", "VintagestoryData");
+
+    /// <summary>Папка игры — из Flatpak (её запускают через flatpak run, а не напрямую).</summary>
+    public static bool IsFlatpak(string? gameDir) =>
+        !OperatingSystem.IsWindows() && !string.IsNullOrWhiteSpace(gameDir)
+        && Path.GetFullPath(gameDir).Contains($"/flatpak/app/{FlatpakAppId}/", StringComparison.Ordinal);
+
+    /// <summary>Стандартная папка данных для этой папки игры: у Flatpak она своя.</summary>
+    public static string DefaultDataDirFor(string? gameDir) => IsFlatpak(gameDir) ? FlatpakDataDir : DefaultDataDir;
 
     /// <summary>Ищет игру в стандартных местах установки. null — не нашли, пусть укажут вручную.</summary>
     public static string? FindGameDir()
@@ -46,9 +72,13 @@ public static class GameInstall
             (appData, "Vintagestory"),
             (programFiles, "Vintagestory"),
             (programFiles, "Vintage Story"),
+            // на Linux — куда ставит install.sh из архива игры
+            (OperatingSystem.IsWindows() ? "" : Platform.XdgDirs.DataHome() ?? "", "vintagestory"),
         ];
-        // на Linux Program Files нет (пустая строка) — без проверки вышла бы папка относительно текущей
+        // на Linux Program Files нет (пустая строка) — без проверки вышла бы папка относительно текущей;
+        // Flatpak — последним: архив, поставленный рядом, человек скорее всего и выбрал основным
         return candidates.Where(c => c.Root.Length > 0).Select(c => Path.Combine(c.Root, c.Name))
+            .Concat(FlatpakGameDirs())
             .FirstOrDefault(d => DetectVersion(d) is not null);
     }
 }

@@ -1316,6 +1316,7 @@
   "profile.configReadFailed": "Could not read {0}: {1}",
   "profile.dataNotFound": "Data folder not found",
   "profile.defaultClientName": "Client",
+  "profile.flatpakClientName": "Client (Flatpak)",
   "profile.defaultServerName": "Server",
   "profile.foreignModPath": "Skipped a mod folder from another operating system, the game will not find it: {0}. Fix the mod folder list in the game settings (for a server: Configuration → Advanced → Mod folders).",
   "profile.gameNotFound": "Game not found: point to the folder that contains {0}",

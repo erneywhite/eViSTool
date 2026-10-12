@@ -39,6 +39,39 @@ public sealed class GameLauncherTests : IDisposable
     }
 
     [Fact]
+    public void Linux_PointsFontconfigToGameFonts_LikeRunSh()
+    {
+        if (!OperatingSystem.IsLinux()) return; // fontconfig — только на Linux
+        Assert.False(GameLauncher.StartInfo(Client(null)).Environment.ContainsKey("FONTCONFIG_FILE")); // нет fonts.conf — не трогаем
+
+        var fonts = Path.Combine(_game, "fonts.conf");
+        File.WriteAllText(fonts, "");
+        Assert.Equal(fonts, GameLauncher.StartInfo(Client(null)).Environment["FONTCONFIG_FILE"]);
+    }
+
+    [Fact]
+    public void Flatpak_RunsThroughFlatpak_AndOpensOwnDataDirToTheSandbox()
+    {
+        if (!OperatingSystem.IsLinux()) return; // Flatpak — только на Linux
+        var game = Path.Combine(_root, "flatpak", "app", GameInstall.FlatpakAppId, "current", "active", "files", "extra", "vintagestory");
+        Directory.CreateDirectory(game);
+        File.WriteAllText(Path.Combine(game, GameLauncher.ClientExeName), "");
+        Assert.True(GameInstall.IsFlatpak(game));
+        Assert.False(GameInstall.IsFlatpak(_game));
+
+        // своя папка Flatpak — без параметров, как запускает его ярлык
+        var own = new GameProfile { Name = "F", Kind = ProfileKind.Client, GameDir = game, DataDir = GameInstall.FlatpakDataDir };
+        var psi = GameLauncher.StartInfo(own);
+        Assert.Equal("flatpak", psi.FileName);
+        Assert.Equal(["run", GameInstall.FlatpakAppId], psi.ArgumentList);
+
+        // профиль со своими данными: песочнице открываем эту папку и передаём её игре
+        var data = Path.Combine(_root, "Профиль 2");
+        psi = GameLauncher.StartInfo(new GameProfile { Name = "F2", Kind = ProfileKind.Client, GameDir = game, DataDir = data });
+        Assert.Equal(["run", "--filesystem=" + data, GameInstall.FlatpakAppId, "--dataPath", data], psi.ArgumentList);
+    }
+
+    [Fact]
     public void Refuses_ServerProfile_AndMissingGame()
     {
         var server = Client(null);

@@ -104,7 +104,7 @@ public sealed partial class ProfileViewModel : ObservableObject
     [RelayCommand]
     private void BrowseGameDir()
     {
-        var exe = Kind == ProfileKind.Server ? "VintagestoryServer.exe" : "Vintagestory.exe";
+        var exe = Kind == ProfileKind.Server ? Core.Game.ServerExecutable.FileName : Core.Game.GameLauncher.ClientExeName;
         if (Ui.Platform.PickFolder(Loc.T("profile.pickGameDir", exe), GameDir) is { } picked) GameDir = picked;
     }
 

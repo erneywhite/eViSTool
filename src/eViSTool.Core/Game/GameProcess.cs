@@ -115,25 +115,29 @@ public static class GameProcess
                 string? exe;
                 try { exe = p.MainModule?.FileName; }
                 catch (Exception ex) when (ex is Win32Exception or InvalidOperationException) { exe = null; }
-                if (exe is not null && !string.IsNullOrWhiteSpace(profile.GameDir) && !PathRules.IsUnder(exe, profile.GameDir))
+                // у игры из Flatpak путь — изнутри песочницы (/app/extra/vintagestory/Vintagestory)
+                var flatpak = GameInstall.IsFlatpak(profile.GameDir);
+                if (exe is not null && flatpak != exe.StartsWith("/app/", StringComparison.Ordinal)) continue;
+                if (exe is not null && !flatpak && !string.IsNullOrWhiteSpace(profile.GameDir) && !PathRules.IsUnder(exe, profile.GameDir))
                     continue;
                 if (ProcessCommandLine.GetArgs(p.Id) is not { } args)
                 {
                     result.Add(p.Id); // командную строку не узнать — лучше считать своим, чем пропустить
                     continue;
                 }
-                if (SameDataPath(ProcessCommandLine.Argument(args, "--dataPath"), wantData)) result.Add(p.Id);
+                if (SameDataPath(ProcessCommandLine.Argument(args, "--dataPath"), wantData, GameInstall.DefaultDataDirFor(profile.GameDir)))
+                    result.Add(p.Id);
             }
         }
         return result;
     }
 
     /// <summary>Папка данных из --dataPath совпадает с папкой профиля (null — стандартная папка, параметра нет).</summary>
-    public static bool SameDataPath(string? arg, string? profileDataPath)
+    public static bool SameDataPath(string? arg, string? profileDataPath, string? defaultDataDir = null)
     {
         static string? Norm(string? d) => string.IsNullOrWhiteSpace(d) ? null : Path.GetFullPath(d).TrimEnd('\\', '/');
         var a = Norm(arg);
-        if (a is not null && string.Equals(a, Norm(GameInstall.DefaultDataDir), StringComparison.OrdinalIgnoreCase)) a = null;
+        if (a is not null && string.Equals(a, Norm(defaultDataDir ?? GameInstall.DefaultDataDir), StringComparison.OrdinalIgnoreCase)) a = null;
         return string.Equals(a, Norm(profileDataPath), StringComparison.OrdinalIgnoreCase);
     }
 
