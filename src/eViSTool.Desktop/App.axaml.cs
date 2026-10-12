@@ -24,13 +24,16 @@ public partial class App : Application
         Dispatcher.UIThread.UnhandledException += (_, e) =>
         {
             var log = CrashLog.Write(e.Exception);
-            Ui.Error(Loc.T("crash.text", e.Exception.Message, log));
+            // окно уже закрыто (ошибка при выходе) — показать сообщение не над чем, остаётся отчёт в logs
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime { MainWindow.IsVisible: true })
+                Ui.Error(Loc.T("crash.text", e.Exception.Message, log));
             e.Handled = true; // окно продолжает работать
         };
         AppDomain.CurrentDomain.UnhandledException += (_, a) => CrashLog.Write(a.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, a) => { CrashLog.Write(a.Exception); a.SetObserved(); };
         Core.AppPaths.MigrateLegacy(); // до первого чтения настроек
         Core.AppUpdate.AppUpdater.CleanupOld(AppContext.BaseDirectory); // хвосты прошлого обновления
+        PreloadForRestart();
 
         Ui.Platform = new AvaloniaUiPlatform(); // модели спрашивают, открывают файлы и ставят таймеры через него
         AppWindows.Current = new AvaloniaAppWindows(); // и открывают окна программы
@@ -59,6 +62,22 @@ public partial class App : Application
         if (Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime { MainWindow: { } main }) return;
         main.Close();
         if (main.IsVisible) _restartExe = null;
+    }
+
+    /// <summary>
+    /// На Linux окно — один файл с .NET внутри, и сборки .NET из него грузятся по мере надобности. Обновление подменяет
+    /// этот файл, пока окно ещё работает, и то, что понадобится после подмены, старое окно в новом файле уже не найдёт:
+    /// перезапуск падал на «Could not load System.IO.Pipes». Поэтому всё, что нужно для запуска новой версии, — заранее.
+    /// </summary>
+    private static void PreloadForRestart()
+    {
+        if (OperatingSystem.IsWindows()) return; // там .NET установлен в системе, а не лежит в exe
+        _ = typeof(Process).Assembly;
+        _ = typeof(System.IO.Pipes.AnonymousPipeServerStream).Assembly;
+        _ = typeof(System.ComponentModel.Win32Exception).Assembly;
+        // загрузка типа ещё не грузит то, что нужно его методам, — холостой запуск тем же путём, что и перезапуск
+        try { using var p = Process.Start(new ProcessStartInfo("/bin/true") { UseShellExecute = true }); p?.WaitForExit(2000); }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { }
     }
 
     private static void StartRestart()
