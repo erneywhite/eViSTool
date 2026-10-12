@@ -302,10 +302,11 @@ public sealed class ClientProfileViewModelTests : IDisposable
     public void StaleCalculation_IsDropped_NewOneShown() => Sta.Run(() =>
     {
         using var slow = new ManualResetEventSlim(false);
-        var calls = 0;
         _plan = o =>
         {
-            if (Interlocked.Increment(ref calls) == 1) slow.Wait(TimeSpan.FromSeconds(20)); // первый расчёт (при открытии) задерживается
+            // задерживается расчёт при открытии (старое имя) — по имени, а не по порядку вызова: под нагрузкой фоновый
+            // расчёт открытия мог стартовать позже расчёта для нового имени, и тогда ждал бы не тот
+            if (o.Name != "Новое") slow.Wait(TimeSpan.FromSeconds(20));
             return Plan(o, bytes: o.Name == "Новое" ? 4000 : PlanBytes);
         };
         var vm = Model();
