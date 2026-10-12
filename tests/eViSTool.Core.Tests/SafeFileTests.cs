@@ -23,9 +23,11 @@ public sealed class SafeFileTests : IDisposable
         File.WriteAllText(tmp, "new");
 
         var reader = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var release = Task.Run(async () => { await Task.Delay(100); reader.Dispose(); });
+        // свой поток, не пул: на занятой машине CI задача из пула стартовала позже, чем Replace сдавался
+        var release = new Thread(() => { Thread.Sleep(50); reader.Dispose(); });
+        release.Start();
         SafeFile.Replace(tmp, file);
-        release.Wait();
+        release.Join();
 
         Assert.Equal("new", File.ReadAllText(file));
         Assert.False(File.Exists(tmp));
