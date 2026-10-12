@@ -261,6 +261,15 @@ public sealed partial class ModsViewModel : ObservableObject
         ? Loc.T("mods.subtitle", p.Name, p.KindText, Profile?.GameVersion?.ToString() ?? Loc.T("common.notFound"))
         : Loc.T("mods.noProfile");
 
+    /// <summary>У своего профиля не нашлась игра: в «Моих модах» плашка с кнопкой «Указать папку».</summary>
+    public bool GameMissing => !IsRemote && _main.ActiveProfile is { } p && p.Resolved.GameVersion is null;
+
+    public string GameMissingText => Loc.T("mods.gameMissing", _main.ActiveProfile is { IsServer: true }
+        ? Core.Game.ServerExecutable.FileName : Core.Game.GameLauncher.ClientExeName);
+
+    [RelayCommand]
+    private void PickGameDir() => _main.ActiveProfile?.BrowseGameDirCommand.Execute(null);
+
     /// <summary>Строка под кнопками: какие папки и какая игра.</summary>
     public string ProfileInfo => Profile is { } r
         ? Loc.T("mods.profileInfo", r.GameVersion?.ToString() ?? Loc.T("common.notFound"), string.Join("; ", r.ModDirs))
@@ -278,6 +287,8 @@ public sealed partial class ModsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsLocalProfile));
         OnPropertyChanged(nameof(ProfileInfo));
         OnPropertyChanged(nameof(HeaderSubtitle));
+        OnPropertyChanged(nameof(GameMissing));
+        OnPropertyChanged(nameof(GameMissingText));
         Selected = null;
         Card = null;
         if (IsRemote)

@@ -3,8 +3,9 @@ eViSTool 0.11.0: a new window, now on Windows and Linux.
 New
 - The window is rebuilt on a new framework (Avalonia). It looks and works the same as before, and the same program now runs on Linux too. Everything you had stays: profiles, settings, mods, servers.
 - Fonts are built in (Noto Sans and Cascadia Mono), so text looks the same on any system. Icons are redrawn.
-- On Linux eViSTool finds the game installed from the archive (install.sh) or from Flatpak, launches it and manages its mods. If both are installed, each gets its own profile.
+- On Linux eViSTool finds the game installed from the archive (it follows the shortcut install.sh creates, so the folder can be anywhere) or from Flatpak, launches it and manages its mods. If both are installed, each gets its own profile.
 - On Linux the first start adds eViSTool to the applications menu.
+- If the game isn't found, My mods says so and offers to choose its folder right there.
 
 Fixes
 - The window no longer needs the .NET Desktop Runtime specifically: plain .NET 10 is enough. If you play Vintage Story, you already have it.
@@ -19,8 +20,9 @@ eViSTool 0.11.0: новое окно, теперь на Windows и Linux.
 Новое
 - Окно пересобрано на новой основе (Avalonia). Выглядит и работает как раньше, а сама программа теперь запускается и на Linux. Всё на месте: профили, настройки, моды, серверы.
 - Шрифты встроены (Noto Sans и Cascadia Mono), текст выглядит одинаково на любой системе. Значки перерисованы.
-- На Linux eViSTool находит игру, поставленную из архива (install.sh) или из Flatpak, запускает её и управляет модами. Если стоят обе, у каждой будет свой профиль.
+- На Linux eViSTool находит игру из архива (по ярлыку, который создаёт install.sh, так что папка может быть любой) или из Flatpak, запускает её и управляет модами. Если стоят обе, у каждой будет свой профиль.
 - На Linux при первом запуске eViSTool сам появляется в меню приложений.
+- Если игра не нашлась, «Мои моды» прямо об этом говорят и предлагают сразу указать её папку.
 
 Исправления
 - Окну больше не нужен именно .NET Desktop Runtime: хватает обычного .NET 10. Если ты играешь в Vintage Story, он уже установлен.

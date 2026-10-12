@@ -72,13 +72,54 @@ public static class GameInstall
             (appData, "Vintagestory"),
             (programFiles, "Vintagestory"),
             (programFiles, "Vintage Story"),
-            // на Linux — куда ставит install.sh из архива игры
-            (OperatingSystem.IsWindows() ? "" : Platform.XdgDirs.DataHome() ?? "", "vintagestory"),
         ];
         // на Linux Program Files нет (пустая строка) — без проверки вышла бы папка относительно текущей;
         // Flatpak — последним: архив, поставленный рядом, человек скорее всего и выбрал основным
         return candidates.Where(c => c.Root.Length > 0).Select(c => Path.Combine(c.Root, c.Name))
+            .Concat(LinuxArchiveDirs())
             .Concat(FlatpakGameDirs())
             .FirstOrDefault(d => DetectVersion(d) is not null);
+    }
+
+    /// <summary>
+    /// Где искать игру из архива на Linux. Первым — папка из ярлыка, который пишет install.sh
+    /// (~/.local/share/applications/Vintagestory.desktop, строка Path=): так найдётся, куда бы её ни поставили.
+    /// Дальше — куда ставит сам install.sh и куда архив обычно распаковывают руками.
+    /// </summary>
+    public static IEnumerable<string> LinuxArchiveDirs()
+    {
+        if (OperatingSystem.IsWindows()) yield break;
+        var data = Platform.XdgDirs.DataHome();
+        if (data is not null)
+        {
+            var shortcut = Path.Combine(data, "applications", "Vintagestory.desktop");
+            string? text = null;
+            try { if (File.Exists(shortcut)) text = File.ReadAllText(shortcut); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            if (text is not null && GameDirFromShortcut(text) is { } fromShortcut) yield return fromShortcut;
+            yield return Path.Combine(data, "vintagestory");
+        }
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (home.Length > 0)
+        {
+            yield return Path.Combine(home, "Games", "vintagestory");
+            yield return Path.Combine(home, "Games", "Vintagestory");
+            yield return Path.Combine(home, "vintagestory");
+        }
+        yield return "/opt/vintagestory";
+    }
+
+    /// <summary>Папка игры из ярлыка install.sh: строка Path= в разделе [Desktop Entry]; нет её — null.</summary>
+    public static string? GameDirFromShortcut(string desktopEntry)
+    {
+        var inEntry = false;
+        foreach (var raw in desktopEntry.Split('\n'))
+        {
+            var line = raw.Trim();
+            if (line.StartsWith('[')) { inEntry = line == "[Desktop Entry]"; continue; }
+            if (inEntry && line.StartsWith("Path=", StringComparison.Ordinal) && line.Length > 5)
+                return line[5..].Trim();
+        }
+        return null;
     }
 }
