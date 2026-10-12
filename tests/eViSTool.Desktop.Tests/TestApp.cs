@@ -43,8 +43,11 @@ public sealed class RecordingCommand : ICommand
 
 internal static class Wait
 {
-    /// <summary>Ждать условия, давая поработать очереди окна (туда приходят ответы фоновых загрузок).</summary>
-    public static async Task Until(Func<bool> condition, int timeoutMs = 5000)
+    /// <summary>
+    /// Ждать условия, давая поработать очереди окна (туда приходят ответы фоновых загрузок). Запас — с расчётом на
+    /// медленные машины CI (запись настроек на диск там не укладывалась в 5 с); выполненное условие не ждёт.
+    /// </summary>
+    public static async Task Until(Func<bool> condition, int timeoutMs = 20000)
     {
         var watch = Stopwatch.StartNew();
         while (!condition())
