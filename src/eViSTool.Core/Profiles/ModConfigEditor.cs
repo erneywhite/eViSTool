@@ -117,7 +117,7 @@ public static class ModConfigEditor
         using (var writer = new JsonTextWriter(text) { Formatting = Formatting.Indented })
             root.WriteTo(writer);
         File.WriteAllText(tmp, text.ToString(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        File.Move(tmp, path, overwrite: true);
+        Platform.SafeFile.Replace(tmp, path);
     }
 
     /// <summary>Перевод строки файла по первой строке: «\r\n» или «\n»; строк нет — null.</summary>

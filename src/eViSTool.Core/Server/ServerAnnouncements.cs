@@ -52,7 +52,7 @@ public sealed record ServerAnnouncements
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
         var tmp = file + ".tmp";
         File.WriteAllText(tmp, JsonConvert.SerializeObject(this, Formatting.Indented));
-        File.Move(tmp, file, overwrite: true);
+        Platform.SafeFile.Replace(tmp, file);
     }
 
     public static DateTime? ChangedAt(string profileId, string? agentsDir = null) =>

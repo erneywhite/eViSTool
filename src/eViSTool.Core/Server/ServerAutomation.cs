@@ -141,6 +141,6 @@ public sealed record ServerAutomation
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
         var tmp = file + ".tmp";
         File.WriteAllText(tmp, JsonConvert.SerializeObject(this, Formatting.Indented));
-        File.Move(tmp, file, overwrite: true);
+        Platform.SafeFile.Replace(tmp, file);
     }
 }

@@ -93,6 +93,6 @@ public sealed class SettingsStore(string? path = null)
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
         var tmp = Path + ".tmp";
         File.WriteAllText(tmp, JsonConvert.SerializeObject(settings, Formatting.Indented));
-        File.Move(tmp, Path, overwrite: true);
+        Platform.SafeFile.Replace(tmp, Path);
     }
 }

@@ -126,7 +126,7 @@ public sealed record AgentConfig
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(file))!);
         var tmp = file + ".tmp";
         File.WriteAllText(tmp, doc.ToString(Formatting.Indented) + "\n");
-        File.Move(tmp, file, overwrite: true);
+        Platform.SafeFile.Replace(tmp, file);
     }
 
     private static void Put(JObject doc, string name, string? value, string fallback) =>

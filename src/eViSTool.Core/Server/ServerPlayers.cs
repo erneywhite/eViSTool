@@ -167,7 +167,7 @@ public sealed class ServerPlayers(string dataDir)
     {
         var tmp = file + ".evistool.tmp";
         File.WriteAllText(tmp, token.ToString(Formatting.Indented));
-        File.Move(tmp, file, overwrite: true);
+        Platform.SafeFile.Replace(tmp, file);
     }
 }
 

@@ -97,7 +97,7 @@ public static class NotifyChannels
         Directory.CreateDirectory(root);
         var tmp = file + ".tmp";
         File.WriteAllText(tmp, JsonConvert.SerializeObject(channels.ToList(), Formatting.Indented));
-        File.Move(tmp, file, overwrite: true);
+        Platform.SafeFile.Replace(tmp, file);
     }
 }
 

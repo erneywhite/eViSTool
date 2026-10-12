@@ -21,7 +21,7 @@ public static class OwnerOnlyFile
         try
         {
             using (var stream = new FileStream(tmp, options)) stream.Write(bytes);
-            File.Move(tmp, path, overwrite: true);
+            SafeFile.Replace(tmp, path);
         }
         catch
         {

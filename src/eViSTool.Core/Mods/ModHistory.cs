@@ -250,7 +250,7 @@ public static class ModHistory
         if (entries[0].At >= from.AddDays(-7)) return;
         var tmp = file + ".tmp";
         File.WriteAllLines(tmp, entries.Where(e => e.At >= from).Select(e => JsonConvert.SerializeObject(e, Settings)));
-        File.Move(tmp, file, overwrite: true);
+        Platform.SafeFile.Replace(tmp, file);
     }
 
     /// <summary>Файл может быть занят второй копией (окно и агент на одной машине) — несколько попыток.</summary>

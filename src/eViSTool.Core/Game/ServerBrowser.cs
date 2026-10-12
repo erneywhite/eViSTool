@@ -160,6 +160,6 @@ public static class GameFavorites
         change(list);
         var tmp = file + ".evistool.tmp";
         File.WriteAllText(tmp, root.ToString(Formatting.Indented));
-        File.Move(tmp, file, overwrite: true);
+        Platform.SafeFile.Replace(tmp, file);
     }
 }

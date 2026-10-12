@@ -205,7 +205,7 @@ public static partial class ModConfigs
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(file.Path)!); // файла (и папки) ещё может не быть
         var tmp = file.Path + ".evistool.tmp";
         File.WriteAllText(tmp, text, new UTF8Encoding(bom));
-        File.Move(tmp, file.Path, overwrite: true);
+        Platform.SafeFile.Replace(tmp, file.Path);
     }
 
     /// <summary>
@@ -273,7 +273,7 @@ public sealed class ModConfigBackups(string root, int keep = 5)
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
         var tmp = path + ".evistool.tmp";
         File.Copy(last, tmp, overwrite: true);
-        File.Move(tmp, path, overwrite: true);
+        Platform.SafeFile.Replace(tmp, path);
         File.Delete(last);
         return true;
     }

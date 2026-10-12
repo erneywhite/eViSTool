@@ -96,6 +96,6 @@ public static partial class ServerCommands
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
         var tmp = file + ".tmp";
         File.WriteAllText(tmp, JsonConvert.SerializeObject(commands.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase), Formatting.Indented));
-        File.Move(tmp, file, overwrite: true);
+        Platform.SafeFile.Replace(tmp, file);
     }
 }
