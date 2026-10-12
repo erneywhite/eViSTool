@@ -80,7 +80,7 @@ public static class ConfigValueCodec
 
             case Kind.Text or Kind.Multiline or Kind.Path:
             {
-                // поле ввода WPF вставляет «\r\n», сервер сам пишет «\n»; у пути пробелы по краям — всегда опечатка
+                // поле ввода может вставить «\r\n», сервер сам пишет «\n»; у пути пробелы по краям — всегда опечатка
                 var value = spec.Kind switch { Kind.Multiline => Lf(text), Kind.Path => text.Trim(), _ => text };
                 if (spec.EmptyIsNull && string.IsNullOrWhiteSpace(value)) return Ok(JValue.CreateNull());
                 if (value.Length == 0 && spec.Nullable && !spec.NeverNull) return Ok(JValue.CreateNull());

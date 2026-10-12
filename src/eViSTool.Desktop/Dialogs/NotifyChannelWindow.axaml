@@ -8,9 +8,9 @@
                       x:Class="eViSTool.Desktop.Dialogs.NotifyChannelWindow"
                       x:DataType="vm:NotifyChannelEditorViewModel"
                       Title="{local:Tr notify.windowTitle}" Width="544" SizeToContent="Height" CanResize="False">
-    <!-- ширина без рамки: в WPF Width="560" считается вместе с рамкой окна, внутри остаётся 544 -->
+    <!-- ширина — содержимого окна, без рамки -->
     <dialogs:DialogWindow.Styles>
-        <!-- строка состояния: песочная, ошибка — красная (в окне на WPF цвет ставил код через FindResource) -->
+        <!-- строка состояния: песочная, ошибка — красная -->
         <Style Selector="TextBlock.notifyStatus">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
         </Style>

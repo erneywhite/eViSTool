@@ -8,9 +8,9 @@
                       x:DataType="vm:RemoteFolderViewModel"
                       Title="{local:Tr rfolder.title}"
                       Width="544" Height="481" MinWidth="404" MinHeight="321">
-    <!-- размеры окна — клиентская область: Width/Height у окна на WPF (560×520, минимум 420×360) считают и рамку с заголовком (16 и 39 пикселей на Windows 11) -->
+    <!-- размеры окна — клиентская область, без рамки и заголовка -->
     <dialogs:DialogWindow.Styles>
-        <!-- строка списка папок такой же высоты, как у стандартного ListBox на WPF (там шаг строк около 49), у Avalonia — 45 -->
+        <!-- строка списка папок выше стандартной в Avalonia: шаг строк 49 вместо 45 -->
         <Style Selector="ListBox ListBoxItem">
             <Setter Property="MinHeight" Value="49" />
         </Style>

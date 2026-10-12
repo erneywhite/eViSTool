@@ -20,7 +20,7 @@ public partial class ModsView : UserControl
     public ModsView()
     {
         InitializeComponent();
-        // правый клик выделяет строку под курсором до открытия меню — меню действует на неё (как в таблице WPF)
+        // правый клик выделяет строку под курсором до открытия меню — меню действует на неё
         Grid.AddHandler(PointerPressedEvent, Grid_PointerPressed, RoutingStrategies.Tunnel);
         // перетаскивание zip-архивов из Проводника (Nautilus, Dolphin) в список модов
         Grid.AddHandler(DragDrop.DragOverEvent, Grid_DragOver);

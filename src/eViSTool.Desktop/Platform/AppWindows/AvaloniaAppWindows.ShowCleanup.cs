@@ -7,8 +7,8 @@ namespace eViSTool.Desktop.Platform;
 partial class AvaloniaAppWindows
 {
     /// <summary>
-    /// «Уборка диска» профиля: модально над главным окном, ответа нет (как ShowDialog в окне на WPF). Главного окна на
-    /// экране нет — окно не открывается, как и в окне на WPF.
+    /// «Уборка диска» профиля: модально над главным окном, ответа нет. Главного окна на
+    /// экране нет — окно не открывается.
     /// </summary>
     public void ShowCleanup(GameProfile profile)
     {

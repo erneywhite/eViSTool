@@ -183,7 +183,7 @@ public sealed class StatsChartLayout
         {
             var at = new StatsChartPoint(x + 4 + labelWidth > PlotRight ? x - 4 - labelWidth : x + 4, Top);
             var box = (L: at.X - 4, T: at.Y, R: at.X + labelWidth + 4, B: at.Y + labelHeight);
-            // как Rect.IntersectsWith в WPF: касание краями — тоже пересечение
+            // касание краями — тоже пересечение
             if (last is { } p && p.L <= box.R && box.L <= p.R && p.T <= box.B && box.T <= p.B) continue;
             list.Add(at);
             last = box;

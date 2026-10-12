@@ -9,7 +9,7 @@ partial class AvaloniaAppWindows
 {
     /// <summary>
     /// «Ошибки модов» профиля: не модально и не поверх всех окон, с владельцем — главным окном (из него и открывают, по
-    /// «!» у профиля), как Show с Owner в окне на WPF.
+    /// «!» у профиля).
     /// </summary>
     public void ShowModErrors(MainViewModel main, GameProfile profile, ModErrorReport report) =>
         new ModErrorsWindow { DataContext = ModErrorsViewModel.For(main, profile, report) }.ShowModeless();

@@ -8,14 +8,14 @@
                       x:Class="eViSTool.Desktop.Dialogs.ClientProfileWindow"
                       x:DataType="vm:ClientProfileViewModel"
                       Title="{Binding Title}" Width="624" SizeToContent="Height" CanResize="False">
-    <!-- ширина без рамки: в WPF Width="640" считается вместе с рамкой окна, внутри остаётся 624 -->
+    <!-- ширина — содержимого окна, без рамки -->
     <Window.Styles>
-        <!-- вариант с пояснением: у Fluent в окне на WPF текст варианта на 6 ниже верха переключателя (вровень с кружком),
+        <!-- вариант с пояснением: текст варианта на 6 ниже верха переключателя (вровень с кружком),
              у Fluent в Avalonia — вплотную к верху -->
         <Style Selector="RadioButton">
             <Setter Property="Padding" Value="8,6,0,0" />
         </Style>
-        <!-- название варианта (OptionTitle): цвет свой, как в окне на WPF, — у выключенного варианта он не бледнеет -->
+        <!-- название варианта (OptionTitle): цвет свой — у выключенного варианта он не бледнеет -->
         <Style Selector="TextBlock.optionTitle">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />

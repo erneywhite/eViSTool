@@ -86,7 +86,7 @@ public class AvaloniaUiPlatform : IUiPlatform
         OnUiThread(() => Modal.Wait(async () =>
         {
             if (Storage is not { } storage) return null;
-            // расширение — из первого фильтра («*.evpack» → «evpack»), как DefaultExt в окне на WPF
+            // расширение — из первого фильтра («*.evpack» → «evpack»)
             var ext = filters.FirstOrDefault()?.Patterns.FirstOrDefault() is { } first && first.StartsWith("*.") && first != "*.*" ? first[2..] : null;
             var file = await storage.SaveFilePickerAsync(new FilePickerSaveOptions
             {

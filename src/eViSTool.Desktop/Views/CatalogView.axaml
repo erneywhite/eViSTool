@@ -148,7 +148,7 @@
                                                            FontSize="40" FontWeight="Bold" Foreground="{DynamicResource Forest.Accent}"
                                                            Margin="20,0,0,0" VerticalAlignment="Center" Opacity="0.85" />
                                                 <!-- логотип целиком, по краям — он же, размытый. Размытый — во всю ширину и прижат к верху,
-                                                     низ обрезает шапка (как в окне на WPF): Image у Avalonia обрезает UniformToFill по центру
+                                                     низ обрезает шапка: Image у Avalonia обрезает UniformToFill по центру
                                                      своих границ, а в StackPanel её высоту ничто не ограничивает -->
                                                 <StackPanel>
                                                     <Image ctl:RemoteImage.Source="{Binding Logo}" Stretch="UniformToFill" Opacity="0.35">

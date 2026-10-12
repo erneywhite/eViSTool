@@ -32,7 +32,7 @@ public partial class BanWindow : DialogWindow
     private void Cancel_Click(object? sender, RoutedEventArgs e) => Close();
 
     // Enter на чипе срока Avalonia оставляет самому чипу (переключатель его забирает), до кнопки по умолчанию он не
-    // доходит. В окне на WPF он шёл на «Забанить» — здесь так же. В поле причины и на кнопках Enter работает сам.
+    // доходит. Поэтому он идёт на «Забанить». В поле причины и на кнопках Enter работает сам.
     private void OnPreviewKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter || e.Handled || e.KeyModifiers != KeyModifiers.None || e.Source is not ToggleButton) return;

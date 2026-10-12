@@ -5,7 +5,7 @@ using Avalonia.Data.Converters;
 namespace eViSTool.Desktop.Converters;
 
 /// <summary>
-/// Число → отступ слева (LeftMarginConverter окна на WPF): вложенное поле формы конфига сдвигается на
+/// Число → отступ слева: вложенное поле формы конфига сдвигается на
 /// <c>ConfigField.IndentLeft</c> пикселей. Не число — без отступа.
 /// </summary>
 public sealed class LeftMarginConverter : IValueConverter

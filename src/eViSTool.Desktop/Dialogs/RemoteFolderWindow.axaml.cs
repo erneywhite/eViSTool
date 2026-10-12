@@ -22,7 +22,7 @@ public partial class RemoteFolderWindow : DialogWindow
         if (_model is not null) _model.Chosen += OnChosen;
     }
 
-    // папки читает агент по сети — когда окно уже на экране (в окне на WPF — по Loaded)
+    // папки читает агент по сети — когда окно уже на экране
     protected override async void OnOpened(EventArgs e)
     {
         base.OnOpened(e);

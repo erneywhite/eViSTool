@@ -12,7 +12,7 @@ namespace eViSTool.Desktop.Controls;
 
 /// <summary>
 /// Картинка по адресу в сети: <c>&lt;Image c:RemoteImage.Source="{Binding Logo}" c:RemoteImage.DecodeWidth="92" /&gt;</c>.
-/// Avalonia сама по http не грузит (WPF умел), поэтому загрузка здесь: в фоне, с кэшем в памяти и на диске. Смена адреса
+/// Avalonia сама по http не грузит, поэтому загрузка здесь: в фоне, с кэшем в памяти и на диске. Смена адреса
 /// отменяет прежнюю загрузку — в списке с переработкой строк опоздавший ответ не подменит картинку соседа. Пока картинки
 /// нет, <c>Image.Source</c> = null: разметка показывает буквы, глядя на него, на <see cref="IsLoadingProperty"/> или
 /// <see cref="FailedProperty"/>.

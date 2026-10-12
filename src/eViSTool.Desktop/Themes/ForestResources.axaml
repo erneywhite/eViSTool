@@ -1,10 +1,10 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <!--
-        Лесная палитра (дизайн eViSTool-forest, Erney White) — те же значения, что в Themes/Forest.xaml окна на WPF.
+        Лесная палитра (дизайн eViSTool-forest, Erney White).
         1) Токены дизайна: Forest.*.
         2) Кисти элементов Fluent теми же цветами (базовые цвета Fluent меняет палитра в App.axaml, здесь — точечно
-           то, что окно на WPF перекрашивало отдельно: поля ввода, списки, галочки, таблица, подсказки).
+           поля ввода, списки, галочки, таблица, подсказки).
         3) Иконки и шрифты.
         Ключи кистей Fluent сверены по теме Avalonia.Themes.Fluent 12.1: опечатка в ключе ничего не роняет, элемент
         просто остаётся стандартного цвета, поэтому новые ключи — только после проверки на снимке.
@@ -41,23 +41,23 @@
     <SolidColorBrush x:Key="Forest.WarningBg" Color="{StaticResource Forest.WarningBgColor}" />
     <SolidColorBrush x:Key="Forest.Danger" Color="{StaticResource Forest.DangerColor}" />
 
-    <!-- оттенки, которые в окне на WPF стояли числом прямо в шаблонах -->
+    <!-- оттенки для шаблонов элементов -->
     <SolidColorBrush x:Key="Forest.LineStrong" Color="#46523F" />
     <SolidColorBrush x:Key="Forest.SelectedHover" Color="#414D39" />
     <SolidColorBrush x:Key="Forest.Disabled" Color="#242C25" />
     <SolidColorBrush x:Key="Forest.DisabledText" Color="#6E7A6A" />
-    <SolidColorBrush x:Key="Forest.Selection" Color="#666B6044" /> <!-- песок с прозрачностью 0.4, как выделение в WPF -->
+    <SolidColorBrush x:Key="Forest.Selection" Color="#666B6044" /> <!-- песок с прозрачностью 0.4 -->
 
     <!-- ===== шрифты ===== -->
     <!-- основной (Noto Sans) задан шрифтом по умолчанию в Program.cs; здесь — моноширинный для версий, кода, консоли -->
     <FontFamily x:Key="Forest.Mono">avares://eViSTool/Assets/Fonts#Cascadia Mono</FontFamily>
 
-    <!-- ===== формы: скругления как у Fluent в окне на WPF ===== -->
+    <!-- ===== формы: скругления Fluent ===== -->
     <CornerRadius x:Key="ControlCornerRadius">4</CornerRadius>
     <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
 
     <!-- ===== поля ввода: рамка-линия, в фокусе — песок ===== -->
-    <!-- Заливка — полупрозрачный белый, как её на деле рисует окно на WPF (Fluent ControlFillColor*: подмена в его теме
+    <!-- Заливка — полупрозрачный белый (Fluent ControlFillColor*: подмена в его теме
          до полей не доходила). На карточке поле так чуть светлее её; непрозрачная «поверхность» с карточкой сливалась. -->
     <SolidColorBrush x:Key="TextControlBackground" Color="#0FFFFFFF" />
     <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#15FFFFFF" />
@@ -69,7 +69,7 @@
     <StaticResource x:Key="TextControlBorderBrushPointerOver" ResourceKey="Forest.LineStrong" />
     <StaticResource x:Key="TextControlBorderBrushFocused" ResourceKey="Forest.Accent" />
     <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#12FFFFFF" />
-    <!-- отступ текста и подсказка без полупрозрачности — тоже как в окне на WPF -->
+    <!-- отступ текста и подсказка без полупрозрачности -->
     <Thickness x:Key="TextControlThemePadding">11,5,11,6</Thickness>
     <x:Double x:Key="TextControlPlaceholderOpacity">1</x:Double>
     <StaticResource x:Key="TextControlForeground" ResourceKey="Forest.Text" />

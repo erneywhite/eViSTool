@@ -8,11 +8,11 @@
                       Width="584" SizeToContent="Height" CanResize="False"
                       WindowStartupLocation="CenterScreen" ShowInTaskbar="True" Topmost="True"
                       Title="{Binding Title}">
-    <!-- ширина — содержимого окна: в окне на WPF Width="600" считал и рамку (по 8 px с боков), внутри было 584.
+    <!-- ширина — содержимого окна, без рамки.
          Окно — поверх всех и в панели задач, без владельца: вылет приходит, пока игрок в игре, а программа может быть
          свёрнута (на Wayland «поверх всех» композитор может не выполнить) -->
 
-    <!-- «Подробности» — как Expander Fluent в окне на WPF (лесная тема его не перекрашивала): шапка и содержимое —
+    <!-- «Подробности» — как Expander Fluent (лесная тема его не перекрашивала): шапка и содержимое —
          полупрозрачный белый, рамка — тёмная полупрозрачная (CardBackgroundFillColorDefault/Secondary, CardStrokeColorDefault) -->
     <dialogs:DialogWindow.Resources>
         <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#0DFFFFFF" />
@@ -23,7 +23,7 @@
         <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="#19000000" />
     </dialogs:DialogWindow.Resources>
     <dialogs:DialogWindow.Styles>
-        <!-- шапка ниже, чем у Fluent в Avalonia (48): в окне на WPF 43 с рамкой; текст и содержимое ближе к краю (11, у
+        <!-- шапка ниже, чем у Fluent в Avalonia (48); текст и содержимое ближе к краю (11, у
              Fluent в Avalonia 16) -->
         <Style Selector="Expander.details">
             <Setter Property="MinHeight" Value="43" />
@@ -32,13 +32,12 @@
         <Style Selector="Expander.details /template/ ToggleButton#ExpanderHeader">
             <Setter Property="Padding" Value="11,0,0,0" />
         </Style>
-        <!-- шеврон мельче и ближе к краю, как в окне на WPF (10×5 у правого края). Он в шаблоне шапки, вложенном в шаблон
+        <!-- шеврон мельче и ближе к краю (10×5 у правого края). Он в шаблоне шапки, вложенном в шаблон
              Expander. Масштабом и сдвигом: размер и отступ заданы в самом шаблоне, а значения шаблона сильнее стиля -->
         <Style Selector="Expander.details /template/ ToggleButton#ExpanderHeader /template/ Border#ExpandCollapseChevronBorder">
             <Setter Property="RenderTransform" Value="translate(7px, 0px) scale(0.71)" />
         </Style>
-        <!-- тонкая полоса прокрутки по горизонтали ложится поверх нижней строки стека: снизу у текста место под неё (в окне
-             на WPF она так же лежит в нижнем отступе поля). Отступ поля снизу — тот же, только внутри прокрутки -->
+        <!-- тонкая полоса прокрутки по горизонтали ложится поверх нижней строки стека: снизу у текста место под неё. Отступ поля снизу — тот же, только внутри прокрутки -->
         <Style Selector="TextBox.details">
             <Setter Property="Padding" Value="11,5,11,0" />
         </Style>

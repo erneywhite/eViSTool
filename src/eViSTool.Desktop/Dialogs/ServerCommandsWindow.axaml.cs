@@ -48,7 +48,7 @@ public partial class ServerCommandsWindow : DialogWindow
         e.Handled = true;
     }
 
-    // Enter в списке забирает сам список (в WPF он шёл на «Вставить»): перехватываем до него
+    // Enter в списке забирает сам список: перехватываем до него
     private void List_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter || e.KeyModifiers != KeyModifiers.None || _model is null) return;

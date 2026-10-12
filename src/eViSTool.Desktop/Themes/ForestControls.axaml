@@ -1,12 +1,12 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <!--
-        Шаблоны элементов лесной темы — перенос стилей с шаблонами из Themes/Forest.xaml окна на WPF.
-        Правила переноса:
-        • стиль WPF с шаблоном → ControlTheme с тем же ключом; в разметке Style="{StaticResource Forest.X}" становится
+        Шаблоны элементов лесной темы.
+        Правила:
+        • стиль с шаблоном → ControlTheme с тем же ключом; в разметке Style="{StaticResource Forest.X}" становится
           Theme="{StaticResource Forest.X}", ItemContainerStyle — ItemContainerTheme;
         • триггеры → вложенные стили ^:pointerover, ^:checked и т.п. Победителя при совпадении решает порядок
-          объявления (последний), как порядок триггеров в WPF, поэтому :checked/:selected идут после :pointerover;
+          объявления (последний), поэтому :checked/:selected идут после :pointerover;
         • варианты кнопки (песочная, «опасная», половинки «Играть ▾») — классы на той же теме: Classes="primary".
     -->
 
@@ -24,8 +24,8 @@
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <ControlTemplate>
-                <!-- содержимое всегда по центру, как в шаблоне WPF. RequiresFullOpacityHandling: прозрачность выключенной кнопки
-                     применяется к ней целиком, как Opacity на Border в WPF; иначе тёмный текст песочной кнопки
+                <!-- содержимое всегда по центру. RequiresFullOpacityHandling: прозрачность выключенной кнопки
+                     применяется к ней целиком; иначе тёмный текст песочной кнопки
                      смешивается с уже приглушённой заливкой и светлеет -->
                 <ContentPresenter x:Name="PART_ContentPresenter"
                                   Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"

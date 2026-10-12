@@ -110,7 +110,7 @@ public sealed partial class NewProfileViewModel : ObservableObject
     private static string Clean(string? text) => text?.Trim() ?? "";
 
     /// <summary>
-    /// Пересчёт после правки названия или папки. Как в окне на WPF, папка перечитывается и при смене названия: от него
+    /// Пересчёт после правки названия или папки. Папка перечитывается и при смене названия: от него
     /// зависят кнопки существующих данных.
     /// </summary>
     private void Refresh()

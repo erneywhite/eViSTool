@@ -6,8 +6,7 @@ namespace eViSTool.Desktop.Platform;
 partial class AvaloniaAppWindows
 {
     /// <summary>
-    /// «Найти сервер»: немодально (как Show в окне на WPF), список с сервера загружается сразу после открытия (в окне на
-    /// WPF — по Loaded).
+    /// «Найти сервер»: немодально, список с сервера загружается сразу после открытия.
     /// </summary>
     public void ShowFindServer(FindServerViewModel model)
     {

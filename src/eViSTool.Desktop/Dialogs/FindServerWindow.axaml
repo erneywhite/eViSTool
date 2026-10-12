@@ -8,8 +8,7 @@
                       x:DataType="vm:FindServerViewModel"
                       Title="{local:Tr browse.title}"
                       Width="964" Height="681" MinWidth="704" MinHeight="441">
-    <!-- Размер — рабочей области: у окна на WPF Width=980, Height=720 (MinWidth=720, MinHeight=480) считаются с рамкой и
-         заголовком -->
+    <!-- Размер — рабочей области, без рамки и заголовка -->
     <Window.Resources>
         <!-- чип-переключатель фильтра: как Forest.Chip, но для CheckBox и с рамкой-линией у невыбранного -->
         <ControlTheme x:Key="FindServer.FilterChip" TargetType="CheckBox">
@@ -195,7 +194,7 @@
         </StackPanel>
 
         <Grid Margin="0,6,0,0">
-            <!-- общий список: тысячи строк — ListBox виртуализирует сам. Выделения у строк нет (как в окне на WPF): щелчок
+            <!-- общий список: тысячи строк — ListBox виртуализирует сам. Выделения у строк нет: щелчок
                  мимо кнопок строку всё же выделяет, но прокручивать к ней список не нужно -->
             <ListBox ItemsSource="{Binding View.Items}" ItemTemplate="{StaticResource ServerRow}" ItemContainerTheme="{StaticResource FindServer.PlainItem}"
                      Background="Transparent" BorderThickness="0" Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"

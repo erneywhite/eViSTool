@@ -7,7 +7,7 @@
                       x:Class="eViSTool.Desktop.Dialogs.FavoriteServerWindow"
                       x:DataType="vm:FavoriteServerViewModel"
                       Title="{local:Tr browse.favTitle}" Width="444" SizeToContent="Height" CanResize="False">
-    <!-- ширина без рамки: в WPF Width="460" считается вместе с рамкой окна, внутри остаётся 444 -->
+    <!-- ширина — содержимого окна, без рамки -->
     <StackPanel Margin="24,20,24,22">
         <TextBlock Classes="dialogTitle" Text="{Binding Heading}" />
 

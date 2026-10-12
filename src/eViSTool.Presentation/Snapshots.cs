@@ -9,9 +9,8 @@ namespace eViSTool.Presentation;
 public sealed record SnapshotRequest(string Screen, string OutPath, int Width, int Height, TimeSpan Wait, string? Profile = null);
 
 /// <summary>
-/// Снимки окна для сверки переноса на Avalonia: окно (на WPF или на Avalonia) запускается с переменной
-/// EVISTOOL_SNAPSHOT, переходит на нужный экран, ждёт, сохраняет себя в PNG и закрывается. Оба окна берут одни и те же
-/// данные и одну и ту же навигацию отсюда — снимки сравнимы один к одному.
+/// Снимки окна: окно запускается с переменной
+/// EVISTOOL_SNAPSHOT, переходит на нужный экран, ждёт, сохраняет себя в PNG и закрывается. Данные и навигацию окно берёт отсюда — снимки воспроизводимы.
 /// Формат: <c>screen=server.config.world;out=C:\snap\a.png;size=1400x860;wait=5;profile=Сервер</c> (size, wait, profile —
 /// необязательно).
 /// Экраны: mods, mods.history, mods.card, catalog, catalog.card, modconfig[.&lt;modid&gt;], settings, about[.update], server[.console|players|stats|announcements|

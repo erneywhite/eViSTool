@@ -20,7 +20,7 @@ public partial class RollbackWindow : DialogWindow
         _model = new RollbackViewModel(heading, options);
         _model.Accepted += option => Close(option);
         DataContext = _model;
-        // Enter в таблице забирает сама таблица (у ListView в WPF — нет), и кнопка по умолчанию не срабатывает: перехватываем до неё
+        // Enter в таблице забирает сама таблица, и кнопка по умолчанию не срабатывает: перехватываем до неё
         List.AddHandler(KeyDownEvent, List_KeyDown, RoutingStrategies.Tunnel);
     }
 

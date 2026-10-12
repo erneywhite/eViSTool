@@ -7,8 +7,7 @@
                       x:DataType="vm:ModErrorsViewModel"
                       Title="{local:Tr errs.title}"
                       Width="664" MinWidth="504" MaxHeight="721" SizeToContent="Height">
-    <!-- размеры — содержимого окна: у окна на WPF Width=680, MinWidth=520, MaxHeight=760 считают и рамку с заголовком
-         (по 8 px с боков, 39 по высоте). Высота — под список, модов много — прокрутка -->
+    <!-- размеры — содержимого окна, без рамки и заголовка. Высота — под список, модов много — прокрутка -->
     <DockPanel Margin="24,20,24,20">
         <StackPanel DockPanel.Dock="Top">
             <TextBlock Classes="dialogTitle" Text="{local:Tr errs.title}" />
@@ -24,7 +23,7 @@
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="{local:Tr errs.dismiss}" Command="{Binding DismissCommand}" Padding="14,8" ToolTip.Tip="{local:Tr errs.dismissTip}"
                             AutomationProperties.AutomationId="ErrsDismiss" />
-                    <!-- Escape закрывает окно в DialogWindow, как IsCancel у этой кнопки в окне на WPF -->
+                    <!-- Escape закрывает окно в DialogWindow -->
                     <Button Content="{local:Tr common.close}" Click="Close_Click" Margin="8,0,0,0" Padding="16,8"
                             AutomationProperties.AutomationId="ErrsClose" />
                 </StackPanel>

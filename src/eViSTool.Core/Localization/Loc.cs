@@ -8,7 +8,7 @@ namespace eViSTool.Core.Localization;
 /// <summary>
 /// Переводы интерфейса. Словари — плоские JSON (ключ → текст) в Lang/*.json, вшиты в сборку.
 /// Нет ключа в выбранном языке — берётся английский, нет и там — показывается сам ключ (сразу видно, что забыли).
-/// Для WPF: индексатор + PropertyChanged("Item[]") — привязки обновляются при смене языка на лету.
+/// Индексатор + PropertyChanged("Item[]") — привязки по индексатору обновляются при смене языка на лету.
 /// </summary>
 public sealed class Loc : INotifyPropertyChanged
 {

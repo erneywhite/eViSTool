@@ -20,7 +20,7 @@ public partial class CleanupWindow : DialogWindow
         _model = DataContext as CleanupViewModel;
     }
 
-    // папки бывают большими — модель обходит их в фоне, когда окно уже на экране (в окне на WPF — по Loaded)
+    // папки бывают большими — модель обходит их в фоне, когда окно уже на экране
     protected override async void OnOpened(EventArgs e)
     {
         base.OnOpened(e);

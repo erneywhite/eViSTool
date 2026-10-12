@@ -7,8 +7,8 @@ using eViSTool.Core.Localization;
 namespace eViSTool.Desktop;
 
 /// <summary>
-/// Перевод в разметке: Text="{local:Tr mods.check}". Текст меняется сразу при переключении языка, как и в окне на WPF.
-/// Привязка — к Loc.Language, а перевод берёт конвертер: оповещение индексатора («Item[]», как ждёт WPF) привязки
+/// Перевод в разметке: Text="{local:Tr mods.check}". Текст меняется сразу при переключении языка.
+/// Привязка — к Loc.Language, а перевод берёт конвертер: оповещение индексатора («Item[]») привязки
 /// Avalonia не ловят, а смену свойства Language — ловят.
 /// </summary>
 public sealed class Tr(string key) : MarkupExtension

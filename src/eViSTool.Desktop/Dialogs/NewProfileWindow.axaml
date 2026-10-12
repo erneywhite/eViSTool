@@ -7,7 +7,7 @@
                       x:Class="eViSTool.Desktop.Dialogs.NewProfileWindow"
                       x:DataType="vm:NewProfileViewModel"
                       Title="{Binding Title}" Width="544" SizeToContent="Height" CanResize="False">
-    <!-- ширина без рамки: в WPF Width="560" считается вместе с рамкой окна, внутри остаётся 544 -->
+    <!-- ширина — содержимого окна, без рамки -->
     <StackPanel Margin="24,20,24,22">
         <TextBlock Classes="dialogTitle" Text="{Binding Title}" />
 

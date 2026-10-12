@@ -129,8 +129,8 @@
                                 <Button DockPanel.Dock="Left" Content="{local:Tr mcfg.openFolder}" Command="{Binding OpenFolderCommand}" Padding="12,6"
                                         IsVisible="{Binding CanShowFile}" />
                                 <!--
-                                    кнопки справа. Не влезают (узкое окно) — уходят под левый край, «Сохранить» видно всегда,
-                                    как в окне на WPF. Панель с HorizontalAlignment=Right Avalonia сжала бы до места и вытолкнула
+                                    кнопки справа. Не влезают (узкое окно) — уходят под левый край, «Сохранить» видно всегда.
+                                    Панель с HorizontalAlignment=Right Avalonia сжала бы до места и вытолкнула
                                     правые кнопки за карточку, поэтому холст: он ставит панель по её полной ширине от правого края
                                 -->
                                 <Canvas ClipToBounds="True" Height="{Binding #Actions.Bounds.Height}">
@@ -152,7 +152,7 @@
                             <ScrollViewer Margin="0,12,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                                           IsVisible="{Binding ShowForm}">
                                 <ItemsControl ItemsSource="{Binding Fields}" Margin="0,0,10,0">
-                                    <!-- поле — по типу значения (шаблон подбирается по DataType, как неявные шаблоны WPF) -->
+                                    <!-- поле — по типу значения (шаблон подбирается по DataType) -->
                                     <ItemsControl.DataTemplates>
                                         <DataTemplate DataType="vm:GroupField">
                                             <TextBlock Text="{Binding Key}" Margin="{Binding IndentLeft, Converter={x:Static conv:LeftMarginConverter.Instance}}"

@@ -45,7 +45,7 @@ public partial class App : Application
             desktop.MainWindow = main;
             // ярлык в меню приложений Linux — после настроек: описание в нём на языке программы
             if (Snapshots.FromEnvironment() is null) LinuxDesktopEntry.Ensure();
-            // снимок для сверки с окном на WPF: экран → PNG → выход (см. Presentation.Snapshots)
+            // снимок: экран → PNG → выход (см. Presentation.Snapshots)
             if (Snapshots.FromEnvironment() is { } snapshot)
                 main.Opened += (_, _) => Dispatcher.UIThread.Post(() => _ = SnapshotRunner.RunAsync(desktop, snapshot), DispatcherPriority.ApplicationIdle);
         }

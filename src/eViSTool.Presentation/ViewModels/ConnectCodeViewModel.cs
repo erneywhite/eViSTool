@@ -21,8 +21,7 @@ public sealed partial class ConnectCodeViewModel : ObservableObject
     internal static string? SnapshotText;
 
     private readonly Func<ConnectionCode, CancellationToken, Task<AgentStatus>> _status;
-    // проверка, которая идёт сейчас: код поменяли — её отменяют, и её ответ окно уже не покажет (в окне на WPF то же
-    // делал счётчик проверок)
+    // проверка, которая идёт сейчас: код поменяли — её отменяют, и её ответ окно уже не покажет
     private CancellationTokenSource? _check;
 
     /// <param name="okText">Надпись на кнопке «ОК»: «Подключить», «Сохранить».</param>
