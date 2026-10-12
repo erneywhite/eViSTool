@@ -31,6 +31,18 @@ cli.LoadConfig(); // data/agent.json — только без окна
 // язык сообщений: окно передаёт свой, без окна — из agent.json или язык системы (нет такого словаря — английский)
 eViSTool.Core.Localization.Loc.Instance.SetLanguage(cli.Language ?? cli.Config?.Language
     ?? System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
+// запустили двойным щелчком из Проводника: это не то, что человек хотел — объяснить и дождаться клавиши,
+// а не мигнуть консолью (без окна агент искал бы сервер рядом и тут же закрылся бы с ошибкой)
+if (args.Length == 0 && DoubleClick.Detected())
+{
+    Console.WriteLine(eViSTool.Core.Localization.Loc.T("agent.doubleClick"));
+    Console.WriteLine();
+    Console.WriteLine(eViSTool.Core.Localization.Loc.T("agent.pressKey"));
+    try { Console.ReadKey(intercept: true); }
+    catch (InvalidOperationException) { } // ввод перенаправлен — просто выйти
+    return 0;
+}
+
 // команды (setup, remote, status…, service) — выполнить и выйти; без команды агент работает дальше
 if (Commands.Run(cli, args) is { } exitCode) return exitCode;
 
