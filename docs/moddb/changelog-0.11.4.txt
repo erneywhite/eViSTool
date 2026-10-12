@@ -1,0 +1,17 @@
+eViSTool 0.11.4: the window's own title bar.
+
+New
+- The top bar of the window, with the section, the profile and Play, is now the title bar. The separate system title bar is gone, so the window has more room for mods. Drag the window by any empty spot of the bar or by the logo; double-click to maximize. Snap and the window menu work as before.
+- The minimize, maximize and close buttons sit at the right end of the bar, in the window's colors.
+
+Update from About.
+
+---
+
+eViSTool 0.11.4: своя шапка окна.
+
+Новое
+- Верхняя полоса окна с разделом, профилем и кнопкой «Играть» теперь служит заголовком. Отдельного системного заголовка больше нет, и модам достаётся больше места. Окно тащится за любое пустое место полосы и за логотип, двойной щелчок разворачивает его. Snap и меню окна работают как раньше.
+- Кнопки «свернуть», «развернуть» и «закрыть» стоят справа на полосе, в цветах окна.
+
+Обнови из «О программе».

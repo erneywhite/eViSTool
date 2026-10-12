@@ -1,0 +1,11 @@
+eViSTool 0.11.4 for Linux: the window's own title bar.
+
+- The top bar of the window, with the section, the profile and Play, is now the title bar: drag the window by any empty spot of it or by the logo, double-click to maximize. The window buttons sit at the right end of the bar, and the window draws its own border and shadow, so it can be resized by the edges as usual.
+- If you prefer the frame of your desktop, turn on Settings → System window frame: the usual title bar and buttons come back right away.
+
+---
+
+eViSTool 0.11.4 для Linux: своя шапка окна.
+
+- Верхняя полоса окна с разделом, профилем и кнопкой «Играть» теперь служит заголовком: окно тащится за любое пустое место полосы и за логотип, двойной щелчок разворачивает его. Кнопки окна стоят справа на полосе, рамку и тень окно рисует само, растягивается за края как обычно.
+- Если привычнее рамка рабочего стола, включи «Настройки» → «Системная рамка окна»: обычный заголовок с кнопками вернётся сразу.
