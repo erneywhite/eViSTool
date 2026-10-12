@@ -1,0 +1,11 @@
+eViSTool 0.11.1: a smaller archive for Linux.
+
+Fixes
+- The Linux archive is now 32 MB instead of 55 MB, so it fits on the ModDB page for Linux. The Windows version is the same as 0.11.0; updating is optional.
+
+---
+
+eViSTool 0.11.1: архив для Linux меньше.
+
+Исправления
+- Архив для Linux теперь весит 32 МБ вместо 55 МБ и помещается на страницу модбазы для Linux. Версия для Windows та же, что и 0.11.0, обновляться не обязательно.

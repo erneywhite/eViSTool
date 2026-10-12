@@ -49,13 +49,17 @@ foreach ($doc in 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'README.md', 'README.ru.md
 }
 
 Compress-Archive -Path (Join-Path $out '*') -DestinationPath $zip
+# ModDB принимает файлы до 40 МБ
+if ((Get-Item $zip).Length -gt 40MB) { throw "zip для Windows $([math]::Round((Get-Item $zip).Length / 1MB, 1)) МБ — больше 40 МБ, ModDB его не примет" }
 # контрольная сумма рядом с архивом: по ней программа проверяет скачанное, когда API GitHub недоступен (лимит запросов)
 $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText("$zip.sha256", "$hash  $(Split-Path $zip -Leaf)`n")
 Get-ChildItem $out, $zip, "$zip.sha256" | Select-Object Name, @{ n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
 
-# ---- Linux: окно и агент, оба одним файлом с рантаймом внутри — .NET на машине не нужен (на Linux его ставят редко).
-# Агент обрезан, как и на Windows; окно — нет: Avalonia после обрезки ломается на привязках и стилях.
+# ---- Linux: окно и агент, оба одним файлом с рантаймом внутри — .NET на машине не нужен (на Linux его ставят редко,
+# у игры из Flatpak и на Steam Deck его нет). Оба обрезаны, иначе архив не влезает в 40 МБ ModDB: агент — полностью,
+# как и на Windows; окно — мягко (TrimMode=partial): режутся только сборки, помеченные как безопасные для обрезки
+# (сам .NET), а наш код и то, что берёт типы через рефлексию, остаются целиком.
 # Архив — tar.gz, распаковывается в отдельную папку рядом с сервером (папку игры обновляют через rm -rf).
 $linuxOut = Join-Path $dist "$name-linux-x64"
 $tgz = Join-Path $dist "$name-linux-x64.tar.gz"
@@ -70,7 +74,8 @@ if ($LASTEXITCODE) { throw "publish eViSTool.Agent linux-x64: $LASTEXITCODE" }
 
 dotnet publish (Join-Path $root 'src/eViSTool.Desktop') -c Release -r linux-x64 "-p:Version=$Version" `
     '-p:PublishSingleFile=true' '-p:DebugType=None' '-p:DebugSymbols=false' '-p:IncludeNativeLibrariesForSelfExtract=true' `
-    --self-contained true '-p:EnableCompressionInSingleFile=true' -o $linuxOut
+    --self-contained true '-p:EnableCompressionInSingleFile=true' `
+    '-p:PublishTrimmed=true' '-p:TrimMode=partial' '-p:EnableTrimAnalyzer=false' '-p:SuppressTrimAnalysisWarnings=true' -o $linuxOut
 if ($LASTEXITCODE) { throw "publish eViSTool.Desktop linux-x64: $LASTEXITCODE" }
 
 $linuxExe = 'eViSTool', 'eViSTool.Agent'
@@ -129,6 +134,8 @@ for ($i = 0; $i -lt $count; $i++) {
     $at += 46 + [BitConverter]::ToUInt16($bytes, $at + 28) + [BitConverter]::ToUInt16($bytes, $at + 30) + [BitConverter]::ToUInt16($bytes, $at + 32)
 }
 [IO.File]::WriteAllBytes($lzip, $bytes)
+# ModDB принимает файлы до 40 МБ — больше выкладывать некуда, лучше узнать здесь, чем при заливке
+if ((Get-Item $lzip).Length -gt 40MB) { throw "zip для Linux $([math]::Round((Get-Item $lzip).Length / 1MB, 1)) МБ — больше 40 МБ, ModDB его не примет" }
 $hash = (Get-FileHash $lzip -Algorithm SHA256).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText("$lzip.sha256", "$hash  $(Split-Path $lzip -Leaf)`n")
 Get-ChildItem $linuxOut, $tgz, "$tgz.sha256", $lzip, "$lzip.sha256" | Select-Object Name, @{ n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
