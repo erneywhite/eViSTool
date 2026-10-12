@@ -1,0 +1,196 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+        Своя шапка главного окна (ExtendClientAreaToDecorationsHint): шапкой служит верхняя полоса окна (раздел, профиль,
+        «Играть»), здесь — только то, что рисует сама Avalonia поверх и под ней: кнопки окна, а на Linux ещё рамка и тень.
+        Кнопки находятся по именам PART_* и ролям ElementRole (так их подключает WindowDrawnDecorations); фона у шапки нет,
+        его даёт полоса окна. Основа — шаблон Fluent из Avalonia 12.1 (Controls/WindowDrawnDecorations.xaml).
+        Windows — прямоугольные кнопки 46×32 у верхнего края, как у системных; Linux — круглые, в духе GNOME, по центру полосы.
+    -->
+
+    <x:Double x:Key="Forest.TitleBarHeight">60</x:Double>
+
+    <!-- кнопка окна Windows: прямоугольник без рамки, «закрыть» при наведении — красная -->
+    <ControlTheme x:Key="Forest.CaptionButtonWin" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Width" Value="46" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="(WindowDecorationProperties.ElementRole)" Value="DecorationsElement" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <ContentPresenter Name="PART_ContentPresenter" Background="{TemplateBinding Background}"
+                                  HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                  Content="{TemplateBinding Content}" />
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover">
+            <Setter Property="Background" Value="{DynamicResource Forest.Raised}" />
+        </Style>
+        <Style Selector="^:pressed">
+            <Setter Property="Background" Value="{DynamicResource Forest.Selected}" />
+        </Style>
+        <Style Selector="^.close:pointerover">
+            <Setter Property="Background" Value="#C42B1C" />
+        </Style>
+        <Style Selector="^.close:pressed">
+            <Setter Property="Background" Value="#B0291C" />
+        </Style>
+    </ControlTheme>
+
+    <!-- кнопка окна Linux: круг -->
+    <ControlTheme x:Key="Forest.CaptionButtonLinux" TargetType="Button">
+        <Setter Property="Background" Value="{DynamicResource Forest.Raised}" />
+        <Setter Property="Width" Value="24" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="(WindowDecorationProperties.ElementRole)" Value="DecorationsElement" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <ContentPresenter Name="PART_ContentPresenter" Background="{TemplateBinding Background}" CornerRadius="12"
+                                  HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                  Content="{TemplateBinding Content}" />
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover">
+            <Setter Property="Background" Value="{DynamicResource Forest.SelectedHover}" />
+        </Style>
+        <Style Selector="^:pressed">
+            <Setter Property="Background" Value="{DynamicResource Forest.Selected}" />
+        </Style>
+    </ControlTheme>
+
+    <!-- значки кнопок: линии в сетке 24×24, как остальные иконки; в шаблоне каждый — в Viewbox с холстом 24×24
+         (у линии «свернуть» нулевая высота, сама она не растягивается) -->
+    <StreamGeometry x:Key="Icon.WinMinimize">M6 12 H18</StreamGeometry>
+    <StreamGeometry x:Key="Icon.WinMaximize">M6.5 6.5 H17.5 V17.5 H6.5 Z</StreamGeometry>
+    <StreamGeometry x:Key="Icon.WinRestore">M6.5 9.5 H14.5 V17.5 H6.5 Z M9.5 9.5 V6.5 H17.5 V14.5 H14.5</StreamGeometry>
+    <StreamGeometry x:Key="Icon.WinClose">M7 7 L17 17 M17 7 L7 17</StreamGeometry>
+
+    <!-- ===== Windows ===== -->
+    <ControlTheme x:Key="Forest.WindowChromeWin" TargetType="WindowDrawnDecorations">
+        <Setter Property="DefaultTitleBarHeight" Value="{StaticResource Forest.TitleBarHeight}" />
+        <Setter Property="DefaultFrameThickness" Value="0" />
+        <Setter Property="DefaultShadowThickness" Value="0" />
+        <Setter Property="Template">
+            <WindowDrawnDecorationsTemplate>
+                <WindowDrawnDecorationsContent>
+                    <WindowDrawnDecorationsContent.Overlay>
+                        <StackPanel x:Name="PART_OverlayPanel" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                    IsVisible="{TemplateBinding HasTitleBar}">
+                            <Button x:Name="PART_MinimizeButton" Theme="{StaticResource Forest.CaptionButtonWin}"
+                                    WindowDecorationProperties.ElementRole="MinimizeButton">
+                                <Viewbox Classes="caption"><Canvas Width="24" Height="24"><Path Classes="caption" Data="{StaticResource Icon.WinMinimize}" /></Canvas></Viewbox>
+                            </Button>
+                            <Button x:Name="PART_MaximizeButton" Theme="{StaticResource Forest.CaptionButtonWin}"
+                                    WindowDecorationProperties.ElementRole="MaximizeButton">
+                                <Viewbox Classes="caption"><Canvas Width="24" Height="24"><Path x:Name="MaximizePath" Classes="caption" Data="{StaticResource Icon.WinMaximize}" /></Canvas></Viewbox>
+                            </Button>
+                            <Button x:Name="PART_CloseButton" Classes="close" Theme="{StaticResource Forest.CaptionButtonWin}"
+                                    WindowDecorationProperties.ElementRole="CloseButton">
+                                <Viewbox Classes="caption"><Canvas Width="24" Height="24"><Path Classes="caption" Data="{StaticResource Icon.WinClose}" /></Canvas></Viewbox>
+                            </Button>
+                        </StackPanel>
+                    </WindowDrawnDecorationsContent.Overlay>
+                </WindowDrawnDecorationsContent>
+            </WindowDrawnDecorationsTemplate>
+        </Setter>
+        <Style Selector="^ /template/ Viewbox.caption">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+        </Style>
+        <Style Selector="^ /template/ Path.caption">
+            <Setter Property="StrokeThickness" Value="1.5" />
+            <Setter Property="Stroke" Value="{DynamicResource Forest.Text}" />
+        </Style>
+        <Style Selector="^:maximized /template/ Path#MaximizePath">
+            <Setter Property="Data" Value="{StaticResource Icon.WinRestore}" />
+        </Style>
+        <Style Selector="^ /template/ Button:disabled">
+            <Setter Property="Opacity" Value="0.3" />
+        </Style>
+        <Style Selector="^:not(:has-minimize) /template/ Button#PART_MinimizeButton">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="^:not(:has-maximize) /template/ Button#PART_MaximizeButton">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="^:fullscreen /template/ StackPanel#PART_OverlayPanel">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+    </ControlTheme>
+
+    <!-- ===== Linux: Avalonia рисует ещё рамку, тень и уголки для растягивания ===== -->
+    <ControlTheme x:Key="Forest.WindowChromeLinux" TargetType="WindowDrawnDecorations">
+        <Setter Property="DefaultTitleBarHeight" Value="{StaticResource Forest.TitleBarHeight}" />
+        <Setter Property="DefaultFrameThickness" Value="1" />
+        <Setter Property="DefaultShadowThickness" Value="8" />
+        <Setter Property="Template">
+            <WindowDrawnDecorationsTemplate>
+                <WindowDrawnDecorationsContent>
+                    <WindowDrawnDecorationsContent.Underlay>
+                        <Panel x:Name="PART_UnderlayWrapper">
+                            <Border x:Name="PART_WindowBorder" BorderThickness="{TemplateBinding FrameThickness}"
+                                    BorderBrush="{DynamicResource Forest.LineStrong}" IsHitTestVisible="False" />
+                        </Panel>
+                    </WindowDrawnDecorationsContent.Underlay>
+                    <WindowDrawnDecorationsContent.Overlay>
+                        <Panel x:Name="PART_OverlayWrapper">
+                            <StackPanel x:Name="PART_OverlayPanel" Orientation="Horizontal" Spacing="10" Margin="0,0,16,0"
+                                        HorizontalAlignment="Right" VerticalAlignment="Top" Height="{TemplateBinding TitleBarHeight}"
+                                        IsVisible="{TemplateBinding HasTitleBar}">
+                                <Button x:Name="PART_MinimizeButton" Theme="{StaticResource Forest.CaptionButtonLinux}"
+                                        WindowDecorationProperties.ElementRole="MinimizeButton">
+                                    <Viewbox Classes="caption"><Canvas Width="24" Height="24"><Path Classes="caption" Data="{StaticResource Icon.WinMinimize}" /></Canvas></Viewbox>
+                                </Button>
+                                <Button x:Name="PART_MaximizeButton" Theme="{StaticResource Forest.CaptionButtonLinux}"
+                                        WindowDecorationProperties.ElementRole="MaximizeButton">
+                                    <Viewbox Classes="caption"><Canvas Width="24" Height="24"><Path x:Name="MaximizePath" Classes="caption" Data="{StaticResource Icon.WinMaximize}" /></Canvas></Viewbox>
+                                </Button>
+                                <Button x:Name="PART_CloseButton" Theme="{StaticResource Forest.CaptionButtonLinux}"
+                                        WindowDecorationProperties.ElementRole="CloseButton">
+                                    <Viewbox Classes="caption"><Canvas Width="24" Height="24"><Path Classes="caption" Data="{StaticResource Icon.WinClose}" /></Canvas></Viewbox>
+                                </Button>
+                            </StackPanel>
+                        </Panel>
+                    </WindowDrawnDecorationsContent.Overlay>
+                </WindowDrawnDecorationsContent>
+            </WindowDrawnDecorationsTemplate>
+        </Setter>
+        <Style Selector="^ /template/ Viewbox.caption">
+            <Setter Property="Width" Value="12" />
+            <Setter Property="Height" Value="12" />
+        </Style>
+        <Style Selector="^ /template/ Path.caption">
+            <Setter Property="StrokeThickness" Value="2.5" />
+            <Setter Property="Stroke" Value="{DynamicResource Forest.Text}" />
+        </Style>
+        <Style Selector="^:maximized /template/ Path#MaximizePath">
+            <Setter Property="Data" Value="{StaticResource Icon.WinRestore}" />
+        </Style>
+        <!-- тень: рамка и кнопки отступают внутрь на её толщину -->
+        <Style Selector="^:has-shadow /template/ Panel#PART_UnderlayWrapper">
+            <Setter Property="Margin" Value="{TemplateBinding ShadowThickness}" />
+        </Style>
+        <Style Selector="^:has-shadow /template/ Border#PART_WindowBorder">
+            <Setter Property="BoxShadow" Value="0 2 10 2 #80000000" />
+        </Style>
+        <Style Selector="^:has-shadow /template/ Panel#PART_OverlayWrapper">
+            <Setter Property="Margin" Value="{TemplateBinding ShadowThickness}" />
+        </Style>
+        <!-- кнопки — внутри рамки: по высоте ровно на полосе окна (та отступает на тень и рамку, см. MainWindow) -->
+        <Style Selector="^:has-border /template/ StackPanel#PART_OverlayPanel">
+            <Setter Property="Margin" Value="0,1,16,0" />
+        </Style>
+        <Style Selector="^ /template/ Button:disabled">
+            <Setter Property="Opacity" Value="0.3" />
+        </Style>
+        <Style Selector="^:not(:has-minimize) /template/ Button#PART_MinimizeButton">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="^:not(:has-maximize) /template/ Button#PART_MaximizeButton">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="^:fullscreen /template/ StackPanel#PART_OverlayPanel">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+    </ControlTheme>
+</ResourceDictionary>

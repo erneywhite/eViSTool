@@ -315,6 +315,16 @@
                                     </StackPanel>
                                 </DockPanel>
                             </Border>
+                            <Border Classes="row" Margin="0,10,0,0" IsVisible="{Binding CanChooseWindowFrame}">
+                                <DockPanel>
+                                    <CheckBox DockPanel.Dock="Right" Theme="{StaticResource Forest.Switch}" IsChecked="{Binding SystemWindowFrame}"
+                                              VerticalAlignment="Center" AutomationProperties.AutomationId="SystemWindowFrame" />
+                                    <StackPanel Margin="0,0,16,0">
+                                        <TextBlock Text="{local:Tr settings.systemFrame}" FontSize="13" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{local:Tr settings.systemFrameHint}" Classes="hint" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
                         </StackPanel>
                     </Border>
 

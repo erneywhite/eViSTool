@@ -87,6 +87,9 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Копия одиночных миров перед изменением модов клиентского профиля.</summary>
     [ObservableProperty] private bool _copyWorldsBeforeModChanges;
 
+    /// <summary>Рамка главного окна — системная (окно следит за свойством и переключает шапку сразу).</summary>
+    [ObservableProperty] private bool _systemWindowFrame;
+
     /// <summary>Связи редактируемого профиля: в какие профили ставить моды заодно.</summary>
     public System.Collections.ObjectModel.ObservableCollection<LinkChoice> LinkChoices { get; } = [];
 
@@ -146,6 +149,15 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnCopyWorldsBeforeModChangesChanged(bool value)
     {
         _settings.CopyWorldsBeforeModChanges = value;
+        Save();
+    }
+
+    /// <summary>Переключатель «Системная рамка» — только на Linux: там шапку можно вернуть оконному менеджеру.</summary>
+    public bool CanChooseWindowFrame => OperatingSystem.IsLinux();
+
+    partial void OnSystemWindowFrameChanged(bool value)
+    {
+        _settings.SystemWindowFrame = value;
         Save();
     }
 
@@ -501,6 +513,7 @@ public sealed partial class MainViewModel : ObservableObject
         _allowUnstable = _settings.AllowUnstable;
         _alsoInstallWithoutAsking = _settings.AlsoInstallWithoutAsking;
         _copyWorldsBeforeModChanges = _settings.CopyWorldsBeforeModChanges;
+        _systemWindowFrame = _settings.SystemWindowFrame;
         _autoCheckUpdates = _settings.AutoCheckUpdates;
         _selectedLanguage = Languages.FirstOrDefault(l => l.Value == Loc.Instance.Language) ?? Languages[0];
         _activeProfile = Profiles.FirstOrDefault(p => p.Model == _settings.ActiveProfile);

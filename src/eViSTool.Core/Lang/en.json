@@ -1765,6 +1765,8 @@
   "settings.cloneTip": "A copy of the profile with its own data folder",
   "settings.configFile": "Settings file:",
   "settings.copyWorlds": "Copy single-player worlds before changing mods",
+  "settings.systemFrame": "System window frame",
+  "settings.systemFrameHint": "The title bar and window buttons are drawn by the window manager, like other apps. Without it, the top bar of the window serves as the title bar.",
   "settings.copyWorldsHint": "Before a mod is installed, updated, removed or switched in a game profile, the worlds you played since the last copy are copied (one copy per world, in the profile's data folder). If an update breaks a world, you can put it back.",
   "settings.dataDir": "Data folder",
   "settings.dataDirHint": "Client — usually %APPDATA%\\VintagestoryData. Server — the --dataPath folder (with serverconfig.json). Mod folders and disabled mods are read from the game settings.",

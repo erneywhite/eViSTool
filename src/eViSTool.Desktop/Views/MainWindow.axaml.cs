@@ -1,7 +1,11 @@
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Chrome;
+using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.Interactivity;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using eViSTool.Desktop.Platform;
 using eViSTool.Presentation.ViewModels;
@@ -20,7 +24,68 @@ public partial class MainWindow : Window
         SizeChanged += (_, _) =>
         {
             if (WindowState == WindowState.Normal) _normalSize = ClientSize;
+            // узкое окно: подпись «Активный профиль» уступает место разделу и кнопкам окна
+            ActiveProfileLabel.IsVisible = ClientSize.Width >= 1100;
         };
+        SetupChrome();
+    }
+
+    // ---------- своя шапка: верхняя полоса окна вместо системного заголовка
+
+    // место под кнопки окна справа от «Играть» (за вычетом правого поля полосы): Windows — 3 × 46, Linux — 3 круга по 24 с зазорами
+    private static readonly double CaptionWidth = OperatingSystem.IsWindows() ? 3 * 46 + 12 - 20 : 3 * 24 + 2 * 10 + 15 + 16 - 20;
+
+    private void SetupChrome()
+    {
+        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux()) return;
+        WindowDecorationsTheme = (ControlTheme)this.FindResource(OperatingSystem.IsWindows() ? "Forest.WindowChromeWin" : "Forest.WindowChromeLinux")!;
+        if (OperatingSystem.IsWindows())
+        {
+            // Windows: полоса и логотип — заголовок окна для системы: перетаскивание, разворот двойным щелчком, Snap,
+            // системное меню по правой кнопке
+            WindowDecorationProperties.SetElementRole(TopBar, WindowDecorationsElementRole.TitleBar);
+            WindowDecorationProperties.SetElementRole(LogoArea, WindowDecorationsElementRole.TitleBar);
+        }
+        else
+        {
+            // Linux (X11): роль TitleBar отдала бы нажатие оконному менеджеру целиком и двойной щелчок пропал бы, поэтому сами
+            TopBar.PointerPressed += DragArea_PointerPressed;
+            LogoArea.PointerPressed += DragArea_PointerPressed;
+        }
+        ApplyWindowFrame(systemFrame: false);
+    }
+
+    // Linux: рамку, тень и уголки для растягивания Avalonia рисует по краям окна, а отступ от них — дело окна
+    // (WindowDecorationMargin = рамка + тень, сверху ещё высота шапки, которую занимает наша полоса: её не вычитаем)
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == WindowDecorationMarginProperty && OperatingSystem.IsLinux() && Root is { } root)
+        {
+            var m = WindowDecorationMargin;
+            root.Margin = new Thickness(m.Left, m.Left, m.Right, m.Bottom);
+        }
+    }
+
+    private void ApplyWindowFrame(bool systemFrame)
+    {
+        var own = OperatingSystem.IsWindows() || (OperatingSystem.IsLinux() && !systemFrame);
+        ExtendClientAreaToDecorationsHint = own;
+        CaptionSpace.Width = own ? CaptionWidth : 0;
+        // под тенью своей рамки на Linux окно прозрачное; фон даёт Root
+        if (OperatingSystem.IsLinux() && own) Background = Brushes.Transparent;
+        else ClearValue(BackgroundProperty);
+    }
+
+    // кнопки и список профилей забирают нажатие себе, сюда доходит только пустое место и подписи
+    private void DragArea_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!IsExtendedIntoWindowDecorations || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        if (e.ClickCount == 2)
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        else
+            BeginMoveDrag(e);
+        e.Handled = true;
     }
 
     private MainViewModel Vm => (MainViewModel)DataContext!;
@@ -30,6 +95,7 @@ public partial class MainWindow : Window
         base.OnDataContextChanged(e);
         if (DataContext is not MainViewModel vm) return;
         vm.PropertyChanged += OnVmPropertyChanged;
+        if (OperatingSystem.IsLinux()) ApplyWindowFrame(vm.SystemWindowFrame);
         // смену профиля отменили (правки конфига) — вернуть список на текущий профиль, когда он закончит обработку выбора
         vm.ProfileSwitchDeclined += () => Dispatcher.UIThread.Post(() =>
         {
@@ -41,6 +107,7 @@ public partial class MainWindow : Window
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MainViewModel.SelectedTab)) ShowPage();
+        else if (e.PropertyName == nameof(MainViewModel.SystemWindowFrame) && OperatingSystem.IsLinux()) ApplyWindowFrame(Vm.SystemWindowFrame);
     }
 
     // виден один раздел — по SelectedTab (порядок страниц в разметке = порядок AppTab)

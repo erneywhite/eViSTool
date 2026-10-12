@@ -9,6 +9,8 @@
                 <ResourceInclude Source="avares://eViSTool/Themes/ForestResources.axaml" />
                 <!-- шаблоны кнопок, вкладок, тумблеров, пунктов списков (ControlTheme) -->
                 <ResourceInclude Source="avares://eViSTool/Themes/ForestControls.axaml" />
+                <!-- кнопки, рамка и тень своей шапки главного окна (WindowDecorationsTheme) -->
+                <ResourceInclude Source="avares://eViSTool/Themes/ForestWindowChrome.axaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

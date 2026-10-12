@@ -123,17 +123,17 @@
         </Style>
     </Window.Styles>
 
-    <Grid ColumnDefinitions="210,*" Background="{DynamicResource Forest.Base}">
+    <Grid x:Name="Root" ColumnDefinitions="210,*" Background="{DynamicResource Forest.Base}">
 
         <!-- ===== боковая колонка ===== -->
         <DockPanel Background="{DynamicResource Forest.Side}">
             <Border DockPanel.Dock="Right" Width="1" Background="{DynamicResource Forest.Line}" />
 
-            <!-- лого и слоган -->
-            <DockPanel DockPanel.Dock="Top" Margin="16,20,10,22">
-                <Image Source="avares://eViSTool/Assets/logo256.png" Width="36" Height="36" VerticalAlignment="Top"
+            <!-- лого и слоган; за них, как и за верхнюю полосу, окно можно тащить (своя шапка, см. MainWindow.SetupChrome) -->
+            <DockPanel x:Name="LogoArea" DockPanel.Dock="Top" Background="Transparent" Margin="0,0,0,22">
+                <Image Source="avares://eViSTool/Assets/logo256.png" Width="36" Height="36" VerticalAlignment="Top" Margin="16,20,0,0"
                        RenderOptions.BitmapInterpolationMode="HighQuality" />
-                <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                <StackPanel Margin="10,20,10,0" VerticalAlignment="Center">
                     <TextBlock Text="eViSTool" FontSize="19" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />
                     <TextBlock Text="{local:Tr shell.slogan}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" />
                 </StackPanel>
@@ -227,12 +227,14 @@
 
         <!-- ===== основная часть ===== -->
         <DockPanel Grid.Column="1">
-            <!-- полоса: раздел и активный профиль -->
-            <Border DockPanel.Dock="Top" Height="60" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1">
+            <!-- полоса: раздел и активный профиль. Она же шапка окна: тащится за пустое место и подписи, кнопки окна — справа
+                 (место под них — CaptionSpace); кнопки и список профилей помечены ролью User, чтобы нажимались -->
+            <Border x:Name="TopBar" DockPanel.Dock="Top" Height="60" Background="Transparent" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1">
                 <DockPanel Margin="24,0,20,0">
+                    <Border x:Name="CaptionSpace" DockPanel.Dock="Right" Width="0" />
                     <!-- игра с активным клиентским профилем: его папка данных, его моды -->
                     <!-- «Играть ▾»: большая часть — с сервером по умолчанию (или без сервера), стрелка — меню серверов -->
-                    <Button x:Name="PlayMenuButton" DockPanel.Dock="Right" Classes="primary splitArrow" Click="PlayMenu_Click"
+                    <Button x:Name="PlayMenuButton" DockPanel.Dock="Right" Classes="primary splitArrow" Click="PlayMenu_Click" WindowDecorationProperties.ElementRole="User"
                             VerticalAlignment="Center" Height="36" MinHeight="0" Padding="0" Width="34" BorderThickness="0,1,1,1"
                             ToolTip.Tip="{local:Tr play.menuTip}" IsVisible="{Binding CanPlay}"
                             AutomationProperties.AutomationId="PlayMenuButton" AutomationProperties.Name="{local:Tr play.menuTip}">
@@ -282,7 +284,7 @@
                             </StackPanel>
                         </Border>
                     </Popup>
-                    <Button DockPanel.Dock="Right" Classes="primary splitMain" Command="{Binding PlayCommand}"
+                    <Button DockPanel.Dock="Right" Classes="primary splitMain" Command="{Binding PlayCommand}" WindowDecorationProperties.ElementRole="User"
                             VerticalAlignment="Center" Height="36" MinHeight="0" Padding="13,0" Margin="12,0,0,0" BorderThickness="1,1,0,1"
                             ToolTip.Tip="{Binding PlayTip}" ToolTip.ShowOnDisabled="True"
                             IsVisible="{Binding CanPlay}" AutomationProperties.AutomationId="PlayButton">
@@ -294,14 +296,14 @@
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                         <!-- моды профиля сыплют ошибками (игра работает, но лог пухнет и бывают фризы) — отчёт по кнопке -->
                         <Button Command="{Binding ShowErrorsCommand}" ToolTip.Tip="{Binding ErrorBadgeTip}" Margin="0,0,10,0" Padding="10,4" MinHeight="0"
-                                IsVisible="{Binding HasErrorBadge}" AutomationProperties.AutomationId="ErrorBadge"
+                                IsVisible="{Binding HasErrorBadge}" AutomationProperties.AutomationId="ErrorBadge" WindowDecorationProperties.ElementRole="User"
                                 Background="{DynamicResource Forest.Warn}" BorderBrush="{DynamicResource Forest.Warn}">
                             <TextBlock Text="!" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource Forest.Base}" />
                         </Button>
-                        <TextBlock Text="{local:Tr shell.activeProfile}" VerticalAlignment="Center" Margin="0,0,10,0"
+                        <TextBlock x:Name="ActiveProfileLabel" Text="{local:Tr shell.activeProfile}" VerticalAlignment="Center" Margin="0,0,10,0"
                                    Foreground="{DynamicResource Forest.Muted}" FontSize="12" />
                         <ComboBox x:Name="ProfileCombo" ItemsSource="{Binding Profiles}" SelectedItem="{Binding ActiveProfile}" MinWidth="240"
-                                  AutomationProperties.AutomationId="ProfileCombo">
+                                  AutomationProperties.AutomationId="ProfileCombo" WindowDecorationProperties.ElementRole="User">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ProfileViewModel">
                                     <TextBlock>
@@ -311,7 +313,7 @@
                             </ComboBox.ItemTemplate>
                         </ComboBox>
                     </StackPanel>
-                    <TextBlock VerticalAlignment="Center" FontSize="13">
+                    <TextBlock VerticalAlignment="Center" FontSize="13" TextTrimming="CharacterEllipsis">
                         <Run Text="{local:Tr shell.workspaceCrumb}" Foreground="{DynamicResource Forest.Muted}" /><Run Text="   /   " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding PageTitle, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />
                     </TextBlock>
                 </DockPanel>

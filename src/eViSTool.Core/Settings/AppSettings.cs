@@ -26,6 +26,9 @@ public sealed class AppSettings
     /// </summary>
     public bool CopyWorldsBeforeModChanges { get; set; } = true;
 
+    /// <summary>Рамка главного окна от оконного менеджера, а не своя шапка (только Linux: на Windows шапка всегда своя).</summary>
+    public bool SystemWindowFrame { get; set; }
+
     /// <summary>Версия eViSTool, про которую попросили не напоминать («Пропустить эту версию»); вышла новее — окно покажется снова.</summary>
     public string? SkippedAppVersion { get; set; }
 
