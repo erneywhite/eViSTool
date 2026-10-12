@@ -11,8 +11,11 @@ public sealed class ImportPackViewModelTests
     private static PackMod PackMod(string name, string? version = "1.0.0", bool bundled = false, bool enabled = true) =>
         new() { ModId = name.ToLowerInvariant().Replace(' ', '_'), Name = name, Version = version, Bundled = bundled, Enabled = enabled, FileName = name + ".zip" };
 
+    // папка модов — путём этой системы: на Linux «C:\Mods\x.zip» не делится на папку и имя файла
+    private static readonly string ModsDir = Path.Combine(Path.GetTempPath(), "Mods");
+
     private static LocalMod Local(string name, string version = "1.0.0", string? file = null) =>
-        new(@"C:\Mods\" + (file ?? name + ".zip"), new ModInfo { ModId = name.ToLowerInvariant(), Name = name, Version = version }, null);
+        new(Path.Combine(ModsDir, file ?? name + ".zip"), new ModInfo { ModId = name.ToLowerInvariant(), Name = name, Version = version }, null);
 
     private static PackImportPlan Plan(IReadOnlyList<PackItemPlan> items, IReadOnlyList<LocalMod>? notInPack = null,
         Action<PackManifest>? tune = null, string? warning = null)
@@ -131,7 +134,7 @@ public sealed class ImportPackViewModelTests
     {
         var items = new[] { Item(PackMod("A"), PackItemAction.Install) };
         // у одного мода нет modinfo (имени нет) — в подсказке имя файла
-        var unknown = new LocalMod(@"C:\Mods\mystery.zip", null, "нет modinfo.json");
+        var unknown = new LocalMod(Path.Combine(ModsDir, "mystery.zip"), null, "нет modinfo.json");
         var model = new ImportPackViewModel(Plan(items, [Local("Extra"), unknown]));
 
         Assert.True(model.CanMirror);
