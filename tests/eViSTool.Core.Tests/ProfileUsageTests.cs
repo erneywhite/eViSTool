@@ -71,8 +71,9 @@ public sealed class ProfileUsageTests : IDisposable
         var ab = Server("AB", modPaths: ["Mods", Path.Combine(_root, "ServerProfiles", "AB", "Mods")]); // «AB» — не внутри «A»
         Assert.Empty(ProfileUsage.UsersOf(a.DataDir!, [ab]));
 
-        var shout = Server("C", modPaths: ["Mods", Path.Combine(a.DataDir!, "Mods").ToUpperInvariant() + "\\"]);
-        Assert.Single(ProfileUsage.UsersOf(a.DataDir! + "\\", [shout]));
+        // слэш в конце — разделитель этой системы: обратный слэш на Linux — путь Windows, его пропускают (другая система)
+        var shout = Server("C", modPaths: ["Mods", Path.Combine(a.DataDir!, "Mods").ToUpperInvariant() + Path.DirectorySeparatorChar]);
+        Assert.Single(ProfileUsage.UsersOf(a.DataDir! + Path.DirectorySeparatorChar, [shout]));
 
         Assert.True(ProfileUsage.IsSameOrInside(a.DataDir!, a.DataDir!.ToLowerInvariant() + "/"));
         Assert.False(ProfileUsage.IsSameOrInside(ab.DataDir!, a.DataDir!));
