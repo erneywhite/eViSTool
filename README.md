@@ -66,10 +66,11 @@ It is portable: unzip it anywhere and run. Nothing is installed into the system 
 The game client needs it too, so it is already there if you play Vintage Story.
 On a machine with only a dedicated server, Windows offers to download the runtime on the first start.
 On Linux (x64) nothing extra is needed: eViSTool ships with its own runtime. Tested on Ubuntu 24.04 with GNOME.
+The window draws its own title bar there; if you prefer the frame of your desktop, turn on **Settings → System window frame**.
 
 > **"Windows protected your PC"?** eViSTool is not code-signed yet (see [Code signing policy](#code-signing-policy)),
 > so SmartScreen may warn about an unknown publisher on the first start. Click **More info → Run anyway**.
-> The source code is open, and every release comes with a SHA-256 checksum.
+> The source code is open, and every release comes with a SHA-256 checksum and a signature that eViSTool checks before updating itself.
 
 The interface is in English or Russian. It follows the system language, and you can switch it in **Settings**.
 
@@ -183,6 +184,11 @@ that is already installed, eViSTool asks before replacing. **Delete** moves the 
 **Import modpack…** shows what will be installed, updated or disabled before changing anything.
 Import works for a server on another computer too. Afterwards eViSTool offers to put the same mods into linked profiles,
 like **Also install into**.
+
+**Mod set code.** **Modpack → Copy mod set code** turns your turned-on mods into one line like `EV1-…`, about 3 characters
+per mod. Send it in a chat: your friend pastes it with **Modpack → Paste mod set code** and gets the same mods in the same
+versions, straight from the ModDB. No files and no server: everything is in the code itself, and it works between Windows
+and Linux. Mods that aren't on the ModDB in your version are listed so you see what is left out; for those, make a modpack.
 
 The list refreshes by itself when mods change outside the window — in another eViSTool window or by copying files by hand.
 
@@ -462,7 +468,7 @@ It works for game and server profiles on this computer.
 ## Updates, data and uninstalling
 
 **Updates.** On start eViSTool checks GitHub for a new release. **About → Update to …** downloads it, verifies the checksum
-and replaces the program. A running server is not interrupted.
+and the release signature, and replaces the program. A running server is not interrupted.
 
 **Your data** — settings, saved versions of mods, downloads and logs — lives in the `data` folder next to `eViSTool.exe`.
 Move the program folder, and everything moves with it. (If eViSTool cannot write there, for example in `Program Files`,
