@@ -21,7 +21,7 @@ namespace eViSTool.Desktop.Tests;
 
 /// <summary>
 /// Окно «Уборка диска» с настоящей разметкой и лесной темой: открылось — модель ищет мусор и следит за игрой, закрылось —
-/// перестаёт; пометки «безопасно» / «осторожно» своими цветами (в окне на WPF — DataTrigger); у папки целиком нет
+/// перестаёт; пометки «безопасно» / «осторожно» своими цветами; у папки целиком нет
 /// списка пунктов; галочка «частично» — черта; запущенный сервер — предупреждение и выключенная кнопка; Escape и
 /// «Закрыть». Диск и процессы подменены: поиск отдаёт готовые группы, ничего не удаляется.
 /// </summary>
@@ -144,7 +144,7 @@ public sealed class CleanupWindowTests : IDisposable
                 checks.Select(c => AutomationProperties.GetName(c)));
             Assert.Equal([true, null, true, false, false, false], checks.Select(c => c.IsChecked));
 
-            // часть пунктов отмечена — черта (как у Fluent в окне на WPF), а не квадрат
+            // часть пунктов отмечена — черта, а не квадрат
             var glyph = checks[1].GetVisualDescendants().OfType<GlyphPath>().Single(p => p.Name == "CheckGlyph");
             Assert.True(glyph.Bounds.Width > 4 * glyph.Bounds.Height, $"значок {glyph.Bounds.Width}×{glyph.Bounds.Height}");
 

@@ -19,7 +19,7 @@ using eViSTool.Presentation.ViewModels;
 namespace eViSTool.Desktop.Tests;
 
 /// <summary>
-/// Окно «Вышла новая версия» на Avalonia: то, что в окне на WPF делал код за окном, — цвет номера рекомендуемой версии,
+/// Окно «Вышла новая версия»: цвет номера рекомендуемой версии,
 /// черта над всеми версиями, кроме первой, ссылка у версии без текста, запрет закрытия посреди установки, Enter и Escape.
 /// </summary>
 public sealed class UpdateWindowTests

@@ -10,7 +10,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace eViSTool.Desktop.Tests;
 
 /// <summary>
-/// Хватит ли встроенного редактируемого ComboBox (Avalonia 12.1) для полей «список или свой текст» из окна на WPF:
+/// Хватит ли встроенного редактируемого ComboBox (Avalonia 12.1) для полей «список или свой текст»:
 /// ключ настройки мира, цвет роли, адрес агента, чат Telegram.
 /// </summary>
 public class EditableComboBoxTests
@@ -61,7 +61,7 @@ public class EditableComboBoxTests
 
     /// <summary>
     /// Начало существующего элемента не выбирает его и не дописывает текст (поиск по первым буквам видит ввод уже
-    /// обработанным полем). Автодополнения, как у WPF, тоже нет.
+    /// обработанным полем). Автодополнения тоже нет.
     /// </summary>
     [AvaloniaFact]
     public void Typing_prefix_of_item_keeps_typed_text()
@@ -102,7 +102,7 @@ public class EditableComboBoxTests
         window.Close();
     }
 
-    /// <summary>Объекты в списке: текст поля — их свойство (в WPF — TextSearch.TextPath, здесь TextSearch.TextBinding).</summary>
+    /// <summary>Объекты в списке: текст поля — их свойство (TextSearch.TextBinding).</summary>
     [AvaloniaFact]
     public void Object_items_use_text_binding()
     {

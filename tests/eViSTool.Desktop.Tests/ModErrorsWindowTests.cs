@@ -133,7 +133,7 @@ public sealed class ModErrorsWindowTests
         Assert.Empty(host.Calls); // «Закрыть» отчёт не скрывает
     }
 
-    // модов много — список прокручивается, окно не выше предела (в окне на WPF — то же ограничение списка)
+    // модов много — список прокручивается, окно не выше предела
     [AvaloniaFact]
     public void ManyMods_ListScrolls_WindowStaysBounded()
     {

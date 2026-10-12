@@ -1,8 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Окно eViSTool на Avalonia — одно на Windows и Linux. Модели — eViSTool.Presentation (общие с окном на WPF, пока
-    оно не уйдёт). Шрифты вшиты (Noto Sans, Cascadia Mono — SIL OFL), чтобы окно выглядело одинаково на любой системе.
+    Окно eViSTool на Avalonia — одно на Windows и Linux. Модели — eViSTool.Presentation. Шрифты вшиты (Noto Sans, Cascadia Mono — SIL OFL), чтобы окно выглядело одинаково на любой системе.
   -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
