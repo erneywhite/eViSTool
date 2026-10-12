@@ -1,11 +1,11 @@
 eViSTool 0.11.2 for Linux: the window restarts after an update.
 
 - After updating from About the window now restarts by itself. In 0.11.0 and 0.11.1 the files were updated, but the window closed and stayed closed: if you update from one of them, open eViSTool once more by hand.
-- My mods has a Side column (client, server or both), and the Side menu turns all client-side or all server-side mods on or off at once.
+- My mods has a Side column: client, server or both, as the mod itself says.
 
 ---
 
 eViSTool 0.11.2 для Linux: окно перезапускается после обновления.
 
 - После обновления из «О программе» окно теперь само запускается заново. В 0.11.0 и 0.11.1 файлы обновлялись, но окно закрывалось и не открывалось: если обновляешься с них, открой eViSTool ещё раз вручную.
-- В «Моих модах» появилась колонка «Сторона» (клиент, сервер или оба), а меню «Сторона» включает или выключает разом все клиентские или все серверные моды.
+- В «Моих модах» появилась колонка «Сторона»: клиент, сервер или оба, как указано в самом моде.

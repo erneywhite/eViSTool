@@ -1,8 +1,7 @@
-eViSTool 0.11.2: mod sides in My mods.
+eViSTool 0.11.2: a Side column in My mods.
 
 New
 - My mods has a Side column: client, server or both, as the mod itself says. The table can be sorted by it.
-- The Side menu next to Modpack turns all client-side or all server-side mods on or off at once.
 
 Fixes
 - Linux: after an update the window now restarts by itself. Before, the files were updated, but the window closed and stayed closed.
@@ -12,11 +11,10 @@ Update from About; then update the agent on the server computer with Update on t
 
 ---
 
-eViSTool 0.11.2: сторона мода в «Моих модах».
+eViSTool 0.11.2: колонка «Сторона» в «Моих модах».
 
 Новое
 - В «Моих модах» появилась колонка «Сторона»: клиент, сервер или оба, как указано в самом моде. По ней можно сортировать.
-- Меню «Сторона» рядом с «Модпаком» включает или выключает разом все клиентские или все серверные моды.
 
 Исправления
 - Linux: после обновления окно теперь само запускается заново. Раньше файлы обновлялись, а окно закрывалось и не открывалось.

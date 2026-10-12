@@ -216,19 +216,6 @@
                                 <TextBlock Text="{local:Tr pack.menu}" />
                             </StackPanel>
                         </Button>
-                        <!-- разом все моды одной стороны: например, клиентские на копии профиля для проверки -->
-                        <Button Margin="8,0,0,0" ToolTip.Tip="{local:Tr mods.sideMenuTip}" IsEnabled="{Binding !IsBusy}" Classes.hidden="{Binding IsHistory}">
-                            <Button.Flyout>
-                                <MenuFlyout Placement="BottomEdgeAlignedLeft">
-                                    <MenuItem Header="{Binding DisableClientText}" Command="{Binding DisableClientCommand}" />
-                                    <MenuItem Header="{Binding EnableClientText}" Command="{Binding EnableClientCommand}" />
-                                    <Separator />
-                                    <MenuItem Header="{Binding DisableServerText}" Command="{Binding DisableServerCommand}" />
-                                    <MenuItem Header="{Binding EnableServerText}" Command="{Binding EnableServerCommand}" />
-                                </MenuFlyout>
-                            </Button.Flyout>
-                            <TextBlock Text="{local:Tr mods.sideMenu}" />
-                        </Button>
                         <Button Margin="8,0,0,0" Command="{Binding OpenModsFolderCommand}" ToolTip.Tip="{local:Tr mods.openFolder}" Padding="10,8"
                                 IsVisible="{Binding IsLocalProfile}">
                             <Path Classes="icon" Data="{StaticResource Icon.Folder}" Width="16" Height="16" />
