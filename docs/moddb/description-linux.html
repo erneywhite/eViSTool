@@ -1,10 +1,18 @@
-<p><strong>This is the Linux version.</strong> The Windows app, with the full feature list, is on <a href="https://mods.vintagestory.at/evistoolwin">eViSTool &mdash; Windows</a>.<br />
-<strong>Это версия для Linux.</strong> Программа для Windows и полное описание &mdash; на странице <a href="https://mods.vintagestory.at/evistoolwin">eViSTool &mdash; Windows</a>.</p>
+<p><strong>This is the Linux version.</strong> The Windows version, with the full feature list, is on <a href="https://mods.vintagestory.at/evistoolwin">eViSTool &mdash; Windows</a>.<br />
+<strong>Это версия для Linux.</strong> Версия для Windows и полное описание &mdash; на странице <a href="https://mods.vintagestory.at/evistoolwin">eViSTool &mdash; Windows</a>.</p>
 
-<p>Lots of dedicated Vintage Story servers run on Linux, and now eViSTool runs there too. You put it next to your server, and it looks after the server around the clock as a systemd service. You control it from eViSTool on your Windows PC with a connection code, the same way as any remote server.</p>
-<p>There's no window on Linux yet, only the agent and a few commands. A full app for Linux players is planned.</p>
+<p>eViSTool on Linux is the same program as on Windows. On a desktop it's a window for your mods and servers. On a server without a desktop it's an agent that looks after the game server around the clock as a systemd service. Both are in one archive: take what you need.</p>
 
-<h2>What it does on the server</h2>
+<h2>For players: the window</h2>
+<ul>
+<li>Finds the game by itself, whether it's from the archive (installed with <code>install.sh</code>) or from Flatpak. If you have both, each gets its own profile with its own mods.</li>
+<li>Mod updates in one click, the ModDB catalog with search and filters, modpacks, mod settings as a form, copies of your worlds before mod changes.</li>
+<li>Launches the game, for Flatpak too, and won't touch the mods while the game is running.</li>
+<li>Manages your servers, local or on another machine, with a connection code.</li>
+</ul>
+<p>Unpack the zip anywhere in your home folder and run <code>./eViSTool</code>. On the first start it adds itself to the applications menu. Nothing else to install: the window ships with its own runtime. Tested on Ubuntu 24.04 with GNOME.</p>
+
+<h2>For servers: the agent</h2>
 <ul>
 <li>Starts the server with the machine and brings it back after a crash, telling you which mod is most likely to blame.</li>
 <li>Scheduled world backups with rotation, into any folder, a mounted network share included. Restore with one click.</li>
@@ -12,10 +20,8 @@
 <li>Notifications to Telegram, Discord, ntfy or any webhook: the server crashed, a backup failed, mod updates are out, the disk is running low, someone joined. The game chat can go to a Discord channel.</li>
 <li>Chat announcements on a schedule and statistics: who was online, memory and CPU, time played.</li>
 </ul>
-<p>From your Windows PC you get everything the Windows app has for a server: the live console with command hints, the config editor, players and whitelist, mods (from the catalog, zips, modpacks), mod settings as a form, and <strong>Update on the server</strong>, which updates the agent on Linux to your version in one click.</p>
-
-<h2>Getting started</h2>
-<p>If your server is installed the official way, with <code>server.sh</code>, unpack the zip below into its own folder (not into the game folder: the game is updated with <code>rm -rf *</code>) and run:</p>
+<p>You control it from the eViSTool window on your computer, Windows or Linux, with a connection code: the live console with command hints, the config editor, players and whitelist, mods, mod settings and <strong>Update on the server</strong>, which updates the agent to your version in one click.</p>
+<p>If your server is installed the official way, with <code>server.sh</code>, unpack the zip into its own folder (not into the game folder: the game is updated with <code>rm -rf *</code>) and run:</p>
 <pre><code>sudo apt install unzip
 sudo mkdir -p /home/vintagestory/evistool
 sudo unzip eViSTool-&lt;version&gt;-linux-x64.zip -d /home/vintagestory/evistool
@@ -25,12 +31,12 @@ sudo -u vintagestory ./eViSTool.Agent setup
 sudo -u vintagestory ./eViSTool.Agent remote enable --host &lt;address of this machine&gt;
 sudo -u vintagestory ./eViSTool.Agent remote code
 sudo ./eViSTool.Agent service install</code></pre>
-<p>Then paste the code into eViSTool on Windows: <em>Settings &rarr; + Server &rarr; Server on another computer? &rarr; Connect by code&hellip;</em></p>
-<p>The same files are on <a href="https://github.com/erneywhite/eViSTool/releases/latest">GitHub</a> as a tar.gz, if you prefer that. You'll need Linux x64 with systemd (tested on Ubuntu Server 24.04) and .NET 10 for the game server itself. The agent doesn't need .NET, it ships with its own runtime. The step-by-step guide, with ports, day-to-day commands, logs and uninstalling, is <a href="https://github.com/erneywhite/eViSTool/blob/main/docs/linux.md">on GitHub</a>.</p>
+<p>Then paste the code into the window: <em>Settings &rarr; + Server &rarr; Server on another computer? &rarr; Connect by code&hellip;</em> The window file in that folder isn't needed on a server, it just lies there.</p>
+<p>The same files are on <a href="https://github.com/erneywhite/eViSTool/releases/latest">GitHub</a> as a tar.gz. You'll need Linux x64 with systemd (tested on Ubuntu Server 24.04) and .NET 10 for the game server itself; the agent ships with its own runtime. The step-by-step guide, with ports, day-to-day commands, logs and uninstalling, is <a href="https://github.com/erneywhite/eViSTool/blob/main/docs/linux.md">on GitHub</a>.</p>
 
 <h2>Links</h2>
 <ul>
-<li>Linux guide: <a href="https://github.com/erneywhite/eViSTool/blob/main/docs/linux.md">docs/linux.md</a>, configuration files: <a href="https://github.com/erneywhite/eViSTool/blob/main/docs/config.md">docs/config.md</a></li>
+<li>Linux server guide: <a href="https://github.com/erneywhite/eViSTool/blob/main/docs/linux.md">docs/linux.md</a>, configuration files: <a href="https://github.com/erneywhite/eViSTool/blob/main/docs/config.md">docs/config.md</a></li>
 <li>Found a bug or have an idea? <a href="https://github.com/erneywhite/eViSTool/issues">Tell me on GitHub</a></li>
 <li>If it saves you time and you'd like to say thanks: <a href="https://ko-fi.com/erneywhite">Ko-fi</a></li>
 </ul>
@@ -39,8 +45,18 @@ sudo ./eViSTool.Agent service install</code></pre>
 <hr />
 
 <h2>По-русски</h2>
-<p>Выделенные серверы Vintage Story часто живут на Linux, и теперь eViSTool работает и там. Ставишь его рядом с сервером, и он круглые сутки присматривает за ним как служба systemd. Управляешь им из eViSTool на своём ПК с Windows по коду подключения, как любым удалённым сервером.</p>
-<p>Окна на Linux пока нет, только агент и несколько команд. Полноценную программу для тех, кто играет на Linux, сделаю позже.</p>
+<p>eViSTool на Linux &mdash; та же программа, что и на Windows. На компьютере с рабочим столом это окно для модов и серверов. На сервере без рабочего стола это агент, который круглые сутки присматривает за сервером игры как служба systemd. Оба лежат в одном архиве, бери что нужно.</p>
+
+<h2>Для игроков: окно</h2>
+<ul>
+<li>Само находит игру &mdash; из архива (через <code>install.sh</code>) или из Flatpak. Если стоят обе, у каждой будет свой профиль со своими модами.</li>
+<li>Обновление модов одной кнопкой, каталог модбазы с поиском и фильтрами, модпаки, настройки модов формой, копии миров перед изменением модов.</li>
+<li>Запускает игру, в том числе из Flatpak, и не трогает моды, пока игра запущена.</li>
+<li>Управляет твоими серверами, своими и на другой машине, по коду подключения.</li>
+</ul>
+<p>Распакуй zip куда угодно в домашней папке и запусти <code>./eViSTool</code>. При первом запуске он сам появится в меню приложений. Больше ничего ставить не нужно: окно собрано вместе со своей средой. Проверено на Ubuntu 24.04 с GNOME.</p>
+
+<h2>Для серверов: агент</h2>
 <ul>
 <li>Запускает сервер вместе с машиной и поднимает после падения, а в оповещении пишет, какой мод скорее всего виноват.</li>
 <li>Копии мира по расписанию с удалением старых, в любую папку, в том числе подключённую сетевую. Восстановление одной кнопкой.</li>
@@ -48,5 +64,5 @@ sudo ./eViSTool.Agent service install</code></pre>
 <li>Оповещения в Telegram, Discord, ntfy или вебхук: упал, копия не получилась, вышли обновления модов, мало места, кто зашёл. Чат игры можно пересылать в Discord.</li>
 <li>Объявления в чат по расписанию и статистика: онлайн, память и процессор, кто сколько наиграл.</li>
 </ul>
-<p>С Windows доступно всё, что есть для сервера в программе: консоль с подсказками, редактор конфига, игроки и белый список, моды (из каталога, zip, модпаки), настройки модов формой и кнопка «Обновить на сервере», которая обновит агент на Linux до твоей версии.</p>
-<p>Установка &mdash; командами выше, если сервер поставлен через <code>server.sh</code>. Те же файлы в tar.gz лежат <a href="https://github.com/erneywhite/eViSTool/releases/latest">на GitHub</a>. Подробная инструкция &mdash; <a href="https://github.com/erneywhite/eViSTool/blob/main/docs/linux.ru.md">на GitHub по-русски</a>.</p>
+<p>Управляешь им из окна eViSTool на своём компьютере, с Windows или Linux, по коду подключения: консоль с подсказками, редактор конфига, игроки и белый список, моды, настройки модов и кнопка «Обновить на сервере», которая обновит агента до твоей версии.</p>
+<p>Установка &mdash; командами выше, если сервер поставлен через <code>server.sh</code>. Файл окна в этой папке серверу не нужен, пусть просто лежит. Те же файлы в tar.gz лежат <a href="https://github.com/erneywhite/eViSTool/releases/latest">на GitHub</a>. Подробная инструкция &mdash; <a href="https://github.com/erneywhite/eViSTool/blob/main/docs/linux.ru.md">на GitHub по-русски</a>.</p>
