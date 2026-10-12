@@ -10,8 +10,8 @@
                       Title="{local:Tr connect.title}">
     <!-- ширина — содержимого окна: в окне на WPF Width="560" считал и рамку (по 8 px с боков), внутри было 544 -->
     <StackPanel Margin="24,20,24,22">
-        <TextBlock Text="{local:Tr connect.title}" FontSize="20" FontWeight="SemiBold" />
-        <TextBlock Classes="muted" Text="{local:Tr connect.hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" />
+        <TextBlock Classes="dialogTitle" Text="{local:Tr connect.title}" />
+        <TextBlock Classes="dialogLead" Text="{local:Tr connect.hint}" />
 
         <TextBlock Classes="label" Text="{local:Tr connect.code}" />
         <!-- код — секрет: поле скрытое, как для пароля. Точки — из Cascadia Mono (mono): в Noto Sans нет «●», и она
@@ -32,7 +32,7 @@
                        TextWrapping="Wrap" Margin="12,0,0,0" AutomationProperties.AutomationId="ConnectResult" />
         </DockPanel>
 
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+        <StackPanel Classes="dialogButtons" Margin="0,20,0,0">
             <Button Classes="primary" Content="{Binding OkText}" IsDefault="True" IsEnabled="{Binding CanAccept}"
                     Click="Ok_Click" Padding="18,8" AutomationProperties.AutomationId="ConnectOk" />
             <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8" />

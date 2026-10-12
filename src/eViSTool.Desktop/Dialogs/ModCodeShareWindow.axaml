@@ -8,8 +8,8 @@
                       Width="544" SizeToContent="Height" CanResize="False"
                       Title="{local:Tr modcode.shareTitle}">
     <StackPanel Margin="24,20,24,22">
-        <TextBlock Text="{local:Tr modcode.shareTitle}" FontSize="20" FontWeight="SemiBold" />
-        <TextBlock Classes="muted" Text="{Binding Summary}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" />
+        <TextBlock Classes="dialogTitle" Text="{local:Tr modcode.shareTitle}" />
+        <TextBlock Classes="dialogLead" Text="{Binding Summary}" />
 
         <!-- код блоком: щелчок по нему копирует (на случай, если в буфер он не попал сам). У набора в сотни модов код
              длинный — блок не выше ~9 строк, дальше прокрутка: окно не уходит за край экрана -->
@@ -21,12 +21,12 @@
         </Border>
         <TextBlock Classes="tone" Text="{Binding CopiedText}" FontSize="12" Margin="0,6,0,0" Foreground="{DynamicResource Forest.Good}" />
 
-        <TextBlock Classes="muted" Text="{local:Tr modcode.shareHint}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" />
+        <TextBlock Classes="dialogLead" Text="{local:Tr modcode.shareHint}" Margin="0,8,0,0" />
         <ScrollViewer MaxHeight="140" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasMissing}" Margin="0,10,0,0">
-            <TextBlock Classes="muted" Text="{Binding MissingText}" FontSize="12" TextWrapping="Wrap" />
+            <TextBlock Classes="dialogLead" Text="{Binding MissingText}" Margin="0" />
         </ScrollViewer>
 
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+        <StackPanel Classes="dialogButtons" Margin="0,20,0,0">
             <Button Content="{local:Tr modcode.copy}" Click="Copy_Click" Padding="16,8" AutomationProperties.AutomationId="ModCodeCopy" />
             <Button Classes="primary" Content="{local:Tr common.close}" IsDefault="True" IsCancel="True" Click="Close_Click" Margin="8,0,0,0" Padding="18,8" />
         </StackPanel>

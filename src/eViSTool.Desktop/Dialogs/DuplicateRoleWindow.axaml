@@ -9,7 +9,7 @@
                       Title="{local:Tr roles.dupTitle}" Width="444" SizeToContent="Height" CanResize="False">
     <!-- ширина без рамки: в WPF Width="460" считается вместе с рамкой окна, внутри остаётся 444 -->
     <StackPanel Margin="24,20,24,22">
-        <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Classes="dialogTitle" Text="{Binding Heading}" />
         <TextBlock Classes="hint" Text="{local:Tr roles.dupIntro}" FontSize="12" Margin="0,4,0,0" />
 
         <TextBlock Classes="label" Text="{local:Tr roles.dupCode}" />
@@ -23,7 +23,7 @@
         <TextBox Classes="clearButton" Text="{Binding Name}" Margin="0,6,0,0" MaxLength="80"
                  AutomationProperties.AutomationId="DuplicateName" AutomationProperties.Name="{local:Tr roles.dupName}" />
 
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+        <StackPanel Classes="dialogButtons" Margin="0,20,0,0">
             <Button Classes="primary" Content="{local:Tr roles.dupGo}" IsDefault="True" Command="{Binding GoCommand}" Padding="18,8"
                     AutomationProperties.AutomationId="DuplicateOk" />
             <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8"

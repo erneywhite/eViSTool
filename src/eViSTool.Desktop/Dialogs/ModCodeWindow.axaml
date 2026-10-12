@@ -9,8 +9,8 @@
                       Width="544" SizeToContent="Height" CanResize="False"
                       Title="{local:Tr modcode.title}">
     <StackPanel Margin="24,20,24,22">
-        <TextBlock Text="{local:Tr modcode.title}" FontSize="20" FontWeight="SemiBold" />
-        <TextBlock Classes="muted" Text="{local:Tr modcode.hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" />
+        <TextBlock Classes="dialogTitle" Text="{local:Tr modcode.title}" />
+        <TextBlock Classes="dialogLead" Text="{local:Tr modcode.hint}" />
 
         <TextBlock Classes="label" Text="{local:Tr modcode.code}" />
         <!-- код длинный (≈3 символа на мод) — поле в несколько строк с переносом, Enter не добавляет строку -->
@@ -23,7 +23,7 @@
         <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding StatusTone}" Text="{Binding StatusText}"
                    FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0" AutomationProperties.AutomationId="ModCodeStatus" />
 
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+        <StackPanel Classes="dialogButtons" Margin="0,20,0,0">
             <Button Classes="primary" Content="{local:Tr modcode.ok}" IsDefault="True" IsEnabled="{Binding CanAccept}"
                     Click="Ok_Click" Padding="18,8" AutomationProperties.AutomationId="ModCodeOk" />
             <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8" />

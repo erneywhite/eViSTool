@@ -34,6 +34,23 @@
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
     </Style>
+    <!-- окно программы: заголовок, строка-пояснение под ним и строка кнопок внизу (отступ сверху — у каждого окна свой) -->
+    <Style Selector="TextBlock.dialogTitle">
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.dialogLead">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Margin" Value="0,4,0,0" />
+    </Style>
+    <Style Selector="StackPanel.dialogButtons">
+        <Setter Property="Orientation" Value="Horizontal" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
     <!-- пояснение под полем (Hint) -->
     <Style Selector="TextBlock.hint">
         <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />

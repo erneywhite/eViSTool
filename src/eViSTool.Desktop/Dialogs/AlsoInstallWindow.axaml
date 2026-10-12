@@ -9,7 +9,7 @@
                       Width="544" SizeToContent="Height" CanResize="False"
                       Title="{local:Tr also.title}">
     <StackPanel Margin="24,20,24,22">
-        <TextBlock Text="{local:Tr also.title}" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />
+        <TextBlock Classes="dialogTitle" Text="{local:Tr also.title}" />
         <TextBlock Text="{Binding Hint}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="0,4,0,0" />
 
         <!-- профили: текущий отмечен всегда; недоступные — с причиной, без галочки -->
@@ -36,7 +36,7 @@
             <TextBlock Text="{Binding RememberText}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Forest.Text}" />
         </CheckBox>
 
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+        <StackPanel Classes="dialogButtons" Margin="0,14,0,0">
             <Button Content="{local:Tr also.install}" Classes="primary" IsDefault="True" Click="Ok_Click" Padding="18,8"
                     ctl:Focus.OnOpen="True" AutomationProperties.AutomationId="AlsoOk" />
             <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8" />

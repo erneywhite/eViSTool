@@ -10,7 +10,7 @@
                       Title="{local:Tr players.banTitle}" Width="444" SizeToContent="Height" CanResize="False">
     <!-- ширина без рамки: в WPF Width="460" считается вместе с рамкой окна, внутри остаётся 444 -->
     <StackPanel Margin="24,20,24,22">
-        <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Classes="dialogTitle" Text="{Binding Heading}" />
 
         <TextBlock Classes="label" Text="{local:Tr players.banFor}" />
         <WrapPanel Margin="0,8,0,0">
@@ -35,7 +35,7 @@
         <TextBox Text="{Binding Reason}" Margin="0,6,0,0" MaxLength="200" ctl:Focus.OnOpen="True"
                  AutomationProperties.AutomationId="BanReason" AutomationProperties.Name="{local:Tr players.banReason}" />
 
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+        <StackPanel Classes="dialogButtons" Margin="0,20,0,0">
             <Button Classes="primary" Content="{local:Tr players.banGo}" IsDefault="True" Command="{Binding OkCommand}" Padding="18,8"
                     AutomationProperties.AutomationId="BanOk" />
             <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8"

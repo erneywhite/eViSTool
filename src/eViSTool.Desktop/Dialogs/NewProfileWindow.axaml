@@ -9,7 +9,7 @@
                       Title="{Binding Title}" Width="544" SizeToContent="Height" CanResize="False">
     <!-- ширина без рамки: в WPF Width="560" считается вместе с рамкой окна, внутри остаётся 544 -->
     <StackPanel Margin="24,20,24,22">
-        <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock Classes="dialogTitle" Text="{Binding Title}" />
 
         <TextBlock Classes="label" Text="{local:Tr newprofile.name}" />
         <TextBox x:Name="NameBox" Classes="clearButton" Text="{Binding Name}" Margin="0,6,0,0" MaxLength="60" ctl:Focus.OnOpen="True" ctl:Focus.SelectAll="True"
@@ -34,7 +34,7 @@
                 </DockPanel>
                 <!-- что нашлось в папке: обычное — приглушённым, «не похоже на данные сервера» — красным -->
                 <TextBlock Classes="hint" Classes.error="{Binding ExistingInfoIsError}" Text="{Binding ExistingInfo}" Margin="0,6,0,0" />
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                <StackPanel Classes="dialogButtons" Margin="0,10,0,0">
                     <Button Content="{local:Tr newprofile.import}" Command="{Binding ImportCommand}" Margin="0,0,8,0"
                             ToolTip.Tip="{local:Tr newprofile.importTip}" AutomationProperties.AutomationId="NewProfileImport" />
                     <Button Content="{local:Tr newprofile.useInPlace}" Command="{Binding UseInPlaceCommand}"
@@ -55,7 +55,7 @@
             </DockPanel>
         </Border>
 
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+        <StackPanel Classes="dialogButtons" Margin="0,20,0,0">
             <Button Classes="primary" Content="{local:Tr newprofile.create}" IsDefault="True" Command="{Binding OkCommand}" Padding="18,8"
                     AutomationProperties.AutomationId="NewProfileCreate" />
             <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8" />

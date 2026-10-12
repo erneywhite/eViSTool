@@ -9,7 +9,7 @@
                       Title="{local:Tr browse.favTitle}" Width="444" SizeToContent="Height" CanResize="False">
     <!-- ширина без рамки: в WPF Width="460" считается вместе с рамкой окна, внутри остаётся 444 -->
     <StackPanel Margin="24,20,24,22">
-        <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock Classes="dialogTitle" Text="{Binding Heading}" />
 
         <!-- новый сервер — фокус в названии, правка записи — в адресе -->
         <TextBlock Classes="label" Text="{local:Tr browse.favName}" />
@@ -28,7 +28,7 @@
 
         <TextBlock Classes="error" Text="{Binding ErrorText}" FontSize="12" Margin="0,12,0,0" IsVisible="{Binding HasError}" />
 
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+        <StackPanel Classes="dialogButtons" Margin="0,20,0,0">
             <Button Classes="primary" Content="{local:Tr common.save}" IsDefault="True" Command="{Binding SaveCommand}" Padding="18,8"
                     AutomationProperties.AutomationId="FavSave" />
             <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8" />

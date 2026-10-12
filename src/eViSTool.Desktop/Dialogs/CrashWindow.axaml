@@ -48,18 +48,18 @@
     </dialogs:DialogWindow.Styles>
 
     <StackPanel Margin="24,20,24,22">
-        <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Classes="dialogTitle" Text="{Binding Title}" />
         <TextBlock Classes="muted" Text="{Binding ProfileText}" FontSize="12" Margin="0,2,0,0" />
 
         <!-- виновник -->
         <Border Background="{DynamicResource Forest.Surface}" CornerRadius="6" Padding="14,10" Margin="0,14,0,0">
             <StackPanel>
                 <TextBlock Text="{Binding CulpritText}" FontSize="14" TextWrapping="Wrap" />
-                <TextBlock Classes="muted" Text="{Binding HowText}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" />
+                <TextBlock Classes="dialogLead" Text="{Binding HowText}" />
             </StackPanel>
         </Border>
 
-        <TextBlock Classes="muted" Text="{Binding ReasonText}" FontSize="12" TextWrapping="Wrap" Margin="0,10,0,0" />
+        <TextBlock Classes="dialogLead" Text="{Binding ReasonText}" Margin="0,10,0,0" />
 
         <!-- подробности: ошибка и стек — для автора мода или форума. AcceptsReturn — иначе TextBox однострочный и стек
              сложится в одну строку -->

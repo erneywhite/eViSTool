@@ -20,7 +20,7 @@
     </dialogs:DialogWindow.Styles>
 
     <StackPanel Margin="24,20,24,22">
-        <TextBlock Text="{local:Tr notify.windowTitle}" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock Classes="dialogTitle" Text="{local:Tr notify.windowTitle}" />
 
         <!-- тип канала, как в Uptime Kuma: поля ниже — под выбранный тип; у сохранённого канала тип не меняется -->
         <TextBlock Classes="label" Text="{local:Tr notify.kind}" />

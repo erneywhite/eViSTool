@@ -9,7 +9,7 @@
                       Title="{Binding Title}" Width="624" SizeToContent="Height" CanResize="False">
     <!-- ширина без рамки: в WPF Width="640" считается вместе с рамкой окна, внутри остаётся 624 -->
     <StackPanel Margin="24,20,24,22">
-        <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Classes="dialogTitle" Text="{Binding Heading}" />
         <TextBlock Classes="hint" Text="{local:Tr clone.intro}" FontSize="12" Margin="0,4,0,0" />
 
         <!-- сервер профиля запущен — копия мира может получиться битой -->
@@ -100,7 +100,7 @@
             <TextBlock Classes="hint" Text="{Binding ProgressText}" Margin="0,6,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
         </StackPanel>
 
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+        <StackPanel Classes="dialogButtons" Margin="0,20,0,0">
             <Button Classes="primary" Content="{local:Tr clone.go}" IsDefault="True" Command="{Binding GoCommand}" Padding="18,8" />
             <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8" />
         </StackPanel>
