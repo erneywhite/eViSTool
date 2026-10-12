@@ -26,7 +26,7 @@ public sealed class ServerRemoteViewModelTests : IDisposable
     public void Dispose()
     {
         foreach (var p in _profiles) p.Dispose();
-        if (_before is not null) Ui.Platform = _before;
+        Ui.Platform = _before!; // как было; null — не задано (иначе заглушка досталась бы следующим тестам)
     }
 
     /// <summary>Профиль с включённым удалённым доступом (файлы — в папке данных тестов, настоящие данные не трогаются).</summary>

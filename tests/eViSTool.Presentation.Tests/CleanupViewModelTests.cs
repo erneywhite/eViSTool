@@ -28,7 +28,7 @@ public sealed class CleanupViewModelTests : IDisposable
 
     public void Dispose()
     {
-        if (_oldPlatform is not null) Ui.Platform = _oldPlatform;
+        Ui.Platform = _oldPlatform!; // как было; null — не задано (иначе заглушка с ручным таймером досталась бы следующим тестам)
         try { Directory.Delete(_root, recursive: true); } catch (IOException) { }
     }
 
