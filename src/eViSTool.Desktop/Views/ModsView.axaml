@@ -7,7 +7,10 @@
              x:Class="eViSTool.Desktop.Views.ModsView"
              x:DataType="vm:ModsViewModel">
     <UserControl.Styles>        <!-- пометка «не нужен на этой стороне» в строке мода -->
-        <Style Selector="Run.warn">
+        <Style Selector="TextBlock.note">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+        </Style>
+        <Style Selector="TextBlock.note.warn">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
         </Style>
         <Style Selector="TextBlock.side">
@@ -313,9 +316,12 @@
                                                 <StackPanel VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"
                                                                Foreground="{DynamicResource Forest.Text}" ToolTip.Tip="{Binding FileName}" />
-                                                    <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextTrimming="CharacterEllipsis">
-                                                        <Run Text="{Binding ModId, Mode=OneWay}" /><Run Text="{Binding SideNote, Mode=OneWay}" Classes.warn="{Binding IsUnneeded}" />
-                                                    </TextBlock>
+                                                    <!-- два текста, а не куски одного: в Avalonia подпись из кусков, сменившаяся на месте
+                                                         (смена языка — строки собираются заново), на Linux переставала рисоваться -->
+                                                    <StackPanel Orientation="Horizontal" ClipToBounds="True">
+                                                        <TextBlock Text="{Binding ModId}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" />
+                                                        <TextBlock Text="{Binding SideNote}" FontSize="11" Classes="note" Classes.warn="{Binding IsUnneeded}" />
+                                                    </StackPanel>
                                                 </StackPanel>
                                             </DockPanel>
                                         </DataTemplate>
