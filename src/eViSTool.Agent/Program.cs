@@ -35,6 +35,9 @@ eViSTool.Core.Localization.Loc.Instance.SetLanguage(cli.Language ?? cli.Config?.
 // а не мигнуть консолью (без окна агент искал бы сервер рядом и тут же закрылся бы с ошибкой)
 if (args.Length == 0 && DoubleClick.Detected())
 {
+    // новое окно консоли открывается в кодировке системы по умолчанию (часто без кириллицы) — иначе вместо букв «?»;
+    // консоль своя, только для агента, так что это больше ни на что не влияет
+    Console.OutputEncoding = System.Text.Encoding.UTF8;
     Console.WriteLine(eViSTool.Core.Localization.Loc.T("agent.doubleClick"));
     Console.WriteLine();
     Console.WriteLine(eViSTool.Core.Localization.Loc.T("agent.pressKey"));

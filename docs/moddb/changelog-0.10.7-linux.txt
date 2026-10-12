@@ -1,0 +1,9 @@
+eViSTool 0.10.7 for Linux: no changes for the Linux agent.
+
+- This release fixes the message the Windows agent shows when double-clicked. The Linux agent is the same as in 0.10.6; updating is optional.
+
+---
+
+eViSTool 0.10.7 для Linux: для агента на Linux изменений нет.
+
+- В этом выпуске исправлено сообщение, которое показывает агент на Windows при запуске двойным щелчком. Агент на Linux такой же, как в 0.10.6, обновляться не обязательно.

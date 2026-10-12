@@ -1,0 +1,15 @@
+eViSTool 0.10.7: a readable agent message.
+
+Fixes
+- The message eViSTool.Agent.exe shows when double-clicked was unreadable on some systems: letters turned into question marks. Fixed.
+
+Update from About; then update the agent on the server computer with Update on the server.
+
+---
+
+eViSTool 0.10.7: читаемое сообщение агента.
+
+Исправления
+- Сообщение, которое eViSTool.Agent.exe показывает при запуске двойным щелчком, на части систем было нечитаемым: вместо букв стояли вопросительные знаки. Исправлено.
+
+Обнови из «О программе», потом обнови агента на компьютере с сервером кнопкой «Обновить на сервере».
