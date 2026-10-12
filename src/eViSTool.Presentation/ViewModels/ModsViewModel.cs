@@ -525,7 +525,7 @@ public sealed partial class ModsViewModel : ObservableObject
             }
         }
 
-        await CopyWorldsAsync(target);
+        await CopyWorldsAsync(target, side: ModSides.Parse(row.Local.Info.Side));
         try
         {
             await ModTargets.SetEnabledAsync(target, row.Local, enabled: !row.IsEnabled);
@@ -550,7 +550,7 @@ public sealed partial class ModsViewModel : ObservableObject
             ? "\n\n" + Loc.T("mods.deleteRunning") : "";
         if (!Confirm(Loc.T("mods.deleteConfirm", row.Name, row.Installed) + running))
             return;
-        await CopyWorldsAsync(target);
+        await CopyWorldsAsync(target, side: ModSides.Parse(row.Local.Info?.Side));
 
         using var history = ModHistory.Begin(ModHistorySource.Manual);
         try
@@ -689,10 +689,11 @@ public sealed partial class ModsViewModel : ObservableObject
     /// не останавливает — уходит в problems (нет списка — в строку статуса). Свои серверы и удалённые — не трогаем:
     /// у них свои копии мира по расписанию.
     /// </summary>
-    private async Task CopyWorldsAsync(ModTarget target, List<string>? problems = null)
+    private async Task CopyWorldsAsync(ModTarget target, List<string>? problems = null, ModSide side = ModSide.Both)
     {
         // скопированные миры — в итоговую строку статуса операции (иначе её сразу затрёт «мод выключен» и т. п.)
-        if (!_main.CopyWorldsBeforeModChanges || target.IsRemote || target.Profile.Kind != ProfileKind.Client) return;
+        if (!_main.CopyWorldsBeforeModChanges || target.IsRemote || target.Profile.Kind != ProfileKind.Client
+            || !NeedsWorldCopy(side)) return;
         var data = string.IsNullOrWhiteSpace(target.Profile.DataDir) ? GameInstall.DefaultDataDir : target.Profile.DataDir;
         if (!WorldCopies.AnyToCopy(data)) return;
         void Note(string text)
@@ -715,12 +716,19 @@ public sealed partial class ModsViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Нужна ли копия миров перед изменением мода этой стороны. Клиентский мод (шейдеры, интерфейс) в одиночной игре
+    /// работает только в клиентской части и мир не меняет — копию не делаем. Не указано (несколько модов сразу,
+    /// пак, откат сеанса) — как у игры, «обе стороны»: копируем.
+    /// </summary>
+    public static bool NeedsWorldCopy(ModSide side) => side != ModSide.Client;
+
+    /// <summary>
     /// Ставит один zip в профиль: старая версия — в хранилище, выключенный мод остаётся выключенным.
     /// interactive — спрашивать про ту же версию и даунгрейд (при обновлении/откате не спрашиваем: решение уже принято).
     /// </summary>
     private async Task<bool> InstallZipAsync(ModTarget target, string zip, bool interactive, List<string> installed, List<string> problems)
     {
-        await CopyWorldsAsync(target, problems);
+        await CopyWorldsAsync(target, problems, ModSides.Parse(ModScanner.ReadZip(zip).Info?.Side));
         try
         {
             // ставится строго в цель: свою папку или удалённый сервер (своё соединение), активный профиль не важен.
