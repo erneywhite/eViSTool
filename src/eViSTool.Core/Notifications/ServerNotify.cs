@@ -74,7 +74,20 @@ public sealed record ServerNotifySettings
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
         var tmp = file + ".tmp";
         File.WriteAllText(tmp, JsonConvert.SerializeObject(this, Formatting.Indented));
-        File.Move(tmp, file, overwrite: true);
+        // на Windows файл, который кто-то в этот миг читает (агент, второе окно), подменить нельзя — чтение короткое,
+        // поэтому несколько попыток с паузой, а не ошибка «не удалось сохранить»
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                File.Move(tmp, file, overwrite: true);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && attempt < 20)
+            {
+                Thread.Sleep(25);
+            }
+        }
     }
 
     public static DateTime? ChangedAt(string profileId, string? agentsDir = null) =>

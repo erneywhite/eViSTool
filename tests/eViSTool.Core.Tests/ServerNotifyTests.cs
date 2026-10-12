@@ -109,4 +109,28 @@ public sealed class ServerNotifyTests
             try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
         }
     }
+
+    [Fact]
+    public void Save_IsNotBroken_ByAReaderAtTheSameTime()
+    {
+        // окно сохраняет, а агент в тот же миг читает: на Windows подмена файла падала, пока чтение держало его открытым
+        var dir = Path.Combine(Path.GetTempPath(), "evistool-notify-srv-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Settings().Save("p1", dir);
+            using var stop = new CancellationTokenSource();
+            var reader = Task.Run(() =>
+            {
+                while (!stop.IsCancellationRequested) ServerNotifySettings.Load("p1", dir);
+            });
+            for (var i = 0; i < 50; i++) Settings().Save("p1", dir);
+            stop.Cancel();
+            reader.Wait();
+            Assert.True(ServerNotifySettings.Load("p1", dir).IsOn(NotifyEvent.PlayerJoined, "b"));
+        }
+        finally
+        {
+            try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
+        }
+    }
 }
