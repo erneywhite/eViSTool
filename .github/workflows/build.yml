@@ -86,9 +86,13 @@ jobs:
         run: |
           dotnet build tests/eViSTool.Core.Tests -c Debug
           dotnet build tests/eViSTool.Desktop.Tests -c Debug
+          dotnet build tests/eViSTool.Presentation.Tests -c Debug
 
       - name: Test
         run: dotnet test tests/eViSTool.Core.Tests --no-build -c Debug --logger "console;verbosity=normal"
+
+      - name: Test the window models
+        run: dotnet test tests/eViSTool.Presentation.Tests --no-build -c Debug --logger "console;verbosity=normal"
 
       - name: Test the Avalonia window
         run: dotnet test tests/eViSTool.Desktop.Tests --no-build -c Debug --logger "console;verbosity=normal"

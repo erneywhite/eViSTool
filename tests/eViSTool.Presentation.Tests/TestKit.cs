@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using eViSTool.Presentation.ViewModels;
 using eViSTool.Presentation;
+using eViSTool.Core.Game;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Server;
 using eViSTool.Core.Server.Remote;
@@ -205,7 +206,7 @@ internal sealed record TestServer(string Name, string DataDir, GameProfile View,
 public sealed class TestServers : IAsyncLifetime
 {
     private static readonly string Root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
-    private static readonly string AgentExe = Path.Combine(Root, "src", "eViSTool.Agent", "bin", "Debug", "net10.0", "eViSTool.Agent.exe");
+    private static readonly string AgentExe = Path.Combine(Root, "src", "eViSTool.Agent", "bin", "Debug", "net10.0", AgentProtocol.ExeName);
     private static readonly string FakeBin = Path.Combine(Root, "tests", "FakeVsServer", "bin", "Debug", "net10.0");
     private static readonly string Sample = Path.Combine(AppContext.BaseDirectory, "TestData", "serverconfig-real.json");
 
@@ -222,7 +223,14 @@ public sealed class TestServers : IAsyncLifetime
     {
         var game = Directory.CreateDirectory(Path.Combine(_tmp, "game")).FullName;
         foreach (var f in Directory.GetFiles(FakeBin)) File.Copy(f, Path.Combine(game, Path.GetFileName(f)));
-        File.Copy(Path.Combine(FakeBin, "FakeVsServer.exe"), Path.Combine(game, "VintagestoryServer.exe"));
+        // поддельный сервер под именем настоящего: на Windows — exe-запускатель, на Linux — dll и её runtimeconfig для dotnet
+        if (OperatingSystem.IsWindows())
+            File.Copy(Path.Combine(FakeBin, "FakeVsServer.exe"), Path.Combine(game, "VintagestoryServer.exe"));
+        else
+        {
+            File.Copy(Path.Combine(FakeBin, "FakeVsServer.dll"), Path.Combine(game, ServerExecutable.DllName), overwrite: true);
+            File.Copy(Path.Combine(FakeBin, "FakeVsServer.runtimeconfig.json"), Path.Combine(game, "VintagestoryServer.runtimeconfig.json"), overwrite: true);
+        }
 
         LocalA = Local("local-a", game);
         LocalB = Local("local-b", game);
