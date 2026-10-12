@@ -1398,10 +1398,14 @@ public sealed partial class ModsViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            if (_remote.Count == 0)
+            // модбазу могли спрашивать раньше, до установки части модов: про них дозапрашиваем, иначе они выпали бы
+            // из кода как «нет на модбазе»
+            var unknown = _locals.Where(l => l.Info is not null && !_remote.ContainsKey(l.Info.ModId)).ToList();
+            if (unknown.Count > 0)
             {
-                StatusText = Loc.T("check.querying", 0, _locals.Count);
-                _remote = await _service.FetchRemoteAsync(_locals, new Progress<string>(s => StatusText = s));
+                StatusText = Loc.T("check.querying", 0, unknown.Count);
+                foreach (var (id, r) in await _service.FetchRemoteAsync(unknown, new Progress<string>(s => StatusText = s)))
+                    _remote[id] = r;
             }
             var entries = new List<ModCodeEntry>();
             var missing = new List<string>();
