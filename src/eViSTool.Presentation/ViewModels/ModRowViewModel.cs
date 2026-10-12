@@ -70,18 +70,25 @@ public sealed class ModRowViewModel
         Changelog = r.Status == ModStatus.UpdateAvailable ? Html.ToPlainText(r.LatestCompatible?.Changelog, 1500) : null;
 
         // сторона — из modinfo.json, как её видит игра; у «обеих сторон» (таких большинство) пометки нет
-        var side = r.Local.Info is { } info ? ModSides.Parse(info.Side) : ModSide.Both;
-        IsUnneeded = ModSides.IsUnneeded(side, profileKind);
-        SideNote = side switch
+        Side = r.Local.Info is { } info ? ModSides.Parse(info.Side) : ModSide.Both;
+        IsUnneeded = ModSides.IsUnneeded(Side, profileKind);
+        SideText = Loc.T(Side switch { ModSide.Client => "mods.sideColClient", ModSide.Server => "mods.sideColServer", _ => "mods.sideColBoth" });
+        SideNote = Side switch
         {
-            ModSide.Client => Loc.T("mods.sideClient") + (IsUnneeded ? " · " + Loc.T("mods.unneededOnServer") : ""),
+            ModSide.Client when IsUnneeded => " · " + Loc.T("mods.unneededOnServer"),
             // у игрока серверный мод работает в одиночной игре (её мир крутит встроенный сервер)
-            ModSide.Server => Loc.T("mods.sideServer") + (profileKind == ProfileKind.Client ? " · " + Loc.T("mods.forSingleplayer") : ""),
+            ModSide.Server when profileKind == ProfileKind.Client => " · " + Loc.T("mods.forSingleplayer"),
             _ => "",
         };
     }
 
-    /// <summary>« · только клиент» / « · только сервер» после modid; у мода для обеих сторон — пусто.</summary>
+    /// <summary>Сторона из modinfo.json, как её видит игра.</summary>
+    public ModSide Side { get; }
+
+    /// <summary>Колонка «Сторона»: клиент / сервер / оба.</summary>
+    public string SideText { get; }
+
+    /// <summary>Пояснение после modid: « · серверу не нужен», « · для одиночной игры»; обычно пусто.</summary>
     public string SideNote { get; }
 
     /// <summary>Профилю мод не нужен (клиентский мод на выделенном сервере) — подсказка, не проблема.</summary>

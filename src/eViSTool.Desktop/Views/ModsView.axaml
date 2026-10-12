@@ -9,6 +9,12 @@
     <UserControl.Styles>        <!-- пометка «не нужен на этой стороне» в строке мода -->
         <Style Selector="Run.warn">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
+        </Style>
+        <Style Selector="TextBlock.side">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+        </Style>
+        <Style Selector="TextBlock.side.sideWarn">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
         </Style>        <!-- список сеансов истории: строки во всю ширину, без своих отступов -->
         <Style Selector="ListBox.history ListBoxItem">
             <Setter Property="Padding" Value="0" />
@@ -210,6 +216,19 @@
                                 <TextBlock Text="{local:Tr pack.menu}" />
                             </StackPanel>
                         </Button>
+                        <!-- разом все моды одной стороны: например, клиентские на копии профиля для проверки -->
+                        <Button Margin="8,0,0,0" ToolTip.Tip="{local:Tr mods.sideMenuTip}" IsEnabled="{Binding !IsBusy}" Classes.hidden="{Binding IsHistory}">
+                            <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                                    <MenuItem Header="{Binding DisableClientText}" Command="{Binding DisableClientCommand}" />
+                                    <MenuItem Header="{Binding EnableClientText}" Command="{Binding EnableClientCommand}" />
+                                    <Separator />
+                                    <MenuItem Header="{Binding DisableServerText}" Command="{Binding DisableServerCommand}" />
+                                    <MenuItem Header="{Binding EnableServerText}" Command="{Binding EnableServerCommand}" />
+                                </MenuFlyout>
+                            </Button.Flyout>
+                            <TextBlock Text="{local:Tr mods.sideMenu}" />
+                        </Button>
                         <Button Margin="8,0,0,0" Command="{Binding OpenModsFolderCommand}" ToolTip.Tip="{local:Tr mods.openFolder}" Padding="10,8"
                                 IsVisible="{Binding IsLocalProfile}">
                             <Path Classes="icon" Data="{StaticResource Icon.Folder}" Width="16" Height="16" />
@@ -325,6 +344,14 @@
                                                            IsVisible="{Binding LatestArrow, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                                            TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="{local:Tr col.side}" Width="90" SortMemberPath="SideText">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="vm:ModRowViewModel">
+                                            <TextBlock Text="{Binding SideText}" FontSize="12" VerticalAlignment="Center" Margin="12,0"
+                                                       Classes="side" Classes.sideWarn="{Binding IsUnneeded}" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>

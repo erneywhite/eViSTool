@@ -92,6 +92,7 @@ public sealed partial class ModsViewModel : ObservableObject
         var sort = SortIndex;
         SortIndex = -1;
         SortIndex = sort;
+        NotifySideMenu();
         foreach (var name in new[] { nameof(InstalledLabel), nameof(UpdatesLabel), nameof(ProblemsLabel), nameof(DisabledLabel),
                      nameof(PinnedLabel), nameof(UnneededLabel), nameof(ShownText), nameof(UpdateAllText), nameof(DependencyText) })
             OnPropertyChanged(name);
@@ -486,6 +487,7 @@ public sealed partial class ModsViewModel : ObservableObject
         UnneededCount = Rows.Count(r => r.IsUnneeded);
         if (UnneededCount == 0 && Filter == ModFilter.Unneeded) Filter = ModFilter.All; // таких модов не осталось — показываем всё
         OnPropertyChanged(nameof(ShownText));
+        NotifySideMenu();
 
         if (keep is not null)
         {
@@ -556,6 +558,72 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             await ModTargets.SetEnabledAsync(target, row.Local, enabled: !row.IsEnabled);
             StatusText = WithWorldCopies(Loc.T(row.IsEnabled ? "mods.disabledOk" : "mods.enabledOk", row.Name));
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException
+                                       or HttpRequestException or TaskCanceledException)
+        {
+            Error(Loc.T("mods.toggleFailed", ex.Message));
+        }
+        await ReloadAsync();
+    }
+
+    // ---------- включение / выключение по стороне ----------
+
+    // моды этой стороны, которых коснётся команда: с прочитанным modinfo, не дубликаты
+    private List<ModRowViewModel> SideRows(ModSide side, bool enabled) =>
+        [.. Rows.Where(r => r.Side == side && r.Local.Info is not null && !r.IsDuplicate && r.IsEnabled != enabled)];
+
+    public string DisableClientText => Loc.T("mods.sideDisableClient", SideRows(ModSide.Client, false).Count);
+    public string EnableClientText => Loc.T("mods.sideEnableClient", SideRows(ModSide.Client, true).Count);
+    public string DisableServerText => Loc.T("mods.sideDisableServer", SideRows(ModSide.Server, false).Count);
+    public string EnableServerText => Loc.T("mods.sideEnableServer", SideRows(ModSide.Server, true).Count);
+
+    private bool CanDisableClient() => SideRows(ModSide.Client, false).Count > 0;
+    private bool CanEnableClient() => SideRows(ModSide.Client, true).Count > 0;
+    private bool CanDisableServer() => SideRows(ModSide.Server, false).Count > 0;
+    private bool CanEnableServer() => SideRows(ModSide.Server, true).Count > 0;
+
+    private void NotifySideMenu()
+    {
+        foreach (var name in new[] { nameof(DisableClientText), nameof(EnableClientText), nameof(DisableServerText), nameof(EnableServerText) })
+            OnPropertyChanged(name);
+        DisableClientCommand.NotifyCanExecuteChanged();
+        EnableClientCommand.NotifyCanExecuteChanged();
+        DisableServerCommand.NotifyCanExecuteChanged();
+        EnableServerCommand.NotifyCanExecuteChanged();
+    }
+
+    // пункт, которому нечего делать (все клиентские уже выключены), гаснет
+    [RelayCommand(CanExecute = nameof(CanDisableClient))] private Task DisableClientAsync() => SetSideEnabledAsync(ModSide.Client, enabled: false);
+    [RelayCommand(CanExecute = nameof(CanEnableClient))] private Task EnableClientAsync() => SetSideEnabledAsync(ModSide.Client, enabled: true);
+    [RelayCommand(CanExecute = nameof(CanDisableServer))] private Task DisableServerAsync() => SetSideEnabledAsync(ModSide.Server, enabled: false);
+    [RelayCommand(CanExecute = nameof(CanEnableServer))] private Task EnableServerAsync() => SetSideEnabledAsync(ModSide.Server, enabled: true);
+
+    /// <summary>
+    /// Включить или выключить разом все моды одной стороны (меню «Сторона»): например, клиентские на копии профиля
+    /// для проверки или серверные у игрока. Как и одиночное переключение — с вопросом, если игра или сервер запущены,
+    /// и с копией миров, если сторона их касается.
+    /// </summary>
+    private async Task SetSideEnabledAsync(ModSide side, bool enabled)
+    {
+        var rows = SideRows(side, enabled);
+        if (rows.Count == 0 || CurrentTarget() is not { } target) return;
+        if (IsRunning(target))
+        {
+            var what = Loc.T(target.Profile.Kind == ProfileKind.Server ? "mods.toggleServerRunning" : "mods.toggleGameRunning");
+            if (!Confirm(Loc.T(enabled ? "mods.sideAnywayEnable" : "mods.sideAnywayDisable", what, rows.Count))) return;
+        }
+
+        await CopyWorldsAsync(target, side: side);
+        var done = 0;
+        try
+        {
+            foreach (var row in rows)
+            {
+                await ModTargets.SetEnabledAsync(target, row.Local, enabled);
+                done++;
+            }
+            StatusText = WithWorldCopies(Loc.T(enabled ? "mods.sideEnabledOk" : "mods.sideDisabledOk", done));
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException
                                        or HttpRequestException or TaskCanceledException)
