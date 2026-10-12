@@ -85,6 +85,18 @@ public sealed partial class ModsViewModel : ObservableObject
 
     public IReadOnlyList<string> SortModes { get; } = [Loc.T("mods.sortImportant"), Loc.T("mods.sortName")];
 
+    /// <summary>Сменился язык: подписи счётчиков сами пересчитываются только при смене числа.</summary>
+    public void OnLanguageChanged()
+    {
+        // выпадающий список запоминает текст выбранного пункта — выбрать его заново, чтобы подпись сменилась
+        var sort = SortIndex;
+        SortIndex = -1;
+        SortIndex = sort;
+        foreach (var name in new[] { nameof(InstalledLabel), nameof(UpdatesLabel), nameof(ProblemsLabel), nameof(DisabledLabel),
+                     nameof(PinnedLabel), nameof(UnneededLabel), nameof(ShownText), nameof(UpdateAllText), nameof(DependencyText) })
+            OnPropertyChanged(name);
+    }
+
     /// <summary>Ширина карточки (тянется разделителем, запоминается).</summary>
     public double CardWidth
     {
@@ -189,7 +201,10 @@ public sealed partial class ModsViewModel : ObservableObject
         if (CurrentTarget() is not { } target) return;
         await History.LoadAsync(target, _locals);
     }
-    partial void OnSortIndexChanged(int value) => ApplySort();
+    partial void OnSortIndexChanged(int value)
+    {
+        if (value >= 0) ApplySort(); // -1 — пункт перевыбирают при смене языка, порядок тот же
+    }
 
     private void RefreshView()
     {

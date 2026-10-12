@@ -73,8 +73,17 @@ public sealed class Loc : INotifyPropertyChanged
         return 2;
     }
 
+    /// <summary>
+    /// Текст по ключу. На Linux сначала ищется «ключ@linux» — вариант для этой системы (пути и имена файлов там другие),
+    /// нет его — обычный текст.
+    /// </summary>
     private string Get(string key) =>
-        _current.TryGetValue(key, out var s) ? s : _fallback.TryGetValue(key, out var f) ? f : key;
+        !OperatingSystem.IsWindows() && Find(key + LinuxSuffix) is { } linux ? linux : Find(key) ?? key;
+
+    public const string LinuxSuffix = "@linux";
+
+    private string? Find(string key) =>
+        _current.TryGetValue(key, out var s) ? s : _fallback.TryGetValue(key, out var f) ? f : null;
 
     private static Dictionary<string, string> Load(string code)
     {

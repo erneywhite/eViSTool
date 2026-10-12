@@ -48,6 +48,15 @@ public partial class LocalizationTests
     }
 
     [Fact]
+    public void LinuxVariant_ReplacesTheTextOnLinuxOnly()
+    {
+        Loc.Instance.SetLanguage("en");
+        var hint = Loc.T("settings.gameDirHint");
+        Assert.Contains(OperatingSystem.IsWindows() ? "VintagestoryServer.exe" : "VintagestoryServer.dll", hint);
+        Assert.Equal("Mods: 5", Loc.T("mods.sumMods", 5)); // без варианта для Linux — обычный текст
+    }
+
+    [Fact]
     public void PluralPicksRussianAndEnglishForms()
     {
         Loc.Instance.SetLanguage("ru");

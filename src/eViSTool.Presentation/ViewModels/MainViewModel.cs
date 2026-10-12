@@ -474,6 +474,7 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var p in Profiles) p.NotifyLanguageChanged();
         NotifyPlay();
         Mods.OnProfileSwitched();
+        Mods.OnLanguageChanged();
         Catalog.OnLanguageChanged();
         Server.OnLanguageChanged();
     }
