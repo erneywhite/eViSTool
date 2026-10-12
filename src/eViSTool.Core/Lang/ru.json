@@ -1314,6 +1314,7 @@
   "profile.dataNotFound": "Папка данных не найдена",
   "profile.defaultClientName": "Клиент",
   "profile.defaultServerName": "Сервер",
+  "profile.foreignModPath": "Папка модов из другой системы пропущена, игра её не найдёт: {0}. Поправь список папок модов в настройках игры (у сервера — «Конфигурация» → «Дополнительно» → «Папки модов»).",
   "profile.gameNotFound": "Не найдена игра: укажи папку, где лежит {0}",
   "profile.kindClient": "клиент",
   "profile.kindRemote": "удалённый сервер",

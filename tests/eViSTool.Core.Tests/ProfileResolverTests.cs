@@ -46,6 +46,47 @@ public sealed class ProfileResolverTests : IDisposable
         Assert.Equal(["carryon", "footprints@1.2.11"], r.DisabledMods);
     }
 
+    // конфиг перенесли с другой системы: путь той системы игра здесь не найдёт — пропустить, предупредить, ставить в Mods данных
+    [Fact]
+    public void ForeignModPath_IsSkippedWithWarning_AndModsGoToDataMods()
+    {
+        var foreign = OperatingSystem.IsWindows() ? "/home/user/.config/VintagestoryData/Mods" : @"C:\Users\Admin\AppData\Roaming\VintagestoryData\Mods";
+        File.WriteAllText(Path.Combine(_data, "serverconfig.json"), $$"""
+        {
+          "ModPaths": ["Mods", "{{Json(foreign)}}"],
+          "WorldConfig": { "DisabledMods": [] }
+        }
+        """);
+
+        var r = ProfileResolver.Resolve(new GameProfile { Kind = ProfileKind.Server, GameDir = _game, DataDir = _data });
+
+        Assert.Equal([Path.Combine(_data, "Mods")], r.ModDirs);
+        Assert.Equal(Path.Combine(_data, "Mods"), r.InstallDir);
+        Assert.Contains(r.Warnings, w => w.Contains(foreign));
+        Assert.False(Directory.EnumerateDirectories(_game).Any(d => d.Contains('\\') && !OperatingSystem.IsWindows()));
+    }
+
+    [Theory]
+    [InlineData("Mods", false)]
+    [InlineData("", false)]
+    public void IsForeignPath_SameOnAnySystem(string path, bool expected) => Assert.Equal(expected, ProfileResolver.IsForeignPath(path));
+
+    [Fact]
+    public void IsForeignPath_ByCurrentSystem()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.True(ProfileResolver.IsForeignPath("/srv/vs/Mods"));
+            Assert.False(ProfileResolver.IsForeignPath(@"C:\Games\VS\Mods"));
+        }
+        else
+        {
+            Assert.True(ProfileResolver.IsForeignPath(@"C:\Games\VS\Mods"));
+            Assert.True(ProfileResolver.IsForeignPath(@"\\nas\vs\Mods"));
+            Assert.False(ProfileResolver.IsForeignPath("/srv/vs/Mods"));
+        }
+    }
+
     [Fact]
     public void ServerReadsServerConfig()
     {

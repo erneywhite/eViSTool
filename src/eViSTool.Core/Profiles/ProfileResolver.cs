@@ -53,7 +53,12 @@ public static class ProfileResolver
             }
         }
 
+        // путь другой системы (конфиг перенесли с Windows на Linux или наоборот): игра его не найдёт, а склеенный с папкой
+        // игры он дал бы папку с обратными слэшами в имени — туда ставились бы моды. Пропускаем и предупреждаем
+        foreach (var foreign in modPaths.Where(IsForeignPath))
+            warnings.Add(Loc.T("profile.foreignModPath", foreign));
         var dirs = modPaths
+            .Where(p => !IsForeignPath(p))
             .Select(p => ResolvePath(p, profile.GameDir))
             .Where(p => p is not null && !IsBuiltInModsDir(p, profile.GameDir))
             .Select(p => p!)
@@ -105,6 +110,19 @@ public static class ProfileResolver
 
     private static List<string> Strings(JToken? token) =>
         token is JArray arr ? arr.Where(t => t.Type == JTokenType.String).Select(t => t.ToString()).ToList() : [];
+
+    /// <summary>
+    /// Путь, записанный под другой системой: на Linux — с буквой диска или обратными слэшами (C:\…, \\server\…),
+    /// на Windows — абсолютный путь Linux (/home/…).
+    /// </summary>
+    public static bool IsForeignPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        path = path.Trim();
+        return OperatingSystem.IsWindows()
+            ? path.StartsWith('/')
+            : path.Length >= 2 && char.IsAsciiLetter(path[0]) && path[1] == ':' || path.Contains('\\');
+    }
 
     /// <summary>Относительные пути игра считает от своей папки установки.</summary>
     private static string? ResolvePath(string path, string? gameDir)

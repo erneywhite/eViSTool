@@ -327,8 +327,10 @@ public static class ProfileCloner
             }
             else
             {
-                // своя копия: все внешние папки собраны в одну свою — клон ни на что чужое не ссылается
-                var relative = paths.Where(p => p.Type == JTokenType.String && !Path.IsPathRooted(p.ToString())).Select(p => p.ToString());
+                // своя копия: все внешние папки собраны в одну свою — клон ни на что чужое не ссылается (пути другой системы
+                // тоже: игра здесь их не найдёт)
+                var relative = paths.Where(p => p.Type == JTokenType.String && !Path.IsPathRooted(p.ToString())
+                                                && !ProfileResolver.IsForeignPath(p.ToString())).Select(p => p.ToString());
                 root["ModPaths"] = paths = new JArray(relative.Append(Path.Combine(to, ModsDir)).Distinct(StringComparer.OrdinalIgnoreCase));
             }
 

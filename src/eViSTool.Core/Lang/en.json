@@ -1314,6 +1314,7 @@
   "profile.dataNotFound": "Data folder not found",
   "profile.defaultClientName": "Client",
   "profile.defaultServerName": "Server",
+  "profile.foreignModPath": "Skipped a mod folder from another operating system, the game will not find it: {0}. Fix the mod folder list in the game settings (for a server: Configuration → Advanced → Mod folders).",
   "profile.gameNotFound": "Game not found: point to the folder that contains {0}",
   "profile.kindClient": "client",
   "profile.kindRemote": "remote server",
