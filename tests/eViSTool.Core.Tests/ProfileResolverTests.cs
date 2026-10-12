@@ -63,7 +63,7 @@ public sealed class ProfileResolverTests : IDisposable
         Assert.Equal([Path.Combine(_data, "Mods")], r.ModDirs);
         Assert.Equal(Path.Combine(_data, "Mods"), r.InstallDir);
         Assert.Contains(r.Warnings, w => w.Contains(foreign));
-        Assert.False(Directory.EnumerateDirectories(_game).Any(d => d.Contains('\\') && !OperatingSystem.IsWindows()));
+        Assert.DoesNotContain(Directory.EnumerateDirectories(_game), d => d.Contains('\\') && !OperatingSystem.IsWindows());
     }
 
     [Theory]

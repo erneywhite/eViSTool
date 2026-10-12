@@ -334,8 +334,7 @@
   ],
   "DefaultRoleCode": "suplayer",
   "ModPaths": [
-    "Mods",
-    "C:\\Users\\Admin\\AppData\\Roaming\\VintagestoryData\\Mods"
+    "Mods"
   ],
   "AntiAbuse": 0,
   "AntiAbuseBufferSize": 100,
