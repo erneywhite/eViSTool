@@ -13,6 +13,7 @@ namespace eViSTool.Desktop.Views;
 public partial class ModsView : UserControl
 {
     private ModsViewModel? _vm;
+    private bool? _rightClickOnRow; // последний правый щелчок по таблице пришёлся на строку мода (null — меню с клавиатуры)
 
     private ColumnDefinition CardColumn => Split.ColumnDefinitions[2]; // колонка карточки справа от разделителя
 
@@ -45,8 +46,17 @@ public partial class ModsView : UserControl
     private void Grid_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (!e.GetCurrentPoint(Grid).Properties.IsRightButtonPressed) return;
-        if ((e.Source as Visual)?.FindAncestorOfType<DataGridRow>(includeSelf: true) is { DataContext: ModRowViewModel row })
-            Grid.SelectedItem = row;
+        var row = (e.Source as Visual)?.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext as ModRowViewModel;
+        _rightClickOnRow = row is not null;
+        if (row is not null) Grid.SelectedItem = row;
+    }
+
+    // меню действий с модом — только над строкой мода: над заголовком колонки или пустым местом оно действовало бы на
+    // мод, выбранный раньше. С клавиатуры — если мод выбран
+    private void RowMenu_Opening(object? sender, CancelEventArgs e)
+    {
+        if (_rightClickOnRow == false || (_rightClickOnRow is null && _vm?.Selected is null)) e.Cancel = true;
+        _rightClickOnRow = null;
     }
 
     private void Grid_DragOver(object? sender, DragEventArgs e)

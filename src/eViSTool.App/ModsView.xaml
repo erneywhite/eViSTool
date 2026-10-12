@@ -384,7 +384,7 @@
                               HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource Forest.Line}"
                               SelectionMode="Single" CanUserResizeRows="False" RowHeight="54"
                               Background="Transparent" RowBackground="Transparent" BorderThickness="0"
-                              ColumnHeaderStyle="{StaticResource Forest.ColumnHeader}" ContextMenu="{StaticResource RowMenu}"
+                              ColumnHeaderStyle="{StaticResource Forest.ColumnHeader}" ContextMenu="{StaticResource RowMenu}" ContextMenuOpening="Grid_ContextMenuOpening"
                               AllowDrop="True" DragOver="Grid_DragOver" Drop="Grid_Drop">
                         <DataGrid.Resources>
                             <!-- выделение строки — лесной «выбранный», без рамки текущей ячейки -->

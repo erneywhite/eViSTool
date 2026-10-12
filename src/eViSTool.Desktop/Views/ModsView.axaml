@@ -249,7 +249,7 @@
                                   DragDrop.AllowDrop="True" AutomationProperties.AutomationId="ModsGrid">
                             <!-- контекстное меню строки: всё, что умеет вкладка; строка под курсором выделяется до открытия меню -->
                             <DataGrid.ContextMenu>
-                                <ContextMenu>
+                                <ContextMenu Opening="RowMenu_Opening">
                                     <MenuItem Header="{local:Tr menu.toggle}" Command="{Binding ToggleEnabledCommand}" CommandParameter="{Binding Selected}" />
                                     <MenuItem Header="{local:Tr menu.delete}" Command="{Binding DeleteCommand}" CommandParameter="{Binding Selected}" />
                                     <Separator />

@@ -40,6 +40,18 @@ public partial class ModsView : UserControl
         }
     }
 
+    // меню действий с модом — только над строкой мода: над заголовком колонки или пустым местом оно действовало бы на
+    // мод, выбранный раньше
+    private void Grid_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        for (var d = e.OriginalSource as DependencyObject; d is not null; d = System.Windows.Media.VisualTreeHelper.GetParent(d))
+        {
+            if (d is DataGridRow) return;
+            if (d is DataGrid) break;
+        }
+        e.Handled = true;
+    }
+
     // перетаскивание zip-архивов из Проводника в список модов
     private void Grid_DragOver(object sender, DragEventArgs e)
     {
