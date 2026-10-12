@@ -6,8 +6,7 @@ namespace eViSTool.Presentation.Tests;
 
 /// <summary>
 /// Окно канала оповещений: поля под тип, имя по умолчанию, правило «пустое поле секрета — оставить сохранённый», чат
-/// Telegram (найденный или вписанный руками), поиск чатов, проверочное сообщение и сборка канала с проверками — как
-/// у окна на WPF. Поиск и отправка подменены делегатами: в сеть тесты не ходят. Токены и ссылки выдуманные.
+/// Telegram (найденный или вписанный руками), поиск чатов, проверочное сообщение и сборка канала с проверками. Поиск и отправка подменены делегатами: в сеть тесты не ходят. Токены и ссылки выдуманные.
 /// </summary>
 public sealed class NotifyChannelEditorViewModelTests
 {
@@ -162,7 +161,7 @@ public sealed class NotifyChannelEditorViewModelTests
     [Fact]
     public void OtherKinds_IgnoreNtfyAndWebhookFields()
     {
-        // поля другого типа в канале (так не бывает, но окно на WPF их не брало) — не подставляются
+        // поля другого типа в канале (так не бывает, но окно их не берёт) — не подставляются
         var vm = Model(Saved(NotifyKind.Discord, DiscordHook) with { Url = "https://ntfy.example.org", Template = "{}" }, isNew: false);
         Assert.Equal("", vm.NtfyServer);
         Assert.Matches("^evistool-[0-9a-f]{16}$", vm.NtfyTopic);
@@ -237,7 +236,7 @@ public sealed class NotifyChannelEditorViewModelTests
         Pick(vm, NotifyKind.Telegram);
         Assert.Equal("Мой телефон", vm.Name);
 
-        vm.Name = "  "; // одни пробелы — тоже своё, как в окне на WPF
+        vm.Name = "  "; // одни пробелы — тоже своё
         Pick(vm, NotifyKind.Discord);
         Assert.Equal("  ", vm.Name);
     }
@@ -730,7 +729,7 @@ public sealed class NotifyChannelEditorViewModelTests
 
         var running = vm.FindChatsCommand.ExecuteAsync(null);
         Assert.False(vm.FindChatsCommand.CanExecute(null));
-        Assert.True(vm.TestCommand.CanExecute(null)); // проверочное — своей кнопкой, как в окне на WPF
+        Assert.True(vm.TestCommand.CanExecute(null)); // проверочное — своей кнопкой
 
         reply.SetResult([new TelegramChat("1", "@me")]);
         await running;

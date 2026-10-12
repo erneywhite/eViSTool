@@ -6,8 +6,7 @@ using eViSTool.Core.Profiles;
 namespace eViSTool.Presentation.Tests;
 
 /// <summary>
-/// Окно уборки: общая галочка группы — все / ни одного / часть; выбор пунктов сообщает окну. То, что в окне на WPF
-/// делал код за окном, — поиск при открытии и проверка раз в 2 секунды, не запущены ли игра и сервер (до закрытия окна), —
+/// Окно уборки: общая галочка группы — все / ни одного / часть; выбор пунктов сообщает окну. То, что делал код за окном, — поиск при открытии и проверка раз в 2 секунды, не запущены ли игра и сервер (до закрытия окна), —
 /// теперь в модели: таймер ручной, процессы и диск подменены. Уборка — на временной папке, «корзина» её просто удаляет.
 /// </summary>
 public sealed class CleanupViewModelTests : IDisposable
@@ -54,7 +53,7 @@ public sealed class CleanupViewModelTests : IDisposable
         Assert.True(changes >= 3);
     }
 
-    // Корзину открывает платформа окна (на WPF — Проводник, на Linux — файловый менеджер), а не сама модель
+    // Корзину открывает платформа окна (на Windows — Проводник, на Linux — файловый менеджер), а не сама модель
     [Fact]
     public void OpenRecycleBin_GoesThroughPlatform() => Sta.Run(() =>
     {
@@ -71,7 +70,7 @@ public sealed class CleanupViewModelTests : IDisposable
     public void Sizes_AreReadable(long bytes, string number) =>
         Assert.StartsWith(number, WorldCopiesViewModel.SizeText(bytes));
 
-    // ---- открытие и закрытие окна (в окне на WPF — Loaded, DispatcherTimer на 2 с и Closed)
+    // ---- открытие и закрытие окна (Loaded, таймер на 2 с и Closed)
 
     /// <summary>Мусор во временной папке: логи (безопасно, отмечены), карта мира и данные мода (осторожно, не отмечены).</summary>
     private void MakeJunk()

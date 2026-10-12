@@ -9,7 +9,7 @@ namespace eViSTool.Presentation.Tests;
 
 /// <summary>
 /// Окно «Новый профиль»: название и папка будущего профиля, существующие данные сервера (нашлись конфиги или нет),
-/// ответ каждой кнопки — как у окна на WPF.
+/// ответ каждой кнопки.
 /// </summary>
 public sealed class NewProfileViewModelTests : IDisposable
 {

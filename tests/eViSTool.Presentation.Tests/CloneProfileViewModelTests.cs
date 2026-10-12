@@ -10,7 +10,7 @@ namespace eViSTool.Presentation.Tests;
 /// <summary>
 /// Окно клона серверного профиля и импорта данных сервера: что видно при открытии, подстановка папки по названию,
 /// пересчёт плана после паузы с отбрасыванием устаревших ответов, нехватка места, ошибки плана, копирование с ходом,
-/// отменой и сбоями — ветка за веткой, как в окне на WPF. Папки данных — во временной папке; пауза — ручной таймер,
+/// отменой и сбоями — ветка за веткой. Папки данных — во временной папке; пауза — ручной таймер,
 /// свободное место, выбор папки и журнал ошибок подменены.
 /// </summary>
 public sealed class CloneProfileViewModelTests : IDisposable
@@ -318,7 +318,7 @@ public sealed class CloneProfileViewModelTests : IDisposable
         Assert.False(vm.CanGo);
         Assert.False(vm.GoCommand.CanExecute(null));
         Assert.Equal(1, PlanCount); // пока пауза идёт, план не считается
-        // каждая правка начинает паузу заново; название двигает и папку — это две правки, как в окне на WPF
+        // каждая правка начинает паузу заново; название двигает и папку — это две правки
         Assert.Equal(7, _timer.Starts);
 
         Pause(vm);
@@ -593,7 +593,7 @@ public sealed class CloneProfileViewModelTests : IDisposable
         Assert.True(vm.IsCopying);
         Assert.False(vm.IsFormEnabled);
         Assert.False(vm.CanGo);
-        Assert.Equal(5.0 / total, vm.Progress); // доля — от объёма плана, как в окне на WPF
+        Assert.Equal(5.0 / total, vm.Progress); // доля — от объёма плана
         Assert.Equal(Loc.T("clone.copying", "Saves/duo.vcdbs", Sizes.Format(5), Sizes.Format(10)), vm.ProgressText);
 
         Assert.True(vm.CancelCopy()); // идёт — прервать, окно остаётся

@@ -169,7 +169,7 @@ public sealed class UpdateWindowViewModelTests
     [Fact]
     public void DataIsTakenOnce_WhenTheWindowOpens()
     {
-        // фоновая проверка может потом сбросить найденное — открытое окно показывает то, с чем открылось (как на WPF)
+        // фоновая проверка может потом сбросить найденное — открытое окно показывает то, с чем открылось
         var about = About(Release("9.9.9", RecommendedMark + Notes));
         var vm = Model(about, new Probe());
         about.UseReleases([]);

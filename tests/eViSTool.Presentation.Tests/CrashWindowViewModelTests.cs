@@ -91,7 +91,7 @@ public sealed class CrashWindowViewModelTests
         Assert.Equal("Найти", vm.ShowLabel);
     }
 
-    // источник не записан (старый агент) — как и в окне на WPF, «строка перевода»
+    // источник не записан (старый агент) — «строка перевода»
     [Fact]
     public void UnknownSource_FallsBackToTranslation()
     {
@@ -236,7 +236,7 @@ public sealed class CrashWindowViewModelTests
         Assert.Equal(Loc.T("crash.copied"), vm.Status);
     }
 
-    // буфер занят другой программой — молча, как в окне на WPF: ни ошибки, ни «скопировано»
+    // буфер занят другой программой — молча: ни ошибки, ни «скопировано»
     [Fact]
     public void Copy_ClipboardBusy_IsQuiet()
     {

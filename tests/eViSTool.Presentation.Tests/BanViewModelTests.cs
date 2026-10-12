@@ -5,8 +5,7 @@ using eViSTool.Presentation.ViewModels;
 namespace eViSTool.Presentation.Tests;
 
 /// <summary>
-/// Окно бана игрока: срок (по умолчанию день), причина без пробелов по краям, ответ в единицах команды /ban — как у
-/// окна на WPF.
+/// Окно бана игрока: срок (по умолчанию день), причина без пробелов по краям, ответ в единицах команды /ban.
 /// </summary>
 public sealed class BanViewModelTests
 {

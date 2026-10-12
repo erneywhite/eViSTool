@@ -7,7 +7,7 @@ namespace eViSTool.Presentation.Tests;
 
 /// <summary>
 /// Плоский список ключей настроек мира с заголовками категорий — для выпадающего списка ключей в окне на Avalonia
-/// (группировки, как у WPF, там нет).
+/// (группировок там нет).
 /// </summary>
 public sealed class WorldSettingKeyListTests
 {

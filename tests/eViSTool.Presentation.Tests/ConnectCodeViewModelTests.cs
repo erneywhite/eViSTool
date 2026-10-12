@@ -143,14 +143,14 @@ public sealed class ConnectCodeViewModelTests
         Assert.Equal(Loc.T("connect.checking"), vm.CheckText);
         Assert.Equal(RowTone.Muted, vm.CheckTone);
         Assert.False(vm.CheckCommand.CanExecute(null));
-        Assert.True(vm.CanAccept); // «ОК» проверки не ждёт, как и в окне на WPF
+        Assert.True(vm.CanAccept); // «ОК» проверки не ждёт
 
         answer.SetResult(Running);
         await run;
         Assert.Equal(RowTone.Good, vm.CheckTone);
     }
 
-    // Запрос не слушает отмену (как было в окне на WPF): ответ всё равно приходит, но уже не про тот код, что в поле
+    // Запрос не слушает отмену (так и задумано): ответ всё равно приходит, но уже не про тот код, что в поле
     [Fact]
     public async Task CodeChangedDuringCheck_StaleAnswerIsDropped()
     {

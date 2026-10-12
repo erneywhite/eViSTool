@@ -4,7 +4,7 @@ using eViSTool.Presentation;
 
 namespace eViSTool.Presentation.Tests;
 
-/// <summary>Вид списка без WPF: фильтр, устойчивая сортировка, обновление сдвигом (те же объекты, без очистки).</summary>
+/// <summary>Вид списка без оконного движка: фильтр, устойчивая сортировка, обновление сдвигом (те же объекты, без очистки).</summary>
 public sealed class FilteredListTests
 {
     private sealed record Mod(string Name, int Importance);

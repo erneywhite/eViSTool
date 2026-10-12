@@ -7,7 +7,7 @@ namespace eViSTool.Presentation.Tests;
 
 /// <summary>
 /// Окно «Сервер в избранном игры»: что видно при открытии (новый сервер и правка записи), проверка адреса, название по
-/// умолчанию, пустой пароль — «без пароля», ответ окна — ветка за веткой, как в окне на WPF. Диска и сети не касается.
+/// умолчанию, пустой пароль — «без пароля», ответ окна — ветка за веткой. Диска и сети не касается.
 /// </summary>
 public sealed class FavoriteServerViewModelTests
 {
@@ -270,7 +270,7 @@ public sealed class FavoriteServerViewModelTests
     [Fact]
     public void Error_StaysAfterFixingAddress_UntilNextSave()
     {
-        // как в окне на WPF: текст убирает только следующее «Сохранить»
+        // текст убирает только следующее «Сохранить»
         var (vm, answers) = Open();
         vm.Address = "bad address";
         vm.SaveCommand.Execute(null);

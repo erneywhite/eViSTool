@@ -42,7 +42,7 @@
                     </DataTemplate>
                 </ComboBox.ItemTemplate>
             </ComboBox>
-            <!-- без шаблона хватит DisplayMemberBinding (в WPF — DisplayMemberPath) -->
+            <!-- без шаблона хватит DisplayMemberBinding -->
             <ComboBox x:Name="ChatBox" IsEditable="True" ItemsSource="{Binding Colors}" DisplayMemberBinding="{Binding Name}" />
 
             <Image x:Name="GameIconImage" Width="24" Height="24"

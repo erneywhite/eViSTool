@@ -2,7 +2,7 @@ using eViSTool.Presentation;
 
 namespace eViSTool.Presentation.Tests;
 
-/// <summary>Разбор EVISTOOL_SNAPSHOT: оба окна (WPF и Avalonia) читают его одинаково.</summary>
+/// <summary>Разбор EVISTOOL_SNAPSHOT: окно читает его так.</summary>
 public sealed class SnapshotsTests
 {
     [Fact]

@@ -135,8 +135,7 @@ public sealed class ModErrorsViewModelTests
         Assert.Equal(0, disables.TargetCalls);
     }
 
-    // удалённый сервер, код которого на этой машине не прочитать, — выключать негде: кнопка недоступна (в окне на WPF
-    // она была доступна, но ничего не делала)
+    // удалённый сервер, код которого на этой машине не прочитать, — выключать негде: кнопка недоступна (раньше она была доступна, но ничего не делала)
     [Fact]
     public void Row_WithoutTarget_CannotDisable()
     {
@@ -233,7 +232,7 @@ public sealed class ModErrorsViewModelTests
     }
 
     // пока мод выключается (агент удалённого сервера отвечает не сразу) — его кнопка недоступна, а соседнюю строку
-    // выключать можно, как в окне на WPF
+    // выключать можно
     [Fact]
     public async Task Disable_WhileRunning_RowIsBusy_OtherRowsAvailable()
     {
@@ -264,7 +263,7 @@ public sealed class ModErrorsViewModelTests
         Assert.Equal([@"C:\Mods\b.zip", @"C:\Mods\a.zip"], disables.Paths);
     }
 
-    // чего не ждали — не глотаем: уходит в общий обработчик ошибок программы, как в окне на WPF (кнопка остаётся недоступной)
+    // чего не ждали — не глотаем: уходит в общий обработчик ошибок программы (кнопка остаётся недоступной)
     [Fact]
     public async Task Disable_UnexpectedFailure_IsNotSwallowed()
     {
@@ -339,12 +338,12 @@ public sealed class ModErrorsViewModelTests
         vm.CopyCommand.Execute(null);
 
         var nl = Environment.NewLine;
-        // версии нет — пробел остаётся, как в окне на WPF
+        // версии нет — пробел остаётся
         Assert.Equal([$"{vm.Summary}{nl}Carry On 1.8.0 — 12: [carryon] boom{nl}HUD Clock  — 3: нет текстуры"], host.Copied);
         Assert.Equal(Loc.T("crash.copied"), vm.Status);
     }
 
-    // буфер занят другой программой — молча, как в окне на WPF: ни ошибки, ни «скопировано»
+    // буфер занят другой программой — молча: ни ошибки, ни «скопировано»
     [Fact]
     public void Copy_ClipboardBusy_IsQuiet()
     {

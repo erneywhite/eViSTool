@@ -166,7 +166,7 @@ public sealed class ModDisablerTests : IDisposable
         Assert.True(ModDisabler.IsExpectedFailure(failure));
     }
 
-    // чего не ждали — не глотаем: уходит в общий обработчик ошибок программы, как в окне на WPF
+    // чего не ждали — не глотаем: уходит в общий обработчик ошибок программы
     [Fact]
     public async Task UnexpectedFailure_IsNotSwallowed()
     {
