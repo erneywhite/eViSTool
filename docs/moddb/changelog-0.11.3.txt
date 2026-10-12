@@ -1,0 +1,23 @@
+eViSTool 0.11.3: share your mods with a code.
+
+New
+- Mod set code: Modpack → Copy mod set code turns your turned-on mods into one line like EV1-… (about 3 characters per mod). Send it in a chat; your friend pastes it with Modpack → Paste mod set code and gets the same mods in the same versions, straight from the ModDB. No files and no server needed: everything is in the code itself.
+- The code works between Windows and Linux. Mods that aren't on the ModDB in your version are listed so you know what's left out; for those, make a modpack as before.
+
+Fixes
+- Linux: after switching the language, the mod line under a mod's name in My mods could go blank until you scrolled. Fixed.
+
+Update from About; then update the agent on the server computer with Update on the server.
+
+---
+
+eViSTool 0.11.3: моды по коду.
+
+Новое
+- Код набора: «Модпак» → «Скопировать код набора» превращает включённые моды в одну строку вида EV1-… (около 3 символов на мод). Кинь её в чат: друг вставит её через «Модпак» → «Вставить код набора» и получит те же моды в тех же версиях прямо с модбазы. Ни файлов, ни сервера: всё внутри самого кода.
+- Код работает между Windows и Linux. Моды, которых нет на модбазе в твоей версии, перечисляются, чтобы было видно, что не вошло; для них, как и раньше, — модпак.
+
+Исправления
+- Linux: после смены языка строка под названием мода в «Моих модах» могла стать пустой до прокрутки. Исправлено.
+
+Обнови из «О программе», потом обнови агента на компьютере с сервером кнопкой «Обновить на сервере».
