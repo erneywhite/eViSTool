@@ -1,13 +1,12 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/eViSTool.Agent/eViSTool.Agent.csproj" />
-    <Project Path="src/eViSTool.App/eViSTool.App.csproj" />
     <Project Path="src/eViSTool.Core/eViSTool.Core.csproj" />
     <Project Path="src/eViSTool.Desktop/eViSTool.Desktop.csproj" />
     <Project Path="src/eViSTool.Presentation/eViSTool.Presentation.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/eViSTool.App.Tests/eViSTool.App.Tests.csproj" />
+    <Project Path="tests/eViSTool.Presentation.Tests/eViSTool.Presentation.Tests.csproj" />
     <Project Path="tests/eViSTool.Core.Tests/eViSTool.Core.Tests.csproj" />
     <Project Path="tests/eViSTool.Desktop.Tests/eViSTool.Desktop.Tests.csproj" />
     <Project Path="tests/FakeVsServer/FakeVsServer.csproj" />

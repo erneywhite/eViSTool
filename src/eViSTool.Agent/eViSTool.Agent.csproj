@@ -5,7 +5,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>eViSTool.Agent</AssemblyName>
     <RootNamespace>eViSTool.Agent</RootNamespace>
-    <ApplicationIcon>..\eViSTool.App\Assets\eViSTool.ico</ApplicationIcon>
+    <ApplicationIcon>..\eViSTool.Desktop\Assets\eViSTool.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

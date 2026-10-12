@@ -507,7 +507,7 @@ pwsh build/publish.ps1   # release build and zip in dist/
 
 Projects: `eViSTool.Core` — mods, ModDB, profiles, configs, backups, remote access; `eViSTool.Agent` — background agent that owns
 the server process; `eViSTool.Presentation` — window models; `eViSTool.Desktop` — the window (Avalonia, Windows and Linux);
-`eViSTool.App` — the former WPF window, kept for screen comparison until it is removed; `tests/` — tests.
+`tests/` — tests.
 
 ## Code signing policy
 

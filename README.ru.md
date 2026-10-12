@@ -513,7 +513,7 @@ pwsh build/publish.ps1   # релизная сборка и zip в dist/
 
 Проекты: `eViSTool.Core` — моды, модбаза, профили, конфиги, бэкапы, удалённый доступ; `eViSTool.Agent` — фоновый агент, который владеет
 процессом сервера; `eViSTool.Presentation` — модели окна; `eViSTool.Desktop` — окно (Avalonia, Windows и Linux);
-`eViSTool.App` — прежнее окно на WPF, остаётся для сверки экранов, пока его не уберём; `tests/` — тесты.
+`tests/` — тесты.
 
 ## Политика подписи кода
 

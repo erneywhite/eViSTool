@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-    Снимки экранов окна на WPF и на Avalonia — для сверки при переносе окна на Avalonia.
+    Снимки экранов окна — для проверки вида после правок и для скриншотов.
 
 .DESCRIPTION
-    Собирает оба окна во временную папку, кладёт рядом с каждым данные стенда (tests/snapshots/fixture: серверный
+    Собирает окно во временную папку, кладёт рядом с ним данные стенда (tests/snapshots/fixture: серверный
     профиль «Стенд» с четырьмя модами, без игры и без сети) и запускает их с переменной EVISTOOL_SNAPSHOT. Окно само
     переходит на экран, ждёт, сохраняет себя в PNG и закрывается. Данные стенда перед каждым запуском — свежая копия,
     поэтому снимки повторяемы. Настоящие данные пользователя не трогаются: окно берёт папку data рядом с собой.
@@ -14,16 +14,15 @@
 
 .EXAMPLE
     pwsh build/snapshot.ps1 -Screens mods,mods.card,settings
-    # → <Out>\mods.wpf.png, <Out>\mods.avalonia.png, ... (папка Out печатается в конце)
+    # → <Out>\mods.png, <Out>\mods.card.png, ... (папка Out печатается в конце)
 
 .EXAMPLE
-    pwsh build/snapshot.ps1 -Screens server.config.world -Only Avalonia -NoBuild -Out C:\snap
+    pwsh build/snapshot.ps1 -Screens server.config.world -NoBuild -Out C:\snap
 #>
 param(
     [Parameter(Mandatory)][string[]]$Screens,
     # по умолчанию — evistool-snap-<метка копии репозитория> во временной папке
     [string]$Out,
-    [ValidateSet('Both', 'Wpf', 'Avalonia')][string]$Only = 'Both',
     [string]$Size = '1400x860',
     [double]$Wait = 4,
     [string]$Profile = 'Стенд',
@@ -40,13 +39,8 @@ $tag = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Enc
 $work = Join-Path ([IO.Path]::GetTempPath()) "evistool-snap-work-$tag"
 if (-not $Out) { $Out = Join-Path ([IO.Path]::GetTempPath()) "evistool-snap-$tag" }
 $fixture = Join-Path $root 'tests/snapshots/fixture'
-if (-not $IsWindows -and $Only -ne 'Avalonia') { $Only = 'Avalonia' } # окна на WPF есть только на Windows
 
-$apps = @()
-if ($Only -in 'Both', 'Wpf') { $apps += @{ Name = 'wpf'; Project = 'src/eViSTool.App'; Exe = 'eViSTool.Wpf.exe' } }
-if ($Only -in 'Both', 'Avalonia') {
-    $apps += @{ Name = 'avalonia'; Project = 'src/eViSTool.Desktop'; Exe = $(if ($IsWindows) { 'eViSTool.exe' } else { 'eViSTool' }) }
-}
+$apps = @(@{ Name = 'avalonia'; Project = 'src/eViSTool.Desktop'; Exe = $(if ($IsWindows) { 'eViSTool.exe' } else { 'eViSTool' }) })
 
 New-Item -ItemType Directory -Force $work, $Out | Out-Null
 
@@ -81,7 +75,7 @@ $made = @()
 foreach ($screen in $Screens) {
     foreach ($app in $apps) {
         Reset-Fixture $app.Dir
-        $png = Join-Path $Out "$screen.$($app.Name).png"
+        $png = Join-Path $Out "$screen.png"
         if (Test-Path $png) { Remove-Item $png }
         $env:EVISTOOL_SNAPSHOT = "screen=$screen;out=$png;size=$Size;wait=$Wait;profile=$Profile"
         $p = Start-Process (Join-Path $app.Dir $app.Exe) -WorkingDirectory $app.Dir -PassThru

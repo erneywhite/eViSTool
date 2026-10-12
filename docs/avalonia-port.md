@@ -1,6 +1,6 @@
-# Перенос экранов с WPF на Avalonia
+# Окно на Avalonia: как устроено и где грабли
 
-Памятка для переноса окна eViSTool с WPF (`src/eViSTool.App`) на Avalonia 12 (`src/eViSTool.Desktop`). Образец переноса — главное окно (`Views/MainWindow.axaml`) и «Мои моды» (`Views/ModsView.axaml`): если что-то непонятно, смотри, как сделано там.
+Памятка по окну eViSTool на Avalonia 12 (`src/eViSTool.Desktop`). Собрана при переносе с WPF; окно на WPF удалено после перехода (0.11), поэтому таблица соответствий и сравнения с WPF ниже — для понимания, откуда что взялось. Образец — главное окно (`Views/MainWindow.axaml`) и «Мои моды» (`Views/ModsView.axaml`): если что-то непонятно, смотри, как сделано там.
 
 ## Где что лежит
 
@@ -13,7 +13,7 @@
 | `Converters/` | конвертеры, которых нет среди встроенных |
 | `Themes/` | тема Forest: `ForestResources.axaml` (цвета, кисти Fluent, иконки, шрифты), `ForestControls.axaml` (шаблоны), `Forest.axaml` (классы) |
 
-Модели — в `src/eViSTool.Presentation`, общие для обоих окон. Логику из кода за окном WPF переносим в модель, с тестами в `tests/eViSTool.App.Tests`. В коде за окном Avalonia остаётся только то, что касается самого вида: прокрутка, фокус, перетаскивание.
+Модели — в `src/eViSTool.Presentation`, без Avalonia. Логика — в модели, с тестами в `tests/eViSTool.Presentation.Tests`. В коде за окном Avalonia остаётся только то, что касается самого вида: прокрутка, фокус, перетаскивание.
 
 ## Тема: что во что превращается
 
@@ -81,11 +81,11 @@
 - У окна должен быть публичный конструктор без параметров (иначе предупреждение AVLN3001): модель передаём через `DataContext` (`new XWindow { DataContext = model }`), а не аргументом конструктора.
 - Enter в `DataGrid`, на переключателе или галочке до кнопки `IsDefault` не доходит: таблица и переключатели забирают его себе (в WPF доходил). Где Enter должен подтверждать окно — туннельный обработчик `KeyDown` в коде окна (образец — `RollbackWindow.axaml.cs`, `ImportPackWindow.axaml.cs`).
 - Поле пароля или секрета: `<ctl:SecretTextBox Classes="mono" PasswordChar="●" />`. Обычный `TextBox` отдаёт свой текст специальным возможностям системы даже с точками; `mono` — потому что в Noto Sans нет символа «●».
-- Логику из кода за окном WPF переносим в новую модель окна в `src/eViSTool.Presentation/ViewModels/` (`BanViewModel` и т. п.) с тестами. Окно на WPF не трогаем: оно уйдёт целиком, когда перенос закончится, а сравнивать с ним удобнее, пока оно как было.
-- Снимок окна: `pwsh build/snapshot.ps1 -Screens dialog.<имя>`. Окно открывает метод с атрибутом `[SnapshotDialog("<имя>")]` в своём файле `src/eViSTool.Presentation/SnapshotDialogs/<Окно>.cs`: вызывает `AppWindows.Current.<Метод>(…)` с примерными данными (образец — `SnapshotDialogs/Ban.cs`). Снимается верхнее окно, без заголовка. Окно на WPF откроется тем же вызовом, так что пара сравнима.
+- Логика окна — в его модели в `src/eViSTool.Presentation/ViewModels/` (`BanViewModel` и т. п.) с тестами.
+- Снимок окна: `pwsh build/snapshot.ps1 -Screens dialog.<имя>`. Окно открывает метод с атрибутом `[SnapshotDialog("<имя>")]` в своём файле `src/eViSTool.Presentation/SnapshotDialogs/<Окно>.cs`: вызывает `AppWindows.Current.<Метод>(…)` с примерными данными (образец — `SnapshotDialogs/Ban.cs`). Снимается верхнее окно, без заголовка.
 
 ## Проверка
 
 - `dotnet build eViSTool.slnx` без ошибок и предупреждений, `dotnet test eViSTool.slnx` зелёный. Свои элементы (`Controls/`, `Converters/`) проверяются headless-тестами в `tests/eViSTool.Desktop.Tests` (xunit v3).
-- Снимки рядом: `pwsh build/snapshot.ps1 -Screens <экран>` → `<экран>.wpf.png` и `<экран>.avalonia.png` во временной папке. Окна берут данные стенда (`tests/snapshots/fixture`: серверный профиль «Стенд», четыре мода, конфиги модов в `ModConfig`), настоящие данные пользователя не трогаются. Нужного состояния на снимке нет (выбранная строка, открытая вкладка) — добавь экран в `Snapshots.Navigate` (`src/eViSTool.Presentation/Snapshots.cs`), как `mods.card`.
+- Снимки: `pwsh build/snapshot.ps1 -Screens <экран>` → `<экран>.png` во временной папке. Окна берут данные стенда (`tests/snapshots/fixture`: серверный профиль «Стенд», четыре мода, конфиги модов в `ModConfig`), настоящие данные пользователя не трогаются. Нужного состояния на снимке нет (выбранная строка, открытая вкладка) — добавь экран в `Snapshots.Navigate` (`src/eViSTool.Presentation/Snapshots.cs`), как `mods.card`.
 - Шрифт другой (Noto Sans вместо Segoe UI, Cascadia Mono вместо Consolas), поэтому текст чуть шире и плотнее. Это ожидаемо. Ищем другое: пропавшие элементы, чужие цвета Fluent (синий акцент, белые рамки), обрезанный текст, лишние отступы.
