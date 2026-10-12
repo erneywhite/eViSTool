@@ -8,6 +8,7 @@ New
 
 Fixes
 - The window no longer needs the .NET Desktop Runtime specifically: plain .NET 10 is enough. If you play Vintage Story, you already have it.
+- Switching the language now also translates the counters and sorting in My mods right away. Before, they stayed in the old language until the numbers changed.
 
 Update from About; then update the agent on the server computer with Update on the server.
 
@@ -23,5 +24,6 @@ eViSTool 0.11.0: новое окно, теперь на Windows и Linux.
 
 Исправления
 - Окну больше не нужен именно .NET Desktop Runtime: хватает обычного .NET 10. Если ты играешь в Vintage Story, он уже установлен.
+- При смене языка счётчики и сортировка в «Моих модах» теперь переводятся сразу. Раньше они оставались на прежнем языке, пока не менялись числа.
 
 Обнови из «О программе», потом обнови агента на компьютере с сервером кнопкой «Обновить на сервере».
