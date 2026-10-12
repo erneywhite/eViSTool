@@ -68,7 +68,7 @@ public static class GameIcon
         }
     }
 
-    // ---- Windows: значок из exe без WPF и WinForms — HICON → пиксели BGRA → Bitmap
+    // ---- Windows: значок из exe без WinForms — HICON → пиксели BGRA → Bitmap
 
     [SupportedOSPlatform("windows")]
     private static Bitmap? FromExe(string path)

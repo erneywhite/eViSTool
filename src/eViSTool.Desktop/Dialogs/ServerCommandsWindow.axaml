@@ -9,9 +9,9 @@
                       x:DataType="vm:ServerCommandsViewModel"
                       Title="{local:Tr cmds.title}"
                       Width="744" Height="521" MinWidth="504" MinHeight="321">
-    <!-- размеры окна — клиентская область: Width/Height у окна на WPF (760×560, минимум 520×360) считают и рамку с заголовком (16 и 39 пикселей на Windows 11) -->
+    <!-- размеры окна — клиентская область, без рамки и заголовка -->
     <Window.Styles>
-        <!-- строка списка в WPF Fluent выше стандартной в Avalonia (12,11) на три пикселя: шаг строк 65 вместо 62 -->
+        <!-- строка списка выше стандартной в Avalonia (12,11) на три пикселя: шаг строк 65 вместо 62 -->
         <Style Selector="ListBox#List ListBoxItem">
             <Setter Property="Padding" Value="12,12.5" />
         </Style>

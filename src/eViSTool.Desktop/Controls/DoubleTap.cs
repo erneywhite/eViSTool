@@ -10,9 +10,9 @@ namespace eViSTool.Desktop.Controls;
 /// Двойной щелчок по строке списка выполняет команду:
 /// <c>&lt;ListBox c:DoubleTap.Command="{Binding OpenCommand}" /&gt;</c> — для ListBox, DataGrid и любого ItemsControl.
 /// Срабатывает только по строке: заголовок колонки, полоса прокрутки и пустое место под строками не в счёт, как и
-/// кнопка, переключатель или поле внутри строки (у них свой щелчок — в WPF их тоже не перехватывало).
+/// кнопка, переключатель или поле внутри строки (у них свой щелчок).
 /// Параметр команды — <see cref="CommandParameterProperty"/>, если он задан, иначе элемент строки (то, что лежит в
-/// ItemsSource): окна на WPF брали SelectedItem, а это он и есть — первый щелчок выделил строку.
+/// ItemsSource): это и есть SelectedItem, первый щелчок выделил строку.
 /// </summary>
 public static class DoubleTap
 {

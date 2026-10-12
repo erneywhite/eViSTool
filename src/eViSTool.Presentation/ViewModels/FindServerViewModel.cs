@@ -116,7 +116,7 @@ public sealed partial class FindServerViewModel : ObservableObject
 
     /// <summary>
     /// Вкладка «Все серверы» — обратная сторона <see cref="IsFavoritesTab"/>. Записать можно: переключатель вкладки
-    /// привязан к ней в обе стороны (в окне на WPF вместо этого был обработчик Checked).
+    /// привязан к ней в обе стороны.
     /// </summary>
     public bool IsAllTab
     {
@@ -301,15 +301,14 @@ public sealed partial class FindServerViewModel : ObservableObject
         }
     }
 
-    // ---------- для окна на Avalonia: то, что в окне на WPF делали код окна и привязки
+    // ---------- для окна на Avalonia: то, что делали бы код окна и привязки
 
     /// <summary>
-    /// Окно просит закрыться: игру запустили с сервером из списка (<see cref="PlayCommand"/>). В окне на WPF то же
-    /// делал Close() в обработчике кнопки «Играть».
+    /// Окно просит закрыться: игру запустили с сервером из списка (<see cref="PlayCommand"/>).
     /// </summary>
     public event EventHandler? CloseRequested;
 
-    /// <summary>Пауза после последней буквы в поле поиска, после неё список фильтруется (в окне на WPF — Delay у привязки).</summary>
+    /// <summary>Пауза после последней буквы в поле поиска, после неё список фильтруется.</summary>
     public static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(200);
 
     private IUiTimer? _searchDelay;
@@ -317,7 +316,7 @@ public sealed partial class FindServerViewModel : ObservableObject
     /// <summary>
     /// Текст поля поиска, как его печатают. В <see cref="Search"/> (по нему фильтр) он попадает после паузы
     /// <see cref="SearchDelay"/>: тысячи серверов не перефильтровываются на каждую букву. Каждая новая буква паузу
-    /// начинает заново, как Delay у привязки в WPF.
+    /// начинает заново.
     /// </summary>
     [ObservableProperty] private string _searchInput = "";
 
@@ -325,7 +324,7 @@ public sealed partial class FindServerViewModel : ObservableObject
     {
         if (_searchDelay is null)
         {
-            // таймер — при первой букве: окну на WPF (оно пишет прямо в Search) он не нужен
+            // таймер создаётся при первой букве
             _searchDelay = Ui.Timer(SearchDelay);
             _searchDelay.Tick += (_, _) =>
             {
@@ -339,7 +338,7 @@ public sealed partial class FindServerViewModel : ObservableObject
 
     /// <summary>
     /// Сортировка по игрокам — обратная сторона <see cref="ByName"/>, для второго переключателя: оба привязаны в обе
-    /// стороны (в окне на WPF вместо этого были конвертер и обработчик Checked).
+    /// стороны.
     /// </summary>
     public bool ByPlayers
     {

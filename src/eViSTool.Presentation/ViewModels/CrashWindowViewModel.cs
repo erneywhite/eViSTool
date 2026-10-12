@@ -173,7 +173,7 @@ public sealed partial class CrashWindowViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is ExternalException or TimeoutException)
         {
-            // буфер занят другой программой — молча, как в окне на WPF
+            // буфер занят другой программой — молча
         }
     }
 

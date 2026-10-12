@@ -8,14 +8,14 @@
                       x:DataType="vm:ConnectCodeViewModel"
                       Width="544" SizeToContent="Height" CanResize="False"
                       Title="{local:Tr connect.title}">
-    <!-- ширина — содержимого окна: в окне на WPF Width="560" считал и рамку (по 8 px с боков), внутри было 544 -->
+    <!-- ширина — содержимого окна, без рамки -->
     <StackPanel Margin="24,20,24,22">
         <TextBlock Classes="dialogTitle" Text="{local:Tr connect.title}" />
         <TextBlock Classes="dialogLead" Text="{local:Tr connect.hint}" />
 
         <TextBlock Classes="label" Text="{local:Tr connect.code}" />
         <!-- код — секрет: поле скрытое, как для пароля. Точки — из Cascadia Mono (mono): в Noto Sans нет «●», и она
-             бралась бы из случайного системного шрифта, а у Cascadia она того же размера, что у Segoe UI в окне на WPF -->
+             бралась бы из случайного системного шрифта, а у Cascadia она того же размера, что у Segoe UI -->
         <DockPanel Margin="0,6,0,0">
             <Button DockPanel.Dock="Right" Content="{local:Tr connect.paste}" Click="Paste_Click" Margin="8,0,0,0"
                     ToolTip.Tip="{local:Tr connect.pasteTip}" AutomationProperties.AutomationId="ConnectPaste" />

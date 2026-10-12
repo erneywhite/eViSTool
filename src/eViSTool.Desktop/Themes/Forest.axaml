@@ -1,9 +1,9 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <!--
-        Стили лесной темы для элементов без шаблона — классы вместо стилей по ключу из окна на WPF:
+        Стили лесной темы для элементов без шаблона — классы вместо стилей по ключу:
         Style="{StaticResource Forest.Card}" → Classes="card", Forest.Icon → Classes="icon" и т.д.
-        Общие подписи, которые в WPF повторялись локальными стилями в каждом экране (Hint, Label, CardTitle, Row,
+        Общие подписи, чтобы не повторять локальные стили в каждом экране (Hint, Label, CardTitle, Row,
         ErrorText), тоже здесь. Отличие конкретного экрана — локальным значением или локальным стилем.
         Важно: значение, которое меняет класс или состояние, задавать стилем, а не атрибутом — атрибут (локальное
         значение) в Avalonia сильнее любого стиля.
@@ -169,7 +169,7 @@
         <Setter Property="IsHitTestVisible" Value="False" />
     </Style>
 
-    <!-- ===== разделитель колонок: прозрачная полоса, посередине — короткая ручка (как у Fluent в окне на WPF) ===== -->
+    <!-- ===== разделитель колонок: прозрачная полоса, посередине — короткая ручка ===== -->
     <Style Selector="GridSplitter">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Template">
@@ -207,20 +207,20 @@
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
 
-    <!-- прокрутка: полоса тонкая, как у Fluent, но место под неё оставлено, а не поверх содержимого (как в окне на WPF) -->
+    <!-- прокрутка: полоса тонкая, как у Fluent, но место под неё оставлено, а не поверх содержимого -->
     <Style Selector="ScrollViewer /template/ ScrollContentPresenter#PART_ContentPresenter">
         <Setter Property="Grid.ColumnSpan" Value="1" />
         <Setter Property="Grid.RowSpan" Value="1" />
     </Style>
 
-    <!-- стрелка выпадающего списка — мельче, как у Fluent в окне на WPF (у Fluent в Avalonia 12×12). Масштабом, а не
+    <!-- стрелка выпадающего списка — мельче (у Fluent в Avalonia 12×12). Масштабом, а не
          размером: размер задан в самом шаблоне, а значения шаблона сильнее обычного стиля -->
     <Style Selector="ComboBox /template/ PathIcon#DropDownGlyph">
         <Setter Property="RenderTransform" Value="scale(0.7)" />
     </Style>
 
     <!-- ===== служебные ===== -->
-    <!-- невидимый, но место занимает (Visibility=Hidden в WPF) -->
+    <!-- невидимый, но место занимает -->
     <Style Selector=":is(Control).hidden">
         <Setter Property="Opacity" Value="0" />
         <Setter Property="IsHitTestVisible" Value="False" />

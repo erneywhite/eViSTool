@@ -236,7 +236,7 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
 
     /// <summary>
     /// «Открыть настройки» в подсказке «каналов ещё нет»: переход в «Настройки», где каналы добавляют. То же, что делает
-    /// одноимённая команда раздела «Сервер» — в окне на WPF вкладка брала её у предка через RelativeSource.
+    /// одноимённая команда раздела «Сервер».
     /// </summary>
     [RelayCommand]
     private void OpenSettings() => _server.OpenSettingsCommand.Execute(null);

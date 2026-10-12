@@ -47,7 +47,7 @@
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <!-- пояснение мелким приглушённым текстом (Muted в окне на WPF) -->
+        <!-- пояснение мелким приглушённым текстом -->
         <Style Selector="TextBlock.note">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
             <Setter Property="FontSize" Value="12" />

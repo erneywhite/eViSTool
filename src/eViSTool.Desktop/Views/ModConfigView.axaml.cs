@@ -25,8 +25,8 @@ public partial class ModConfigView : UserControl
     }
 
     // Модель может отменить выбор вида прямо во время записи: «Форма», а текст сейчас не JSON — остаётся «Текст».
-    // Привязка Avalonia не слышит оповещений, пока сама пишет в модель, и чип «Форма» остался бы выбранным над текстом
-    // (привязка WPF после записи перечитывает значение сама). Поэтому после записи сверяем чипы с моделью.
+    // Привязка Avalonia не слышит оповещений, пока сама пишет в модель, и чип «Форма» остался бы выбранным над текстом.
+    // Поэтому после записи сверяем чипы с моделью.
     private void OnVmChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(ModConfigViewModel.IsFormMode)) Dispatcher.UIThread.Post(SyncViewChips);

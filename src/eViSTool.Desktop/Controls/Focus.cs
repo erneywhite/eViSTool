@@ -7,7 +7,7 @@ namespace eViSTool.Desktop.Controls;
 
 /// <summary>
 /// Фокус в поле, когда открылось окно: <c>&lt;TextBox c:Focus.OnOpen="True" c:Focus.SelectAll="True" /&gt;</c>.
-/// Замена <c>Loaded += (_, _) => NameBox.Focus()</c> из окон на WPF. Фокус ставится не сразу в Loaded/Opened, а через
+/// Вместо <c>Loaded += (_, _) => NameBox.Focus()</c>. Фокус ставится не сразу в Loaded/Opened, а через
 /// очередь диспетчера: на Linux окно в этот момент ещё не готово его принять, и фокус теряется.
 /// </summary>
 public static class Focus

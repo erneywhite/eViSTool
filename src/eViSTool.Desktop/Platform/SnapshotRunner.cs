@@ -9,8 +9,8 @@ using eViSTool.Presentation.ViewModels;
 namespace eViSTool.Desktop.Platform;
 
 /// <summary>
-/// Снимок окна для сверки с окном на WPF (EVISTOOL_SNAPSHOT, см. <see cref="Snapshots"/>): та же навигация и тот же
-/// размер области окна, что у окна на WPF, → PNG → выход.
+/// Снимок окна (EVISTOOL_SNAPSHOT, см. <see cref="Snapshots"/>): переход на экран, заданный
+/// размер области окна → PNG → выход.
 /// </summary>
 internal static class SnapshotRunner
 {
@@ -20,7 +20,7 @@ internal static class SnapshotRunner
         {
             if (desktop.MainWindow is not { DataContext: MainViewModel main } window) return;
             window.WindowState = WindowState.Normal;
-            window.Width = request.Width;   // у Avalonia Width/Height окна — это область без рамки, как содержимое у WPF
+            window.Width = request.Width;   // у Avalonia Width/Height окна — это область без рамки
             window.Height = request.Height;
             // окно программы (dialog.*) модальное: Navigate не вернётся, пока его не закроют, — поэтому переход отдельно,
             // а снимок — по таймеру (вложенный цикл диспетчера его выполнит)

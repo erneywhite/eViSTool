@@ -89,7 +89,7 @@ public sealed partial class NotifyChannelEditorViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(Kind), nameof(IsTelegram), nameof(IsDiscord), nameof(IsNtfy), nameof(IsWebhook), nameof(IntroText))]
     private NotifyKindItem? _selectedKind;
 
-    /// <summary>Тип канала (ничего не выбрано — Telegram, как в окне на WPF).</summary>
+    /// <summary>Тип канала (ничего не выбрано — Telegram).</summary>
     public NotifyKind Kind => CurrentKind.Kind;
 
     public bool IsTelegram => Kind == NotifyKind.Telegram;
@@ -212,7 +212,7 @@ public sealed partial class NotifyChannelEditorViewModel : ObservableObject
             Chats = chats;
             if (chats.Count == 0)
             {
-                // выбранного раньше чата в списке больше нет — поле очищается, как в окне на WPF (иначе подпись чата
+                // выбранного раньше чата в списке больше нет — поле очищается (иначе подпись чата
                 // ушла бы в сохранение как ID); вписанный руками ID остаётся
                 if (old is not null)
                 {

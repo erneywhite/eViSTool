@@ -11,7 +11,7 @@ namespace eViSTool.Desktop.Dialogs;
 /// <summary>
 /// Основа окон программы на Avalonia (диалоги и немодальные окна): значок, положение по центру владельца, Escape —
 /// закрыть без ответа. От неё наследуют окна из .axaml: <c>&lt;dialogs:DialogWindow x:Class="…"&gt;</c>.
-/// Модели спрашивают и ждут ответа на месте, как с ShowDialog в WPF, — для этого <see cref="ShowModal{TResult}"/>:
+/// Модели спрашивают и ждут ответа на месте, — для этого <see cref="ShowModal{TResult}"/>:
 /// возвращает то, что окно передало в <c>Close(ответ)</c> (закрыли без ответа — default).
 /// </summary>
 public class DialogWindow : Window
@@ -104,7 +104,7 @@ public class DialogWindow : Window
     /// <summary>
     /// Владелец нового окна: открыто модальное окно — самое верхнее видимое (вложенные диалоги цепляются друг за друга,
     /// иначе нижний остался бы доступным); нет — активное окно (вопрос из немодального «Найти сервер» должен встать над
-    /// ним, а не над главным, как ActiveOwner в WPF); иначе главное. null — главного окна ещё или уже нет.
+    /// ним, а не над главным); иначе главное. null — главного окна ещё или уже нет.
     /// </summary>
     private static Window? PickOwner() =>
         (OpenModals.Count > 0 ? AvaloniaUiPlatform.TopWindow() : null)

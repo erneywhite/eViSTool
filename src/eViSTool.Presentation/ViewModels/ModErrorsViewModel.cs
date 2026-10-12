@@ -94,7 +94,7 @@ public sealed partial class ModErrorsViewModel : ObservableObject
     private static bool CanDisable(ModErrorRow? row) => row is { CanRunDisable: true };
 
     /// <summary>
-    /// Выключить мод строки. Строки независимы, как кнопки в окне на WPF: пока выключается один мод, другой тоже можно
+    /// Выключить мод строки. Строки независимы: пока выключается один мод, другой тоже можно
     /// выключать. Удалось (или отложено до выхода из игры) — кнопка строки остаётся недоступной, не удалось — снова доступна.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanDisable), AllowConcurrentExecutions = true)]
@@ -144,7 +144,7 @@ public sealed partial class ModErrorsViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is ExternalException or TimeoutException)
         {
-            // буфер занят другой программой — молча, как в окне на WPF
+            // буфер занят другой программой — молча
         }
     }
 

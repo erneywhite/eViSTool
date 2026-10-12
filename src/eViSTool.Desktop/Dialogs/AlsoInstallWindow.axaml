@@ -16,7 +16,7 @@
         <ItemsControl ItemsSource="{Binding Rows}" Margin="0,14,0,0">
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:AlsoInstallRowViewModel">
-                    <!-- 12,12,12,10 вместо 12,8: у CheckBox в WPF отступ сверху 6, у Avalonia его нет, а галочка у неё прижата к верху -->
+                    <!-- 12,12,12,10 вместо 12,8: у CheckBox в Avalonia нет отступа сверху, галочка прижата к верху -->
                     <Border Background="{DynamicResource Forest.Surface}" CornerRadius="6" Padding="12,12,12,10" Margin="0,0,0,6">
                         <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding IsEnabled}" VerticalContentAlignment="Center"
                                   AutomationProperties.Name="{Binding Name}">

@@ -4,7 +4,7 @@ using eViSTool.Presentation.ViewModels;
 namespace eViSTool.Desktop.Converters;
 
 /// <summary>
-/// Заголовки категорий в выпадающем списке ключей настроек мира (GroupByCategoryConverter окна на WPF). Группировки у
+/// Заголовки категорий в выпадающем списке ключей настроек мира. Группировки у
 /// списков Avalonia нет, поэтому список плоский: <c>ItemsSource="{Binding KeyOptions, Converter={x:Static
 /// conv:CategoryHeaders.Interleave}}"</c>, а контейнер заголовка выключается стилем —
 /// <c>&lt;Setter Property="IsEnabled" Value="{Binding Converter={x:Static conv:CategoryHeaders.IsItem}}" /&gt;</c>:

@@ -9,7 +9,7 @@ using eViSTool.Presentation;
 namespace eViSTool.Desktop.Platform;
 
 /// <summary>
-/// Окно вопроса или сообщения в лесной теме — замена MessageBox из WPF (в Avalonia своего нет). Значок по смыслу,
+/// Окно вопроса или сообщения в лесной теме — своя замена MessageBox (в Avalonia его нет). Значок по смыслу,
 /// кнопки по набору, кнопка по умолчанию — на Enter, Escape — «Отмена» (или «Нет», если отмены нет).
 /// </summary>
 internal sealed class MessageDialog : Window

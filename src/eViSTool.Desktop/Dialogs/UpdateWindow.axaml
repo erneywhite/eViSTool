@@ -9,11 +9,10 @@
                       Title="{local:Tr updwin.title}"
                       Width="764" Height="571" MinWidth="624" MinHeight="481"
                       Background="{DynamicResource Forest.Surface}">
-    <!-- Размер — рабочей области: у окна на WPF Width=780, Height=580 (MinWidth=640, MinHeight=520) считаются с рамкой
-         и заголовком, внутри 764×541. Высота здесь на 30 больше: Noto Sans шире Segoe UI, тексты слева переносятся на
+    <!-- Размер — рабочей области, без рамки и заголовка (764×541). Высота здесь на 30 больше: Noto Sans шире Segoe UI, тексты слева переносятся на
          3 строки больше, и у рекомендуемого обновления при 541 кнопка «Позже» уходила за нижний край -->
     <dialogs:DialogWindow.Styles>
-        <!-- версии разделены чертой; над первой её нет (в окне на WPF — DataTrigger по IsFirst). Толщина и отступ — стилем:
+        <!-- версии разделены чертой; над первой её нет. Толщина и отступ — стилем:
              локальное значение на Border класс .first не перебил бы -->
         <Style Selector="Border.release">
             <Setter Property="BorderBrush" Value="{DynamicResource Forest.Line}" />
@@ -25,7 +24,7 @@
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="0" />
         </Style>
-        <!-- номер новой версии: песочный, у рекомендуемого — тёплый (в окне на WPF красил код за окном) -->
+        <!-- номер новой версии: песочный, у рекомендуемого — тёплый -->
         <Style Selector="Run.newVersion">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
         </Style>
@@ -64,7 +63,7 @@
                     <Image Source="avares://eViSTool/Assets/logo256.png" Width="96" Height="96" RenderOptions.BitmapInterpolationMode="HighQuality" />
                     <TextBlock Text="{local:Tr updwin.title}" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}"
                                TextAlignment="Center" TextWrapping="Wrap" Margin="0,12,0,0" />
-                    <!-- в окне на WPF Run шли с новой строки: между ними по пробелу -->
+                    <!-- между Run по пробелу -->
                     <TextBlock HorizontalAlignment="Center" Margin="0,12,0,8">
                         <Run Text="{Binding OldVersion, Mode=OneWay}" FontSize="15" Foreground="{DynamicResource Forest.Muted}" /><Run Text=" " /><Run Text="  →  " FontSize="15" Foreground="{DynamicResource Forest.Muted}" /><Run Text=" " /><Run Classes="newVersion" Classes.recommended="{Binding IsRecommended}" Text="{Binding NewVersion, Mode=OneWay}" FontSize="22" FontWeight="SemiBold" />
                     </TextBlock>

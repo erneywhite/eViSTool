@@ -6,7 +6,7 @@ namespace eViSTool.Desktop.Platform;
 
 /// <summary>
 /// Действия с оболочкой системы: открыть ссылку или папку, показать файл в папке, удалить в корзину. На Windows —
-/// Проводник и Корзина (как в окне на WPF), на Linux — xdg-open, D-Bus FileManager1 и корзина freedesktop.
+/// Проводник и Корзина, на Linux — xdg-open, D-Bus FileManager1 и корзина freedesktop.
 /// </summary>
 internal static class SystemShell
 {
@@ -54,7 +54,7 @@ internal static class SystemShell
         try
         {
             if (OperatingSystem.IsWindows())
-                Process.Start(new ProcessStartInfo("explorer.exe", "shell:RecycleBinFolder") { UseShellExecute = true })?.Dispose(); // как в окне на WPF
+                Process.Start(new ProcessStartInfo("explorer.exe", "shell:RecycleBinFolder") { UseShellExecute = true })?.Dispose();
             else
             {
                 try { Start("gio", "open", "trash:///"); }
@@ -109,7 +109,7 @@ internal static class SystemShell
     /// <summary>
     /// Открывает папку в Проводнике и выделяет файл. «explorer /select» и SHOpenFolderAndSelectItems ломаются, если окна
     /// Проводника перехватывает утилита вкладок: папка открывается, выделение теряется. Поэтому открываем папку, ждём её
-    /// окно в Shell.Application.Windows() и выделяем файл уже в нём (как в окне на WPF).
+    /// окно в Shell.Application.Windows() и выделяем файл уже в нём.
     /// </summary>
     [SupportedOSPlatform("windows")]
     private static class WindowsExplorer

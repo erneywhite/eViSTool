@@ -31,7 +31,7 @@ public partial class ClientProfileWindow : DialogWindow
         if (_model is not null) _model.Finished += OnFinished;
     }
 
-    // миры бывают большими — их размер модель считает в фоне, когда окно уже на экране (в окне на WPF — по Loaded)
+    // миры бывают большими — их размер модель считает в фоне, когда окно уже на экране
     protected override async void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
@@ -45,8 +45,8 @@ public partial class ClientProfileWindow : DialogWindow
         if (_model?.CancelCopy() == true) e.Cancel = true;
     }
 
-    // Enter на переключателях и галочке Avalonia оставляет им самим, и до кнопки по умолчанию он не доходит. В окне на WPF
-    // он шёл на «Создать» / «Клонировать» — здесь так же. На обычной кнопке Enter нажимает её саму, тут ничего не меняем.
+    // Enter на переключателях и галочке Avalonia оставляет им самим, и до кнопки по умолчанию он не доходит. Поэтому
+    // он идёт на «Создать» / «Клонировать». На обычной кнопке Enter нажимает её саму, тут ничего не меняем.
     private void OnPreviewKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter || e.Handled || e.KeyModifiers != KeyModifiers.None || e.Source is not ToggleButton) return;

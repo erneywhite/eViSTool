@@ -34,7 +34,7 @@ public sealed record FavoriteServerChoice(string Name, string Address, string? P
 
 /// <summary>
 /// Окна программы, которые открывают модели. Модальные возвращают ответ (null — закрыли без выбора), остальные просто
-/// показываются. Реализация — у окна (<c>WpfAppWindows</c>); модели знают только этот интерфейс.
+/// показываются. Реализация — у окна (<c>AvaloniaAppWindows</c>); модели знают только этот интерфейс.
 /// </summary>
 public interface IAppWindows
 {

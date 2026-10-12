@@ -7,10 +7,9 @@
                       x:DataType="vm:CleanupViewModel"
                       Title="{Binding Heading}"
                       Width="744" Height="681" MinWidth="544" MinHeight="381">
-    <!-- размеры окна — клиентская область: Width/Height у окна на WPF (760×720, не меньше 560×420) считают и рамку с заголовком -->
+    <!-- размеры окна — клиентская область, без рамки и заголовка -->
     <dialogs:DialogWindow.Styles>
-        <!-- пометка вида уборки: «безопасно» — зелёная на тёмно-оливковом, «осторожно» — тёплая на приподнятом
-             (в окне на WPF — DataTrigger по IsCareful) -->
+        <!-- пометка вида уборки: «безопасно» — зелёная на тёмно-оливковом, «осторожно» — тёплая на приподнятом -->
         <Style Selector="Border.safety">
             <Setter Property="Background" Value="{DynamicResource Forest.Selected}" />
         </Style>
@@ -23,7 +22,7 @@
         <Style Selector="Border.safety.careful > TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
         </Style>
-        <!-- галочка вида «частично» (выбрана часть пунктов): черта, как у Fluent в окне на WPF, а не квадратик Fluent в
+        <!-- галочка вида «частично» (выбрана часть пунктов): черта, а не квадратик Fluent в
              Avalonia. Значок в шаблоне растянут в 1,25 раза: 6×0,8 → черта 7,5×1 пиксель; отступ сверху сдвигает её на
              полпикселя вниз, на целую строку пикселей (иначе черта размазана на две бледные) -->
         <Style Selector="CheckBox:indeterminate /template/ Path#CheckGlyph">

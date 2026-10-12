@@ -7,7 +7,7 @@
                       x:Class="eViSTool.Desktop.Dialogs.DuplicateRoleWindow"
                       x:DataType="vm:DuplicateRoleViewModel"
                       Title="{local:Tr roles.dupTitle}" Width="444" SizeToContent="Height" CanResize="False">
-    <!-- ширина без рамки: в WPF Width="460" считается вместе с рамкой окна, внутри остаётся 444 -->
+    <!-- ширина — содержимого окна, без рамки -->
     <StackPanel Margin="24,20,24,22">
         <TextBlock Classes="dialogTitle" Text="{Binding Heading}" />
         <TextBlock Classes="hint" Text="{local:Tr roles.dupIntro}" FontSize="12" Margin="0,4,0,0" />

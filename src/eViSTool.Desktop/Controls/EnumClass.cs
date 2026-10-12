@@ -5,7 +5,7 @@ namespace eViSTool.Desktop.Controls;
 /// <summary>
 /// Класс стиля по значению перечисления: <c>&lt;Ellipse Classes="tone" c:EnumClass.Value="{Binding Tone}" /&gt;</c> даёт
 /// элементу класс <c>good</c>, <c>warn</c>… (имя члена с маленькой буквы, <c>UpdateAvailable</c> → <c>updateAvailable</c>),
-/// а класс прежнего значения снимает. Стили — <c>Ellipse.tone.good</c>: так вместо лесенки DataTrigger из окна на WPF.
+/// а класс прежнего значения снимает. Стили — <c>Ellipse.tone.good</c>: так вместо лесенки DataTrigger.
 /// </summary>
 public static class EnumClass
 {

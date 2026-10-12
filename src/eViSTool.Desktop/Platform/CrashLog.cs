@@ -2,7 +2,7 @@ using System.Text;
 
 namespace eViSTool.Desktop.Platform;
 
-/// <summary>Отчёты об ошибках — в logs папки данных, по файлу на день (как у окна на WPF).</summary>
+/// <summary>Отчёты об ошибках — в logs папки данных, по файлу на день.</summary>
 internal static class CrashLog
 {
     public static string? Write(Exception? ex)

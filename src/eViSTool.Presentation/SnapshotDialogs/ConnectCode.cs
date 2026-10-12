@@ -7,7 +7,6 @@ namespace eViSTool.Presentation.SnapshotDialogs;
 /// <summary>
 /// Окно кода подключения к серверу на другом компьютере: dialog.connectcode, .bad, .good. Коды выдуманные (адрес из
 /// TEST-NET, ключ и отпечаток — не настоящие); проверку связи снимки не запускают, сеть не нужна.
-/// Окно на WPF модели не берёт и с кодом в поле не откроется: состояния .bad и .good у него — пустое поле.
 /// </summary>
 internal static class ConnectCode
 {

@@ -17,8 +17,7 @@ internal static class DuplicateRole
     private static void Open(MainViewModel main) => AppWindows.Current.DuplicateRole("suplayer", "Survival Player", Codes);
 
     /// <summary>
-    /// В поле код, который уже есть в списке («admin»): под полем — ошибка, «Создать копию» выключена. Окно на WPF
-    /// модели не берёт и с кодом в поле не откроется: у него это состояние — подобранный свободный код.
+    /// В поле код, который уже есть в списке («admin»): под полем — ошибка, «Создать копию» выключена.
     /// </summary>
     [SnapshotDialog("duplicaterole.taken")]
     private static void OpenTaken(MainViewModel main)

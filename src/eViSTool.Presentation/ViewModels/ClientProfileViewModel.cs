@@ -216,7 +216,7 @@ public sealed partial class ClientProfileViewModel : ObservableObject
 
     /// <summary>
     /// Последний начатый расчёт плана (окну не нужен: по нему тесты ждут ответа). Неожиданная ошибка расчёта уходит и
-    /// в обработчик сбоев программы, как из async void в окне на WPF.
+    /// в обработчик сбоев программы.
     /// </summary>
     public Task Calculation { get; private set; } = Task.CompletedTask;
 
@@ -290,7 +290,7 @@ public sealed partial class ClientProfileViewModel : ObservableObject
         Observe(Calculation);
     }
 
-    // как async void в окне на WPF: неожиданная ошибка не теряется, а идёт в обработчик сбоев программы
+    // как async void: неожиданная ошибка не теряется, а идёт в обработчик сбоев программы
     private static async void Observe(Task task) => await task;
 
     /// <summary>Пересчитать план в фоне; устаревший ответ (условия успели поменяться) отбрасывается.</summary>

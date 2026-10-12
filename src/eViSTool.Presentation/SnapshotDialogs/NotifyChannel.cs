@@ -36,8 +36,7 @@ internal static class NotifyChannelDialog
         }, isNew: false);
 
     /// <summary>
-    /// Сохранённый ntfy со своим сервером. Тема на снимке — новая случайная (выдуманный секрет не расшифровать), у окон
-    /// на WPF и Avalonia она разная: сверять раскладку, а не текст темы.
+    /// Сохранённый ntfy со своим сервером. Тема на снимке — новая случайная (выдуманный секрет не расшифровать), поэтому она разная: сверять раскладку, а не текст темы.
     /// </summary>
     [SnapshotDialog("notifychannel.ntfy")]
     private static void Ntfy(MainViewModel main) =>

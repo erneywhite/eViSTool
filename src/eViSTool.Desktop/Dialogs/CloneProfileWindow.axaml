@@ -7,7 +7,7 @@
                       x:Class="eViSTool.Desktop.Dialogs.CloneProfileWindow"
                       x:DataType="vm:CloneProfileViewModel"
                       Title="{Binding Title}" Width="624" SizeToContent="Height" CanResize="False">
-    <!-- ширина без рамки: в WPF Width="640" считается вместе с рамкой окна, внутри остаётся 624 -->
+    <!-- ширина — содержимого окна, без рамки -->
     <StackPanel Margin="24,20,24,22">
         <TextBlock Classes="dialogTitle" Text="{Binding Heading}" />
         <TextBlock Classes="hint" Text="{local:Tr clone.intro}" FontSize="12" Margin="0,4,0,0" />

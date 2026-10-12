@@ -214,7 +214,7 @@ public sealed partial class ModsViewModel : ObservableObject
 
     private void ApplySort()
     {
-        // по названию — как в WPF: с учётом языка системы; «Важность» (проблемы, обновления…) — сначала
+        // по названию — с учётом языка системы; «Важность» (проблемы, обновления…) — сначала
         View.Sort = SortIndex == 0
             ? (a, b) => a.Importance != b.Importance ? a.Importance.CompareTo(b.Importance) : string.Compare(a.Name, b.Name, StringComparison.CurrentCulture)
             : (a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCulture);

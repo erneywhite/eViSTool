@@ -112,7 +112,7 @@ public sealed class StatsChart : Control
         }
         else
         {
-            // изломы линий — скруглённые, как «гладкие» стыки в окне на WPF: острым углом линия выстреливала бы иглой
+            // изломы линий — скруглённые: острым углом линия выстреливала бы иглой
             var memory = new Pen(Tone(StatsChartTone.Good), 1.6, lineJoin: PenLineJoin.Round);
             var cpu = new Pen(Tone(StatsChartTone.Warn), 1.4, lineJoin: PenLineJoin.Round);
             foreach (var l in g.MemoryLines()) dc.DrawGeometry(null, memory, Figure(l, closed: false));
@@ -158,7 +158,7 @@ public sealed class StatsChart : Control
     }
 
     /// <summary>
-    /// Пунктир: штрих и промежуток — в толщинах линии. Концы штрихов квадратные, как у пера WPF (DashCap=Square):
+    /// Пунктир: штрих и промежуток — в толщинах линии. Концы штрихов квадратные (DashCap=Square):
     /// штрих выходит длиннее промежутка на толщину, с плоскими концами пунктир был бы заметно реже.
     /// </summary>
     private static Pen Dashed(IBrush brush, double thickness, double dash, double gap) =>

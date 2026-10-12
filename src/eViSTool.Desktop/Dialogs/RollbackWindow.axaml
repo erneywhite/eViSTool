@@ -8,7 +8,7 @@
                       x:DataType="vm:RollbackViewModel"
                       Title="{local:Tr rollback.title}"
                       Width="624" Height="421" MinWidth="464" MinHeight="281">
-    <!-- размеры окна — клиентская область: Width/Height у окна на WPF (640×460) считают и рамку с заголовком (16 и 39 пикселей на Windows 11) -->
+    <!-- размеры окна — клиентская область, без рамки и заголовка -->
     <DockPanel Margin="16">
         <TextBlock DockPanel.Dock="Top" FontSize="16" FontWeight="SemiBold" Text="{Binding Heading}" />
         <TextBlock DockPanel.Dock="Top" Margin="0,4,0,12" Opacity="0.7" TextWrapping="Wrap" Text="{local:Tr rollback.hint}" />

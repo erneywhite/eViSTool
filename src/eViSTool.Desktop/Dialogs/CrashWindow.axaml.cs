@@ -13,7 +13,7 @@ public partial class CrashWindow : DialogWindow
     public CrashWindow() => InitializeComponent();
 
     /// <summary>
-    /// Показать окно вылета и вывести его вперёд. Немодальное и без владельца, как в окне на WPF: вылет приходит, пока
+    /// Показать окно вылета и вывести его вперёд. Немодальное и без владельца: вылет приходит, пока
     /// игрок в игре, а программа может быть свёрнута, — окно с владельцем свернулось бы вместе с ней. Поверх всех окон
     /// и в панели задач (Topmost, ShowInTaskbar — в разметке), по центру экрана.
     /// </summary>
@@ -29,6 +29,6 @@ public partial class CrashWindow : DialogWindow
         window.Activate();
     }
 
-    // Escape закрывает окно в DialogWindow, как IsCancel у кнопки «Закрыть» в окне на WPF
+    // Escape закрывает окно в DialogWindow
     private void Close_Click(object? sender, RoutedEventArgs e) => Close();
 }

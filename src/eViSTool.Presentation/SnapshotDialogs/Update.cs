@@ -22,7 +22,7 @@ internal static class Update
 
     /// <summary>
     /// Строка состояния над кнопками (dialog.update.status): окно показывает её, только когда она меняется при открытом
-    /// окне, — поэтому после открытия. Установку не изображаем: кнопки в окне на WPF выключает только своё нажатие.
+    /// окне, — поэтому после открытия. Установку не изображаем: кнопки выключает только своё нажатие.
     /// </summary>
     [SnapshotDialog("update.status")]
     private static void OpenWithStatus(MainViewModel main)

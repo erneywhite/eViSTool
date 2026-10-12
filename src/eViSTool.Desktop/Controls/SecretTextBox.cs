@@ -6,7 +6,7 @@ namespace eViSTool.Desktop.Controls;
 /// <summary>
 /// Поле для секрета: TextBox с <see cref="TextBox.PasswordChar"/>, который не отдаёт свой текст специальным
 /// возможностям системы. Обычный TextBox Avalonia отдаёт Text любому клиенту UI Automation даже с точками вместо букв,
-/// а PasswordBox в окне на WPF — нет. Вид — как у обычного поля (та же тема).
+/// а этот — нет. Вид — как у обычного поля (та же тема).
 /// </summary>
 public sealed class SecretTextBox : TextBox
 {
