@@ -137,7 +137,8 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         _main = main;
         _monitor = new ServerMonitor(this);
         _console = new ServerConsoleViewModel(() => Client);
-        // свойства консоли вид берёт у раздела под теми же именами — и уведомления о них приходят от раздела
+        // свойства консоли вид берёт у раздела под теми же именами — и уведомления о них приходят от раздела. Фильтра по
+        // имени нет: у каждого свойства консоли есть двойник здесь, это держит тест ServerConsoleViewModelTests
         _console.PropertyChanging += (_, e) => OnPropertyChanging(e);
         _console.PropertyChanged += (_, e) => OnPropertyChanged(e);
         Schedule = new ServerScheduleViewModel(this);
@@ -301,19 +302,23 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         Notify.PollLocal();
     }
 
+    void IServerMonitorHost.OnRemoteAnswered()
+    {
+        if (ErrorText.Length > 0 && !IsBusy) ErrorText = "";
+    }
+
     void IServerMonitorHost.OnRemoteChecked(Exception? error)
     {
-        if (error is null)
+        if (error is not null)
         {
-            if (ErrorText.Length > 0 && !IsBusy) ErrorText = "";
+            if (DateTime.UtcNow < _agentRestartingUntil)
+            {
+                // агент обновляется и перезапускается — связь и должна пропасть: не пугаем ошибкой, ждём его
+                AgentNote = Loc.T("selfupd.stateRestart");
+                ErrorText = "";
+            }
+            else ErrorText = RemoteSecret.Describe(error);
         }
-        else if (DateTime.UtcNow < _agentRestartingUntil)
-        {
-            // агент обновляется и перезапускается — связь и должна пропасть: не пугаем ошибкой, ждём его
-            AgentNote = Loc.T("selfupd.stateRestart");
-            ErrorText = "";
-        }
-        else ErrorText = RemoteSecret.Describe(error);
         _stateKnown = true;
         Refresh();
     }

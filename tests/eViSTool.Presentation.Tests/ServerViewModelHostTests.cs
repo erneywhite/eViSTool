@@ -75,6 +75,7 @@ public sealed class ServerViewModelHostTests
         host.OnRemoteChecked(error);
         Assert.Equal(RemoteSecret.Describe(error), server.ErrorText);
 
+        host.OnRemoteAnswered();
         host.OnRemoteChecked(null);
         Assert.Equal("", server.ErrorText);
     });
@@ -86,6 +87,7 @@ public sealed class ServerViewModelHostTests
         server.ErrorText = "button failed";
         server.IsBusy = true;
 
+        host.OnRemoteAnswered();
         host.OnRemoteChecked(null);
 
         Assert.Equal("button failed", server.ErrorText);

@@ -45,6 +45,8 @@ public sealed class ServerMonitorTests(TestServers servers) : IClassFixture<Test
             OnLocal?.Invoke(LocalChecks);
         }
 
+        public void OnRemoteAnswered() => Calls.Add("answered");
+
         public void OnRemoteChecked(Exception? error)
         {
             Calls.Add(error is null ? "remote-ok" : "remote-failed");
@@ -100,7 +102,8 @@ public sealed class ServerMonitorTests(TestServers servers) : IClassFixture<Test
         Assert.Null(monitor.Client);
     });
 
-    // сначала связь (поток консоли запускается от неё), потом статус, потом «проход удался»; остановка закрывает связь
+    // сначала связь (поток консоли запускается от неё), потом статус, «агент ответил» и «проход удался»; остановка
+    // закрывает связь
     [Fact]
     public void RemoteAgent_AttachesThenReportsStatus_AndStopClosesTheSession() => Sta.Run(() =>
     {
@@ -110,7 +113,7 @@ public sealed class ServerMonitorTests(TestServers servers) : IClassFixture<Test
         var watch = monitor.Start();
         Sta.WaitFor(() => host.Calls.Contains("remote-ok"));
 
-        Assert.Equal(["attached", "status", "remote-ok"], host.Calls.Take(3));
+        Assert.Equal(["attached", "status", "answered", "remote-ok"], host.Calls.Take(4));
         Assert.NotNull(host.Attached);
         Assert.Same(host.Attached, monitor.Client);
 

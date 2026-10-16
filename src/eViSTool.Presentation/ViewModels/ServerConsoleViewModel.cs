@@ -14,7 +14,7 @@ namespace eViSTool.Presentation.ViewModels;
 /// (<see cref="ServerViewModel"/>), а раздел отдаёт ему свойства и уведомления консоли под теми же именами.
 /// </summary>
 /// <param name="client">Текущая связь с агентом (null — агента нет или связи нет).</param>
-public sealed partial class ServerConsoleViewModel(Func<AgentClient?> client) : ObservableObject
+internal sealed partial class ServerConsoleViewModel(Func<AgentClient?> client) : ObservableObject
 {
     private const int MaxLines = 5000;
 

@@ -9,9 +9,10 @@ namespace eViSTool.Presentation.ViewModels;
 /// <summary>
 /// Хозяин наблюдателя (<see cref="ServerMonitor"/>) — раздел «Сервер». У него наблюдатель узнаёт профиль и состояние,
 /// ему сообщает, что увидел. Всё вызывается в потоке окна, в порядке прохода цикла; исключение из вызова цикл разбирает
-/// так же, как ошибку самого прохода в этом месте.
+/// так же, как ошибку самого прохода в этом месте. Внутренний: подать разделу статус или пропажу связи может только
+/// наблюдатель (и тесты).
 /// </summary>
-public interface IServerMonitorHost
+internal interface IServerMonitorHost
 {
     /// <summary>Профиль, за сервером которого следим (активный); null — следить не за чем, сеанс кончается.</summary>
     GameProfile? Profile { get; }
@@ -37,6 +38,12 @@ public interface IServerMonitorHost
     /// </summary>
     void OnLocalChecked(IReadOnlyList<int> serverPids, bool ourServerUp);
 
+    /// <summary>
+    /// Удалённый агент ответил на опрос (статус уже передан): прежнюю ошибку связи пора снять. Зовётся там же, где
+    /// берётся статус, поэтому сбой здесь разбирается как пропажа связи, а не как ошибка прохода.
+    /// </summary>
+    void OnRemoteAnswered();
+
     /// <summary>Удалённый сервер: проход закончен. null — статус получен; иначе — почему связи нет (клиент уже закрыт).</summary>
     void OnRemoteChecked(Exception? error);
 
@@ -51,7 +58,7 @@ public interface IServerMonitorHost
 /// Удалённый: подключиться по коду и брать статус; связь пропала — новая попытка через пять секунд. Что показывать по
 /// статусу и ошибкам, решает хозяин (<see cref="IServerMonitorHost"/>).
 /// </summary>
-public sealed class ServerMonitor(IServerMonitorHost host)
+internal sealed class ServerMonitor(IServerMonitorHost host)
 {
     private CancellationTokenSource? _session;
 
@@ -73,7 +80,11 @@ public sealed class ServerMonitor(IServerMonitorHost host)
         return WatchAsync(_session.Token);
     }
 
-    /// <summary>Связь, поднятая не циклом (кнопка «Запустить» запустила агента), — в текущий сеанс.</summary>
+    /// <summary>
+    /// Связь, поднятая не циклом (кнопка «Запустить» запустила агента), — в текущий сеанс. Только после
+    /// <see cref="Start"/>: кнопка доступна у профиля сервера, а для него сеанс уже начат. Отдельной проверки нет
+    /// намеренно: другое исключение кнопка поймала бы и показала строкой ошибки, а раньше такого не было.
+    /// </summary>
     public void Attach(AgentClient client) => Attach(client, _session!.Token);
 
     private void Attach(AgentClient client, CancellationToken ct)
@@ -183,6 +194,7 @@ public sealed class ServerMonitor(IServerMonitorHost host)
             {
                 host.OnStatus(await Client.StatusAsync(ct));
             }
+            host.OnRemoteAnswered();
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
         {

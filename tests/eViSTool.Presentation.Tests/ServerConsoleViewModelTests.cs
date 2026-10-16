@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Reflection;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Server;
 using eViSTool.Presentation.ViewModels;
@@ -169,6 +170,21 @@ public sealed class ServerConsoleViewModelTests
         Assert.Equal(Hint(Tp), server.ArgsHint);
         Assert.Contains(nameof(ServerViewModel.ArgsHint), changed);
     });
+
+    // раздел пересылает виду все уведомления консоли подряд, без фильтра по имени: поэтому у каждого свойства консоли
+    // должен быть двойник у раздела, с тем же именем и типом, иначе раздел сообщит об изменении свойства, которого у него нет
+    [Fact]
+    public void Server_HasATwinForEveryConsoleProperty()
+    {
+        var properties = typeof(ServerConsoleViewModel).GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+        Assert.NotEmpty(properties);
+        foreach (var property in properties)
+        {
+            var twin = typeof(ServerViewModel).GetProperty(property.Name, BindingFlags.Public | BindingFlags.Instance);
+            Assert.True(twin is not null, $"у раздела нет свойства консоли {property.Name}");
+            Assert.Equal(property.PropertyType, twin.PropertyType);
+        }
+    }
 
     [Fact]
     public void Server_CommandsList_ComesFromTheConsole_WithItsNotification() => Sta.Run(() =>
