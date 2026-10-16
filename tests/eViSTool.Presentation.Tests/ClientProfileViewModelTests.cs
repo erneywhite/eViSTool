@@ -243,6 +243,27 @@ public sealed class ClientProfileViewModelTests : IDisposable
     });
 
     [Fact]
+    public void FolderByNameFailed_FlagStays_HandEditRightAfterIsNotCounted() => Sta.Run(() =>
+    {
+        // подстановка папки по названию сорвалась (здесь упал подписчик TargetDir): у этого окна флаг «папку подставляет
+        // модель» остаётся поднятым до следующего названия — ручная правка папки в промежутке правкой не считается
+        var vm = Ready();
+        var fail = true;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(vm.TargetDir) || !fail) return;
+            fail = false;
+            throw new InvalidOperationException("подписчик упал");
+        };
+
+        Assert.Throws<InvalidOperationException>(() => vm.Name = "Шестой");
+        vm.TargetDir = @"D:\Игры\Свой";
+        vm.Name = "Седьмой";
+
+        Assert.Equal(Path.Combine(_data, ClientProfileLayout.ContainerName, "Седьмой"), vm.TargetDir);
+    });
+
+    [Fact]
     public void SuggestedFolder_SkipsBusyFolder()
     {
         var busy = Directory.CreateDirectory(Path.Combine(_data, ClientProfileLayout.ContainerName, "Клиент 2")).FullName;
@@ -390,6 +411,22 @@ public sealed class ClientProfileViewModelTests : IDisposable
         Assert.Equal("", vm.ErrorText);
         Assert.Equal(SummaryOf(PlanBytes, _free), vm.Summary);
         Assert.True(vm.CanGo);
+    });
+
+    [Fact]
+    public void UnexpectedPlanError_NotShownInWindow_GoesToProgramCrashHandler() => Sta.Run(() =>
+    {
+        // в отличие от клона сервера: неожиданное окно не ловит — расчёт падает, сбой уходит в обработчик программы
+        var ex = new NullReferenceException("внезапно");
+        _plan = _ => throw ex;
+
+        var vm = Model();
+
+        Assert.Same(ex, Assert.Throws<NullReferenceException>(() => Sta.Wait(vm.Calculation)));
+        Assert.Equal("", vm.Summary);
+        Assert.Equal("", vm.ErrorText);
+        Assert.False(vm.CanGo);
+        Assert.Empty(_platform.CrashLogs); // в журнал пишет обработчик сбоев программы, не окно
     });
 
     // ---- запущенная игра
@@ -765,6 +802,42 @@ public sealed class ClientProfileViewModelTests : IDisposable
         Sta.Wait(vm.Calculation);
         Assert.Equal(Loc.T("clone.failed", ex.Message), vm.ErrorText);
         Assert.True(vm.CanGo);
+    });
+
+    [Fact]
+    public void FinishedHandlerFailed_HandledLikeCopyFailure_FormReturnsWithReason() => Sta.Run(() =>
+    {
+        // профиль создан, но окно не смогло закрыться с ним: у этого окна такой сбой разбирается как сбой копирования
+        var created = new GameProfile { Name = "Клиент 2", Kind = ProfileKind.Client, DataDir = Path.Combine(_root, "new") };
+        _apply = (_, _, _) => Task.FromResult(created);
+        var vm = Ready();
+        vm.Finished += _ => throw new InvalidOperationException("окно уже закрыто");
+
+        Sta.Wait(vm.GoCommand.ExecuteAsync(null)); // из команды не вылетает
+
+        Assert.Same(created, vm.Result);
+        Assert.False(vm.IsCopying);
+        Assert.False(vm.CancelCopy());
+        Assert.Empty(_platform.CrashLogs);
+        Sta.Wait(vm.Calculation);
+        Assert.Equal(Loc.T("clone.failed", "окно уже закрыто"), vm.ErrorText);
+        Assert.True(vm.CanGo);
+    });
+
+    [Fact]
+    public void FinishedHandlerUnexpectedError_IsLogged_FormReturns() => Sta.Run(() =>
+    {
+        var ex = new NullReferenceException("внезапно");
+        _apply = (_, _, _) => Task.FromResult(new GameProfile());
+        var vm = Ready();
+        vm.Finished += _ => throw ex;
+
+        Sta.Wait(vm.GoCommand.ExecuteAsync(null));
+
+        Assert.Same(ex, Assert.Single(_platform.CrashLogs));
+        Assert.False(vm.IsCopying);
+        Sta.Wait(vm.Calculation);
+        Assert.Equal(Loc.T("clone.failed", ex.Message), vm.ErrorText);
     });
 
     [Fact]

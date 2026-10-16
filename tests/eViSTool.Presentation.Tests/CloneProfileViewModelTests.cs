@@ -240,6 +240,28 @@ public sealed class CloneProfileViewModelTests : IDisposable
     });
 
     [Fact]
+    public void TargetByNameFailed_FlagIsReset_HandEditRightAfterCounts() => Sta.Run(() =>
+    {
+        // подстановка папки по названию сорвалась (здесь упал подписчик TargetDir): у этого окна флаг «папку подставляет
+        // модель» снимается и при исключении — ручная правка папки следом считается правкой
+        var vm = Open();
+        var fail = true;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(vm.TargetDir) || !fail) return;
+            fail = false;
+            throw new InvalidOperationException("подписчик упал");
+        };
+
+        Assert.Throws<InvalidOperationException>(() => vm.Name = "Дуо 2");
+        var own = Path.Combine(_root, "мой профиль");
+        vm.TargetDir = own;
+        vm.Name = "Дуо 3";
+
+        Assert.Equal(own, vm.TargetDir);
+    });
+
+    [Fact]
     public void Browse_StartsFromNearestExistingFolder_AndPickedFolderStopsFollowingName() => Sta.Run(() =>
     {
         string? start = null;
@@ -695,6 +717,58 @@ public sealed class CloneProfileViewModelTests : IDisposable
         Assert.IsType<NullReferenceException>(Assert.Single(_logged));
         Assert.False(vm.IsCopying);
         Assert.True(vm.IsFormEnabled);
+    });
+
+    [Fact]
+    public void FinishedHandlerFailed_GoesOutOfCommand_FormStaysOff() => Sta.Run(() =>
+    {
+        // профиль создан, но окно не смогло закрыться с ним: у этого окна сбой уходит дальше, в обработчик сбоев программы
+        var created = new GameProfile { Name = "клон", Kind = ProfileKind.Server, DataDir = Path.Combine(_root, "клон") };
+        var vm = Open(services: Services() with { Apply = (_, _, _) => Task.FromResult(created) });
+        var ex = new InvalidOperationException("окно уже закрыто");
+        vm.Finished += _ => throw ex;
+
+        Assert.Same(ex, Assert.Throws<InvalidOperationException>(() => Sta.Wait(vm.GoCommand.ExecuteAsync(null))));
+
+        Assert.Same(created, vm.Result);
+        Assert.True(vm.IsCopying); // копирование удалось — форма не возвращается
+        Assert.False(vm.CancelCopy());
+        Assert.Equal("", vm.ErrorText);
+        Assert.Empty(_logged);
+    });
+
+    [Fact]
+    public void HasErrorAndIsFormEnabled_AreAnnounced_RightAfterErrorTextAndIsCopying() => Sta.Run(() =>
+    {
+        var vm = Open(services: Services() with
+        {
+            Apply = async (_, _, ct) =>
+            {
+                await Task.Delay(Timeout.Infinite, ct);
+                throw new Xunit.Sdk.XunitException("не отменили");
+            },
+        });
+        var changes = new List<string?>();
+        vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        var go = vm.GoCommand.ExecuteAsync(null);
+        Sta.WaitFor(() => vm.IsCopying);
+        Assert.True(vm.CancelCopy());
+        Sta.Wait(go);
+        Sta.Wait(vm.Planning);
+
+        // форму выключили и вернули, причина прерывания появилась — привязки окна узнают об этом сразу
+        Assert.Equal(2, changes.Count(n => n == nameof(vm.IsCopying)));
+        Assert.Equal(1, changes.Count(n => n == nameof(vm.ErrorText)));
+        Assert.Equal(changes.Count(n => n == nameof(vm.IsCopying)), changes.Count(n => n == nameof(vm.IsFormEnabled)));
+        Assert.Equal(changes.Count(n => n == nameof(vm.ErrorText)), changes.Count(n => n == nameof(vm.HasError)));
+        for (var i = 0; i < changes.Count; i++)
+        {
+            if (changes[i] == nameof(vm.IsCopying)) Assert.Equal(nameof(vm.IsFormEnabled), changes[i + 1]);
+            if (changes[i] == nameof(vm.ErrorText)) Assert.Equal(nameof(vm.HasError), changes[i + 1]);
+        }
+        Assert.True(vm.IsFormEnabled);
+        Assert.True(vm.HasError);
     });
 
     [Fact]
