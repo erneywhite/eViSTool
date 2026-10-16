@@ -531,9 +531,9 @@ pwsh build/publish.ps1   # релизная сборка и zip в dist/
 
 ## Политика подписи кода
 
-Релизы eViSTool пока не подписаны. В планах — бесплатная подпись для открытых проектов
-от [SignPath.io](https://signpath.io) с сертификатом [SignPath Foundation](https://signpath.org),
-когда проект станет достаточно известен для их программы.
+Бесплатную подпись релизов для Windows даёт [SignPath.io](https://signpath.io), сертификат —
+[SignPath Foundation](https://signpath.org). Заявка на рассмотрении: пока сертификат не выдан, релизы не подписаны,
+и при первом запуске SmartScreen может предупредить.
 
 Подписываются только файлы, собранные [GitHub Actions](https://github.com/erneywhite/eViSTool/actions/workflows/build.yml) из исходного кода
 этого репозитория, — никогда не собранные на личном компьютере.
