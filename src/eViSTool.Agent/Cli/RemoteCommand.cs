@@ -17,7 +17,7 @@ internal static class RemoteCommand
     private const string HostOption = "--host";
     private const string PortOption = "--port";
 
-    // как часто работающий агент перечитывает файл удалённого доступа (главный цикл в Program.cs) — с запасом
+    // как часто работающий агент перечитывает файл удалённого доступа (главный цикл в AgentLoop.cs) — с запасом
     private static readonly TimeSpan ApplyPeriod = TimeSpan.FromSeconds(6);
 
     public static int Run(AgentArgs cli, string[] args)
