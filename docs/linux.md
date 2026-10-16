@@ -147,6 +147,11 @@ Options, if you need them:
 Running `service install` again is safe. With the same settings it changes nothing. With different ones it restarts the
 service: the server stops with a world save and starts again.
 
+The service runs with restrictions: no special privileges, no access to devices or kernel settings, and new files
+(world backups, settings) can't be read by other users of the machine. If another user picks up the backups, for
+example through a shared folder, add that user to the `vintagestory` group. A service installed by a version before
+0.11.5 gets these restrictions after you run `service install` again.
+
 ## Day to day
 
 You control the server from the eViSTool window. On the machine itself the main commands are there too:

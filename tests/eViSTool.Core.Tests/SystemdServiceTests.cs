@@ -56,6 +56,11 @@ public sealed class SystemdServiceTests : IDisposable
                      // выход 75 после самообновления — не сбой, но перезапуск; остальные сбои — тоже перезапуск
                      "Restart=on-failure", "RestartSec=5", "SuccessExitStatus=75", "RestartForceExitStatus=75",
                      "NoNewPrivileges=true", "PrivateTmp=true", "ProtectSystem=full",
+                     // без привилегий и устройств, сокеты — сеть и локальные (netlink нужен .NET для сетевых интерфейсов)
+                     "CapabilityBoundingSet=", "AmbientCapabilities=", "PrivateDevices=true", "ProtectProc=invisible",
+                     "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK",
+                     // чужой системный вызов — ошибка, а не убитый процесс; новые файлы — не для чужих глаз
+                     "SystemCallFilter=@system-service", "SystemCallErrorNumber=EPERM", "UMask=0027",
                      "[Install]", "WantedBy=multi-user.target",
                  })
             Assert.Contains(line, lines);
@@ -63,7 +68,7 @@ public sealed class SystemdServiceTests : IDisposable
         Assert.Contains(lines, l => l.StartsWith("Description=") && l.Contains("/var/vintagestory/data"));
         // SIGKILL всем, MemoryDenyWriteExecute (ломает JIT .NET), ProtectHome (всё лежит в /home) — нельзя
         Assert.DoesNotContain("KillMode=control-group", lines);
-        Assert.DoesNotContain(lines, l => l.StartsWith("MemoryDenyWriteExecute") || l.StartsWith("ProtectHome"));
+        Assert.DoesNotContain(lines, l => l.StartsWith("MemoryDenyWriteExecute") || l.StartsWith("ProtectHome") || l.StartsWith("PrivateUsers"));
         Assert.Equal("/etc/systemd/system/evistool.service", SystemdUnit.PathFor("evistool"));
     }
 

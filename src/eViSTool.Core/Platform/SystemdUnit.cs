@@ -12,6 +12,13 @@ namespace eViSTool.Core.Platform;
 /// сразу убивает и сервер, без сохранения (ExecStop при падении главного процесса не вызывается — проверено), и через
 /// RestartSec поднимает агента заново, а тот — сервер. Осиротевший сервер новому агенту не мешает: его уже нет.
 /// </para>
+/// <para>
+/// Ограничения службы (проверены на Ubuntu Server 24.04 с настоящим сервером: запуск, перезапуск, копии, удалённый вход;
+/// systemd-analyze security — 1.8 вместо 7.6): без привилегий, устройств и ручек ядра, сокеты только сетевые и
+/// локальные, обычный набор системных вызовов (чужой вызов получает EPERM, а не убивает процесс), новые файлы закрыты от
+/// других пользователей. Нельзя: ProtectHome (агент и данные обычно в /home), MemoryDenyWriteExecute (ломает JIT .NET),
+/// PrivateUsers (владельцы файлов на подключённых папках копий превратились бы в nobody).
+/// </para>
 /// </summary>
 public sealed partial record SystemdUnit
 {
@@ -117,6 +124,24 @@ public sealed partial record SystemdUnit
         L("ProtectControlGroups=true");
         L("RestrictSUIDSGID=true");
         L("LockPersonality=true");
+        L("# no extra privileges, devices or kernel knobs: the agent and the game server only need files and the network");
+        L("CapabilityBoundingSet=");
+        L("AmbientCapabilities=");
+        L("PrivateDevices=true");
+        L("ProtectKernelLogs=true");
+        L("ProtectClock=true");
+        L("ProtectHostname=true");
+        L("ProtectProc=invisible");
+        L("RestrictNamespaces=true");
+        L("RestrictRealtime=true");
+        L("RemoveIPC=true");
+        L("RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK");
+        L("SystemCallArchitectures=native");
+        L("# a call outside the usual service set fails with EPERM instead of killing the process");
+        L("SystemCallFilter=@system-service");
+        L("SystemCallErrorNumber=EPERM");
+        L("# new files (backups, settings) are not readable by other users");
+        L("UMask=0027");
         L();
         L("[Install]");
         L("WantedBy=multi-user.target");
