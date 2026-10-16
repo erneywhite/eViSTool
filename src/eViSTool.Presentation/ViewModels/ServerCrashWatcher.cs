@@ -25,12 +25,20 @@ public sealed class ServerCrashWatcher(
     private readonly IUiTimer _timer = Ui.Timer(TimeSpan.FromSeconds(15));
     private readonly Dictionary<string, string?> _seen = [];
     private readonly DateTime _startedAt = startedAt ?? DateTime.Now;
+    private bool _subscribed;
     private bool _checking;
 
-    /// <summary>Включить опрос по таймеру.</summary>
+    /// <summary>
+    /// Включить опрос по таймеру. Повторный вызов только запускает таймер: на Tick подписываемся один раз,
+    /// иначе опросы шли бы по два за тик.
+    /// </summary>
     public void Start()
     {
-        _timer.Tick += (_, _) => _ = CheckAsync();
+        if (!_subscribed)
+        {
+            _timer.Tick += (_, _) => _ = CheckAsync();
+            _subscribed = true;
+        }
         _timer.Start();
     }
 

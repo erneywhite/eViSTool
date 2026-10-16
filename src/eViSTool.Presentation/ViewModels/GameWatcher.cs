@@ -29,6 +29,7 @@ public sealed class GameWatcher(
 {
     // раз в пару секунд: запущена ли игра активного клиентского профиля
     private readonly IUiTimer _timer = Ui.Timer(TimeSpan.FromSeconds(2));
+    private bool _subscribed;
     private bool _checking;
 
     private GameSession? _session;
@@ -36,10 +37,17 @@ public sealed class GameWatcher(
     private readonly List<(string ProfileId, Func<Task> Action)> _afterExit = [];
     private int _errorTicks;
 
-    /// <summary>Включить опрос по таймеру.</summary>
+    /// <summary>
+    /// Включить опрос по таймеру. Повторный вызов только запускает таймер: на Tick подписываемся один раз,
+    /// иначе проверки шли бы по две за тик.
+    /// </summary>
     public void Start()
     {
-        _timer.Tick += (_, _) => _ = CheckAsync();
+        if (!_subscribed)
+        {
+            _timer.Tick += (_, _) => _ = CheckAsync();
+            _subscribed = true;
+        }
         _timer.Start();
     }
 

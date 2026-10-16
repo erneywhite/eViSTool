@@ -16,6 +16,7 @@ namespace eViSTool.Presentation.ViewModels;
 public sealed class DiskUpdateWatcher(Func<bool> updatedHere, Action<string> newer)
 {
     private readonly IUiTimer _timer = Ui.Timer(TimeSpan.FromSeconds(10));
+    private bool _subscribed;
 
     // какой exe был при запуске (время и размер): пока он тот же, версию не читаем
     private (DateTime, long)? _exeStamp;
@@ -23,10 +24,17 @@ public sealed class DiskUpdateWatcher(Func<bool> updatedHere, Action<string> new
     /// <summary>Exe окна программы — рядом со сборкой.</summary>
     public static string MainExe => Path.Combine(AppContext.BaseDirectory, AppUpdater.WindowExe);
 
-    /// <summary>Включить проверку по таймеру.</summary>
+    /// <summary>
+    /// Включить проверку по таймеру. Повторный вызов только запускает таймер: на Tick подписываемся один раз,
+    /// иначе проверки шли бы по две за тик.
+    /// </summary>
     public void Start()
     {
-        _timer.Tick += (_, _) => Check();
+        if (!_subscribed)
+        {
+            _timer.Tick += (_, _) => Check();
+            _subscribed = true;
+        }
         _timer.Start();
     }
 

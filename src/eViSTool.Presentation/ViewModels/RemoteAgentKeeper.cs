@@ -13,11 +13,19 @@ namespace eViSTool.Presentation.ViewModels;
 public sealed class RemoteAgentKeeper(IEnumerable<ProfileViewModel> profiles)
 {
     private readonly IUiTimer _timer = Ui.Timer(TimeSpan.FromSeconds(30));
+    private bool _subscribed;
 
-    /// <summary>Включить проходы по таймеру.</summary>
+    /// <summary>
+    /// Включить проходы по таймеру. Повторный вызов только запускает таймер: на Tick подписываемся один раз,
+    /// иначе проходы шли бы по два за тик.
+    /// </summary>
     public void Start()
     {
-        _timer.Tick += (_, _) => _ = KeepAsync();
+        if (!_subscribed)
+        {
+            _timer.Tick += (_, _) => _ = KeepAsync();
+            _subscribed = true;
+        }
         _timer.Start();
     }
 

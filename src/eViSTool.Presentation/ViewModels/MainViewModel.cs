@@ -153,13 +153,14 @@ public sealed partial class MainViewModel : ObservableObject
 
     public MainViewModel()
     {
-        // фоновые наблюдатели — до всего остального, как прежде поля с их таймерами; запускаются в конце конструктора
+        // наблюдатели за игрой, падениями серверов и exe на диске — до всего остального, чтобы модели ниже могли спрашивать
+        // их уже при сборке; запускаются в конце конструктора, рядом с агентами удалённого доступа
         _game = new GameWatcher(() => ActiveProfile is { Kind: ProfileKind.Client } p ? p.Model : null, OnGameChecked,
             UpdateErrorReport, OnGameExitActionsDone, ShowUpdatePrompt, ShowCrash);
         _serverCrashes = new ServerCrashWatcher(Profiles, UpdateErrorReport,
             (profile, crash) => AppWindows.Current.ShowServerCrash(this, profile, crash));
-        _remoteAgents = new RemoteAgentKeeper(Profiles);
         _diskUpdate = new DiskUpdateWatcher(() => About.UpdatedHere, OnUpdatedOnDisk);
+
         _profileActions = new ProfileActions(Profiles, () => ActiveProfile);
 
         _settings = _store.Load();
@@ -196,6 +197,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         // Удалённый доступ работает, пока открыто это окно (или пока работает сервер): держим агентов таких профилей
         // запущенными. Закрыли окно и сервер не работает — агент через пару минут выйдет, в системе ничего не остаётся.
+        _remoteAgents = new RemoteAgentKeeper(Profiles);
         _remoteAgents.Start();
         _game.Start();
         _diskUpdate.Start();
