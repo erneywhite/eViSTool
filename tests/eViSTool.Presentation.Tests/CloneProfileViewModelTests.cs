@@ -698,6 +698,40 @@ public sealed class CloneProfileViewModelTests : IDisposable
     });
 
     [Fact]
+    public void HasErrorAndIsFormEnabled_AreAnnounced_RightAfterErrorTextAndIsCopying() => Sta.Run(() =>
+    {
+        var vm = Open(services: Services() with
+        {
+            Apply = async (_, _, ct) =>
+            {
+                await Task.Delay(Timeout.Infinite, ct);
+                throw new Xunit.Sdk.XunitException("не отменили");
+            },
+        });
+        var changes = new List<string?>();
+        vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        var go = vm.GoCommand.ExecuteAsync(null);
+        Sta.WaitFor(() => vm.IsCopying);
+        Assert.True(vm.CancelCopy());
+        Sta.Wait(go);
+        Sta.Wait(vm.Planning);
+
+        // форму выключили и вернули, причина прерывания появилась — привязки окна узнают об этом сразу
+        Assert.Equal(2, changes.Count(n => n == nameof(vm.IsCopying)));
+        Assert.Equal(1, changes.Count(n => n == nameof(vm.ErrorText)));
+        Assert.Equal(changes.Count(n => n == nameof(vm.IsCopying)), changes.Count(n => n == nameof(vm.IsFormEnabled)));
+        Assert.Equal(changes.Count(n => n == nameof(vm.ErrorText)), changes.Count(n => n == nameof(vm.HasError)));
+        for (var i = 0; i < changes.Count; i++)
+        {
+            if (changes[i] == nameof(vm.IsCopying)) Assert.Equal(nameof(vm.IsFormEnabled), changes[i + 1]);
+            if (changes[i] == nameof(vm.ErrorText)) Assert.Equal(nameof(vm.HasError), changes[i + 1]);
+        }
+        Assert.True(vm.IsFormEnabled);
+        Assert.True(vm.HasError);
+    });
+
+    [Fact]
     public void Notice_WinsOverPlanError_ButNoSpaceWinsOverNotice() => Sta.Run(() =>
     {
         var failPlan = false;

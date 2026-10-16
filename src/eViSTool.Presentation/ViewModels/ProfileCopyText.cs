@@ -2,7 +2,10 @@ using eViSTool.Core.Localization;
 
 namespace eViSTool.Presentation.ViewModels;
 
-/// <summary>Общее у окон нового клиентского профиля и клона сервера: текст про копию модов и свободное место на диске.</summary>
+/// <summary>
+/// Общее у окон нового клиентского профиля и клона сервера: текст про копию модов, свободное место на диске и вес
+/// папок (миров, резервных копий).
+/// </summary>
 public static class ProfileCopyText
 {
     /// <summary>Своя копия модов: откуда соберутся и что не один к одному (дубли, переименования, нет папки).</summary>
@@ -23,5 +26,21 @@ public static class ProfileCopyText
         {
             return null;
         }
+    }
+
+    /// <summary>Сколько весят файлы в папках (со всеми вложенными); папок, которых нет, и недоступного не считаем.</summary>
+    public static long FolderBytes(IEnumerable<string> dirs)
+    {
+        long sum = 0;
+        foreach (var dir in dirs)
+        {
+            try
+            {
+                if (Directory.Exists(dir))
+                    sum += new DirectoryInfo(dir).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
+        return sum;
     }
 }

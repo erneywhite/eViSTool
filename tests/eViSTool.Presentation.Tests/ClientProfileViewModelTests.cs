@@ -392,6 +392,22 @@ public sealed class ClientProfileViewModelTests : IDisposable
         Assert.True(vm.CanGo);
     });
 
+    [Fact]
+    public void UnexpectedPlanError_NotShownInWindow_GoesToProgramCrashHandler() => Sta.Run(() =>
+    {
+        // в отличие от клона сервера: неожиданное окно не ловит — расчёт падает, сбой уходит в обработчик программы
+        var ex = new NullReferenceException("внезапно");
+        _plan = _ => throw ex;
+
+        var vm = Model();
+
+        Assert.Same(ex, Assert.Throws<NullReferenceException>(() => Sta.Wait(vm.Calculation)));
+        Assert.Equal("", vm.Summary);
+        Assert.Equal("", vm.ErrorText);
+        Assert.False(vm.CanGo);
+        Assert.Empty(_platform.CrashLogs); // в журнал пишет обработчик сбоев программы, не окно
+    });
+
     // ---- запущенная игра
 
     [Fact]
