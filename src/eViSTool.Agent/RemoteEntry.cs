@@ -33,13 +33,18 @@ internal sealed class RemoteEntry(AgentState state, AgentJournal journal)
 
     /// <summary>
     /// Точки API для этого входа — те же, что у локального. Задаётся после создания API: тому для статуса нужны
-    /// порт и ошибка этого входа.
+    /// порт и ошибка этого входа. Вызвать до первого <see cref="ApplyAsync"/>.
     /// </summary>
     public void Serve(AgentApi agentApi) => _api = agentApi;
 
     /// <summary>Поднять, пересоздать или погасить вход по файлу настроек; файл не менялся — ничего не делать.</summary>
+    /// <exception cref="InvalidOperationException"><see cref="Serve"/> не вызван: это ошибка сборки агента.</exception>
     public async Task ApplyAsync()
     {
+        // Забытый Serve проверяем до всего остального: агент упадёт при первом же вызове, то есть при запуске. Иначе сбой
+        // всплыл бы только при включении удалённого доступа, и тихо: метка файла уже записана, следующий тик ничего
+        // не делает, а исключение не попадает в фильтр catch ниже
+        var api = _api ?? throw new InvalidOperationException("RemoteEntry.Serve не вызван до ApplyAsync");
         var host = state.Host;
         var opts = state.Options;
         var changedAt = File.Exists(_file) ? File.GetLastWriteTimeUtc(_file) : default;
@@ -106,7 +111,7 @@ internal sealed class RemoteEntry(AgentState state, AgentJournal journal)
                 lock (_failures) _failures.Remove(ip);
                 await next();
             });
-            _api!.Map(web, isRemote: true);
+            api.Map(web, isRemote: true);
             await web.StartAsync();
             _app = web;
             host.Console.Add(ConsoleLineKind.System, Loc.T("remote.listening", _settings.Port));
