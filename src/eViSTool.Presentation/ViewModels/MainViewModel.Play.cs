@@ -1,45 +1,106 @@
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Net.Http;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Game;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;
-using eViSTool.Core.Server;
-using eViSTool.Core.Server.Remote;
 
 namespace eViSTool.Presentation.ViewModels;
 
-/// <summary>Пункт меню «Играть»: сервер (или «без сервера»), подпись, состояние, булавка «по умолчанию».</summary>
-public sealed partial class PlayMenuItemViewModel : ObservableObject
-{
-    public PlayMenuItemViewModel(PlayTarget? target, string name, string detail)
-    {
-        Target = target;
-        Name = name;
-        _detail = detail;
-    }
-
-    /// <summary>null — «Без сервера».</summary>
-    public PlayTarget? Target { get; }
-    public string Name { get; }
-    public bool IsFavorite => Target?.Kind == PlayTargetKind.Favorite;
-    public bool IsOwn => Target?.Kind == PlayTargetKind.OwnServer;
-    public bool IsNone => Target is null;
-    public bool HasPassword => Target?.HasPassword == true;
-
-    [ObservableProperty] private string _detail;
-    [ObservableProperty] private bool _isDefault;
-
-    /// <summary>Версия игры сервера не совпадает с профилем — подпись предупреждением (подключиться всё равно можно попробовать).</summary>
-    [ObservableProperty] private string _versionNote = "";
-}
-
+/// <summary>
+/// «Играть»: запуск игры с активным клиентским профилем, меню серверов у кнопки (сборка пунктов — в
+/// <see cref="PlayMenu"/>) и «Сервер по умолчанию» в настройках клиентского профиля.
+/// </summary>
 public sealed partial class MainViewModel
 {
-    /// <summary>Сколько серверов из избранного игры показывать в меню; остальные — в «Найти сервер…».</summary>
-    private const int MenuFavorites = 5;
+    // ---- запуск игры с активным клиентским профилем
+
+    /// <summary>Кнопка «Играть» — только для клиентского профиля (у серверного свой раздел «Сервер»).</summary>
+    public bool CanPlay => ActiveProfile is { Kind: ProfileKind.Client };
+
+    [ObservableProperty] private bool _isLaunching;
+
+    public string PlayText => IsGameRunning ? Loc.T("play.running") : IsLaunching ? Loc.T("play.starting") : Loc.T("play.button") + PlaySuffix;
+
+    /// <summary>Игра этого профиля запущена (нами или как угодно ещё: ярлык, лаунчер) — второй экземпляр не даём.</summary>
+    [ObservableProperty] private bool _isGameRunning;
+
+    partial void OnIsGameRunningChanged(bool value)
+    {
+        if (!value) ShowUpdatePrompt(); // окно об обновлении ждало, пока закроют игру
+        OnPropertyChanged(nameof(PlayText));
+        PlayCommand.NotifyCanExecuteChanged();
+        PlayOnCommand.NotifyCanExecuteChanged();
+    }
+
+    private bool CanPlayNow => !IsGameRunning && !IsLaunching;
+
+    public string PlayTip => ActiveProfile is not { Kind: ProfileKind.Client } profile ? ""
+        : GameLauncher.DataPathFor(profile.Model) is { } dataPath ? Loc.T("play.tipOwnData", profile.Name, dataPath)
+        : Loc.T("play.tip", profile.Name);
+
+    partial void OnIsLaunchingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(PlayText));
+        PlayCommand.NotifyCanExecuteChanged();
+        PlayOnCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Значок игры для блока «Vintage Story» внизу слева — из установленной игры активного профиля, а если у него
+    /// своей нет (удалённый профиль) — из любого другого профиля. null — игры нет нигде: показываются буквы «VS».
+    /// </summary>
+    public IReadOnlyList<string?> IconSearchDirs =>
+        [.. new[] { ActiveProfile?.GameDir }.Concat(Profiles.Select(p => p.GameDir)).Append(Core.Game.GameInstall.FindGameDir())];
+
+    private void NotifyPlay()
+    {
+        _ = CheckGameAsync(); // сменили профиль — у нового своя игра
+        OnPropertyChanged(nameof(IconSearchDirs));
+        OnPropertyChanged(nameof(CanPlay));
+        OnPropertyChanged(nameof(PlayText));
+        OnPropertyChanged(nameof(PlayTip));
+    }
+
+    /// <summary>«Играть»: с сервером по умолчанию, если он выбран у профиля, иначе просто игра.</summary>
+    [RelayCommand(CanExecute = nameof(CanPlayNow))]
+    private Task Play() => LaunchAsync(DefaultPlayTarget);
+
+    private async Task LaunchAsync(PlayTarget? server)
+    {
+        if (ActiveProfile is not { Kind: ProfileKind.Client } profile) return;
+
+        // вторая копия игры с той же папкой данных перезапишет настройки первой: кнопка в это время неактивна,
+        // а здесь — на случай, если игру запустили только что (ярлык), а опрос ещё не заметил
+        if (await Task.Run(() => GameProcess.FindClientPids(profile.Model).Count > 0))
+        {
+            IsGameRunning = true;
+            return;
+        }
+
+        try
+        {
+            GameLauncher.Launch(profile.Model, server);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            Ui.Warn(Loc.T("play.failed", ex.Message));
+            return;
+        }
+
+        // процесс уже есть — дальше кнопку держит опрос («Игра запущена»)
+        IsLaunching = true;
+        try
+        {
+            await CheckGameAsync();
+            if (!IsGameRunning) await Task.Delay(TimeSpan.FromSeconds(3));
+        }
+        finally { IsLaunching = false; }
+        await CheckGameAsync();
+    }
+
+    // ---- меню «Играть»: свои серверы, избранное игры, без сервера
 
     public ObservableCollection<PlayMenuItemViewModel> PlayOwnServers { get; } = [];
     public ObservableCollection<PlayMenuItemViewModel> PlayFavorites { get; } = [];
@@ -51,13 +112,7 @@ public sealed partial class MainViewModel
     [ObservableProperty] private string _playFavoritesMore = "";
 
     /// <summary>Сервер по умолчанию у активного клиентского профиля (его нет среди серверов — значит, без сервера).</summary>
-    private PlayTarget? DefaultPlayTarget =>
-        ActiveProfile?.Model is { Kind: ProfileKind.Client, DefaultServer: { Length: > 0 } key } profile ? FindPlayTarget(profile, key) : null;
-
-    private PlayTarget? FindPlayTarget(GameProfile client, string key) =>
-        key.StartsWith("own:", StringComparison.Ordinal)
-            ? Profiles.Select(p => p.Model).FirstOrDefault(p => PlayTargets.OwnKey(p.Id) == key) is { } server ? PlayTargets.Own(server) : null
-            : PlayTargets.Favorites(client.DataDir).FirstOrDefault(f => f.Key == key);
+    private PlayTarget? DefaultPlayTarget => PlayMenu.DefaultTarget(ActiveProfile, Profiles);
 
     /// <summary>«Играть · home» — когда у профиля выбран сервер по умолчанию.</summary>
     private string PlaySuffix => DefaultPlayTarget is { } t ? " · " + t.Name : "";
@@ -69,67 +124,11 @@ public sealed partial class MainViewModel
         var defaultKey = DefaultPlayTarget?.Key;
         var clientVersion = ActiveProfile.Resolved.GameVersion?.ToString();
 
-        PlayOwnServers.Clear();
-        foreach (var server in Profiles.Where(p => p.Kind == ProfileKind.Server))
-        {
-            if (PlayTargets.Own(server.Model) is not { } target) continue;
-            var item = new PlayMenuItemViewModel(target, server.Name,
-                (server.Model.IsRemote ? "" : Loc.T("play.thisPc") + " · ") + Loc.T("play.checking"))
-            {
-                IsDefault = target.Key == defaultKey,
-            };
-            PlayOwnServers.Add(item);
-            _ = FillServerStateAsync(item, server, clientVersion);
-        }
-
-        PlayFavorites.Clear();
-        var favorites = PlayTargets.Favorites(client.DataDir);
-        // сервер по умолчанию из избранного — всегда в меню, даже если он дальше пятого
-        var shown = favorites.Where(f => f.Key == defaultKey).Concat(favorites.Where(f => f.Key != defaultKey)).Take(MenuFavorites);
-        foreach (var f in shown)
-            PlayFavorites.Add(new PlayMenuItemViewModel(f, f.Name, f.Address + (f.HasPassword ? " · " + Loc.T("play.withPassword") : ""))
-            {
-                IsDefault = f.Key == defaultKey,
-            });
-        PlayFavoritesMore = favorites.Count > MenuFavorites ? Loc.T("play.moreFavorites", favorites.Count - MenuFavorites) : "";
-        PlayNoServer = new PlayMenuItemViewModel(null, Loc.T("play.noServer"), Loc.T("play.noServerHint")) { IsDefault = defaultKey is null };
+        PlayMenu.FillOwnServers(PlayOwnServers, Profiles, defaultKey, clientVersion);
+        PlayFavoritesMore = PlayMenu.FillFavorites(PlayFavorites, client, defaultKey);
+        PlayNoServer = PlayMenu.NoServer(defaultKey);
         OnPropertyChanged(nameof(HasPlayOwnServers));
         OnPropertyChanged(nameof(HasPlayFavorites));
-    }
-
-    /// <summary>Состояние своего сервера — у его агента (свой — на этой машине, удалённый — по коду); не ответил — «нет связи».</summary>
-    private static async Task FillServerStateAsync(PlayMenuItemViewModel item, ProfileViewModel server, string? clientVersion)
-    {
-        var where = server.Model.IsRemote ? "" : Loc.T("play.thisPc") + " · ";
-        AgentClient? client = null;
-        try
-        {
-            client = server.Model.IsRemote
-                ? RemoteSecret.Unprotect(server.Model.RemoteCode) is { } code ? AgentClient.ForRemote(code) : null
-                : AgentClient.TryConnect(server.Model.Id);
-            if (client is null)
-            {
-                item.Detail = where + Loc.T(server.Model.IsRemote ? "play.noLink" : "play.stopped");
-            }
-            else
-            {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-                var s = await client.StatusAsync(cts.Token);
-                item.Detail = where + (s.State == ServerState.Running
-                    ? Loc.T("play.srvRunning", s.Players.Count)
-                    : Loc.T(s.State == ServerState.Stopped ? "play.stopped" : "play.startingSrv"));
-                var version = server.Model.IsRemote ? s.GameVersion : server.Resolved.GameVersion?.ToString();
-                if (version is { Length: > 0 } && clientVersion is { Length: > 0 } && version != clientVersion)
-                    item.VersionNote = Loc.T("play.otherVersion", version, clientVersion);
-            }
-        }
-        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException or IOException)
-        {
-            item.Detail = where + Loc.T(server.Model.IsRemote ? "play.noLink" : "play.stopped");
-        }
-        finally { client?.Dispose(); }
-        if (!server.Model.IsRemote && clientVersion is { Length: > 0 } cv && server.Resolved.GameVersion?.ToString() is { Length: > 0 } sv && sv != cv)
-            item.VersionNote = Loc.T("play.otherVersion", sv, cv);
     }
 
     /// <summary>Пункт меню: запустить игру с этим сервером один раз (по умолчанию не становится).</summary>
@@ -170,16 +169,8 @@ public sealed partial class MainViewModel
     public sealed record DefaultServerOption(string Key, string Title);
 
     /// <summary>Без сервера, свои серверы, избранное игры редактируемого профиля.</summary>
-    public IReadOnlyList<DefaultServerOption> EditedDefaultServerOptions
-    {
-        get
-        {
-            if (EditedProfile?.Model is not { Kind: ProfileKind.Client } client) return [];
-            var own = Profiles.Where(p => p.Kind == ProfileKind.Server).Select(p => PlayTargets.Own(p.Model)).OfType<PlayTarget>();
-            return [new DefaultServerOption("", Loc.T("play.noServer")),
-                .. own.Concat(PlayTargets.Favorites(client.DataDir)).Select(t => new DefaultServerOption(t.Key, $"{t.Name}  ·  {t.Address}"))];
-        }
-    }
+    public IReadOnlyList<DefaultServerOption> EditedDefaultServerOptions =>
+        EditedProfile?.Model is not { Kind: ProfileKind.Client } client ? [] : PlayMenu.DefaultServerOptions(client, Profiles);
 
     /// <summary>Выбранный ключ (выбор по ключу: варианты пересоздаются, а выбор должен узнаваться).</summary>
     public string EditedDefaultServer
