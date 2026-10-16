@@ -78,5 +78,15 @@ public sealed class ServerJournalTests : IDisposable
     }
 
     [Fact]
+    public void Read_SameTime_LaterInTheFileComesFirst()
+    {
+        var at = new DateTime(2026, 10, 16, 12, 0, 0, DateTimeKind.Utc);
+        ServerJournal.Append(File1, new JournalEntry(at, "stop", [], null, null, false));
+        ServerJournal.Append(File1, new JournalEntry(at, "start", [], null, null, false));
+
+        Assert.Equal(["start", "stop"], ServerJournal.Read(File1, at).Select(e => e.Action));
+    }
+
+    [Fact]
     public void Read_NoFile_IsEmpty() => Assert.Empty(ServerJournal.Read(File1, DateTime.UtcNow));
 }

@@ -42,7 +42,9 @@ public static class ServerJournal
     public static IReadOnlyList<JournalEntry> Read(string file, DateTime utcNow)
     {
         var from = utcNow - Keep;
-        return [.. Lines(file).Where(e => e.At >= from).OrderByDescending(e => e.At)];
+        // при равном времени новее та, что ниже в файле
+        return [.. Lines(file).Select((e, i) => (e, i)).Where(x => x.e.At >= from)
+            .OrderByDescending(x => x.e.At).ThenByDescending(x => x.i).Select(x => x.e)];
     }
 
     /// <summary>Убрать записи старше <see cref="Keep"/> (агент — при запуске и раз в сутки).</summary>

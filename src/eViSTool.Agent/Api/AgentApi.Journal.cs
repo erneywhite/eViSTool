@@ -9,6 +9,7 @@ internal sealed partial class AgentApi
     {
         web.Use(async (ctx, next) =>
         {
+            var started = DateTime.UtcNow;
             var path = ctx.Request.Path.Value ?? "";
             if (HttpMethods.IsGet(ctx.Request.Method) || ServerJournal.Describe(ctx.Request.Method, path, null, null) is null)
             {
@@ -25,7 +26,7 @@ internal sealed partial class AgentApi
             await next();
             if (ctx.Response.StatusCode is >= 200 and < 300
                 && ServerJournal.Describe(ctx.Request.Method, path, body, ctx.Request.Headers[AgentClient.ModFileHeader].ToString()) is { } act)
-                journal.Write(act.Action, act.Args, ctx, isRemote);
+                journal.Write(act.Action, act.Args, ctx, isRemote, started);
         });
     }
 
