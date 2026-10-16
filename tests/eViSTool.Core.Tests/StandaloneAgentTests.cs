@@ -87,7 +87,7 @@ public sealed class StandaloneAgentTests : IDisposable
                     File.GetUnixFileMode(AgentProtocol.KeyFile(Profile, AgentsDir)));
 
             // отказ — с понятным текстом (problem+json), а не пустой 500: обрезанный агент не умеет Results.Problem
-            var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => client.DeleteBackupAsync("no-such.vcdbs"));
+            var refused = await Assert.ThrowsAsync<AgentHttpException>(() => client.DeleteBackupAsync("no-such.vcdbs"));
             Assert.Equal("There is no backup named no-such.vcdbs.", refused.Message); // агент — с --lang en
 
             // второй агент на тот же профиль не запускается

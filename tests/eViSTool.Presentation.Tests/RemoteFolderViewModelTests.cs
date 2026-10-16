@@ -412,9 +412,9 @@ public sealed class RemoteFolderViewModelTests
         var calls = 0;
         Exception[] failures =
         [
-            new InvalidOperationException("401 Unauthorized"),
-            new InvalidOperationException("429 Too Many Requests"),
-            new InvalidOperationException("404 Not Found"),
+            new eViSTool.Core.Server.AgentHttpException(401, "401 Unauthorized"),
+            new eViSTool.Core.Server.AgentHttpException(429, "429 Too Many Requests"),
+            new eViSTool.Core.Server.AgentHttpException(404, "404 Not Found"),
             new HttpRequestException("нет маршрута"),
             new TaskCanceledException("таймаут"),
         ];

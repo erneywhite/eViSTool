@@ -148,7 +148,7 @@ public sealed partial class ServerStatsViewModel : ObservableObject
         {
             if (generation != _generation) return;
             // старый агент не знает /stats — подскажем обновить его
-            StatusText = data.IsRemote && ex.Message.StartsWith("404", StringComparison.Ordinal)
+            StatusText = data.IsRemote && AgentHttpException.IsOldAgent(ex)
                 ? Loc.T("stats.oldAgent")
                 : Loc.T("stats.failed", data.IsRemote ? RemoteSecret.Describe(ex) : ex.Message);
         }

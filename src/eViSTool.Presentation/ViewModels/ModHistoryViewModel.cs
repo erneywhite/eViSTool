@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Net.Http;
 using CommunityToolkit.Mvvm.ComponentModel;
+using eViSTool.Core.Server;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Mods;
 using eViSTool.Core.Profiles;
@@ -58,7 +59,7 @@ public sealed partial class ModHistoryViewModel : ObservableObject
             _all = [];
             Show();
             // агент сервера старее 0.10.2 истории не знает
-            Status = ex.Message.StartsWith("404") ? Loc.T("hist.agentOld") : Loc.T("hist.loadFailed", ex.Message);
+            Status = AgentHttpException.IsOldAgent(ex) ? Loc.T("hist.agentOld") : Loc.T("hist.loadFailed", ex.Message);
         }
         finally
         {

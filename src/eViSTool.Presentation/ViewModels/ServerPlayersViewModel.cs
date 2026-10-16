@@ -258,7 +258,7 @@ public sealed partial class ServerPlayersViewModel : ObservableObject
                                        or UnauthorizedAccessException or Newtonsoft.Json.JsonException)
         {
             if (generation != _generation) return;
-            ErrorText = ex.Message.StartsWith("404") ? Loc.T("players.agentOld")
+            ErrorText = AgentHttpException.IsOldAgent(ex) ? Loc.T("players.agentOld")
                 : _profile is { IsRemote: true } ? RemoteSecret.Describe(ex) : Loc.T("players.readFailed", ex.Message);
         }
     }

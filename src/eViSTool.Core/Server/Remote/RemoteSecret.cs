@@ -21,9 +21,9 @@ public static class RemoteSecret
     /// <summary>Ошибка подключения к удалённому агенту — человеческими словами.</summary>
     public static string Describe(Exception ex) => ex switch
     {
-        InvalidOperationException { Message: var m } when m.StartsWith("401") => Loc.T("remote.errKey"),
-        InvalidOperationException { Message: var m } when m.StartsWith("429") => Loc.T("remote.errTooMany"),
-        InvalidOperationException { Message: var m } when m.StartsWith("404") => Loc.T("remote.errOldAgent"),
+        AgentHttpException { StatusCode: 401 } => Loc.T("remote.errKey"),
+        AgentHttpException { StatusCode: 429 } => Loc.T("remote.errTooMany"),
+        AgentHttpException { StatusCode: 404 } => Loc.T("remote.errOldAgent"),
         HttpRequestException { InnerException: System.Security.Authentication.AuthenticationException } => Loc.T("remote.errCertificate"),
         HttpRequestException or TaskCanceledException => Loc.T("remote.errNoConnection", ex.Message),
         _ => ex.Message,

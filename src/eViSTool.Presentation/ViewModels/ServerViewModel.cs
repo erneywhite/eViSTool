@@ -699,7 +699,7 @@ public sealed partial class ServerViewModel : ObservableObject
             _agentRestartingUntil = DateTime.UtcNow.AddMinutes(3); // с этой минуты агент может пропасть — это он обновляется
             Apply(await client.SelfUpdateAsync(AgentProtocol.AppVersion));
         }
-        catch (InvalidOperationException ex) when (ex.Message.StartsWith("404"))
+        catch (AgentHttpException ex) when (AgentHttpException.IsOldAgent(ex))
         {
             // агент из версии без самообновления — его один раз обновляют руками
             _agentRestartingUntil = DateTime.MinValue;

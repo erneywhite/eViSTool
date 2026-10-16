@@ -218,7 +218,7 @@ public sealed partial class ServerAnnouncementsViewModel : ObservableObject
                                        or UnauthorizedAccessException or JsonException)
         {
             if (generation != _generation) return;
-            ErrorText = ex.Message.StartsWith("404") ? Loc.T("ann.agentOld")
+            ErrorText = AgentHttpException.IsOldAgent(ex) ? Loc.T("ann.agentOld")
                 : _profile is { IsRemote: true } ? RemoteSecret.Describe(ex) : ex.Message;
         }
     }

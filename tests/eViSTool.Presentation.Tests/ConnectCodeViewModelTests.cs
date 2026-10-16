@@ -111,7 +111,7 @@ public sealed class ConnectCodeViewModelTests
     {
         Exception[] errors =
         [
-            new InvalidOperationException("401 Unauthorized"),             // ключ не подходит
+            new eViSTool.Core.Server.AgentHttpException(401, "401 Unauthorized"), // ключ не подходит
             new HttpRequestException("No connection could be made"),     // агент не отвечает
             new TaskCanceledException("timeout"),                        // не дождались ответа (не отмена)
         ];

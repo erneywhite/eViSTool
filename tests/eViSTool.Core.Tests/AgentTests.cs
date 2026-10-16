@@ -208,7 +208,7 @@ public sealed class AgentTests : IAsyncLifetime
     {
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
         using var stranger = new AgentClient(_client.Endpoint, "wrong-key");
-        await Assert.ThrowsAsync<InvalidOperationException>(() => stranger.StatusAsync());
+        await Assert.ThrowsAsync<AgentHttpException>(() => stranger.StatusAsync());
     }
 
     [Fact]
@@ -257,13 +257,13 @@ public sealed class AgentTests : IAsyncLifetime
         using (var wrong = AgentClient.ForRemote(code with { Key = eViSTool.Core.Server.Remote.RemoteAccess.NewKey() }))
         {
             for (var i = 0; i < 5; i++)
-                Assert.Contains("401", (await Assert.ThrowsAsync<InvalidOperationException>(() => wrong.StatusAsync())).Message);
+                Assert.Equal(401, (await Assert.ThrowsAsync<AgentHttpException>(() => wrong.StatusAsync())).StatusCode);
             // после пяти неверных попыток адрес ждёт — даже с верным ключом
             using var right = AgentClient.ForRemote(code);
-            Assert.Contains("429", (await Assert.ThrowsAsync<InvalidOperationException>(() => right.StatusAsync())).Message);
+            Assert.Equal(429, (await Assert.ThrowsAsync<AgentHttpException>(() => right.StatusAsync())).StatusCode);
         }
         using (var local = new AgentClient(_client.Endpoint, remote.Key))
-            await Assert.ThrowsAsync<InvalidOperationException>(() => local.StatusAsync());
+            await Assert.ThrowsAsync<AgentHttpException>(() => local.StatusAsync());
 
         // выключили в настройках — агент сам закрывает сетевой вход
         eViSTool.Core.Server.Remote.RemoteAccess.Disable(_profile.Id, AgentsDir);
@@ -323,14 +323,14 @@ public sealed class AgentTests : IAsyncLifetime
         Assert.Equal(["a", "b"], SqliteWorld.Read(Path.Combine(_profile.DataDir!, "Backups", crashed.Name)));
 
         // чужие пути и несуществующие копии — отказ
-        await Assert.ThrowsAsync<InvalidOperationException>(() => data.RestoreAsync(@"..\..\serverconfig.json"));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => data.DeleteBackupAsync("нет-такой.vcdbs"));
+        await Assert.ThrowsAsync<AgentHttpException>(() => data.RestoreAsync(@"..\..\serverconfig.json"));
+        await Assert.ThrowsAsync<AgentHttpException>(() => data.DeleteBackupAsync("нет-такой.vcdbs"));
 
         // сервер работает — файл мира не трогаем
         await client.StartAsync();
         await Until(async () => (await client.StatusAsync()).State == ServerState.Running);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => data.CopyWorldAsync());
-        await Assert.ThrowsAsync<InvalidOperationException>(() => data.RestoreAsync(made.Name));
+        await Assert.ThrowsAsync<AgentHttpException>(() => data.CopyWorldAsync());
+        await Assert.ThrowsAsync<AgentHttpException>(() => data.RestoreAsync(made.Name));
     }
 
     [Fact]
@@ -372,13 +372,13 @@ public sealed class AgentTests : IAsyncLifetime
         Assert.Contains("Mine", File.ReadAllText(config));
 
         // не JSON — отказ, файл цел
-        await Assert.ThrowsAsync<InvalidOperationException>(() => client.SaveConfigAsync(new ConfigSaveRequest("не json", forced.File.Stamp, Force: true)));
+        await Assert.ThrowsAsync<AgentHttpException>(() => client.SaveConfigAsync(new ConfigSaveRequest("не json", forced.File.Stamp, Force: true)));
         Assert.Contains("Mine", File.ReadAllText(config));
 
         // сервер работает — конфиг не трогаем (он перезапишет файл при остановке)
         await client.StartAsync();
         await Until(async () => (await client.StatusAsync()).State == ServerState.Running);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => client.SaveConfigAsync(new ConfigSaveRequest("{}", forced.File.Stamp, Force: true)));
+        await Assert.ThrowsAsync<AgentHttpException>(() => client.SaveConfigAsync(new ConfigSaveRequest("{}", forced.File.Stamp, Force: true)));
     }
 
     private static string MakeModZip(string dir, string fileName, string modId, string version)
@@ -444,13 +444,13 @@ public sealed class AgentTests : IAsyncLifetime
             // не мод — отказ с понятной причиной, ничего не поставлено
             var junk = Path.Combine(_tmp, "upload", "junk.zip");
             File.WriteAllText(junk, "not a zip");
-            await Assert.ThrowsAsync<InvalidOperationException>(() => client.InstallModAsync(junk));
+            await Assert.ThrowsAsync<AgentHttpException>(() => client.InstallModAsync(junk));
             Assert.False(File.Exists(Path.Combine(mods, "junk.zip")));
 
             // чужой путь (не из списка модов) не удаляется и не выключается
             var outside = Path.Combine(_tmp, "upload", "carryon_1.1.0.zip");
-            await Assert.ThrowsAsync<InvalidOperationException>(() => client.DeleteModAsync(outside));
-            await Assert.ThrowsAsync<InvalidOperationException>(() => client.SetModEnabledAsync(outside, false));
+            await Assert.ThrowsAsync<AgentHttpException>(() => client.DeleteModAsync(outside));
+            await Assert.ThrowsAsync<AgentHttpException>(() => client.SetModEnabledAsync(outside, false));
             Assert.True(File.Exists(outside));
 
             // цель установки — удалённый сервер по коду: мод уходит на него, а не в «текущий» профиль этой машины
@@ -508,7 +508,7 @@ public sealed class AgentTests : IAsyncLifetime
         // сервер запущен — файлы не трогаем (он перезапишет их сам): отказ с понятной причиной
         await _client.StartAsync();
         await Until(async () => (await _client.StatusAsync()).State == ServerState.Running);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _client.EditPlayersAsync(new PlayerFileEdit("UID-ANNA", Role: "suplayer")));
+        await Assert.ThrowsAsync<AgentHttpException>(() => _client.EditPlayersAsync(new PlayerFileEdit("UID-ANNA", Role: "suplayer")));
         Assert.Equal("admin", (await _client.PlayersAsync()).Players[0].Role);
     }
 
@@ -518,10 +518,10 @@ public sealed class AgentTests : IAsyncLifetime
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
         var version = (await _client.StatusAsync()).AgentVersion;
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _client.SelfUpdateAsync(version));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _client.SelfUpdateAsync("not a version"));
+        await Assert.ThrowsAsync<AgentHttpException>(() => _client.SelfUpdateAsync(version));
+        await Assert.ThrowsAsync<AgentHttpException>(() => _client.SelfUpdateAsync("not a version"));
         // старше своей — отказ без явного разрешения: окно так не делает, значит запрос не от него
-        var older = await Assert.ThrowsAsync<InvalidOperationException>(() => _client.SelfUpdateAsync("0.1.0"));
+        var older = await Assert.ThrowsAsync<AgentHttpException>(() => _client.SelfUpdateAsync("0.1.0"));
         Assert.Contains("0.1.0", older.Message);
         Assert.Null((await _client.StatusAsync()).SelfUpdate);
     }
@@ -741,13 +741,13 @@ public sealed class AgentTests : IAsyncLifetime
             Assert.Contains("1.0", (await source.UndoAsync("CarryOnConfig.json")).Text);
 
             // за пределы ModConfig — отказ, файл рядом цел
-            await Assert.ThrowsAsync<InvalidOperationException>(() => source.ReadAsync("../serverconfig-secret.json"));
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            await Assert.ThrowsAsync<AgentHttpException>(() => source.ReadAsync("../serverconfig-secret.json"));
+            await Assert.ThrowsAsync<AgentHttpException>(() =>
                 source.SaveAsync(new ModConfigSaveRequest("../serverconfig-secret.json", "{ \"x\": 1 }", null)));
             Assert.Equal("{}", File.ReadAllText(Path.Combine(_profile.DataDir!, "serverconfig-secret.json")));
 
             // сломанный JSON не записывается
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            await Assert.ThrowsAsync<AgentHttpException>(() =>
                 source.SaveAsync(new ModConfigSaveRequest("CarryOnConfig.json", "{ \"Speed\": ", null)));
         }
         finally

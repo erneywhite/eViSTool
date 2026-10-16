@@ -156,7 +156,7 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
                                        or UnauthorizedAccessException or JsonException)
         {
             if (generation != _generation) return;
-            ErrorText = ex.Message.StartsWith("404") ? Loc.T("srvnotify.agentOld")
+            ErrorText = AgentHttpException.IsOldAgent(ex) ? Loc.T("srvnotify.agentOld")
                 : _profile is { IsRemote: true } ? RemoteSecret.Describe(ex) : ex.Message;
         }
     }
@@ -266,7 +266,7 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
         {
             StatusText = "";
-            ErrorText = ex.Message.StartsWith("404") ? Loc.T("srvnotify.agentOld") : ex.Message;
+            ErrorText = AgentHttpException.IsOldAgent(ex) ? Loc.T("srvnotify.agentOld") : ex.Message;
         }
         finally
         {

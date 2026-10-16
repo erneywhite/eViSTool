@@ -249,7 +249,7 @@ public sealed class AgentClient : IDisposable
         {
             // агент отдаёт ошибки как problem+json: {"detail": "…"}
             var detail = TryDetail(text) ?? $"{(int)resp.StatusCode} {resp.ReasonPhrase}";
-            throw new InvalidOperationException(detail);
+            throw new AgentHttpException((int)resp.StatusCode, detail);
         }
         return JsonConvert.DeserializeObject<T>(text) ?? throw new InvalidOperationException("empty response");
     }

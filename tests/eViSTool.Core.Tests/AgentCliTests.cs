@@ -289,7 +289,7 @@ public sealed class AgentCliTests : IAsyncLifetime
         {
             using var old = AgentClient.ForRemote(code);
             try { await old.StatusAsync(); return false; }
-            catch (InvalidOperationException ex) when (ex.Message.StartsWith("401")) { return true; }
+            catch (AgentHttpException ex) when (ex.StatusCode == 401) { return true; }
             catch (HttpRequestException) { return false; }
         });
         var freshCode = await CodeAsync();
