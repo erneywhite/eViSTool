@@ -16,7 +16,13 @@ internal sealed partial class AgentApi
         {
             using var reader = new StreamReader(ctx.Request.Body);
             var settings = JsonConvert.DeserializeObject<ServerAutomation>(await reader.ReadToEndAsync());
-            return settings is null ? Results.BadRequest() : Guard(() => { Files.SaveAutomation(settings); return Status(); });
+            return settings is null ? Results.BadRequest() : Guard(() =>
+            {
+                var before = JsonConvert.SerializeObject(Files.LoadAutomation());
+                Files.SaveAutomation(settings);
+                NoteJson(ctx, before, JsonConvert.SerializeObject(settings));
+                return Status();
+            });
         });
 
         web.MapGet("/backups", () => Guard(Files.ListBackups));

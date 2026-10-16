@@ -16,7 +16,15 @@ internal sealed partial class AgentApi
         {
             using var reader = new StreamReader(ctx.Request.Body);
             var upload = JsonConvert.DeserializeObject<ServerNotifyUpload>(await reader.ReadToEndAsync());
-            return upload is null ? Results.BadRequest() : Guard(() => { upload.ToSettings().Save(Opts.ProfileId, Opts.AgentsDir); return Status(); });
+            return upload is null ? Results.BadRequest() : Guard(() =>
+            {
+                // сравниваем без секретов: токены и адреса вебхуков в журнал не попадают
+                var before = JsonConvert.SerializeObject(ServerNotifySettings.Load(Opts.ProfileId, Opts.AgentsDir).WithoutSecrets());
+                var settings = upload.ToSettings();
+                settings.Save(Opts.ProfileId, Opts.AgentsDir);
+                NoteJson(ctx, before, JsonConvert.SerializeObject(settings.WithoutSecrets()));
+                return Status();
+            });
         });
         web.MapPost("/notify/test", async () => Json(await notify.TestAsync(
             Loc.T("notify.testTitle"), AgentNotifications.Line("◇", "notify.lbl.from", Loc.T("notify.testFromServer", Environment.MachineName)))));
@@ -26,7 +34,13 @@ internal sealed partial class AgentApi
         {
             using var reader = new StreamReader(ctx.Request.Body);
             var settings = JsonConvert.DeserializeObject<ServerAnnouncements>(await reader.ReadToEndAsync());
-            return settings is null ? Results.BadRequest() : Guard(() => { settings.Save(Opts.ProfileId, Opts.AgentsDir); return Status(); });
+            return settings is null ? Results.BadRequest() : Guard(() =>
+            {
+                var before = JsonConvert.SerializeObject(ServerAnnouncements.Load(Opts.ProfileId, Opts.AgentsDir));
+                settings.Save(Opts.ProfileId, Opts.AgentsDir);
+                NoteJson(ctx, before, JsonConvert.SerializeObject(settings));
+                return Status();
+            });
         });
     }
 }

@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Net.Http;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Server;
@@ -9,8 +10,37 @@ using eViSTool.Core.Server.Remote;
 
 namespace eViSTool.Presentation.ViewModels;
 
-/// <summary>Строка журнала: когда (по часам окна), кто и откуда, что сделано. Warn — неудачная попытка подключиться.</summary>
-public sealed record JournalRow(string TimeText, string WhoText, string ActionText, bool Warn);
+/// <summary>
+/// Строка журнала: когда (по часам окна), кто и откуда, что сделано и что именно поменялось. Warn — неудачная попытка
+/// подключиться. Подробностей много — видны первые <see cref="Folded"/>, остальные раскрываются кнопкой.
+/// </summary>
+public sealed partial class JournalRow(string timeText, string whoText, string actionText, bool warn, IReadOnlyList<string> details)
+    : ObservableObject
+{
+    public const int Folded = 5;
+
+    public string TimeText { get; } = timeText;
+    public string WhoText { get; } = whoText;
+    public string ActionText { get; } = actionText;
+    public bool Warn { get; } = warn;
+    public IReadOnlyList<string> Details { get; } = details;
+
+    public bool HasDetails => Details.Count > 0;
+    public bool CanExpand => Details.Count > Folded;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShownDetails), nameof(ExpandText))]
+    private bool _isExpanded;
+
+    /// <summary>Что видно сейчас: всё или первые <see cref="Folded"/>.</summary>
+    public IReadOnlyList<string> ShownDetails => IsExpanded || !CanExpand ? Details : [.. Details.Take(Folded)];
+
+    /// <summary>«и ещё 7» — свёрнуто, «свернуть» — раскрыто.</summary>
+    public string ExpandText => IsExpanded ? Loc.T("journal.detailsLess") : Loc.T("journal.detailsMore", Details.Count - Folded);
+
+    [RelayCommand]
+    private void ToggleExpanded() => IsExpanded = !IsExpanded;
+}
 
 /// <summary>
 /// Вкладка «Журнал»: кто и что делал с сервером через агента за 30 дней — удалённо и с этого компьютера, и неудачные
@@ -114,8 +144,35 @@ public sealed partial class ServerJournalViewModel : ObservableObject
         var when = e.At.Kind == DateTimeKind.Unspecified ? e.At : e.At.ToLocalTime();
         var name = string.IsNullOrWhiteSpace(e.Who) ? "?" : e.Who;
         var who = e.Remote ? $"{name} · {e.Ip ?? "?"}" : Loc.T("journal.local", name);
-        return new JournalRow(Dates.DayMonthClock(when), who, ActionText(e), e.Action is "authFailed" or "authBlocked");
+        return new JournalRow(Dates.DayMonthClock(when), who, ActionText(e), e.Action is "authFailed" or "authBlocked",
+            [.. (e.Details ?? []).Select(DetailText)]);
     }
+
+    /// <summary>Подробность на языке окна; неизвестный код (агент новее окна) — как есть.</summary>
+    public static string DetailText(JournalDetail d)
+    {
+        string A(int i) => i < d.Args.Count ? d.Args[i] : "";
+        return d.Kind switch
+        {
+            "field" => Loc.T("journal.d.field", A(0), A(1), A(2)),
+            "fieldAdded" => Loc.T("journal.d.fieldAdded", A(0), A(1)),
+            "fieldRemoved" => Loc.T("journal.d.fieldRemoved", A(0), A(1)),
+            "secret" => Loc.T("journal.d.secret", A(0)),
+            "playerRole" => Loc.T("journal.d.playerRole", A(0), A(1).Length > 0 ? A(1) : "—", A(2)),
+            "playerWhitelist" => A(1) == "on" ? Loc.T("journal.d.whitelistOn", A(0)) : Loc.T("journal.d.whitelistOff", A(0)),
+            "playerUnban" => Loc.T("journal.d.unban", A(0)),
+            "whitelistMode" => Loc.T("journal.d.whitelistMode", ModeText(A(0)), ModeText(A(1))),
+            "modVersion" => A(2).Length > 0 ? Loc.T("journal.d.modUpdated", A(0), A(1), A(2)) : Loc.T("journal.d.modNew", A(0), A(1)),
+            _ => string.Join(" ", d.Args.Prepend(d.Kind)),
+        };
+    }
+
+    private static string ModeText(string mode) => mode switch
+    {
+        "Off" => Loc.T("journal.mode.off"),
+        "On" => Loc.T("journal.mode.on"),
+        _ => Loc.T("journal.mode.default"),
+    };
 
     /// <summary>Подпись действия на языке окна; неизвестный код (агент новее окна) — как есть, с подробностями.</summary>
     public static string ActionText(JournalEntry e)

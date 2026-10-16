@@ -23,6 +23,13 @@
         <Style Selector="TextBlock.cell.muted">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
         </Style>
+        <!-- строка подробности под действием: мельче и приглушённо -->
+        <Style Selector="TextBlock.detail">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="Margin" Value="0,1,12,0" />
+        </Style>
         <Style Selector="TextBlock.cell.warn">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
         </Style>
@@ -50,10 +57,25 @@
                             <DataTemplate x:DataType="vm:JournalRow">
                                 <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="0,9">
                                     <Grid ColumnDefinitions="130,1.1*,2*">
-                                        <TextBlock Classes="cell muted" Text="{Binding TimeText}" />
-                                        <TextBlock Grid.Column="1" Classes="cell" Text="{Binding WhoText}" ToolTip.Tip="{Binding WhoText}" />
-                                        <TextBlock Grid.Column="2" Classes="cell" Classes.warn="{Binding Warn}" Text="{Binding ActionText}"
-                                                   ToolTip.Tip="{Binding ActionText}" />
+                                        <TextBlock Classes="cell muted" Text="{Binding TimeText}" VerticalAlignment="Top" />
+                                        <TextBlock Grid.Column="1" Classes="cell" Text="{Binding WhoText}" ToolTip.Tip="{Binding WhoText}"
+                                                   VerticalAlignment="Top" />
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Classes="cell" Classes.warn="{Binding Warn}" Text="{Binding ActionText}"
+                                                       ToolTip.Tip="{Binding ActionText}" />
+                                            <!-- что именно поменялось: первые пять, остальные — по кнопке -->
+                                            <ItemsControl ItemsSource="{Binding ShownDetails}" IsVisible="{Binding HasDetails}" Margin="0,4,0,0">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="x:String">
+                                                        <TextBlock Classes="detail" Text="{Binding}" ToolTip.Tip="{Binding}" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <Button Theme="{StaticResource Forest.LinkButton}" Content="{Binding ExpandText}"
+                                                    Command="{Binding ToggleExpandedCommand}" IsVisible="{Binding CanExpand}"
+                                                    HorizontalAlignment="Left" FontSize="12" Margin="0,4,0,0"
+                                                    AutomationProperties.AutomationId="JournalExpand" />
+                                        </StackPanel>
                                     </Grid>
                                 </Border>
                             </DataTemplate>

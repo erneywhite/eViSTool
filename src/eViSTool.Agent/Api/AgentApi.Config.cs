@@ -15,7 +15,15 @@ internal sealed partial class AgentApi
         {
             using var reader = new StreamReader(ctx.Request.Body);
             var request = JsonConvert.DeserializeObject<ConfigSaveRequest>(await reader.ReadToEndAsync());
-            return request is null ? Results.BadRequest() : WhenStopped(() => Files.WriteConfig(request));
+            return request is null ? Results.BadRequest() : WhenStopped(() =>
+            {
+                var before = Files.ReadConfig().Text;
+                var result = Files.WriteConfig(request);
+                // файл на сервере успел поменяться — ничего не записано, и в журнал нечего писать
+                if (result.Conflict) ctx.Items[ServerJournal.SkipItem] = true;
+                else NoteJson(ctx, before, request.Text);
+                return result;
+            });
         });
         web.MapPost("/config/generate", async () =>
         {

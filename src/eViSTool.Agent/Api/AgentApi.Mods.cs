@@ -38,7 +38,12 @@ internal sealed partial class AgentApi
                 await using (var file = File.Create(zip))
                     await ctx.Request.Body.CopyToAsync(file, ctx.RequestAborted);
                 using var history = HistoryOp(ctx);
-                return Guard(() => Mods.Install(zip));
+                return Guard(() =>
+                {
+                    var result = Mods.Install(zip);
+                    Note(ctx, [new JournalDetail("modVersion", [result.Name, result.Version ?? "", result.OldVersion ?? ""])]);
+                    return result;
+                });
             }
             finally
             {

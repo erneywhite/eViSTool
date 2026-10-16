@@ -9,7 +9,9 @@ namespace eViSTool.Core.Server;
 /// окна), Args — подробности (команда, файл мода, имя копии). Who — имя компьютера окна (его сообщает само окно, подделать
 /// можно, но «кто из своих» видно), Ip — откуда пришёл запрос; у окна на машине с сервером Remote = false.
 /// </summary>
-public sealed record JournalEntry(DateTime At, string Action, IReadOnlyList<string> Args, string? Who, string? Ip, bool Remote);
+/// <para>Details — что именно поменялось (<see cref="JournalDetail"/>); у старых записей и простых действий — null.</para>
+public sealed record JournalEntry(DateTime At, string Action, IReadOnlyList<string> Args, string? Who, string? Ip, bool Remote,
+    IReadOnlyList<JournalDetail>? Details = null);
 
 /// <summary>
 /// Журнал действий с сервером через агента: кто, когда и что поменял (запуск, команды, моды, конфиг, копии) и неудачные
@@ -28,9 +30,18 @@ public static class ServerJournal
 
     private static readonly Lock Gate = new();
 
+    // без подробностей поле не пишется — строка как у записей прежних версий
+    private static readonly JsonSerializerSettings LineSettings = new() { Formatting = Formatting.None, NullValueHandling = NullValueHandling.Ignore };
+
+    /// <summary>Ключ HttpContext.Items: обработчик кладёт сюда подробности (IReadOnlyList&lt;JournalDetail&gt;).</summary>
+    public const string DetailsItem = "evistool.journal.details";
+
+    /// <summary>Ключ HttpContext.Items: обработчик ответил 200, но ничего не поменял (конфликт версий) — не записывать.</summary>
+    public const string SkipItem = "evistool.journal.skip";
+
     public static void Append(string file, JournalEntry entry)
     {
-        var line = JsonConvert.SerializeObject(entry, Formatting.None) + "\n";
+        var line = JsonConvert.SerializeObject(entry, LineSettings) + "\n";
         lock (Gate)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
@@ -58,7 +69,7 @@ public static class ServerJournal
             var keep = all.Where(e => e.At >= from).ToList();
             if (keep.Count == all.Count) return;
             var tmp = file + ".tmp";
-            File.WriteAllLines(tmp, keep.Select(e => JsonConvert.SerializeObject(e, Formatting.None)));
+            File.WriteAllLines(tmp, keep.Select(e => JsonConvert.SerializeObject(e, LineSettings)));
             SafeFile.Replace(tmp, file);
         }
     }

@@ -9,6 +9,14 @@ internal sealed partial class AgentApi
     {
         web.MapGet("/players", () => Guard(() => PlayerLists.Read()));
         web.MapPost("/players/edit", async (HttpContext ctx) =>
-            await ReadBody<PlayerFileEdit>(ctx) is { } edit ? WhenStopped(() => { PlayerLists.Apply(edit); return Status(); }) : Results.BadRequest());
+            await ReadBody<PlayerFileEdit>(ctx) is { } edit
+                ? WhenStopped(() =>
+                {
+                    var before = PlayerLists.Read();
+                    PlayerLists.Apply(edit);
+                    Note(ctx, JournalDetails.Players(before, edit));
+                    return Status();
+                })
+                : Results.BadRequest());
     }
 }

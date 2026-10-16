@@ -398,6 +398,11 @@ public sealed class AgentTests : IAsyncLifetime
         var conflict = await client.SaveConfigAsync(new ConfigSaveRequest("{ \"ServerName\": \"Mine\" }", saved.File.Stamp, Force: false));
         Assert.True(conflict.Conflict);
         Assert.Contains("Changed on server", File.ReadAllText(config));
+
+        // в журнале — одна правка и что именно поменялось; отказ из-за конфликта ничего не менял и не записан
+        var edit = Assert.Single(await client.JournalAsync(), e => e.Action == "config");
+        var detail = Assert.Single(edit.Details!);
+        Assert.Equal("field ServerName Old New", string.Join(" ", detail.Args.Prepend(detail.Kind)));
         Assert.Contains("Changed on server", conflict.File.Text);
 
         // перезаписать по согласию

@@ -16,7 +16,8 @@ internal sealed class AgentJournal(AgentOptions opts)
     /// запрос: запись делается после ответа, и следующий запрос того же окна мог успеть записаться раньше; по времени
     /// запроса журнал идёт в порядке действий.
     /// </summary>
-    public void Write(string action, string[] args, HttpContext ctx, bool isRemote, DateTime? at = null)
+    public void Write(string action, string[] args, HttpContext ctx, bool isRemote, DateTime? at = null,
+        IReadOnlyList<JournalDetail>? details = null)
     {
         var ip = ctx.Connection.RemoteIpAddress;
         if (ip is { IsIPv4MappedToIPv6: true }) ip = ip.MapToIPv4();
@@ -29,7 +30,7 @@ internal sealed class AgentJournal(AgentOptions opts)
                 ServerJournal.Prune(FilePath, DateTime.UtcNow);
             }
             ServerJournal.Append(FilePath, new JournalEntry(at ?? DateTime.UtcNow, action, args, who.Length > 0 ? who : null,
-                isRemote ? ip?.ToString() : null, isRemote));
+                isRemote ? ip?.ToString() : null, isRemote, details is { Count: > 0 } ? details : null));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

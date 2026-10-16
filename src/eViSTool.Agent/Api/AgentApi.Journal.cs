@@ -24,11 +24,17 @@ internal sealed partial class AgentApi
                 ctx.Request.Body.Position = 0;
             }
             await next();
-            if (ctx.Response.StatusCode is >= 200 and < 300
+            if (ctx.Response.StatusCode is >= 200 and < 300 && !ctx.Items.ContainsKey(ServerJournal.SkipItem)
                 && ServerJournal.Describe(ctx.Request.Method, path, body, ctx.Request.Headers[AgentClient.ModFileHeader].ToString()) is { } act)
-                journal.Write(act.Action, act.Args, ctx, isRemote, started);
+                journal.Write(act.Action, act.Args, ctx, isRemote, started, ctx.Items[ServerJournal.DetailsItem] as IReadOnlyList<JournalDetail>);
         });
     }
+
+    /// <summary>Подробности для записи журнала об этом запросе: что именно поменялось.</summary>
+    private static void Note(HttpContext ctx, IReadOnlyList<JournalDetail> details) => ctx.Items[ServerJournal.DetailsItem] = details;
+
+    /// <summary>Сравнить «было» и «стало» (JSON) и положить разницу в подробности; сбой сравнения действию не мешает.</summary>
+    private static void NoteJson(HttpContext ctx, string? before, string? after) => Note(ctx, JournalDetails.Json(before, after));
 
     // журнал действий для окна: кто и что менял
     private void MapJournal(WebApplication web)
