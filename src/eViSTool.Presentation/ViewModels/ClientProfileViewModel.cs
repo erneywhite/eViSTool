@@ -183,12 +183,6 @@ public sealed partial class ClientProfileViewModel : ProfileCopyViewModel<Client
     // неожиданная ошибка расчёта — в обработчик сбоев программы, в окне её не показываем
     protected override bool ShowsUnexpectedPlanErrors => false;
 
-    // сбой в обработчике Finished — как сбой копирования: форма возвращается с причиной
-    protected override bool FinishedErrorsAreCopyErrors => true;
-
-    // флаг «папку подставляет модель» поднимается до подбора папки, и сбой подстановки его не снимает
-    protected override bool KeepsTargetFlagOnError => true;
-
     protected override long? FreeSpace(string dir) => _services.FreeSpace(dir);
 
     protected override Task<GameProfile> Apply(ClientClonePlan plan, IProgress<CloneProgress> progress, CancellationToken ct) =>

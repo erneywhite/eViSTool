@@ -243,10 +243,10 @@ public sealed class ClientProfileViewModelTests : IDisposable
     });
 
     [Fact]
-    public void FolderByNameFailed_FlagStays_HandEditRightAfterIsNotCounted() => Sta.Run(() =>
+    public void FolderByNameFailed_FlagIsReset_HandEditRightAfterCounts() => Sta.Run(() =>
     {
-        // подстановка папки по названию сорвалась (здесь упал подписчик TargetDir): у этого окна флаг «папку подставляет
-        // модель» остаётся поднятым до следующего названия — ручная правка папки в промежутке правкой не считается
+        // подстановка папки по названию сорвалась (здесь упал подписчик TargetDir): флаг «папку подставляет модель»
+        // снимается, и ручная правка папки сразу после этого — правка: следующее название её не перетирает
         var vm = Ready();
         var fail = true;
         vm.PropertyChanged += (_, e) =>
@@ -260,7 +260,7 @@ public sealed class ClientProfileViewModelTests : IDisposable
         vm.TargetDir = @"D:\Игры\Свой";
         vm.Name = "Седьмой";
 
-        Assert.Equal(Path.Combine(_data, ClientProfileLayout.ContainerName, "Седьмой"), vm.TargetDir);
+        Assert.Equal(@"D:\Игры\Свой", vm.TargetDir);
     });
 
     [Fact]
@@ -805,39 +805,23 @@ public sealed class ClientProfileViewModelTests : IDisposable
     });
 
     [Fact]
-    public void FinishedHandlerFailed_HandledLikeCopyFailure_FormReturnsWithReason() => Sta.Run(() =>
+    public void FinishedHandlerFailed_GoesOutOfCommand_FormStaysOff() => Sta.Run(() =>
     {
-        // профиль создан, но окно не смогло закрыться с ним: у этого окна такой сбой разбирается как сбой копирования
+        // профиль создан, но окно не смогло закрыться с ним: это не сбой копирования — форма не возвращается (второе
+        // нажатие сделало бы второй профиль), ошибка уходит дальше, в обработчик сбоев программы
         var created = new GameProfile { Name = "Клиент 2", Kind = ProfileKind.Client, DataDir = Path.Combine(_root, "new") };
         _apply = (_, _, _) => Task.FromResult(created);
         var vm = Ready();
-        vm.Finished += _ => throw new InvalidOperationException("окно уже закрыто");
-
-        Sta.Wait(vm.GoCommand.ExecuteAsync(null)); // из команды не вылетает
-
-        Assert.Same(created, vm.Result);
-        Assert.False(vm.IsCopying);
-        Assert.False(vm.CancelCopy());
-        Assert.Empty(_platform.CrashLogs);
-        Sta.Wait(vm.Calculation);
-        Assert.Equal(Loc.T("clone.failed", "окно уже закрыто"), vm.ErrorText);
-        Assert.True(vm.CanGo);
-    });
-
-    [Fact]
-    public void FinishedHandlerUnexpectedError_IsLogged_FormReturns() => Sta.Run(() =>
-    {
-        var ex = new NullReferenceException("внезапно");
-        _apply = (_, _, _) => Task.FromResult(new GameProfile());
-        var vm = Ready();
+        var ex = new InvalidOperationException("окно уже закрыто");
         vm.Finished += _ => throw ex;
 
-        Sta.Wait(vm.GoCommand.ExecuteAsync(null));
+        Assert.Same(ex, Assert.Throws<InvalidOperationException>(() => Sta.Wait(vm.GoCommand.ExecuteAsync(null))));
 
-        Assert.Same(ex, Assert.Single(_platform.CrashLogs));
-        Assert.False(vm.IsCopying);
-        Sta.Wait(vm.Calculation);
-        Assert.Equal(Loc.T("clone.failed", ex.Message), vm.ErrorText);
+        Assert.Same(created, vm.Result);
+        Assert.True(vm.IsCopying);
+        Assert.False(vm.CancelCopy());
+        Assert.Equal("", vm.ErrorText);
+        Assert.Empty(_platform.CrashLogs); // в журнал пишет обработчик сбоев программы, не окно
     });
 
     [Fact]
