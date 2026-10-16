@@ -1,0 +1,15 @@
+eViSTool 0.11.5 for Linux: a journal of who did what with the server.
+
+- Server → Journal: who did what with the server in the last 30 days, with the time, the computer name and its address. Starts and stops, commands, mods, config, backups, schedule, updates, and failed connection attempts.
+- The systemd service runs with tighter restrictions: no special privileges, no access to devices or kernel settings, and new files (world backups, settings) can't be read by other users of the machine. An existing service gets them after you run sudo ./eViSTool.Agent service install again. If another user picks up the backups, add that user to the vintagestory group.
+- The new client profile window no longer replaces a folder typed by hand after the folder couldn't be filled in from the name.
+- Large parts of the program were split into smaller pieces. Nothing should work differently; if something does, please tell me on GitHub.
+
+---
+
+eViSTool 0.11.5 для Linux: журнал действий с сервером.
+
+- «Сервер» → «Журнал»: кто и что делал с сервером за последние 30 дней, со временем, именем компьютера и его адресом. Запуски и остановки, команды, моды, конфиг, копии, расписание, обновления и неудачные попытки подключиться.
+- Служба systemd работает со строгими ограничениями: без особых прав, без доступа к устройствам и настройкам ядра, а новые файлы (копии мира, настройки) другим пользователям машины не видны. Уже установленная служба получит их после повторного sudo ./eViSTool.Agent service install. Если копии забирает другой пользователь, добавь его в группу vintagestory.
+- Окно нового клиентского профиля больше не перетирает папку, указанную руками, после того как её не удалось подставить по названию.
+- Крупные части программы разложены на части поменьше. Внешне ничего меняться не должно; если что-то стало не так, напиши на GitHub.

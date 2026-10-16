@@ -1,0 +1,27 @@
+eViSTool 0.11.5: a journal of who did what with the server.
+
+New
+- Server → Journal: who did what with the server in the last 30 days. Starts and stops, console commands, mods, configuration, mod settings, backups, schedule, notifications, updates, and failed connection attempts. Each line has the time (by your clock), the computer name and its address, so you can see what a friend with the connection code changed.
+
+Fixes
+- The new client profile window: if the folder couldn't be filled in from the name, a folder you then typed by hand could be replaced by the next name. Fixed.
+
+Under the hood
+- Large parts of the program were split into smaller pieces. Nothing should look or work differently; if something does, please tell me on GitHub.
+
+Update from About; then update the agent on the server computer with Update on the server, so the journal starts filling.
+
+---
+
+eViSTool 0.11.5: журнал действий с сервером.
+
+Новое
+- «Сервер» → «Журнал»: кто и что делал с сервером за последние 30 дней. Запуски и остановки, команды в консоли, моды, конфигурация, настройки модов, копии, расписание, оповещения, обновления и неудачные попытки подключиться. В каждой строке время (по твоим часам), имя компьютера и его адрес, так что видно, что поменял друг с кодом подключения.
+
+Исправления
+- Окно нового клиентского профиля: если папку не удалось подставить по названию, папку, указанную потом руками, могло перетереть следующее название. Исправлено.
+
+Внутри
+- Крупные части программы разложены на части поменьше. Внешне ничего меняться не должно; если что-то стало не так, напиши на GitHub.
+
+Обнови из «О программе», потом обнови агента на компьютере с сервером кнопкой «Обновить на сервере», чтобы журнал начал вестись.

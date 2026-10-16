@@ -409,6 +409,10 @@ another computer at the same address is not accepted. Without the key nobody can
 connections are refused for a minute. The code is hidden on screen and copied without showing; on your computer it is stored
 encrypted for your Windows account. If the code got into the wrong hands, **New key** makes the old code useless.
 
+**Journal.** **Server → Journal** shows who did what with the server in the last 30 days: starts and stops, console
+commands, mods, configuration, backups, schedule, updates, and failed connection attempts. Each line has the time, the
+name of the computer and its address, so you can see what a friend with the code changed.
+
 **Over the internet** you also need to forward the port on your router to the server computer.
 A VPN (Tailscale, ZeroTier, WireGuard and the like) is simpler and safer: use the VPN address of the server computer,
 and nothing is exposed to the internet.
