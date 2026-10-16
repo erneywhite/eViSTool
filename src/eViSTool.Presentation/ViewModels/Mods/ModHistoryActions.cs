@@ -1,17 +1,18 @@
-using eViSTool.Presentation;
 using System.IO;
 using System.Net.Http;
-using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Localization;
 using eViSTool.Core.ModDb;
 using eViSTool.Core.Mods;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Server;
 
-namespace eViSTool.Presentation.ViewModels;
+namespace eViSTool.Presentation.ViewModels.Mods;
 
-/// <summary>Откат из вкладки «История»: сеанс целиком или один мод — к версиям, какие были до сеанса.</summary>
-public sealed partial class ModsViewModel
+/// <summary>
+/// История модов в действии: откат из вкладки «История» (сеанс целиком или один мод — к версиям, какие были до сеанса)
+/// и последние изменения мода для вкладки «Версии» его карточки.
+/// </summary>
+internal sealed class ModHistoryActions(ModsViewModel owner, ModInstallService installer, ModDbClient db)
 {
     /// <summary>
     /// Что сделать с модом при откате: поставить прежнюю версию (из сохранённой копии или релизом модбазы), убрать
@@ -20,28 +21,20 @@ public sealed partial class ModsViewModel
     private sealed record RevertStep(HistoryChangeRow Change, LocalMod? Current, string? BackupPath, ModDbRelease? Release,
         bool Remove, string? Problem);
 
-    [RelayCommand]
-    private Task RollbackSessionAsync(HistorySessionRow? session) =>
-        session is null ? Task.CompletedTask : RevertAsync(session, [.. session.Changes.Where(c => c.CanRevert)]);
-
-    [RelayCommand]
-    private Task RevertChangeAsync(HistoryChangeRow? change) =>
-        change is null || History.Selected is not { } session ? Task.CompletedTask : RevertAsync(session, [change]);
-
-    private async Task RevertAsync(HistorySessionRow session, IReadOnlyList<HistoryChangeRow> changes)
+    public async Task RevertAsync(HistorySessionRow session, IReadOnlyList<HistoryChangeRow> changes)
     {
-        if ((IsBusy && !IsQueueRunning) || CurrentTarget() is not { } target) return;
+        if ((owner.IsBusy && !owner.IsQueueRunning) || owner.CurrentTarget() is not { } target) return;
         if (changes.Count == 0)
         {
-            StatusText = Loc.T("hist.nothingToRevert");
+            owner.StatusText = Loc.T("hist.nothingToRevert");
             return;
         }
 
-        StatusText = Loc.T("hist.preparing");
+        owner.StatusText = Loc.T("hist.preparing");
         var steps = new List<RevertStep>();
         foreach (var change in changes)
             steps.Add(await PlanRevertAsync(target, change));
-        StatusText = "";
+        owner.StatusText = "";
 
         var doable = steps.Where(s => s.Problem is null).ToList();
         var lines = string.Join("\n", steps.Select(Describe));
@@ -50,32 +43,32 @@ public sealed partial class ModsViewModel
             Error(Loc.T("hist.allProblems", lines));
             return;
         }
-        if (!Confirm(Loc.T("hist.confirm", session.When, lines)) || !ConfirmIfRunning(target)) return;
+        if (!Confirm(Loc.T("hist.confirm", session.When, lines)) || !installer.ConfirmIfRunning(target)) return;
 
         // откат — одно действие в истории, со ссылкой на сеанс, который он откатывает
         var history = ModHistory.NewScope(ModHistorySource.Rollback, session.Session.Id);
-        await CopyWorldsAsync(target);
+        await installer.CopyWorldsAsync(target);
         var problems = new List<string>();
         using (ModHistory.Join(history.Id, history.Source, history.Undoes))
             foreach (var step in doable.Where(s => s.Remove))
                 await RemoveForRevertAsync(target, step, problems);
-        if (doable.Any(s => s.Remove)) await ReloadAsync();
+        if (doable.Any(s => s.Remove)) await owner.ReloadAsync();
 
         var installs = doable.Where(s => !s.Remove)
             .Select(s => new UpdateQueueItem(target, s.Change.ModId, s.Change.Title, s.Current?.Info?.Version ?? "",
                 s.Change.Change.From!, s.Release, s.BackupPath) { History = history })
             .ToList();
-        if (installs.Count > 0) Enqueue(installs, history.Source, history.Undoes, runningConfirmed: true);
-        StatusText = problems.Count > 0 ? string.Join("; ", problems) : Loc.T("hist.revertStarted");
+        if (installs.Count > 0) owner.Enqueue(installs, history.Source, history.Undoes, runningConfirmed: true);
+        owner.StatusText = problems.Count > 0 ? string.Join("; ", problems) : Loc.T("hist.revertStarted");
     }
 
     /// <summary>
     /// Последние изменения одного мода — для вкладки «Версии» его карточки: «сегодня, 20:37 · 1.2.10 → 1.2.11 · «Обновить всё»».
     /// История не читается (нет связи, старый агент) — пусто, карточке это не мешает.
     /// </summary>
-    public async Task<IReadOnlyList<string>> ModHistoryLinesAsync(string modId, int count = 30)
+    public async Task<IReadOnlyList<string>> LinesAsync(string modId, int count)
     {
-        if (modId.Length == 0 || CurrentTarget() is not { } target) return [];
+        if (modId.Length == 0 || owner.CurrentTarget() is not { } target) return [];
         try
         {
             var entries = await ModTargets.HistoryAsync(target);
@@ -92,7 +85,7 @@ public sealed partial class ModsViewModel
     /// <summary>Где взять прежнюю версию мода: сохранённая копия этого профиля, иначе релиз модбазы с той же версией.</summary>
     private async Task<RevertStep> PlanRevertAsync(ModTarget target, HistoryChangeRow change)
     {
-        var current = _locals.FirstOrDefault(l => string.Equals(l.Info?.ModId, change.ModId, StringComparison.OrdinalIgnoreCase));
+        var current = owner.Locals.FirstOrDefault(l => string.Equals(l.Info?.ModId, change.ModId, StringComparison.OrdinalIgnoreCase));
         var from = change.Change.From;
         if (from is null) return new RevertStep(change, current, null, null, Remove: true, current is null ? Loc.T("hist.alreadyGone") : null);
 
@@ -103,7 +96,7 @@ public sealed partial class ModsViewModel
                     return new RevertStep(change, current, path, null, Remove: false, null);
         try
         {
-            var mod = await _db.GetModAsync(change.ModId);
+            var mod = await db.GetModAsync(change.ModId);
             var release = mod?.Releases.FirstOrDefault(r => r.MainFile is not null
                 && string.Equals(r.ModVersion, from, StringComparison.OrdinalIgnoreCase));
             return release is not null
@@ -140,7 +133,7 @@ public sealed partial class ModsViewModel
             if (mod.Info is { } info)
             {
                 ModHistory.Record(ModHistory.FileFor(target.ProfileId), info.ModId, info.Name, info.Version, null);
-                if (_locals.Count(l => l.Info?.ModId == info.ModId) == 1 && ProfileResolver.Resolve(target.Profile) is { } resolved)
+                if (owner.Locals.Count(l => l.Info?.ModId == info.ModId) == 1 && ProfileResolver.Resolve(target.Profile) is { } resolved)
                     ModConfigEditor.Forget(resolved, info);
             }
         }
@@ -150,4 +143,10 @@ public sealed partial class ModsViewModel
             problems.Add(Loc.T("hist.removeFailed", step.Change.Title, ex.Message));
         }
     }
+
+    private static bool Confirm(string text) =>
+        Ui.Confirm(text);
+
+    private static void Error(string text) =>
+        Ui.Warn(text);
 }
