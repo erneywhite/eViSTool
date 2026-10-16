@@ -23,16 +23,17 @@ internal sealed class LocalModSource : IModSource
     /// <summary>Номер чтения папок модов: результат прежнего (профиль сменили, начали новое) отбрасывается.</summary>
     private int _scanGeneration;
 
+    // обычный конструктор, не первичный: подписке на таймер нужно тело, а обработчику — сам источник (ReloadAsync, отметка)
     public LocalModSource(ModsViewModel owner, MainViewModel main)
     {
         _owner = owner;
         _main = main;
         _diskWatch.Tick += (_, _) =>
         {
-            if (owner.IsRemote || owner.IsBusy || Resolved is not { } profile) return;
+            if (_owner.IsRemote || _owner.IsBusy || Resolved is not { } profile) return;
             if (ServerMods.StampOf(profile) == _diskStamp) return;
             _ = ReloadAsync();
-            owner.StatusText = Loc.T("mods.changedOutside");
+            _owner.StatusText = Loc.T("mods.changedOutside");
         };
     }
 

@@ -18,4 +18,9 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- тесты проверяют части «Моих модов» (очередь, установку в цель, правила таблицы) напрямую, без окна -->
+    <InternalsVisibleTo Include="eViSTool.Presentation.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -337,4 +337,20 @@ public sealed class ModInstallQueueTests
         Assert.Contains(nameof(ModsViewModel.CanQueue), changed);
         Assert.False(mods.CanQueue);
     });
+
+    // о предстоящей смене флага прогона вкладка тоже сообщает сама: до смены значения и только при настоящей смене
+    [Fact]
+    public void Tab_RelaysQueueFlagChanging_BeforeTheChange() => Sta.Run(() =>
+    {
+        var main = (MainViewModel)RuntimeHelpers.GetUninitializedObject(typeof(MainViewModel));
+        var mods = new ModsViewModel(main, new ModDbClient());
+        var changing = new List<(string? Name, bool Value)>();
+        mods.PropertyChanging += (_, e) => changing.Add((e.PropertyName, mods.IsQueueRunning));
+
+        mods.IsQueueRunning = true;
+        mods.IsQueueRunning = true; // то же значение — не смена
+        mods.IsQueueRunning = false;
+
+        Assert.Equal([(nameof(ModsViewModel.IsQueueRunning), false), (nameof(ModsViewModel.IsQueueRunning), true)], changing);
+    });
 }

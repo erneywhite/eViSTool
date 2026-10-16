@@ -16,7 +16,7 @@ namespace eViSTool.Presentation.ViewModels.Mods;
 /// статуса (<c>setStatus</c>), итоги — в списки installed и problems, которые собирает вызывающий.
 /// </summary>
 /// <param name="gameVersion">Версия игры открытого профиля — для подписи «этот профиль» в окне «Установить также в».</param>
-public sealed class ModInstallService(MainViewModel main, ModUpdater updater, Action<string> setStatus, Func<ModVersion?> gameVersion)
+internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, Action<string> setStatus, Func<ModVersion?> gameVersion)
 {
     /// <summary>Миры, скопированные в текущей операции: попадут в её итоговую строку (<see cref="WithWorldCopies"/>).</summary>
     private readonly List<string> _copiedWorlds = [];

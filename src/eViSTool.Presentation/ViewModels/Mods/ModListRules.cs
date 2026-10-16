@@ -3,7 +3,7 @@ using eViSTool.Core.Mods;
 namespace eViSTool.Presentation.ViewModels.Mods;
 
 /// <summary>Правила таблицы «Моих модов»: какие строки видны при выбранном чипе и поиске и в каком они порядке.</summary>
-public static class ModListRules
+internal static class ModListRules
 {
     /// <summary>Строка проходит чип над таблицей и поиск (по названию и modid, без учёта регистра).</summary>
     public static bool Matches(ModRowViewModel r, ModFilter filter, string search) =>

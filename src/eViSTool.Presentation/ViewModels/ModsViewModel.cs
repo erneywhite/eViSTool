@@ -163,6 +163,7 @@ public sealed partial class ModsViewModel : ObservableObject
         var updater = new ModUpdater(db);
         _installer = new ModInstallService(main, updater, s => StatusText = s, () => GameVersion);
         _queue = new ModInstallQueue(new QueueHost(this));
+        _queue.PropertyChanging += OnQueueChanging;
         _queue.PropertyChanged += OnQueueChanged;
         _disk = new LocalModSource(this, main);
         _agent = new RemoteModSource(this, main);
@@ -597,6 +598,12 @@ public sealed partial class ModsViewModel : ObservableObject
     public bool CanQueue => _queue.CanEnqueue;
 
     partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(CanQueue));
+
+    // PropertyChanging флага прогона — тоже от имени вкладки, как раньше, когда флаг был её собственным полем
+    private void OnQueueChanging(object? sender, PropertyChangingEventArgs e)
+    {
+        if (e.PropertyName == nameof(ModInstallQueue.IsRunning)) OnPropertyChanging(nameof(IsQueueRunning));
+    }
 
     // окно привязано к подписям очереди под их прежними именами на вкладке
     private void OnQueueChanged(object? sender, PropertyChangedEventArgs e)

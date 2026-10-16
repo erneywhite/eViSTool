@@ -10,7 +10,7 @@ namespace eViSTool.Presentation.ViewModels.Mods;
 /// Что очереди установки нужно от вкладки «Мои моды»: флаг «идёт операция», вопрос про запущенную игру, сама установка
 /// пункта, перечитать список после него и итог прогона в строке статуса.
 /// </summary>
-public interface IModQueueHost
+internal interface IModQueueHost
 {
     /// <summary>Идёт операция с модами. Очередь занимает вкладку на время прогона; занято чем-то другим — не добавляет.</summary>
     bool IsBusy { get; set; }
@@ -42,7 +42,7 @@ public interface IModQueueHost
 /// Очередь установки вкладки «Мои моды»: обновления, откаты, выбранные версии. Пункты ставятся по одному, каждый в свою
 /// цель (запомненную при добавлении), добавлять можно на ходу. Прогон можно остановить, неудачные и отменённые — повторить.
 /// </summary>
-public sealed partial class ModInstallQueue(IModQueueHost host) : ObservableObject
+internal sealed partial class ModInstallQueue(IModQueueHost host) : ObservableObject
 {
     private CancellationTokenSource? _cts;
 
