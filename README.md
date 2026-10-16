@@ -525,9 +525,9 @@ the server process; `eViSTool.Presentation` — window models; `eViSTool.Desktop
 
 ## Code signing policy
 
-Free code signing for the Windows releases is provided by [SignPath.io](https://signpath.io), certificate by
-[SignPath Foundation](https://signpath.org). The application is being reviewed: until the certificate is issued,
-releases are not code-signed yet, and SmartScreen may warn on the first start.
+eViSTool releases are not code-signed yet, so SmartScreen may warn on the first start. The plan is free code signing
+for open-source projects from [SignPath Foundation](https://signpath.org) once the project is known widely enough for
+their program. The rules below already apply to how releases are built.
 
 Only binaries built by [GitHub Actions](https://github.com/erneywhite/eViSTool/actions/workflows/build.yml) from the source code
 in this repository are signed — never files built on a personal computer.
