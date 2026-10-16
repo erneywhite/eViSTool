@@ -55,6 +55,9 @@ public interface IServerData
     Task<StatsReport> LoadStatsAsync(StatsPeriod period, CancellationToken ct = default);
     Task SetStatsEnabledAsync(bool enabled, CancellationToken ct = default);
     Task ClearStatsAsync(CancellationToken ct = default);
+
+    /// <summary>Журнал действий с сервером (<see cref="ServerJournal"/>), новые сверху.</summary>
+    Task<IReadOnlyList<JournalEntry>> LoadJournalAsync(CancellationToken ct = default);
 }
 
 /// <summary>
@@ -64,6 +67,8 @@ public interface IServerData
 public sealed class ServerFiles(string profileId, string dataDir, string? backupPrefix, string? agentsDir = null)
 {
     public string DataDir => dataDir;
+    public string ProfileId => profileId;
+    public string? AgentsDir => agentsDir;
     /// <summary>Где лежат копии: выбранная папка или Backups сервера.</summary>
     public string BackupsDir => Store.Dir;
 
@@ -188,6 +193,9 @@ public sealed class LocalServerData(ServerFiles files, Func<AgentClient?>? agent
     public Task<StatsReport> LoadStatsAsync(StatsPeriod period, CancellationToken ct = default) => Task.Run(() => files.Stats.Report(period, DateTime.Now), ct);
     public Task SetStatsEnabledAsync(bool enabled, CancellationToken ct = default) => Task.Run(() => files.Stats.SetEnabled(enabled), ct);
     public Task ClearStatsAsync(CancellationToken ct = default) => Task.Run(files.Stats.Clear, ct);
+    // журнал пишет агент, а читать его можно и без агента (сервер остановлен, агент ушёл после простоя)
+    public Task<IReadOnlyList<JournalEntry>> LoadJournalAsync(CancellationToken ct = default) =>
+        Task.Run(() => ServerJournal.Read(ServerJournal.FileFor(files.ProfileId, files.AgentsDir), DateTime.UtcNow), ct);
 }
 
 /// <summary>Сервер на другой машине: всё через его агента.</summary>
@@ -207,6 +215,7 @@ public sealed class RemoteServerData(Func<AgentClient?> client) : IServerData
     public Task<StatsReport> LoadStatsAsync(StatsPeriod period, CancellationToken ct = default) => Client.StatsAsync(period, ct);
     public Task SetStatsEnabledAsync(bool enabled, CancellationToken ct = default) => Client.SetStatsEnabledAsync(enabled, ct);
     public Task ClearStatsAsync(CancellationToken ct = default) => Client.ClearStatsAsync(ct);
+    public Task<IReadOnlyList<JournalEntry>> LoadJournalAsync(CancellationToken ct = default) => Client.JournalAsync(ct);
 }
 
 /// <summary>Включить или выключить сбор статистики на машине с сервером.</summary>

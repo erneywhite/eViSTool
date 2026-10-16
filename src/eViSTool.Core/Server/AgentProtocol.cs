@@ -177,6 +177,9 @@ public sealed record AgentStatus
     /// <summary>Когда менялись оповещения сервера: окна перечитывают вкладку «Оповещения».</summary>
     public DateTime? NotifyChangedAt { get; init; }
 
+    /// <summary>Когда пополнялся журнал действий: окна перечитывают вкладку «Журнал».</summary>
+    public DateTime? JournalChangedAt { get; init; }
+
     /// <summary>Ближайший перезапуск по расписанию (null — расписание выключено или сервер не работает).</summary>
     public DateTime? NextRestartAt { get; init; }
 

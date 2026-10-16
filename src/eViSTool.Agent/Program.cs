@@ -671,6 +671,31 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
+// журнал действий: кто и что менял через агента (этот вход и удалённый); старое чистится при запуске и раз в сутки
+var journalFile = ServerJournal.FileFor(opts.ProfileId, opts.AgentsDir);
+var journalPrunedAt = DateTime.MinValue;
+
+void Journal(string action, string[] args, HttpContext ctx, bool isRemote)
+{
+    var ip = ctx.Connection.RemoteIpAddress;
+    if (ip is { IsIPv4MappedToIPv6: true }) ip = ip.MapToIPv4();
+    var who = Uri.UnescapeDataString(ctx.Request.Headers[ServerJournal.ClientHeader].ToString());
+    try
+    {
+        if (DateTime.UtcNow - journalPrunedAt > TimeSpan.FromDays(1))
+        {
+            journalPrunedAt = DateTime.UtcNow;
+            ServerJournal.Prune(journalFile, DateTime.UtcNow);
+        }
+        ServerJournal.Append(journalFile, new JournalEntry(DateTime.UtcNow, action, args, who.Length > 0 ? who : null,
+            isRemote ? ip?.ToString() : null, isRemote));
+    }
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+    {
+        // журнал — справка: не записался, но действие уже сделано, отвечаем как обычно
+    }
+}
+
 var gameVersion = GameInstall.DetectVersion(Path.GetDirectoryName(Path.GetFullPath(opts.ExePath)) ?? "")?.ToString();
 
 AgentStatus Status() => new()
@@ -702,6 +727,7 @@ AgentStatus Status() => new()
     PlayersChangedAt = playerLists.ChangedAt(),
     AnnouncementsChangedAt = ServerAnnouncements.ChangedAt(opts.ProfileId, opts.AgentsDir),
     NotifyChangedAt = eViSTool.Core.Notifications.ServerNotifySettings.ChangedAt(opts.ProfileId, opts.AgentsDir),
+    JournalChangedAt = File.Exists(journalFile) ? File.GetLastWriteTimeUtc(journalFile) : null,
     GamePort = eViSTool.Core.Game.PlayTargets.GamePortOf(opts.DataPath),
     CommandCount = commands.Count,
     RemoteError = remoteError,
@@ -781,7 +807,30 @@ async Task<string?> ReadName(HttpContext ctx)
 // Точки API — одни и те же для окна на этой машине и для удалённого клиента (кроме выключения агента).
 void MapApi(WebApplication web, bool isRemote)
 {
+// что меняет сервер — в журнал, если получилось (ответ 2xx); тело запроса читаем заранее: обработчик его закроет
+web.Use(async (ctx, next) =>
+{
+    var path = ctx.Request.Path.Value ?? "";
+    if (HttpMethods.IsGet(ctx.Request.Method) || ServerJournal.Describe(ctx.Request.Method, path, null, null) is null)
+    {
+        await next();
+        return;
+    }
+    string? body = null;
+    if (ServerJournal.NeedsBody(path))
+    {
+        ctx.Request.EnableBuffering();
+        using (var reader = new StreamReader(ctx.Request.Body, leaveOpen: true)) body = await reader.ReadToEndAsync();
+        ctx.Request.Body.Position = 0;
+    }
+    await next();
+    if (ctx.Response.StatusCode is >= 200 and < 300
+        && ServerJournal.Describe(ctx.Request.Method, path, body, ctx.Request.Headers[AgentClient.ModFileHeader].ToString()) is { } act)
+        Journal(act.Action, act.Args, ctx, isRemote);
+});
+
 web.MapGet("/status", () => Json(Status()));
+web.MapGet("/journal", () => Guard(() => ServerJournal.Read(journalFile, DateTime.UtcNow)));
 
 web.MapGet("/console", async (long since, int? wait, HttpContext ctx) =>
 {
@@ -1014,11 +1063,16 @@ async Task ApplyRemoteAsync()
             var got = ctx.Request.Headers.TryGetValue(AgentProtocol.KeyHeader, out var header) ? System.Text.Encoding.UTF8.GetBytes(header.ToString()) : [];
             if (!System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(got, remoteKey))
             {
+                int count;
                 lock (failures)
                 {
                     var f = failures.GetValueOrDefault(ip);
-                    failures[ip] = f.Count + 1 >= 5 ? (0, DateTime.Now.AddMinutes(1)) : (f.Count + 1, default);
+                    count = f.Count + 1;
+                    failures[ip] = count >= 5 ? (0, DateTime.Now.AddMinutes(1)) : (count, default);
                 }
+                // в журнал — первая неудача с адреса и блокировка после пяти, а не каждая попытка
+                if (count == 1) Journal("authFailed", [], ctx, isRemote: true);
+                else if (count >= 5) Journal("authBlocked", [], ctx, isRemote: true);
                 ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return;
             }

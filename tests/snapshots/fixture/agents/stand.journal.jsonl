@@ -1,0 +1,9 @@
+{"At":"{{AGO:4}}","Action":"command","Args":["/time set day"],"Who":"ERNEY-PC","Ip":"192.168.31.5","Remote":true}
+{"At":"{{AGO:9}}","Action":"modInstall","Args":["carryon_1.10.4.zip"],"Who":"ERNEY-PC","Ip":"192.168.31.5","Remote":true}
+{"At":"{{AGO:11}}","Action":"stop","Args":[],"Who":"ERNEY-PC","Ip":"192.168.31.5","Remote":true}
+{"At":"{{AGO:52}}","Action":"modConfigSave","Args":["primitivesurvival.json"],"Who":"LEV-LAPTOP","Ip":"85.254.12.40","Remote":true}
+{"At":"{{AGO:180}}","Action":"authBlocked","Args":[],"Who":null,"Ip":"45.155.205.17","Remote":true}
+{"At":"{{AGO:181}}","Action":"authFailed","Args":[],"Who":null,"Ip":"45.155.205.17","Remote":true}
+{"At":"{{AGO:600}}","Action":"restart","Args":[],"Who":"VS-SERVER","Ip":null,"Remote":false}
+{"At":"{{AGO:1440}}","Action":"selfUpdate","Args":["0.11.4"],"Who":"ERNEY-PC","Ip":"192.168.31.5","Remote":true}
+{"At":"{{AGO:1500}}","Action":"backup","Args":[],"Who":"VS-SERVER","Ip":null,"Remote":false}

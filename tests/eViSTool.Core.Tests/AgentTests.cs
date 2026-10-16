@@ -273,6 +273,40 @@ public sealed class AgentTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Journal_RecordsWhoDidWhat_RemoteAndLocal_AndWrongKeys()
+    {
+        var remote = eViSTool.Core.Server.Remote.RemoteAccess.Enable(_profile.Id, AgentsDir);
+        string fingerprint;
+        using (var cert = eViSTool.Core.Server.Remote.RemoteAccess.EnsureCertificate(_profile.Id, AgentsDir))
+            fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
+        _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: true, AgentExe, AgentsDir);
+        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
+        await Until(async () => (await _client.StatusAsync()).State == ServerState.Running);
+        var code = new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint);
+
+        using var client = AgentClient.ForRemote(code);
+        await client.CommandAsync("/time");                                   // удалённо
+        using (var wrong = AgentClient.ForRemote(code with { Key = eViSTool.Core.Server.Remote.RemoteAccess.NewKey() }))
+            await Assert.ThrowsAsync<AgentHttpException>(() => wrong.StatusAsync()); // неверный ключ
+        await _client.CommandAsync("/ping");                                  // с этой машины
+        await client.StatusAsync();                                           // чтение — не пишется
+        // ошибка (пустая команда) — не пишется: в журнал только сделанное
+        await Assert.ThrowsAnyAsync<Exception>(() => client.CommandAsync("   "));
+
+        var journal = await client.JournalAsync();
+        Assert.Equal(["command", "authFailed", "command"], journal.Select(e => e.Action));
+        var (local, failed, viaNet) = (journal[0], journal[1], journal[2]);
+        Assert.Equal(("/ping", false, null, Environment.MachineName), (local.Args[0], local.Remote, local.Ip, local.Who));
+        Assert.Equal(("/time", true, "127.0.0.1", Environment.MachineName), (viaNet.Args[0], viaNet.Remote, viaNet.Ip, viaNet.Who));
+        Assert.Equal(("127.0.0.1", true), (failed.Ip, failed.Remote));
+        Assert.NotNull((await _client.StatusAsync()).JournalChangedAt);
+
+        // окно на этой машине читает тот же журнал с диска, даже без агента
+        var files = new ServerFiles(_profile.Id, _profile.DataDir!, null, AgentsDir);
+        Assert.Equal(3, (await new LocalServerData(files).LoadJournalAsync()).Count);
+    }
+
+    [Fact]
     public async Task RemoteSchedule_AndBackups_ThroughTheAgent()
     {
         // мир профиля: конфиг указывает на файл сохранения в папке данных

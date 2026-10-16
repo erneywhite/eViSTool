@@ -13,7 +13,7 @@ using eViSTool.Core.Server.Remote;
 namespace eViSTool.Presentation.ViewModels;
 
 /// <summary>Виды раздела «Сервер».</summary>
-public enum ServerTab { Console, Players, Stats, Announcements, Config, Schedule, Remote, Notify }
+public enum ServerTab { Console, Players, Stats, Journal, Announcements, Config, Schedule, Remote, Notify }
 
 /// <summary>
 /// Вкладка «Сервер». Сервером владеет агент (отдельный процесс) — окно только показывает и командует,
@@ -57,6 +57,7 @@ public sealed partial class ServerViewModel : ObservableObject
 
     /// <summary>Статистика: онлайн, ресурсы, наигранное время (собирает агент, если включено).</summary>
     public ServerStatsViewModel Stats { get; }
+    public ServerJournalViewModel Journal { get; }
 
     /// <summary>Объявления в чат: по расписанию и «сказать сейчас».</summary>
     public ServerAnnouncementsViewModel Announcements { get; }
@@ -71,6 +72,7 @@ public sealed partial class ServerViewModel : ObservableObject
     public bool IsPlayersTab => Tab == ServerTab.Players;
     public bool IsAnnouncementsTab => Tab == ServerTab.Announcements;
     public bool IsStatsTab => Tab == ServerTab.Stats;
+    public bool IsJournalTab => Tab == ServerTab.Journal;
     public bool IsNotifyTab => Tab == ServerTab.Notify;
     public bool IsConfigTab => Tab == ServerTab.Config;
     public bool IsScheduleTab => Tab == ServerTab.Schedule;
@@ -250,6 +252,7 @@ public sealed partial class ServerViewModel : ObservableObject
         Players = new ServerPlayersViewModel(this);
         Announcements = new ServerAnnouncementsViewModel(this);
         Stats = new ServerStatsViewModel(this);
+        Journal = new ServerJournalViewModel(this);
         Notify = new ServerNotifyViewModel(this);
     }
 
@@ -259,6 +262,7 @@ public sealed partial class ServerViewModel : ObservableObject
         OnPropertyChanged(nameof(IsPlayersTab));
         OnPropertyChanged(nameof(IsAnnouncementsTab));
         OnPropertyChanged(nameof(IsStatsTab));
+        OnPropertyChanged(nameof(IsJournalTab));
         OnPropertyChanged(nameof(IsNotifyTab));
         OnPropertyChanged(nameof(IsConfigTab));
         OnPropertyChanged(nameof(IsScheduleTab));
@@ -268,6 +272,7 @@ public sealed partial class ServerViewModel : ObservableObject
         Players.SetActive(value == ServerTab.Players);
         Announcements.SetActive(value == ServerTab.Announcements);
         Stats.SetActive(value == ServerTab.Stats);
+        Journal.SetActive(value == ServerTab.Journal);
         Notify.SetActive(value == ServerTab.Notify);
         if (value != ServerTab.Remote) Remote.Hide(); // ушли с вкладки — код подключения снова закрыт
     }
@@ -372,6 +377,7 @@ public sealed partial class ServerViewModel : ObservableObject
         Players.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model : null);
         Announcements.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model : null);
         Stats.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model : null);
+        Journal.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model : null);
         Notify.OnProfileSwitched(IsServerProfile ? _main.ActiveProfile?.Model : null);
         if (!IsServerProfile) return;
 
@@ -567,6 +573,7 @@ public sealed partial class ServerViewModel : ObservableObject
         Players.ShowStatus(s);
         Announcements.ShowStatus(s);
         Stats.ShowStatus(s);
+        Journal.ShowStatus(s);
         Notify.ShowStatus(s);
         StateNote = s.RestartScheduledAt is { } at ? Loc.T("server.restartIn", Math.Max(0, (int)(at - DateTime.Now).TotalSeconds))
             : s.State == ServerState.Stopped && s.LastExitCode is { } code ? Loc.T("server.lastExit", code)

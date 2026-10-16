@@ -103,7 +103,7 @@
                 </StackPanel>
             </DockPanel>
 
-            <!-- ===== виды раздела: консоль, игроки, статистика, объявления, serverconfig.json, расписание, удалённый доступ, оповещения ===== -->
+            <!-- ===== виды раздела: консоль, игроки, статистика, журнал, объявления, serverconfig.json, расписание, удалённый доступ, оповещения ===== -->
             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,16,0,0">
                 <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr srvcfg.modeConsole}"
                              IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Console}"
@@ -114,6 +114,9 @@
                 <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr stats.tab}"
                              IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Stats}"
                              AutomationProperties.AutomationId="SrvTabStats" />
+                <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr journal.tab}"
+                             IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Journal}"
+                             AutomationProperties.AutomationId="SrvTabJournal" />
                 <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr ann.tab}"
                              IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Announcements}"
                              AutomationProperties.AutomationId="SrvTabAnnouncements" />
@@ -222,6 +225,9 @@
                 </Panel>
 
                 <!-- ===== статистика ===== -->
+                <Panel IsVisible="{Binding IsJournalTab}">
+                    <views:ServerJournalTab DataContext="{Binding Journal}" />
+                </Panel>
                 <Panel IsVisible="{Binding IsStatsTab}">
                     <views:ServerStatsTab DataContext="{Binding Stats}" />
                 </Panel>

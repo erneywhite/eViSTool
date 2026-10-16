@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:eViSTool.Presentation.ViewModels"
+             xmlns:local="using:eViSTool.Desktop"
+             x:Class="eViSTool.Desktop.Views.ServerJournalTab"
+             x:DataType="vm:ServerJournalViewModel">
+    <UserControl.Styles>
+        <Style Selector="Border.journalCard">
+            <Setter Property="Padding" Value="20,16,20,18" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+        <!-- таблица: заголовки колонок и ячейки; неудачная попытка подключиться — цветом предупреждения -->
+        <Style Selector="TextBlock.colHead">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+        </Style>
+        <Style Selector="TextBlock.cell">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="Margin" Value="0,0,12,0" />
+        </Style>
+        <Style Selector="TextBlock.cell.muted">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+        </Style>
+        <Style Selector="TextBlock.cell.warn">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
+        <StackPanel Margin="0,0,14,0">
+            <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{DynamicResource Forest.Danger}" TextWrapping="Wrap" Margin="2,0,0,10"
+                       IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" AutomationProperties.AutomationId="JournalStatus" />
+
+            <Border Classes="card journalCard">
+                <StackPanel>
+                    <TextBlock Classes="cardTitle" Text="{local:Tr journal.tab}" />
+                    <TextBlock Classes="hint" Text="{local:Tr journal.lead}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                    <TextBlock Classes="hint" Text="{local:Tr journal.empty}" TextWrapping="Wrap" FontSize="12" Margin="0,12,0,0"
+                               IsVisible="{Binding IsEmpty}" AutomationProperties.AutomationId="JournalEmpty" />
+
+                    <Grid Margin="0,14,0,6" ColumnDefinitions="130,1.1*,2*" IsVisible="{Binding HasRows}">
+                        <TextBlock Classes="colHead" Text="{local:Tr journal.colTime}" />
+                        <TextBlock Grid.Column="1" Classes="colHead" Text="{local:Tr journal.colWho}" />
+                        <TextBlock Grid.Column="2" Classes="colHead" Text="{local:Tr journal.colAction}" />
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding Rows}" AutomationProperties.AutomationId="JournalRows">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:JournalRow">
+                                <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="0,9">
+                                    <Grid ColumnDefinitions="130,1.1*,2*">
+                                        <TextBlock Classes="cell muted" Text="{Binding TimeText}" />
+                                        <TextBlock Grid.Column="1" Classes="cell" Text="{Binding WhoText}" ToolTip.Tip="{Binding WhoText}" />
+                                        <TextBlock Grid.Column="2" Classes="cell" Classes.warn="{Binding Warn}" Text="{Binding ActionText}"
+                                                   ToolTip.Tip="{Binding ActionText}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Classes="hint" Text="{Binding MoreText}" FontSize="12" Margin="0,10,0,0"
+                               IsVisible="{Binding MoreText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

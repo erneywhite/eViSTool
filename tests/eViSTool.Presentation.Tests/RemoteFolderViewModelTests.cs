@@ -83,6 +83,7 @@ public sealed class RemoteFolderViewModelTests
         public Task<StatsReport> LoadStatsAsync(StatsPeriod period, CancellationToken ct = default) => throw new NotSupportedException();
         public Task SetStatsEnabledAsync(bool enabled, CancellationToken ct = default) => throw new NotSupportedException();
         public Task ClearStatsAsync(CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<JournalEntry>> LoadJournalAsync(CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     /// <summary>Windows с дисками C: и D:.</summary>

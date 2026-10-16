@@ -33,6 +33,8 @@ public sealed class AgentClient : IDisposable
             Timeout = Timeout.InfiniteTimeSpan,
         };
         _http.DefaultRequestHeaders.Add(AgentProtocol.KeyHeader, key);
+        // имя компьютера — для журнала действий на стороне агента
+        _http.DefaultRequestHeaders.Add(ServerJournal.ClientHeader, Uri.EscapeDataString(Environment.MachineName));
     }
 
     /// <summary>Агент на другой машине — по коду подключения (HTTPS, сертификат сверяется с отпечатком из кода).</summary>
@@ -137,6 +139,10 @@ public sealed class AgentClient : IDisposable
     public Task<StatsReport> StatsAsync(StatsPeriod period, CancellationToken ct = default) => Get<StatsReport>($"stats?period={period}", ct);
     public Task SetStatsEnabledAsync(bool enabled, CancellationToken ct = default) => Post<AgentStatus>("stats/enabled", new StatsToggle(enabled), ct);
     public Task ClearStatsAsync(CancellationToken ct = default) => Post<AgentStatus>("stats/clear", null, ct);
+
+    /// <summary>Журнал действий с сервером за 30 дней, новые сверху.</summary>
+    public async Task<IReadOnlyList<JournalEntry>> JournalAsync(CancellationToken ct = default) =>
+        await Get<List<JournalEntry>>("journal", ct).ConfigureAwait(false);
     public Task<DirListing> ListDirsAsync(string? path, CancellationToken ct = default) =>
         Post<DirListing>("fs/dirs", new BackupNameRequest(path ?? ""), ct);
     public async Task<string?> CheckBackupDirAsync(string? dir, CancellationToken ct = default) =>

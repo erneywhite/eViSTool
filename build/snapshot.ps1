@@ -69,6 +69,16 @@ function Reset-Fixture([string]$appDir) {
     $settings = (Get-Content (Join-Path $fixture 'settings.template.json') -Raw -Encoding utf8).
         Replace('{{VSDATA}}', (& $json $vsdata)).Replace('{{GAME}}', (& $json $game))
     [IO.File]::WriteAllText((Join-Path $data 'settings.json'), $settings)
+
+    # файлы агента профиля (журнал действий): время в шаблоне — «{{AGO:минуты}}» назад от сейчас, чтобы записи не устаревали
+    $agents = Join-Path $data 'agents'
+    New-Item -ItemType Directory -Force $agents | Out-Null
+    $now = [DateTime]::UtcNow
+    foreach ($file in Get-ChildItem (Join-Path $fixture 'agents') -File) {
+        $text = [regex]::Replace((Get-Content $file.FullName -Raw -Encoding utf8), '\{\{AGO:(\d+)\}\}',
+            { param($m) $now.AddMinutes(-[int]$m.Groups[1].Value).ToString('yyyy-MM-ddTHH:mm:ssZ') })
+        [IO.File]::WriteAllText((Join-Path $agents $file.Name), $text)
+    }
 }
 
 $made = @()
