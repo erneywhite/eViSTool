@@ -221,6 +221,12 @@ public sealed partial class CloneProfileViewModel : ProfileCopyViewModel<CloneOp
     // неожиданная ошибка расчёта — в журнал и причиной в окне, иначе «Клонировать» молча осталась бы выключенной
     protected override bool ShowsUnexpectedPlanErrors => true;
 
+    // сбой в обработчике Finished — дальше, в обработчик сбоев программы; копирование уже удалось, форму не возвращаем
+    protected override bool FinishedErrorsAreCopyErrors => false;
+
+    // флаг «папку подставляет модель» — только на запись готовой папки, снимается и при исключении
+    protected override bool KeepsTargetFlagOnError => false;
+
     protected override long? FreeSpace(string dir) => _services.FreeSpace(dir);
 
     // название мира на состав файлов не влияет — берём то, что в поле сейчас

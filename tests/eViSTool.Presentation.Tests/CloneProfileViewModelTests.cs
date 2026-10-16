@@ -240,6 +240,28 @@ public sealed class CloneProfileViewModelTests : IDisposable
     });
 
     [Fact]
+    public void TargetByNameFailed_FlagIsReset_HandEditRightAfterCounts() => Sta.Run(() =>
+    {
+        // подстановка папки по названию сорвалась (здесь упал подписчик TargetDir): у этого окна флаг «папку подставляет
+        // модель» снимается и при исключении — ручная правка папки следом считается правкой
+        var vm = Open();
+        var fail = true;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(vm.TargetDir) || !fail) return;
+            fail = false;
+            throw new InvalidOperationException("подписчик упал");
+        };
+
+        Assert.Throws<InvalidOperationException>(() => vm.Name = "Дуо 2");
+        var own = Path.Combine(_root, "мой профиль");
+        vm.TargetDir = own;
+        vm.Name = "Дуо 3";
+
+        Assert.Equal(own, vm.TargetDir);
+    });
+
+    [Fact]
     public void Browse_StartsFromNearestExistingFolder_AndPickedFolderStopsFollowingName() => Sta.Run(() =>
     {
         string? start = null;
@@ -695,6 +717,24 @@ public sealed class CloneProfileViewModelTests : IDisposable
         Assert.IsType<NullReferenceException>(Assert.Single(_logged));
         Assert.False(vm.IsCopying);
         Assert.True(vm.IsFormEnabled);
+    });
+
+    [Fact]
+    public void FinishedHandlerFailed_GoesOutOfCommand_FormStaysOff() => Sta.Run(() =>
+    {
+        // профиль создан, но окно не смогло закрыться с ним: у этого окна сбой уходит дальше, в обработчик сбоев программы
+        var created = new GameProfile { Name = "клон", Kind = ProfileKind.Server, DataDir = Path.Combine(_root, "клон") };
+        var vm = Open(services: Services() with { Apply = (_, _, _) => Task.FromResult(created) });
+        var ex = new InvalidOperationException("окно уже закрыто");
+        vm.Finished += _ => throw ex;
+
+        Assert.Same(ex, Assert.Throws<InvalidOperationException>(() => Sta.Wait(vm.GoCommand.ExecuteAsync(null))));
+
+        Assert.Same(created, vm.Result);
+        Assert.True(vm.IsCopying); // копирование удалось — форма не возвращается
+        Assert.False(vm.CancelCopy());
+        Assert.Equal("", vm.ErrorText);
+        Assert.Empty(_logged);
     });
 
     [Fact]

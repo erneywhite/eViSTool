@@ -50,11 +50,21 @@ public abstract partial class ProfileCopyViewModel<TOptions, TPlan> : Observable
 
     partial void OnNameChanged(string value)
     {
-        if (!_targetEdited && SuggestTarget(value) is { } target)
+        if (!_targetEdited)
         {
-            _settingTarget = true;
-            try { TargetDir = target; }
-            finally { _settingTarget = false; }
+            if (KeepsTargetFlagOnError)
+            {
+                // флаг поднят ещё до подбора папки, и сбой подбора или записи его не снимает
+                _settingTarget = true;
+                TargetDir = SuggestTarget(value) ?? TargetDir;
+                _settingTarget = false;
+            }
+            else if (SuggestTarget(value) is { } target)
+            {
+                _settingTarget = true;
+                try { TargetDir = target; }
+                finally { _settingTarget = false; }
+            }
         }
         Recalculate();
     }
@@ -147,6 +157,20 @@ public abstract partial class ProfileCopyViewModel<TOptions, TPlan> : Observable
     /// причиной в окне, форма остаётся живой; false — дальше, в обработчик сбоев программы.
     /// </summary>
     protected abstract bool ShowsUnexpectedPlanErrors { get; }
+
+    /// <summary>
+    /// Обработчик <see cref="Finished"/> бросил исключение (профиль уже создан): true — оно разбирается как сбой
+    /// копирования, форма возвращается с причиной; false — уходит дальше, в обработчик сбоев программы. Окна здесь
+    /// расходятся; свести их к одному — уже изменение поведения.
+    /// </summary>
+    protected abstract bool FinishedErrorsAreCopyErrors { get; }
+
+    /// <summary>
+    /// Подстановка папки по названию сорвалась (подбор папки или её запись бросили исключение): true — флаг «папку
+    /// подставляет модель» остаётся поднятым до следующей правки названия, и ручная правка папки в этом промежутке
+    /// правкой не считается; false — флаг снимается. Окна здесь расходятся; свести их к одному — уже изменение поведения.
+    /// </summary>
+    protected abstract bool KeepsTargetFlagOnError { get; }
 
     /// <summary>Свободное место на диске папки; не узнать — null.</summary>
     protected abstract long? FreeSpace(string dir);
@@ -277,6 +301,12 @@ public abstract partial class ProfileCopyViewModel<TOptions, TPlan> : Observable
         try
         {
             created = await Task.Run(() => Apply(plan, progress, copy.Token));
+            if (FinishedErrorsAreCopyErrors)
+            {
+                // сбой в обработчике Finished разберут catch-и ниже: _copy уже пуст, Finish вернёт форму с причиной
+                Complete(copy, created);
+                return;
+            }
         }
         catch (OperationCanceledException)
         {
@@ -298,6 +328,12 @@ public abstract partial class ProfileCopyViewModel<TOptions, TPlan> : Observable
             return;
         }
 
+        Complete(copy, created);
+    }
+
+    /// <summary>Копирование удалось: профиль готов, окно закрывается с ним.</summary>
+    private void Complete(CancellationTokenSource copy, GameProfile created)
+    {
         _copy = null;
         copy.Dispose();
         Result = created;
