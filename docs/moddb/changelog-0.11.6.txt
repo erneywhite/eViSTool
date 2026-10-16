@@ -1,0 +1,23 @@
+eViSTool 0.11.6: the journal shows what exactly changed.
+
+New
+- Server → Journal now shows the details under each action: who was added to or removed from the whitelist, role changes, unbans, the whitelist mode; which keys changed in serverconfig.json, mod settings, the schedule, announcements and notifications (old → new value); the version of an installed mod and the one it replaced. The first five lines are shown, the rest open with "and N more".
+- Passwords, tokens and webhook addresses never go into the journal: only that they changed.
+
+Fixes
+- A serverconfig.json save rejected because the file had changed on the server, and a mod settings save with no changes, no longer show up in the journal.
+
+Update from About; then update the agent on the server computer with Update on the server, so the details start being recorded.
+
+---
+
+eViSTool 0.11.6: журнал показывает, что именно поменялось.
+
+Новое
+- «Сервер» → «Журнал» теперь показывает подробности под каждым действием: кто добавлен в белый список или убран из него, смена роли, снятие бана, режим белого списка; какие ключи поменялись в serverconfig.json, настройках модов, расписании, объявлениях и оповещениях (было → стало); версия установленного мода и прежняя. Видны первые пять строк, остальные открываются по «и ещё N».
+- Пароли, токены и адреса вебхуков в журнал не попадают: только то, что они изменены.
+
+Исправления
+- Сохранение serverconfig.json, отклонённое из-за того, что файл на сервере успел поменяться, и сохранение настроек мода без изменений больше не попадают в журнал.
+
+Обнови из «О программе», потом обнови агента на компьютере с сервером кнопкой «Обновить на сервере», чтобы подробности начали записываться.

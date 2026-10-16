@@ -1,0 +1,11 @@
+eViSTool 0.11.6 for Linux: the journal shows what exactly changed.
+
+- Server → Journal now shows the details under each action: whitelist and role changes, unbans, which keys changed in serverconfig.json, mod settings, the schedule, announcements and notifications (old → new), and the version of an installed mod. The first five lines are shown, the rest open with "and N more". Passwords, tokens and webhook addresses never go into the journal.
+- A rejected serverconfig.json save and a mod settings save with no changes no longer show up in the journal.
+
+---
+
+eViSTool 0.11.6 для Linux: журнал показывает, что именно поменялось.
+
+- «Сервер» → «Журнал» теперь показывает подробности под каждым действием: белый список и роли, снятие бана, какие ключи поменялись в serverconfig.json, настройках модов, расписании, объявлениях и оповещениях (было → стало), версия установленного мода. Видны первые пять строк, остальные открываются по «и ещё N». Пароли, токены и адреса вебхуков в журнал не попадают.
+- Отклонённое сохранение serverconfig.json и сохранение настроек мода без изменений больше не попадают в журнал.
