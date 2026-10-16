@@ -411,7 +411,11 @@ encrypted for your Windows account. If the code got into the wrong hands, **New 
 
 **Journal.** **Server → Journal** shows who did what with the server in the last 30 days: starts and stops, console
 commands, mods, configuration, backups, schedule, updates, and failed connection attempts. Each line has the time, the
-name of the computer and its address, so you can see what a friend with the code changed.
+name of the computer and its address, so you can see what a friend with the code changed. Under each action you see what
+exactly changed: who was added to the whitelist, which config keys changed (old → new), which mod version was installed.
+Passwords and tokens never go into the journal.
+
+![Journal](docs/screenshots/journal.png)
 
 **Over the internet** you also need to forward the port on your router to the server computer.
 A VPN (Tailscale, ZeroTier, WireGuard and the like) is simpler and safer: use the VPN address of the server computer,
