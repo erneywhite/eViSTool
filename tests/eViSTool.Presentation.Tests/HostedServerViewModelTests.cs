@@ -408,6 +408,45 @@ public sealed class HostedServerViewModelTests : IDisposable
         vm.SetActive(false);
     });
 
+    /// <summary>SFTP: незнакомый или сменившийся ключ сервера и беда с файлом ключа повтором не лечатся — своими словами,
+    /// без «доверяй, только если…» (довериться можно только в окне подключения).</summary>
+    [Theory]
+    [InlineData("hostkey")]
+    [InlineData("hostkeychanged")]
+    [InlineData("keyfile")]
+    [InlineData("passphrase")]
+    public void SftpErrorsARetryWillNotFix_AreNotRetried_AndSaidInTheirOwnWords(string what) => Sta.Run(() =>
+    {
+        PutLog(Main, HostedLogSamples.Running);
+        var vm = Vm();
+        _host.Server.FailOn = (op, _) => op == "connect";
+        _host.Server.FailWith = () => what switch
+        {
+            "hostkey" or "hostkeychanged" => new RemoteFilesException(RemoteFailure.CertificateUntrusted, "connect: untrusted host key ssh-ed25519 256")
+            {
+                CertificateSha256 = "SHA256:" + new string('Q', 43), IsHostKey = true, HostKeyChanged = what == "hostkeychanged",
+            },
+            "keyfile" => new RemoteFilesException(RemoteFailure.KeyFile, "C:\\keys\\id_ed25519: Could not find file"),
+            _ => new RemoteFilesException(RemoteFailure.KeyPassphrase, "C:\\keys\\id_ed25519: wrong passphrase"),
+        };
+
+        vm.SetActive(true);
+        Sta.WaitFor(() => vm.StatusText.Length > 0);
+
+        var reason = what switch
+        {
+            "hostkey" => Loc.T("server.hostedHostKeyUntrusted"),
+            "hostkeychanged" => Loc.T("server.hostedHostKeyChanged"),
+            "keyfile" => Loc.T("hosted.errKeyFile", "C:\\keys\\id_ed25519: Could not find file") + ".",
+            _ => Loc.T("hosted.errKeyPassphrase"),
+        };
+        Assert.Equal(Loc.T("server.hostedNoRetry", reason), vm.StatusText);
+        Assert.DoesNotContain(new string('Q', 43), vm.StatusText);
+        Assert.False(vm.IsPolling);
+        Assert.False(Timer(vm).IsEnabled);
+        vm.SetActive(false);
+    });
+
     [Fact]
     public void ErrorText_EndsItsSentence_BeforeTheRetryNote() => Sta.Run(() =>
     {

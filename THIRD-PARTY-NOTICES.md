@@ -43,7 +43,7 @@ with the copyright line given below.
 | Component | Copyright | Source |
 |---|---|---|
 | .NET runtime and ASP.NET Core (bundled into `eViSTool.Agent.exe`) | © .NET Foundation and Contributors | https://github.com/dotnet/runtime, https://github.com/dotnet/aspnetcore |
-| .NET libraries (System.Security.Cryptography.ProtectedData) | © .NET Foundation and Contributors | https://github.com/dotnet/runtime |
+| .NET libraries (System.Security.Cryptography.ProtectedData, Microsoft.Extensions.Logging.Abstractions) | © .NET Foundation and Contributors | https://github.com/dotnet/runtime |
 | CommunityToolkit.Mvvm | © .NET Foundation and Contributors | https://github.com/CommunityToolkit/dotnet |
 | Newtonsoft.Json | © 2007 James Newton-King | https://github.com/JamesNK/Newtonsoft.Json |
 | Microsoft.Data.Sqlite | © .NET Foundation and Contributors | https://github.com/dotnet/efcore |
@@ -51,6 +51,8 @@ with the copyright line given below.
 | SkiaSharp, HarfBuzzSharp (drawing and text shaping in the Avalonia window) | © 2015-2016 Xamarin, Inc.; © 2017-2018 Microsoft Corporation | https://github.com/mono/SkiaSharp |
 | Tmds.DBus (file dialogs and the file manager on Linux) | © Tom Deseyn | https://github.com/tmds/Tmds.DBus |
 | FluentFTP (FTP and FTPS for servers at a hosting provider; the window only, not the agent) | © 2015 Robin Rodricks and FluentFTP Contributors | https://github.com/robinrodricks/FluentFTP |
+| SSH.NET (SFTP for servers at a hosting provider; the window only, not the agent) | © 2010-2026 Renci | https://github.com/sshnet/SSH.NET |
+| BouncyCastle.Cryptography (key exchange and keys for SSH.NET; the window only) | © 2000-2026 The Legion of the Bouncy Castle Inc. | https://github.com/bcgit/bc-csharp |
 
 ## Fonts
 

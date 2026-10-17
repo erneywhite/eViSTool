@@ -6,9 +6,9 @@ using eViSTool.Presentation.ViewModels;
 namespace eViSTool.Presentation.SnapshotDialogs;
 
 /// <summary>
-/// Окно «Сервер у хостера» (подключение по FTP): dialog.hostedconnect, .ok, .error, .cert, .edit, .sftp. Адреса из
-/// TEST-NET-3 (203.0.113.x), логин, пароль и отпечаток выдуманные; проверку связи снимки не запускают, сеть не нужна —
-/// итог проверки модель получает готовым.
+/// Окно «Сервер у хостера» (подключение по FTP или SFTP): dialog.hostedconnect, .ok, .error, .cert, .edit, .sftp,
+/// .sftpkey, .hostkey, .hostkeychanged. Адреса из TEST-NET-3 (203.0.113.x), логин, пароль, путь к ключу и отпечатки
+/// выдуманные; проверку связи снимки не запускают, сеть не нужна — итог проверки модель получает готовым.
 /// </summary>
 internal static class HostedConnect
 {
@@ -56,13 +56,62 @@ internal static class HostedConnect
         Root = "/g123456", ActiveMode = true,
     }, null);
 
-    /// <summary>В адресе ссылка sftp://: объяснение, что SFTP пока нет, и «Подключить» выключена.</summary>
+    /// <summary>SFTP по паролю: вместо шифрования — список «Вход», проверка прошла.</summary>
     [SnapshotDialog("hostedconnect.sftp")]
     private static void OpenSftp(MainViewModel main) => Show(null, vm =>
     {
         vm.Address = "sftp://" + Host + ":2022";
         vm.User = "gp_user";
+        vm.Password = "made-up-password";
+        vm.CommitAddress();
+        var layout = new HostedLayout("/", "/serverconfig.json", "/", "/", ["/Mods"], "/Mods", []);
+        var result = new HostedCheckResult(layout, ModVersion.ParseOrNull("1.22.7"), GameVersionSource.VersionFile, 8,
+            new RemoteFeatures(true, true, true, "SSH-2.0-OpenSSH_9.6"));
+        vm.CheckText = HostedConnectViewModel.CheckSummary(result);
+        vm.CheckTone = RowTone.Good;
     });
+
+    /// <summary>SFTP по файлу ключа: путь к ключу, «Обзор…» и необязательный пароль ключа.</summary>
+    [SnapshotDialog("hostedconnect.sftpkey")]
+    private static void OpenSftpKey(MainViewModel main) => Show(null, vm =>
+    {
+        FillSftpKey(vm);
+        // файла ключа на машине снимка нет: подсказка — обычная, как при найденном файле
+        vm.KeyFileHint = Loc.T("hosted.keyHint");
+        vm.KeyFileTone = RowTone.Muted;
+    });
+
+    /// <summary>Ключ сервера SFTP виден впервые: отпечаток и кнопка «Доверять этому ключу».</summary>
+    [SnapshotDialog("hostedconnect.hostkey")]
+    private static void OpenHostKey(MainViewModel main) => Show(null, vm =>
+    {
+        FillSftpKey(vm);
+        vm.KeyFileHint = Loc.T("hosted.keyHint");
+        vm.KeyFileTone = RowTone.Muted;
+        vm.ShowHostKeyPrompt(HostKey, changed: false);
+    });
+
+    /// <summary>Ключ сервера SFTP сменился с прошлого раза: предупреждение и «Доверять новому ключу».</summary>
+    [SnapshotDialog("hostedconnect.hostkeychanged")]
+    private static void OpenHostKeyChanged(MainViewModel main) => Show(null, vm =>
+    {
+        vm.Address = "sftp://" + Host + ":2022";
+        vm.User = "gp_user";
+        vm.Password = "made-up-password";
+        vm.CommitAddress();
+        vm.ShowHostKeyPrompt(HostKey, changed: true);
+    });
+
+    private const string HostKey = "SHA256:q3Yp0bX7cN2vTzK8wR5mLs1JdHf4GuAe9iOkPnWy6xE";
+
+    private static void FillSftpKey(HostedConnectViewModel vm)
+    {
+        vm.Address = "sftp://" + Host + ":2022";
+        vm.User = "gp_user";
+        vm.CommitAddress();
+        vm.AuthIndex = 1;
+        vm.KeyFile = "~/.ssh/id_ed25519";
+    }
 
     private static void Fill(HostedConnectViewModel vm)
     {

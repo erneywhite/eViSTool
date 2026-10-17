@@ -4,9 +4,9 @@ using eViSTool.Core.Platform;
 namespace eViSTool.Core.Hosting;
 
 /// <summary>
-/// Пароль FTP хранится в настройках зашифрованным для текущего пользователя (<see cref="SecretProtector"/>: DPAPI на
-/// Windows, AES-GCM на Linux) — как код подключения к агенту, но со своим назначением: строку одного не расшифровать
-/// как другое.
+/// Пароль FTP/SFTP и пароль ключа SFTP хранятся в настройках зашифрованными для текущего пользователя
+/// (<see cref="SecretProtector"/>: DPAPI на Windows, AES-GCM на Linux) — как код подключения к агенту, но со своим
+/// назначением: строку одного не расшифровать как другое.
 /// </summary>
 public static class HostedSecret
 {
@@ -24,7 +24,13 @@ public static class HostedSecret
         RemoteFilesException { Kind: RemoteFailure.Connect } => Loc.T("hosted.errConnect", ex.Message),
         RemoteFilesException { Kind: RemoteFailure.Timeout } => Loc.T("hosted.errTimeout"),
         RemoteFilesException { Kind: RemoteFailure.Tls } => Loc.T("hosted.errTls", ex.Message),
+        RemoteFilesException { Kind: RemoteFailure.CertificateUntrusted, IsHostKey: true, HostKeyChanged: true } e =>
+            Loc.T("hosted.hostKeyChanged", e.CertificateSha256 ?? "?"),
+        RemoteFilesException { Kind: RemoteFailure.CertificateUntrusted, IsHostKey: true } e =>
+            Loc.T("hosted.trustHostKey", e.CertificateSha256 ?? "?"),
         RemoteFilesException { Kind: RemoteFailure.CertificateUntrusted } e => Loc.T("hosted.trustCert", e.CertificateSha256 ?? "?"),
+        RemoteFilesException { Kind: RemoteFailure.KeyFile } => Loc.T("hosted.errKeyFile", ex.Message),
+        RemoteFilesException { Kind: RemoteFailure.KeyPassphrase } => Loc.T("hosted.errKeyPassphrase"),
         RemoteFilesException { Kind: RemoteFailure.NotFound } => Loc.T("hosted.errNotFound", ex.Message),
         RemoteFilesException { Kind: RemoteFailure.Denied or RemoteFailure.Exists } => Loc.T("hosted.errDenied", ex.Message),
         RemoteFilesException { Kind: RemoteFailure.Quota } => Loc.T("hosted.errQuota"),

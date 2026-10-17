@@ -10,11 +10,13 @@ using eViSTool.Core.Localization;
 namespace eViSTool.Presentation.ViewModels;
 
 /// <summary>
-/// Окно «Сервер у хостера»: адрес FTP (хост, хост:порт или целиком ftp://логин@хост:порт/папка), порт, шифрование,
-/// логин и пароль, в «Дополнительно» — папка сервера и активный режим; «Проверить подключение» входит на сервер и
-/// одной строкой говорит, что нашлось. Ответ окна — <see cref="Result"/>: подключение с уже зашифрованным паролем и
-/// закреплёнными путями. Открытый пароль живёт только в этой модели; в строки окна и в исключения он не попадает.
-/// При правке готового подключения пустое поле пароля значит «оставить прежний».
+/// Окно «Сервер у хостера»: адрес (хост, хост:порт или целиком ftp://логин@хост:порт/папка, а для SFTP —
+/// sftp://логин@хост:порт/папка), порт, шифрование FTP, логин и пароль, в «Дополнительно» — папка сервера и активный
+/// режим FTP; «Проверить подключение» входит на сервер и одной строкой говорит, что нашлось. У SFTP вместо шифрования —
+/// способ входа: пароль или файл ключа на этом компьютере (с необязательным паролем ключа), а ключ сервера при первом
+/// подключении подтверждает человек, как сертификат FTPS. Ответ окна — <see cref="Result"/>: подключение с уже
+/// зашифрованными паролями и закреплёнными путями. Открытые пароли живут только в этой модели; в строки окна и в
+/// исключения они не попадают. При правке готового подключения пустое поле пароля значит «оставить прежний».
 /// </summary>
 public sealed partial class HostedConnectViewModel : ObservableObject
 {
@@ -37,6 +39,10 @@ public sealed partial class HostedConnectViewModel : ObservableObject
     // сертификат, которому человек доверился (или был в подключении); null — не доверяем никакому
     private string? _trustedCertificate;
     private string? _pendingCertificate;
+    // ключ сервера SFTP, которому доверились, и для какого хоста и порта: на другом порту того же хоста — другой sshd
+    private string? _trustedHostKey;
+    private (string Host, int Port)? _trustedHostKeyFor;
+    private bool _pendingIsHostKey;
     private HostedProtocol _protocol = HostedProtocol.Ftp;
     // поля заполняет сама модель (загрузка, разбор адреса, итог проверки): это не правка человека
     private bool _quiet;
@@ -57,6 +63,7 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         [
             Loc.T("hosted.tlsAuto"), Loc.T("hosted.tlsExplicit"), Loc.T("hosted.tlsNone"), Loc.T("hosted.tlsImplicit"),
         ];
+        AuthOptions = [Loc.T("hosted.authPassword"), Loc.T("hosted.authKey")];
         _quiet = true;
         if (_existing is { } e)
         {
@@ -67,11 +74,15 @@ public sealed partial class HostedConnectViewModel : ObservableObject
             Root = string.IsNullOrEmpty(e.Root) ? "/" : e.Root;
             ActiveMode = e.ActiveMode;
             _trustedCertificate = e.CertificateSha256;
+            if (e.HostKeySha256 is { } hostKey) (_trustedHostKey, _trustedHostKeyFor) = (hostKey, (e.Host.Trim(), e.Port));
+            KeyFile = e.KeyFile ?? "";
+            AuthIndex = e.KeyFile is null ? 0 : 1;
             // свёрнутое «Дополнительно» не должно прятать то, что человек уже менял
-            IsAdvancedOpen = e.ActiveMode || Root != "/";
+            IsAdvancedOpen = e.ActiveMode && e.Protocol != HostedProtocol.Sftp || Root != "/";
         }
-        _quiet = false;
+        // разобрать загруженный адрес, ничего не беря из него в поля: у sftp:// без порта иначе встал бы 22 поверх сохранённого
         Reparse();
+        _quiet = false;
         if (Interlocked.Exchange(ref SnapshotInit, null) is { } init) init(this);
     }
 
@@ -80,8 +91,24 @@ public sealed partial class HostedConnectViewModel : ObservableObject
     /// <summary>Пункты списка «Шифрование», в порядке <see cref="TlsIndex"/>.</summary>
     public IReadOnlyList<string> TlsOptions { get; }
 
+    /// <summary>Пункты списка «Вход» у SFTP, в порядке <see cref="AuthIndex"/>: по паролю, по файлу ключа.</summary>
+    public IReadOnlyList<string> AuthOptions { get; }
+
     /// <summary>Правка готового подключения с сохранённым паролем: под полем «оставь пустым, чтобы не менять».</summary>
     public bool HasSavedPassword => _existing?.Password is not null;
+
+    /// <summary>То же для пароля ключа SFTP.</summary>
+    public bool HasSavedKeyPassphrase => _existing?.KeyPassphrase is not null;
+
+    /// <summary>Под полем пароля — «оставь пустым…»: пароль сохранён, и вход сейчас по паролю.</summary>
+    public bool ShowPasswordKeep => HasSavedPassword && !IsKeyLogin;
+
+    /// <summary>Под полем пароля ключа: «оставь пустым…», если он сохранён, иначе — что он нужен не всегда.</summary>
+    public string KeyPassphraseNote => HasSavedKeyPassphrase ? Loc.T("hosted.keyPassphraseKeep") : Loc.T("hosted.keyPassphraseHint");
+
+    /// <summary>Выбор файла ключа («Обзор…»); null — передумали. Тесты подменяют.</summary>
+    public Func<string?> PickKeyFile { get; init; } = () =>
+        Ui.Platform.PickFiles(Loc.T("hosted.keyPick"), [new FileFilter(Loc.T("hosted.keyFilter"), "*")], multiple: false)?.FirstOrDefault();
 
     // ===== поля =====
 
@@ -105,6 +132,15 @@ public sealed partial class HostedConnectViewModel : ObservableObject
     /// <summary>Активный режим FTP (PORT) вместо пассивного: на случай, когда соединение виснет на списке файлов.</summary>
     [ObservableProperty] private bool _activeMode;
 
+    /// <summary>SFTP: номер пункта списка «Вход» (<see cref="AuthOptions"/>): 0 — по паролю, 1 — по файлу ключа.</summary>
+    [ObservableProperty] private int _authIndex;
+
+    /// <summary>SFTP: путь к файлу закрытого ключа на этом компьютере.</summary>
+    [ObservableProperty] private string _keyFile = "";
+
+    /// <summary>SFTP: пароль ключа открытым текстом (поле скрытое); пустой при правке — оставить прежний.</summary>
+    [ObservableProperty] private string _keyPassphrase = "";
+
     /// <summary>Раскрыт блок «Дополнительно».</summary>
     [ObservableProperty] private bool _isAdvancedOpen;
 
@@ -118,17 +154,24 @@ public sealed partial class HostedConnectViewModel : ObservableObject
 
     public FtpTls Tls => TlsOrder[Math.Clamp(TlsIndex, 0, TlsOrder.Length - 1)];
 
-    /// <summary>Адрес — ссылка sftp://: этот протокол появится позже, подключить и проверить нельзя.</summary>
+    /// <summary>Адрес — ссылка sftp://: файлы по SSH. Шифрование всегда, полей TLS и активного режима у него нет, зато
+    /// есть выбор входа (пароль или ключ).</summary>
     public bool IsSftp => _protocol == HostedProtocol.Sftp;
+
+    /// <summary>Вход по файлу ключа: адрес SFTP и в списке «Вход» выбран ключ.</summary>
+    public bool IsKeyLogin => IsSftp && AuthIndex == 1;
+
+    /// <summary>Порт, если поле не разобралось: 22 у SFTP, 21 у FTP.</summary>
+    private int DefaultPort => IsSftp ? 22 : 21;
 
     /// <summary>Папка сервера в порядке (нормализованный путь); null — в ней «..» или управляющие знаки.</summary>
     public string? NormalizedRoot => NormalizeRoot(Root);
 
-    /// <summary>Пояснение под адресом: формат; для sftp:// — «SFTP появится в следующей версии»; для неразобранного — формат красным.</summary>
+    /// <summary>Пояснение под адресом: формат; для sftp:// — что это SFTP; для неразобранного — формат красным.</summary>
     [ObservableProperty] private string _addressHint = "";
     [ObservableProperty] private RowTone _addressTone = RowTone.Muted;
 
-    /// <summary>Пояснение под портом (21, 8821, SFTP, 990); для остальных портов пусто.</summary>
+    /// <summary>Пояснение под портом (21, 8821, 22 и порты SFTP, 990); для остальных портов пусто.</summary>
     [ObservableProperty] private string _portHint = "";
     [ObservableProperty] private RowTone _portTone = RowTone.Muted;
 
@@ -136,8 +179,12 @@ public sealed partial class HostedConnectViewModel : ObservableObject
     [ObservableProperty] private string _rootHint = "";
     [ObservableProperty] private RowTone _rootTone = RowTone.Muted;
 
-    /// <summary>«ОК» доступна: хост разобран, порт — число, папка верная, протокол не SFTP.</summary>
-    public bool CanAccept => Host.Length > 0 && Port is not null && NormalizedRoot is not null && !IsSftp;
+    /// <summary>Пояснение под файлом ключа; красным, если такого файла на этом компьютере нет.</summary>
+    [ObservableProperty] private string _keyFileHint = "";
+    [ObservableProperty] private RowTone _keyFileTone = RowTone.Muted;
+
+    /// <summary>«ОК» доступна: хост разобран, порт — число, папка верная, а для входа по ключу указан файл ключа.</summary>
+    public bool CanAccept => Host.Length > 0 && Port is not null && NormalizedRoot is not null && (!IsKeyLogin || KeyFile.Trim().Length > 0);
 
     // ===== проверка =====
 
@@ -149,12 +196,15 @@ public sealed partial class HostedConnectViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(CheckCommand))]
     private bool _isChecking;
 
-    /// <summary>Сервер показал сертификат, которому мы не доверяем: текст с отпечатком и кнопка «Доверять».</summary>
+    /// <summary>Сервер показал сертификат (или ключ SSH), которому мы не доверяем: текст с отпечатком и кнопка «Доверять».</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasPendingCertificate))]
     private string _certificateText = "";
 
     public bool HasPendingCertificate => _pendingCertificate is not null;
+
+    /// <summary>Надпись на кнопке «Доверять…»: сертификату TLS или ключу сервера SSH.</summary>
+    [ObservableProperty] private string _trustText = "";
 
     /// <summary>Ответ окна по «ОК»; null — ещё не нажимали.</summary>
     public HostedConnection? Result { get; private set; }
@@ -168,6 +218,9 @@ public sealed partial class HostedConnectViewModel : ObservableObject
     partial void OnPasswordChanged(string value) => Edited();
     partial void OnRootChanged(string value) => Edited();
     partial void OnActiveModeChanged(bool value) => Edited();
+    partial void OnAuthIndexChanged(int value) => Edited();
+    partial void OnKeyFileChanged(string value) => Edited();
+    partial void OnKeyPassphraseChanged(string value) => Edited();
 
     /// <summary>
     /// Разобрать адрес: хост, а из ссылки ещё порт, логин, пароль, папку и шифрование — те части, что в ней есть.
@@ -185,7 +238,7 @@ public sealed partial class HostedConnectViewModel : ObservableObject
             _quiet = true; // поля заполняются из ссылки: каждое из них не должно отдельно сбрасывать проверку
             try
             {
-                var port = p.Port?.ToString(CultureInfo.InvariantCulture) ?? (p.Scheme == "ftps" ? "990" : null);
+                var port = p.Port?.ToString(CultureInfo.InvariantCulture) ?? p.Scheme switch { "ftps" => "990", "sftp" => "22", _ => null };
                 FromLink(nameof(PortText), port, PortText, v => PortText = (string)v);
                 FromLink(nameof(TlsIndex), p.Scheme == "ftps" ? Array.IndexOf(TlsOrder, FtpTls.Implicit) : null, TlsIndex, v => TlsIndex = (int)v);
                 FromLink(nameof(User), p.User is { Length: > 0 } ? p.User : null, User, v => User = (string)v);
@@ -218,18 +271,20 @@ public sealed partial class HostedConnectViewModel : ObservableObject
 
     /// <summary>
     /// Человек ушёл из поля адреса (или нажал «Проверить»/«ОК»): из ссылки остаётся один хост, остальное уже лежит в
-    /// своих полях и дальше принадлежит им. У ссылки sftp:// остаётся схема (иначе пропадёт объяснение, почему подключить
-    /// нельзя), но логин и пароль из видимого поля уходят и у неё.
+    /// своих полях и дальше принадлежит им. У ссылки sftp:// остаётся схема — по ней выбран протокол, — но логин и
+    /// пароль из видимого поля уходят и у неё.
     /// </summary>
     public void CommitAddress()
     {
         if (Host.Length == 0) return;
         var commit = IsSftp ? "sftp://" + Host : Host;
         if (Address.Trim() == commit) return;
-        var keep = _checkedLayout;
         _fromLink.Clear(); // поля больше не «из ссылки»: адрес станет голым хостом, а заполненное остаётся
-        Address = commit;
-        _checkedLayout = keep; // хост тот же — проверка по-прежнему про это подключение
+        // тихо: хост тот же — проверка по-прежнему про это подключение, а у sftp:// без порта разбор иначе снова
+        // поставил бы 22 поверх порта, который пришёл из ссылки
+        _quiet = true;
+        try { Address = commit; }
+        finally { _quiet = false; }
     }
 
     private void Edited()
@@ -244,6 +299,8 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         OnPropertyChanged(nameof(Port));
         OnPropertyChanged(nameof(Tls));
         OnPropertyChanged(nameof(IsSftp));
+        OnPropertyChanged(nameof(IsKeyLogin));
+        OnPropertyChanged(nameof(ShowPasswordKeep));
         OnPropertyChanged(nameof(NormalizedRoot));
         OnPropertyChanged(nameof(CanAccept));
         CheckCommand.NotifyCanExecuteChanged();
@@ -253,20 +310,41 @@ public sealed partial class HostedConnectViewModel : ObservableObject
     private void UpdateHints()
     {
         (AddressHint, AddressTone) =
-            IsSftp ? (Loc.T("hosted.sftpLater"), RowTone.Warn)
-            : Address.Trim().Length > 0 && Host.Length == 0 ? (Loc.T("hosted.hostHint"), RowTone.Danger)
+            Address.Trim().Length > 0 && Host.Length == 0 ? (Loc.T("hosted.hostHint"), RowTone.Danger)
+            : IsSftp ? (Loc.T("hosted.sftpHint"), RowTone.Muted)
             : (Loc.T("hosted.hostHint"), RowTone.Muted);
 
-        (PortHint, PortTone) = Port switch
-        {
-            21 => (Loc.T("hosted.portHintFtp"), RowTone.Muted),
-            8821 => (Loc.T("hosted.portHintTcadmin"), RowTone.Muted),
-            22 or 2022 or 8822 => (Loc.T("hosted.portSftp", Port), RowTone.Warn),
-            990 => (Loc.T("hosted.portImplicit"), RowTone.Muted),
-            _ => ("", RowTone.Muted),
-        };
+        (PortHint, PortTone) = IsSftp
+            ? Port switch
+            {
+                22 => (Loc.T("hosted.portHintSftp"), RowTone.Muted),
+                21 or 990 or 8821 => (Loc.T("hosted.portFtpNotSftp", Port), RowTone.Warn),
+                _ => ("", RowTone.Muted),
+            }
+            : Port switch
+            {
+                21 => (Loc.T("hosted.portHintFtp"), RowTone.Muted),
+                8821 => (Loc.T("hosted.portHintTcadmin"), RowTone.Muted),
+                22 or 2022 or 8822 => (Loc.T("hosted.portSftp", Port), RowTone.Warn),
+                990 => (Loc.T("hosted.portImplicit"), RowTone.Muted),
+                _ => ("", RowTone.Muted),
+            };
 
-        (RootHint, RootTone) = NormalizedRoot is null ? (Loc.T("hosted.rootHint"), RowTone.Danger) : (Loc.T("hosted.rootHint"), RowTone.Muted);
+        var rootHint = IsSftp ? Loc.T("hosted.rootHintSftp") : Loc.T("hosted.rootHint");
+        (RootHint, RootTone) = (rootHint, NormalizedRoot is null ? RowTone.Danger : RowTone.Muted);
+
+        // диск трогаем, только когда поле ключа на виду: правка других полей не должна ждать сетевую папку
+        var keyFile = KeyFile.Trim();
+        (KeyFileHint, KeyFileTone) = IsKeyLogin && keyFile.Length > 0 && !KeyFileExists(keyFile)
+            ? (Loc.T("hosted.keyMissing", keyFile), RowTone.Danger)
+            : (Loc.T("hosted.keyHint"), RowTone.Muted);
+    }
+
+    /// <summary>Файл ключа есть на этом компьютере («~/» — папка пользователя, как пишут для ssh).</summary>
+    private static bool KeyFileExists(string path)
+    {
+        try { return File.Exists(HostedEndpoint.ExpandKeyPath(path)); }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or IOException) { return false; }
     }
 
     /// <summary>Папка сервера: пусто и «/» — корень; иначе нормализованный путь; «..» и управляющие знаки — null.</summary>
@@ -294,7 +372,14 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         CancelCheck();
         SetPending(null);
         _checkedLayout = null;
-        if (EndpointPassword() is not { } password)
+        if (IsKeyLogin && !KeyFileExists(KeyFile.Trim()))
+        {
+            // до сервера идти незачем: без файла ключа вход не получится, а «нет файла» понятнее ошибки входа
+            CheckTone = RowTone.Danger;
+            CheckText = Loc.T("hosted.keyMissing", KeyFile.Trim());
+            return;
+        }
+        if (EndpointSecret() is not { } secret)
         {
             // сохранённый пароль не расшифровать (другой компьютер или пользователь): пустым его не шлём — сервер ответил бы
             // «неверный пароль», а дело не в нём
@@ -313,7 +398,7 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         try
         {
             var settings = BuildConnection();
-            var endpoint = BuildEndpoint(password);
+            var endpoint = BuildEndpoint(secret);
             done = await _check(endpoint, settings, ct);
             result = CheckSummary(done);
             ok = true;
@@ -326,7 +411,7 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         {
             if (ct.IsCancellationRequested) return;
             _checkCts = null;
-            SetPending(ex.CertificateSha256, HostedSecret.Describe(ex));
+            SetPending(ex.CertificateSha256, HostedSecret.Describe(ex), ex.IsHostKey, ex.HostKeyChanged);
             CheckText = "";
             IsChecking = false;
             return;
@@ -343,8 +428,9 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         {
             _checkedLayout = done.Layout;
             _checkedVersion = done.GameVersion?.ToString();
-            // без тихого понижения: сервер умеет TLS — «если сервер умеет» становится «только с шифрованием»
-            if (Tls == FtpTls.Auto && done.Features.Encrypted)
+            // без тихого понижения: сервер умеет TLS — «если сервер умеет» становится «только с шифрованием».
+            // У SFTP шифрование всегда, а списка TLS нет вовсе — его не трогаем
+            if (!IsSftp && Tls == FtpTls.Auto && done.Features.Encrypted)
             {
                 _quiet = true;
                 try { TlsIndex = Array.IndexOf(TlsOrder, FtpTls.Explicit); }
@@ -380,12 +466,16 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         return source is null ? version.ToString() : $"{version} ({source})";
     }
 
-    /// <summary>«Доверять этому сертификату»: отпечаток запоминается в подключении, проверка идёт заново.</summary>
+    /// <summary>
+    /// «Доверять этому сертификату» (или ключу сервера SFTP): отпечаток запоминается в подключении, проверка идёт заново.
+    /// Ключ сервера запоминается вместе с хостом и портом: на другом порту того же хоста отвечает другой сервер.
+    /// </summary>
     [RelayCommand]
     private async Task TrustCertificateAsync()
     {
         if (_pendingCertificate is not { } sha) return;
-        _trustedCertificate = sha;
+        if (_pendingIsHostKey) (_trustedHostKey, _trustedHostKeyFor) = (sha, (Host, Port ?? DefaultPort));
+        else _trustedCertificate = sha;
         SetPending(null);
         await CheckAsync();
     }
@@ -394,10 +484,22 @@ public sealed partial class HostedConnectViewModel : ObservableObject
     internal void ShowCertificatePrompt(string sha) =>
         SetPending(sha, HostedSecret.Describe(new RemoteFilesException(RemoteFailure.CertificateUntrusted, "untrusted") { CertificateSha256 = sha }));
 
-    private void SetPending(string? sha, string text = "")
+    /// <summary>Показать запрос о ключе сервера SFTP — только для снимков окна (dialog.hostedconnect.hostkey и .hostkeychanged).</summary>
+    internal void ShowHostKeyPrompt(string sha, bool changed)
+    {
+        var ex = new RemoteFilesException(RemoteFailure.CertificateUntrusted, "untrusted")
+        {
+            CertificateSha256 = sha, IsHostKey = true, HostKeyChanged = changed,
+        };
+        SetPending(sha, HostedSecret.Describe(ex), hostKey: true, changed);
+    }
+
+    private void SetPending(string? sha, string text = "", bool hostKey = false, bool changed = false)
     {
         _pendingCertificate = sha;
+        _pendingIsHostKey = sha is not null && hostKey;
         CertificateText = sha is null ? "" : text;
+        TrustText = !_pendingIsHostKey ? Loc.T("hosted.trust") : changed ? Loc.T("hosted.trustNewKey") : Loc.T("hosted.trustKey");
         OnPropertyChanged(nameof(HasPendingCertificate));
     }
 
@@ -411,10 +513,17 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         CheckText = "";
     }
 
+    /// <summary>«Обзор…» у файла ключа: выбранный файл встаёт в поле.</summary>
+    [RelayCommand]
+    private void BrowseKey()
+    {
+        if (PickKeyFile() is { Length: > 0 } path) KeyFile = path;
+    }
+
     // ===== ответ =====
 
     /// <summary>
-    /// «ОК»: собрать подключение (пароль шифруется здесь), закрепить пути из удачной проверки и отдать окну.
+    /// «ОК»: собрать подключение (пароли шифруются здесь), закрепить пути из удачной проверки и отдать окну.
     /// null — «ОК» сейчас недоступна.
     /// </summary>
     public HostedConnection? Accept()
@@ -428,38 +537,69 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         return Result;
     }
 
-    /// <summary>Подключение из полей окна. Остальное (версия игры, «не напоминать», закреплённые пути) — от прежнего.</summary>
+    /// <summary>
+    /// Подключение из полей окна. Остальное (версия игры, «не напоминать», закреплённые пути) — от прежнего. Хранится
+    /// секрет только выбранного входа: по ключу — файл и пароль ключа, по паролю — пароль; секрет прежнего способа уходит.
+    /// </summary>
     private HostedConnection BuildConnection()
     {
         var c = _existing?.Clone() ?? new HostedConnection();
         var root = NormalizedRoot ?? "/";
-        // другой сервер или другая папка: закреплённые пути старого уже не про него, раскладка найдётся заново
-        if (_existing is { } e && (!string.Equals(e.Host, Host, StringComparison.OrdinalIgnoreCase) || NormalizeRoot(e.Root) != root))
+        // другой сервер, протокол или папка: закреплённые пути старого уже не про него, раскладка найдётся заново
+        if (_existing is { } e && (!string.Equals(e.Host, Host, StringComparison.OrdinalIgnoreCase) || NormalizeRoot(e.Root) != root
+                                   || e.Protocol != _protocol))
             (c.ConfigPath, c.ModDirs, c.InstallDir, c.GameDir) = (null, null, null, null);
-        c.Protocol = HostedProtocol.Ftp;
+        c.Protocol = _protocol;
         c.Host = Host;
-        c.Port = Port ?? 21;
+        c.Port = Port ?? DefaultPort;
         c.Tls = Tls;
         c.User = User.Trim();
-        c.ActiveMode = ActiveMode;
+        c.ActiveMode = !IsSftp && ActiveMode;
         c.Root = root;
         c.CertificateSha256 = _trustedCertificate;
-        if (Password.Length > 0) c.Password = HostedSecret.Protect(Password);
+        c.HostKeySha256 = IsSftp ? TrustedHostKey(c.Port) : null;
+        if (IsKeyLogin)
+        {
+            c.KeyFile = KeyFile.Trim();
+            if (KeyPassphrase.Length > 0) c.KeyPassphrase = HostedSecret.Protect(KeyPassphrase);
+            c.Password = null;
+        }
+        else
+        {
+            (c.KeyFile, c.KeyPassphrase) = (null, null);
+            if (Password.Length > 0) c.Password = HostedSecret.Protect(Password);
+        }
         return c;
     }
 
-    /// <summary>
-    /// Пароль для проверки: введённый, а при пустом поле — сохранённый (расшифрованный) или пустой, если его нет.
-    /// null — сохранённый есть, но его не расшифровать.
-    /// </summary>
-    private string? EndpointPassword() =>
-        Password.Length > 0 ? Password
-        : _existing?.Password is { Length: > 0 } saved ? HostedSecret.Unprotect(saved)
-        : "";
+    /// <summary>Ключ сервера, которому доверились, — если он про этот хост и порт; иначе null (спросим заново).</summary>
+    private string? TrustedHostKey(int port) =>
+        _trustedHostKeyFor is { } at && at.Port == port && string.Equals(at.Host, Host, StringComparison.OrdinalIgnoreCase) ? _trustedHostKey : null;
 
-    /// <summary>Подключение с расшифрованным паролем — для одной проверки.</summary>
-    private HostedEndpoint BuildEndpoint(string password) =>
-        new(HostedProtocol.Ftp, Host, Port ?? 21, Tls, User.Trim(), password, ActiveMode, _trustedCertificate);
+    /// <summary>
+    /// Секрет для проверки: у входа по ключу — пароль ключа, иначе пароль. Введённый, а при пустом поле — сохранённый
+    /// (расшифрованный) или пустой, если его нет. null — сохранённый есть, но его не расшифровать.
+    /// </summary>
+    private string? EndpointSecret()
+    {
+        var (typed, saved) = IsKeyLogin ? (KeyPassphrase, _existing?.KeyPassphrase) : (Password, _existing?.Password);
+        return typed.Length > 0 ? typed
+            : saved is { Length: > 0 } ? HostedSecret.Unprotect(saved)
+            : "";
+    }
+
+    /// <summary>Подключение с расшифрованным паролем (или паролем ключа) — для одной проверки.</summary>
+    private HostedEndpoint BuildEndpoint(string secret)
+    {
+        var port = Port ?? DefaultPort;
+        var key = IsKeyLogin;
+        return new HostedEndpoint(_protocol, Host, port, Tls, User.Trim(), key ? "" : secret, !IsSftp && ActiveMode, _trustedCertificate)
+        {
+            TrustedHostKey = IsSftp ? TrustedHostKey(port) : null,
+            KeyFile = key ? HostedEndpoint.ExpandKeyPath(KeyFile) : null,
+            KeyPassphrase = key && secret.Length > 0 ? secret : null,
+        };
+    }
 
     // ===== разбор адреса =====
 
