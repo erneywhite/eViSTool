@@ -424,7 +424,7 @@ and nothing is exposed to the internet.
 
 ## Hosted server
 
-*Since 0.12.0, in beta.* If your server is rented from a host (G-Portal and others), eViSTool manages its mods over
+*Since 0.12.0.* If your server is rented from a host (G-Portal and others), eViSTool manages its mods over
 FTP. New profile → Hosted server: take the FTP address, port, login and password from the host's panel, then press
 Check connection. eViSTool finds the mods folders, serverconfig.json and the game version by itself.
 
@@ -434,9 +434,14 @@ serverconfig.json, the rest stays as the host's panel wrote it. Before every rep
 is downloaded to your computer, so a mod can be brought back from History. The host's own mods (G-Portal's
 `gportal_mods` folder) are shown, but cannot be changed.
 
-A running server won't see new mods, so before the first change eViSTool reminds you to stop it in the host's panel.
-Starting the server, the console, players and the schedule stay in the host's panel. The password is stored encrypted
-and is never shown. SFTP and mod settings over FTP are not supported yet.
+In the Server section eViSTool reads the server log over FTP: whether the server is running, who is on it, what it
+writes to the console and how past runs ended. When the server crashes, the same crash window as for a local server
+opens. Mod settings edits the configs in the server's ModConfig folder, the copies for rollback are kept on your
+computer.
+
+A running server won't see new mods, so before a change eViSTool checks the log: if the server is stopped, it just
+goes ahead, otherwise it asks you to stop it in the host's panel. Starting and stopping the server and console
+commands stay in the host's panel. The password is stored encrypted and is never shown. SFTP is not supported yet.
 
 ## Server on Linux
 

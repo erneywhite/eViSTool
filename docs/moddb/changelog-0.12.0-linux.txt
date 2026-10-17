@@ -1,0 +1,25 @@
+eViSTool 0.12.0 for Linux: mods, mod settings and the server log of a server rented from a host (G-Portal and others), over FTP.
+
+Checked on a real G-Portal server. Other hosts may lay out their files differently: if something goes wrong, please write in the comments which host you use.
+
+- New profile → "Hosted server" in the window: FTP address, port, login and password from the host's panel, then Check connection. eViSTool finds serverconfig.json, the mods folders and the game version by itself.
+- My mods: list, update checks, install, update, rollback, turning mods off and on, deleting. Turning a mod off changes only WorldConfig.DisabledMods in serverconfig.json. Before every replacement or deletion the old version is saved on this computer. The host's own mods (gportal_mods) are shown read-only.
+- Server: the server log over FTP: running or stopped, the console (read-only), players online, past runs from Logs/Archive and the crash window when the server crashes.
+- Mod settings: the configs in the server's ModConfig folder can be edited, restored and reset.
+- Before changing anything eViSTool checks the server log and asks you to stop the server in the host's panel only if it is not stopped.
+- The password is stored encrypted with a key only your user can read. SFTP is not supported yet.
+- "In catalog" no longer opens a random mod for a mod without a modid.
+
+---
+
+eViSTool 0.12.0 для Linux: моды, настройки модов и лог сервера у хостера (G-Portal и другие) по FTP.
+
+Проверено на настоящем сервере G-Portal. У других хостеров файлы могут лежать иначе: если что-то пошло не так, напиши в комментариях, какой у тебя хостер.
+
+- «Новый профиль» → «Сервер у хостера» в окне: адрес FTP, порт, логин и пароль из панели хостера, потом «Проверить подключение». eViSTool сам найдёт serverconfig.json, папки модов и версию игры.
+- «Мои моды»: список, проверка обновлений, установка, обновление, откат, выключение и удаление. При выключении мода в serverconfig.json меняется только WorldConfig.DisabledMods. Перед каждой заменой и удалением старая версия сохраняется на этом компьютере. Моды самого хостера (gportal_mods) видны, но менять их нельзя.
+- «Сервер»: лог сервера по FTP: запущен или остановлен, консоль (только чтение), игроки онлайн, прошлые запуски из Logs/Archive и окно вылета, если сервер упал.
+- «Настройки модов»: конфиги из папки ModConfig на сервере можно править, откатывать и сбрасывать.
+- Перед изменениями eViSTool смотрит в лог сервера и просит остановить сервер в панели хостера, только если он не остановлен.
+- Пароль хранится зашифрованным ключом, который может прочитать только твой пользователь. SFTP пока нет.
+- «В каталоге» больше не открывает случайный мод для мода без modid.
