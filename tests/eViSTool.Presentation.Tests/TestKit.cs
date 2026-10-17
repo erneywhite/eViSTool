@@ -147,7 +147,7 @@ internal class TestUiPlatform : IUiPlatform
     }
     public virtual void OpenTrash() { }
     public bool IsMainWindowVisible => true;
-    public void RestartAfterClose(string exe) { }
+    public virtual void RestartAfterClose(string exe) { }
     public string WriteCrashLog(Exception ex) => "";
 
 }
@@ -160,6 +160,8 @@ internal sealed class ScriptedDialogs : IDisposable
     public List<string> Warned { get; } = [];
     /// <summary>Сколько раз модель просила открыть Корзину.</summary>
     public int TrashOpened { get; set; }
+    /// <summary>Сколько раз модель просила перезапустить окно.</summary>
+    public int Restarts { get; set; }
 
     public ScriptedDialogs(params Answer[] answers)
     {
@@ -192,6 +194,12 @@ internal sealed class ScriptedPlatform(ScriptedDialogs? script) : TestUiPlatform
     public override void OpenTrash()
     {
         if (script is not null) script.TrashOpened++;
+    }
+
+    // перезапуск окна — тоже только запоминаем
+    public override void RestartAfterClose(string exe)
+    {
+        if (script is not null) script.Restarts++;
     }
 }
 

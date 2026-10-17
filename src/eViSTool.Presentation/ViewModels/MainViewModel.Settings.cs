@@ -100,9 +100,40 @@ public sealed partial class MainViewModel
         Server?.Schedule.SyncPolicy();
     }
 
+    // выбрали оставить правки другого окна: это окно перезапускается и больше ничего не пишет
+    private bool _settingsStale;
+
     private void Save()
     {
-        try { _store.Save(_settings); }
+        if (_settingsStale) return;
+        try
+        {
+            // другое окно eViSTool успело переписать настройки: спросить, чьи оставить
+            if (_store.ChangedElsewhere && !KeepOursOverOtherWindow()) return;
+            _store.Save(_settings);
+        }
         catch (IOException) { /* не критично: попробуем при следующем изменении */ }
+    }
+
+    /// <summary>
+    /// Настройки поменяли в другом окне. «Да» — записать изменения этого окна поверх; «Нет» — оставить те, а это окно
+    /// перезапустить, чтобы оно их подхватило (его последнее изменение не сохранится).
+    /// </summary>
+    private bool KeepOursOverOtherWindow()
+    {
+        if (Ui.Confirm(Loc.T("settings.changedElsewhere"), byDefault: Answer.No, warning: true)) return true;
+        _settingsStale = true;
+        Ui.Platform.RestartAfterClose(DiskUpdateWatcher.MainExe);
+        return false;
+    }
+
+    /// <summary>
+    /// При закрытии окна: у него к этому времени не сохранены только размеры (остальное пишется сразу) — если настройки
+    /// поменяли в другом окне, размерами не жертвуем чужими правками и молча не пишем.
+    /// </summary>
+    public void SaveOnExit()
+    {
+        if (_settingsStale || _store.ChangedElsewhere) return;
+        SaveSettings();
     }
 }
