@@ -29,32 +29,64 @@ public sealed record InstallPlan
     public ModVersion? NeedsGame => Incoming.Info?.NeedsNewerGame(Game);
 }
 
+/// <summary>
+/// Как строить и проверять пути модов при планировании установки: на этой машине — по диску, у сервера у хостера —
+/// по листингу FTP (<see cref="Hosting.RemoteModPaths"/>). Пути FTP нельзя пускать в Path.GetFullPath и File.Exists:
+/// на Windows «/Mods/x.zip» — это C:\Mods\x.zip на этом компьютере.
+/// </summary>
+public interface IModPaths
+{
+    string Combine(string dir, string name);
+    string DirectoryOf(string path);
+    string FileName(string path);
+    bool Exists(string path);
+    bool Same(string a, string b);
+}
+
+/// <summary>Пути на этой машине (так ModInstaller работал всегда).</summary>
+internal sealed class LocalModPaths : IModPaths
+{
+    public static readonly LocalModPaths Instance = new();
+
+    public string Combine(string dir, string name) => Path.Combine(dir, name);
+    public string DirectoryOf(string path) => Path.GetDirectoryName(path)!;
+    public string FileName(string path) => Path.GetFileName(path);
+    public bool Exists(string path) => File.Exists(path) || Directory.Exists(path);
+    public bool Same(string a, string b) =>
+        string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
+}
+
 public static class ModInstaller
 {
-    /// <summary>Разбирает zip и решает, куда и что ставить. Ничего не меняет на диске.</summary>
-    public static InstallPlan Plan(string sourceZip, ResolvedProfile profile, IReadOnlyList<LocalMod> installed)
+    /// <summary>
+    /// Разбирает zip и решает, куда и что ставить. Ничего не меняет на диске. <paramref name="paths"/> — как проверять
+    /// пути установленных модов (null — по диску этой машины). Исходный архив всегда лежит на этой машине: с путями
+    /// чужого сервера его не сравниваем.
+    /// </summary>
+    public static InstallPlan Plan(string sourceZip, ResolvedProfile profile, IReadOnlyList<LocalMod> installed, IModPaths? paths = null)
     {
+        var local = paths is null;
+        var at = paths ?? LocalModPaths.Instance;
         var incoming = ModScanner.ReadZip(sourceZip);
         if (incoming.Info is null)
             throw new InvalidDataException($"{Path.GetFileName(sourceZip)}: {incoming.Error}");
 
         var info = incoming.Info;
         var replaces = installed
-            .Where(m => m.Info is not null && m.Info.ModId == info.ModId
-                        && !string.Equals(Path.GetFullPath(m.Path), Path.GetFullPath(sourceZip), StringComparison.OrdinalIgnoreCase))
+            .Where(m => m.Info is not null && m.Info.ModId == info.ModId && !(local && SamePath(m.Path, sourceZip)))
             .ToList();
 
         // новая версия ложится туда же, где лежала старая; новый мод — в папку установки профиля
-        var dir = replaces.FirstOrDefault()?.Directory ?? profile.InstallDir
+        var dir = (replaces.FirstOrDefault() is { } first ? at.DirectoryOf(first.Path) : null) ?? profile.InstallDir
                   ?? throw new InvalidOperationException(Loc.T("err.noModsDir"));
-        var target = Path.Combine(dir, Path.GetFileName(sourceZip));
+        var target = at.Combine(dir, Path.GetFileName(sourceZip));
 
         // файл с таким именем есть, но это другой мод — не затираем его: ищем действительно свободное имя
         // (name.zip → name_modid.zip → name_modid_2.zip …)
         var stem = Path.GetFileNameWithoutExtension(sourceZip);
         var ext = Path.GetExtension(sourceZip);
-        for (var n = 1; IsTaken(target, sourceZip, replaces); n++)
-            target = Path.Combine(dir, n == 1 ? $"{stem}_{info.ModId}{ext}" : $"{stem}_{info.ModId}_{n}{ext}");
+        for (var n = 1; IsTaken(target, sourceZip, replaces, at, local); n++)
+            target = at.Combine(dir, n == 1 ? $"{stem}_{info.ModId}{ext}" : $"{stem}_{info.ModId}_{n}{ext}");
 
         var newVersion = ModVersion.ParseOrNull(info.Version);
         var oldVersion = replaces.Select(r => ModVersion.ParseOrNull(r.Info!.Version)).Where(v => v is not null).Max();
@@ -77,12 +109,14 @@ public static class ModInstaller
         };
     }
 
-    /// <summary>Ставит мод: старые копии — в хранилище бэкапов, новый zip — в папку модов.</summary>
     /// <summary>Имя занято чем-то, что эта установка не заменяет (другим модом или посторонним файлом).</summary>
     private static bool IsTaken(string target, string sourceZip, IReadOnlyList<LocalMod> replaces) =>
-        (File.Exists(target) || Directory.Exists(target))
-        && !SamePath(target, sourceZip)
-        && !replaces.Any(r => SamePath(r.Path, target));
+        IsTaken(target, sourceZip, replaces, LocalModPaths.Instance, local: true);
+
+    private static bool IsTaken(string target, string sourceZip, IReadOnlyList<LocalMod> replaces, IModPaths paths, bool local) =>
+        paths.Exists(target)
+        && !(local && SamePath(target, sourceZip))
+        && !replaces.Any(r => paths.Same(r.Path, target));
 
     private static bool SamePath(string a, string b) =>
         string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);

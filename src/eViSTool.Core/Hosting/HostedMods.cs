@@ -1,35 +1,468 @@
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
+using eViSTool.Core.Localization;
 using eViSTool.Core.Mods;
 using eViSTool.Core.Profiles;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace eViSTool.Core.Hosting;
 
 /// <summary>
 /// Операции с модами сервера у хостера — то же, что <see cref="ModTargets"/> делает со своим профилем, но по FTP:
 /// скан (листинг + кэш modinfo), установка через временный файл, вкл/выкл в serverconfig.json, удаление с копией
-/// на этой машине, отпечаток для опроса изменений со стороны.
+/// на этой машине, отпечаток для опроса изменений со стороны. Каждый публичный метод — одна очередь соединения профиля
+/// (<see cref="HostedSessions"/>); всё внутри идёт по уже выданному соединению.
+/// <para>
+/// Ничего из этого не трогает диск этой машины по путям сервера: пути модов здесь — пути на FTP («/Mods/x.zip»), а на
+/// Windows такой путь значил бы C:\Mods\x.zip. На этой машине пишется только своё: кэш, журнал, копии, история.
+/// </para>
 /// </summary>
-public sealed class HostedMods(ModTarget target)
+public sealed partial class HostedMods(ModTarget target)
 {
     public ModTarget Target { get; } = target.IsHosted ? target : throw new ArgumentException("not a hosted target", nameof(target));
 
-    public Task<(ResolvedProfile Profile, IReadOnlyList<LocalMod> Mods)> ScanAsync(IProgress<string>? progress, CancellationToken ct) =>
-        NotReady<(ResolvedProfile, IReadOnlyList<LocalMod>)>("HostedMods.ScanAsync");
+    /// <summary>Раскладка, найденная последним сканом этого экземпляра (null — ещё не сканировали).</summary>
+    public HostedLayout? Layout { get; private set; }
 
-    public Task<ModInstallOutcome?> InstallAsync(string zip, Func<InstallPlan, bool>? confirm, CancellationToken ct) =>
-        NotReady<ModInstallOutcome?>("HostedMods.InstallAsync");
+    /// <summary>Откуда взялась версия игры при последнем скане (null — не нашлась или ещё не сканировали).</summary>
+    public GameVersionSource? VersionSource { get; private set; }
+
+    // раскладка последнего скана профиля — для отпечатка: опрос раз в 30 с не должен заново искать папки и читать лог
+    private static readonly ConcurrentDictionary<string, HostedLayout> LastLayouts = new(StringComparer.Ordinal);
+
+    private HostedTarget Hosted => Target.Hosted!;
+    private string Id => Target.ProfileId;
+
+    /// <summary>Что нашёл скан: профиль и моды, плюс то, что нужно операциям (записи листинга, папки-моды).</summary>
+    private sealed record Scan(ResolvedProfile Profile, IReadOnlyList<LocalMod> Mods, HostedSnapshot Snapshot,
+        IReadOnlyDictionary<string, RemoteEntry> Entries, IReadOnlySet<string> Folders);
+
+    public Task<(ResolvedProfile Profile, IReadOnlyList<LocalMod> Mods)> ScanAsync(IProgress<string>? progress, CancellationToken ct) =>
+        HostedSessions.UseAsync<(ResolvedProfile, IReadOnlyList<LocalMod>)>(Id, Hosted.Endpoint, async files =>
+        {
+            var scan = await ScanCoreAsync(files, progress, ct).ConfigureAwait(false);
+            return (scan.Profile, scan.Mods);
+        }, readOnly: true, ct);
 
     public Task SetEnabledAsync(string path, bool enabled, CancellationToken ct) =>
-        NotReady<bool>("HostedMods.SetEnabledAsync");
+        HostedSessions.UseAsync(Id, Hosted.Endpoint, async files =>
+        {
+            var scan = await ScanCoreAsync(files, null, ct).ConfigureAwait(false);
+            var mod = Find(scan, path);
+            EnsureWritable(scan, mod);
+            var info = mod.Info ?? throw new InvalidOperationException(mod.Error ?? mod.FileName);
+            var config = scan.Profile.ConfigPath ?? throw new InvalidOperationException(Loc.T("hosted.noConfig"));
+            return await EditConfigAsync(files, config, root => ModConfigEditor.SetEnabled(root, ProfileKind.Server, info, enabled), ct)
+                .ConfigureAwait(false);
+        }, ct);
 
+    /// <summary>
+    /// Удалить мод: сначала копия в хранилище версий этой машины (корзины на FTP нет), потом удаление на сервере, запись
+    /// в историю «версия → нет»; других копий мода не осталось — он уходит и из списка выключенных.
+    /// </summary>
     public Task DeleteAsync(string path, CancellationToken ct) =>
-        NotReady<bool>("HostedMods.DeleteAsync");
+        HostedSessions.UseAsync(Id, Hosted.Endpoint, async files =>
+        {
+            var scan = await ScanCoreAsync(files, null, ct).ConfigureAwait(false);
+            var mod = Find(scan, path);
+            EnsureWritable(scan, mod);
 
+            var dir = HostedJournal.OldDirFor(Id);
+            try
+            {
+                Directory.CreateDirectory(dir);
+                var copy = Path.Combine(dir, RemotePath.SafeLocalName(RemotePath.Name(mod.Path)));
+                await using (var file = File.Create(copy))
+                    await files.DownloadAsync(mod.Path, file, null, ct).ConfigureAwait(false);
+                ModBackupStore.ForProfileId(Id).Keep(new LocalMod(copy, mod.Info, null));
+            }
+            finally
+            {
+                DeleteLocalDir(dir);
+            }
+
+            await files.DeleteFileAsync(mod.Path, ct).ConfigureAwait(false);
+            if (mod.Info is { } gone) ModHistory.Record(ModHistory.FileFor(Id), gone.ModId, gone.Name, gone.Version, null);
+
+            // других копий мода не осталось — убираем его и из списка выключенных
+            if (mod.Info is { } info && scan.Profile.ConfigPath is { } config
+                && scan.Mods.Count(m => m.Info?.ModId == info.ModId) == 1)
+                await EditConfigAsync(files, config, root => ModConfigEditor.SetEnabled(root, ProfileKind.Server, info, enabled: true), ct)
+                    .ConfigureAwait(false);
+            return true;
+        }, ct);
+
+    /// <summary>
+    /// Отпечаток набора модов: SHA-1 от «имя|размер|время» файлов папок модов и от размера и времени конфига. Папки — из
+    /// раскладки прошлого скана (1–2 листинга на опрос); скана ещё не было — раскладка ищется.
+    /// </summary>
     public Task<string> StampAsync(CancellationToken ct) =>
-        NotReady<string>("HostedMods.StampAsync");
+        HostedSessions.UseAsync(Id, Hosted.Endpoint, async files =>
+        {
+            var root = HostedLayoutProbe.Root(Hosted.Settings);
+            var layout = LastLayouts.TryGetValue(Id, out var known) && known.Root == root
+                ? known
+                : (await HostedLayoutProbe.ReadAsync(files, Hosted.Settings, ct).ConfigureAwait(false)).Layout;
+            var ls = new HostedListings(files);
+            var text = new StringBuilder();
+            foreach (var dir in layout.ModDirs)
+            {
+                text.Append(dir).Append('\n');
+                var list = await ls.ListAsync(dir, ct).ConfigureAwait(false);
+                if (list is null) text.Append("(gone)\n");
+                foreach (var e in (list ?? []).OrderBy(e => e.Name, StringComparer.Ordinal))
+                    text.Append(e.Name).Append('|').Append(e.Size).Append('|').Append(e.Modified?.Ticks).Append('\n');
+            }
+            if (layout.ConfigPath is { } config && await ls.FileAsync(config, ct).ConfigureAwait(false) is { } entry)
+                text.Append(config).Append('|').Append(entry.Size).Append('|').Append(entry.Modified?.Ticks).Append('\n');
+            return Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(text.ToString())));
+        }, readOnly: true, ct);
 
-    // shortcut: заглушки до пакета P3, там и заменить настоящими операциями. Ошибка — RemoteFilesException (наследник
-    // IOException), а не NotImplementedException: её ловят фильтры окна, и промежуточная сборка не падает,
-    // если профиль у хостера попал, например, в «Поставить заодно»
-    private static Task<T> NotReady<T>(string what) =>
-        Task.FromException<T>(new RemoteFilesException(RemoteFailure.Unsupported, what + " is not implemented yet"));
+    // ---------- скан
+
+    private async Task<Scan> ScanCoreAsync(IRemoteFiles files, IProgress<string>? progress, CancellationToken ct)
+    {
+        var warnings = new List<string>();
+
+        // прерванная установка (связь оборвалась между «удалить старое» и «переименовать новое») — довести или вернуть
+        if (HostedJournal.Read(Id) is { } pending)
+        {
+            try
+            {
+                var name = pending.Name ?? pending.ModId;
+                warnings.Add(await HostedJournal.FinishAsync(files, Id, pending, ct).ConfigureAwait(false)
+                    ? Loc.T("hosted.recovered", name)
+                    : Loc.T("hosted.rolledBack", name));
+            }
+            catch (RemoteFilesException ex) when (ex.Kind is not (RemoteFailure.Connect or RemoteFailure.Timeout))
+            {
+                // сервер не дал довести (права, место) — журнал остаётся, попробуем при следующем скане
+            }
+        }
+
+        var settings = Hosted.Settings;
+        var snapshot = await HostedLayoutProbe.ReadAsync(files, settings, ct).ConfigureAwait(false);
+        var layout = snapshot.Layout;
+        Layout = layout;
+        LastLayouts[Id] = layout;
+        warnings.AddRange(layout.Warnings);
+
+        var disabledList = snapshot.ConfigJson is { } json ? ProfileResolver.ReadServerConfig(json).Disabled : [];
+        var (version, source) = await HostedGameVersion.DetectAsync(files, settings, snapshot, Id, ct).ConfigureAwait(false);
+        VersionSource = source;
+
+        var mods = new List<LocalMod>();
+        var entries = new Dictionary<string, RemoteEntry>(StringComparer.Ordinal);
+        var folders = new HashSet<string>(StringComparer.Ordinal);
+        var zips = new List<RemoteEntry>();
+        foreach (var dir in layout.ModDirs)
+        {
+            var hoster = HostedLayoutProbe.IsHosterDir(dir);
+            foreach (var e in await snapshot.Listings.ListAsync(dir, ct).ConfigureAwait(false) ?? [])
+            {
+                if (e.IsDirectory)
+                {
+                    if (await ReadFolderModAsync(files, snapshot.Listings, e, ct).ConfigureAwait(false) is { } folderMod)
+                    {
+                        mods.Add(folderMod);
+                        folders.Add(e.Path);
+                        entries[e.Path] = e;
+                    }
+                    continue;
+                }
+                var ext = Path.GetExtension(e.Name);
+                if (ext.Equals(".zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    zips.Add(e);
+                    entries[e.Path] = e;
+                }
+                else if ((ext.Equals(".dll", StringComparison.OrdinalIgnoreCase) || ext.Equals(".cs", StringComparison.OrdinalIgnoreCase))
+                         && !HostedLayoutProbe.IsBaseGameFile(e.Name))
+                {
+                    mods.Add(new LocalMod(e.Path, null, hoster ? Loc.T("hosted.hosterMod") : Loc.T("scan.codeModUnsupported")));
+                    entries[e.Path] = e;
+                }
+                // остальное (базовые dll и pdb игры, txt, json менеджеров, наши .evistool.tmp) игра модами не считает
+            }
+        }
+
+        mods.AddRange(await ReadZipsAsync(files, zips, progress, ct).ConfigureAwait(false));
+
+        var disabled = new HashSet<string>(disabledList); // игра сравнивает с учётом регистра
+        var result = mods.Select(l => l with { IsDisabled = ModUpdateService.IsDisabled(l, disabled) })
+            .OrderBy(m => m.Info?.Name ?? m.FileName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (folders.Count > 0) warnings.Add(Loc.T("hosted.folderModReadOnly"));
+        TrackLaunches(snapshot, disabledList, warnings);
+
+        var resolved = new ResolvedProfile
+        {
+            Profile = Target.Profile,
+            GameVersion = version,
+            ConfigPath = layout.ConfigPath,
+            ModDirs = layout.ModDirs,
+            InstallDir = layout.InstallDir,
+            DisabledMods = disabledList,
+            Warnings = warnings,
+            OffMachine = true, // пути — на FTP
+        };
+        return new Scan(resolved, result, snapshot, entries, folders);
+    }
+
+    /// <summary>modinfo архивов: из кэша, а промахи — с сервера (по возможности не целиком), с прогрессом «N из M».</summary>
+    private async Task<IReadOnlyList<LocalMod>> ReadZipsAsync(IRemoteFiles files, IReadOnlyList<RemoteEntry> zips, IProgress<string>? progress,
+        CancellationToken ct)
+    {
+        var cache = ModInfoCache.ForProfile(Id);
+        var misses = zips.Count(z => !cache.TryGet(z, out _));
+        var read = 0;
+        var tempDir = Path.Combine(ModInfoCache.DirFor(Id), "dl");
+        var mods = new List<LocalMod>();
+        try
+        {
+            foreach (var zip in zips)
+            {
+                if (!cache.TryGet(zip, out var info))
+                {
+                    progress?.Report(Loc.T("hosted.readingProgress", ++read, misses));
+                    try
+                    {
+                        info = await ZipProbe.ReadModInfoAsync(new RemoteRangeSource(files, zip, tempDir), ct).ConfigureAwait(false);
+                    }
+                    catch (RemoteFilesException ex) when (ex.Kind is RemoteFailure.NotFound or RemoteFailure.Denied)
+                    {
+                        // файл убрали или не дают читать: показываем ошибкой и не кэшируем
+                        mods.Add(new LocalMod(zip.Path, null, Loc.T("scan.readFailed", HostedSecret.Describe(ex))));
+                        continue;
+                    }
+                    cache.Put(zip, info);
+                }
+                mods.Add(ModScanner.FromCached(zip.Path, info));
+            }
+        }
+        finally
+        {
+            // кэш — даже после обрыва посреди: прочитанное не придётся читать снова
+            cache.Retain(zips.Select(z => z.Path));
+            cache.Save();
+        }
+        return mods;
+    }
+
+    /// <summary>Распакованный мод (папка с modinfo.json); папка без него — не мод (null).</summary>
+    private static async Task<LocalMod?> ReadFolderModAsync(IRemoteFiles files, HostedListings ls, RemoteEntry dir, CancellationToken ct)
+    {
+        var list = await ls.ListAsync(dir.Path, ct).ConfigureAwait(false);
+        var info = list?.FirstOrDefault(e => !e.IsDirectory && e.Name.Equals("modinfo.json", StringComparison.OrdinalIgnoreCase));
+        if (info is null) return null;
+        if (info.Size > ZipProbe.MaxModInfoSize) return new LocalMod(dir.Path, null, Loc.T("scan.corrupt"));
+        try
+        {
+            return ModScanner.FromModInfo(dir.Path, await files.ReadTextAsync(info.Path, ct).ConfigureAwait(false));
+        }
+        catch (RemoteFilesException ex) when (ex.Kind is RemoteFailure.NotFound or RemoteFailure.Denied)
+        {
+            return new LocalMod(dir.Path, null, Loc.T("scan.readFailed", HostedSecret.Describe(ex)));
+        }
+    }
+
+    /// <summary>
+    /// Запуски сервера — по LastLaunchMods (его пишет сервер при старте): поменялся — отметка запуска в истории (история
+    /// разбивается на сеансы по запускам). Если перед этим мы сами выключали моды, а после запуска они снова включены, —
+    /// предупреждение: хостер, похоже, переписал конфиг при старте.
+    /// </summary>
+    private void TrackLaunches(HostedSnapshot snapshot, IReadOnlyList<string> disabled, List<string> warnings)
+    {
+        if (snapshot.ConfigJson?["LastLaunchMods"] is not { Type: not JTokenType.Null } token) return;
+        var launch = token.Type == JTokenType.String ? (string)token! : token.ToString(Formatting.None);
+        var state = HostedState.Load(Id);
+        if (launch == state.LastLaunch) return;
+
+        // отметка — на момент, когда запуск заметили: время файла конфига у FTP грубое (до секунды или минуты, LIST — ещё
+        // и в поясе сервера) и могло бы встать раньше изменений, сделанных до запуска. Свои изменения после запуска
+        // раньше скана не бывают: каждая операция сначала сканирует
+        if (state.LastLaunch is not null) ModHistory.MarkLaunch(ModHistory.FileFor(Id));
+        if (state.WrittenDisabled is { Count: > 0 } written && launch != state.LaunchAtWrite)
+        {
+            var loaded = LaunchedIds(launch);
+            if (written.Any(w => !disabled.Any(d => IsEntryOf(d, w)) || loaded.Contains(w)))
+                warnings.Add(Loc.T("hosted.configReverted"));
+            state.WrittenDisabled = null;
+            state.LaunchAtWrite = null;
+        }
+        state.LastLaunch = launch;
+        state.Save(Id);
+    }
+
+    /// <summary>id модов из LastLaunchMods (то, что сервер загрузил при запуске).</summary>
+    private static HashSet<string> LaunchedIds(string launch)
+    {
+        try
+        {
+            return new HashSet<string>(JArray.Parse(launch).OfType<JObject>().Select(m => (string?)m["id"]).OfType<string>(),
+                StringComparer.OrdinalIgnoreCase);
+        }
+        catch (JsonException)
+        {
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>Запись списка выключенных — этот мод («modid» или «modid@версия»).</summary>
+    private static bool IsEntryOf(string entry, string modId) =>
+        entry == modId || entry.StartsWith(modId + "@", StringComparison.Ordinal);
+
+    /// <summary>Мод по пути — только из свежего скана: чужой путь сюда не пройдёт.</summary>
+    private static LocalMod Find(Scan scan, string path)
+    {
+        string normalized;
+        try
+        {
+            normalized = RemotePath.Normalize(path);
+        }
+        catch (InvalidDataException)
+        {
+            throw new FileNotFoundException(Loc.T("mods.remoteNotFound", path));
+        }
+        return scan.Mods.FirstOrDefault(m => m.Path == normalized)
+               ?? throw new FileNotFoundException(Loc.T("mods.remoteNotFound", RemotePath.Name(normalized)));
+    }
+
+    /// <summary>Мод хостера и распакованная папка — только для чтения.</summary>
+    private static void EnsureWritable(Scan scan, LocalMod mod)
+    {
+        if (HostedLayoutProbe.IsHosterDir(RemotePath.Parent(mod.Path))) throw new InvalidOperationException(Loc.T("hosted.hosterMod"));
+        if (scan.Folders.Contains(mod.Path)) throw new InvalidOperationException(Loc.T("hosted.folderModReadOnly"));
+    }
+
+    // ---------- serverconfig.json
+
+    /// <summary>
+    /// Правка serverconfig.json на сервере: скачать, поправить дерево, собрать текст в том же виде, перед записью
+    /// скачать ещё раз и сравнить (на FTP нет блокировок: конфиг мог поменять сервер или второе окно) — другой текст,
+    /// правка повторяется по нему, до трёх раз. false — менять нечего.
+    /// </summary>
+    private async Task<bool> EditConfigAsync(IRemoteFiles files, string configPath, Func<JObject, bool> edit, CancellationToken ct)
+    {
+        var before = await files.ReadTextAsync(configPath, ct).ConfigureAwait(false);
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            JObject root;
+            try
+            {
+                root = ModConfigEditor.ParseText(before);
+            }
+            catch (JsonException ex)
+            {
+                throw new IOException(Loc.T("profile.configReadFailed", HostedLayoutProbe.ConfigName, ex.Message), ex);
+            }
+            if (!edit(root)) return false;
+            var text = ModConfigEditor.ToText(root, before);
+
+            var now = await files.ReadTextAsync(configPath, ct).ConfigureAwait(false);
+            if (now != before)
+            {
+                before = now;
+                continue;
+            }
+            SavePrevious(before);
+            await WriteConfigAsync(files, configPath, text, ct).ConfigureAwait(false);
+            RememberWritten(root);
+            return true;
+        }
+        throw new IOException(Loc.T("hosted.errConfigBusy"));
+    }
+
+    /// <summary>
+    /// Записать конфиг через временный файл. Многие серверы (G-Portal тоже) не переименовывают поверх — тогда прежний
+    /// файл уходит в .evistool.bak, временный встаёт на место, а при сбое bak возвращается.
+    /// </summary>
+    private static async Task WriteConfigAsync(IRemoteFiles files, string configPath, string text, CancellationToken ct)
+    {
+        var tmp = configPath + ".evistool.tmp";
+        var bak = configPath + ".evistool.bak";
+        await files.WriteTextAsync(tmp, text, ct).ConfigureAwait(false);
+        try
+        {
+            try
+            {
+                await files.RenameAsync(tmp, configPath, ct).ConfigureAwait(false);
+                return;
+            }
+            catch (RemoteFilesException ex) when (ex.Kind == RemoteFailure.Exists)
+            {
+                // поверх не переименовывает — через bak
+            }
+            if (await new HostedListings(files).FileAsync(bak, ct).ConfigureAwait(false) is not null)
+                await files.DeleteFileAsync(bak, ct).ConfigureAwait(false);
+            await files.RenameAsync(configPath, bak, ct).ConfigureAwait(false);
+            try
+            {
+                await files.RenameAsync(tmp, configPath, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is IOException or OperationCanceledException)
+            {
+                await QuietlyAsync(() => files.RenameAsync(bak, configPath, CancellationToken.None)).ConfigureAwait(false);
+                throw;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or OperationCanceledException)
+        {
+            await QuietlyAsync(() => files.DeleteFileAsync(tmp, CancellationToken.None)).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    /// <summary>Прежний текст конфига — копией на этой машине (cache/hosted/&lt;id&gt;/serverconfig.prev.json).</summary>
+    private void SavePrevious(string text)
+    {
+        try
+        {
+            var dir = ModInfoCache.DirFor(Id);
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "serverconfig.prev.json"), text, new UTF8Encoding(false));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // копия — подстраховка, без неё правка всё равно идёт через bak на сервере
+        }
+    }
+
+    /// <summary>Что мы записали в DisabledMods и при каком запуске — для проверки «хостер переписал конфиг».</summary>
+    private void RememberWritten(JObject root)
+    {
+        var state = HostedState.Load(Id);
+        var (_, disabled) = ProfileResolver.ReadServerConfig(root);
+        state.WrittenDisabled = [.. disabled.Select(d => d.Split('@')[0])];
+        state.LaunchAtWrite = root["LastLaunchMods"] is { Type: not JTokenType.Null } t
+            ? t.Type == JTokenType.String ? (string)t! : t.ToString(Formatting.None)
+            : null;
+        state.Save(Id);
+    }
+
+    private static async Task QuietlyAsync(Func<Task> step)
+    {
+        try
+        {
+            await step().ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or OperationCanceledException)
+        {
+            // уборка после сбоя: основную ошибку бросает вызывающий
+        }
+    }
+
+    private static void DeleteLocalDir(string dir)
+    {
+        try
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // временная папка копий — место, но не вред
+        }
+    }
 }
