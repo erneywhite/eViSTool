@@ -14,6 +14,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- тестам — точки вмешательства в гонки (ServerHost.BeforeWatchdogStart) -->
+    <InternalsVisibleTo Include="eViSTool.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- словари переводов вшиваются в сборку -->
     <EmbeddedResource Include="Lang\*.json" />
   </ItemGroup>

@@ -320,6 +320,29 @@ public sealed class ServerHostTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task StopPressedTheMomentTheWatchdogPauseEnds_KeepsTheServerStopped()
+    {
+        var host = Host();
+        await host.StartAsync();
+        await Until(() => host.State == ServerState.Running);
+
+        // «Стоп» ровно между концом паузы сторожа и запуском (ревью 2026-10-10): раньше сервер поднимался вопреки ему
+        var stopped = new TaskCompletionSource();
+        host.BeforeWatchdogStart = () =>
+        {
+            host.StopAsync().GetAwaiter().GetResult(); // сервер уже лежит — «Стоп» только отменяет ожидание сторожа
+            stopped.TrySetResult();
+        };
+        await host.SendCommandAsync("/crash");
+        await stopped.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        await Task.Delay(1000); // хватило бы и на запуск, и на ещё одну паузу сторожа
+        Assert.Equal(ServerState.Stopped, host.State);
+        Assert.Null(host.Pid);
+        Assert.Null(host.RestartScheduledAt);
+    }
+
+    [Fact]
     public async Task StateHandler_ThatWaitsForAnotherThreadUsingTheHost_DoesNotDeadlock()
     {
         var host = Host();

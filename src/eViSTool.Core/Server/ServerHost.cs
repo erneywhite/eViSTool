@@ -161,21 +161,30 @@ public sealed class ServerHost : IAsyncDisposable
 
     public Task StartAsync()
     {
+        Start(CancellationToken.None);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Запуск; <paramref name="watchdog"/> — отмена ожидания сторожа, если запускает он (см. <see cref="StartLocked"/>).</summary>
+    private void Start(CancellationToken watchdog)
+    {
         try
         {
-            StartLocked();
+            StartLocked(watchdog);
         }
         finally
         {
             RaiseStateChanges();
         }
-        return Task.CompletedTask;
     }
 
-    private void StartLocked()
+    private void StartLocked(CancellationToken watchdog)
     {
         lock (_lock)
         {
+            // запускает сторож, а «Стоп» нажали уже после конца паузы, но до этого замка: отмену ставит «Стоп» под этим же
+            // замком, поэтому проверка здесь — последняя и надёжная; иначе сервер поднялся бы вопреки «Стоп»
+            if (watchdog.IsCancellationRequested) return;
             if (State is ServerState.Starting or ServerState.Running or ServerState.Stopping) return;
 
             // мир занят (идёт восстановление, копия) — не стартуем на меняющихся файлах; бронь — до выхода процесса.
@@ -332,14 +341,20 @@ public sealed class ServerHost : IAsyncDisposable
         _world = null;
     }
 
+    /// <summary>Тестам: пауза сторожа истекла, запуск — следующий шаг (сюда тест вставляет «Стоп», нажатый в этот миг).</summary>
+    internal Action? BeforeWatchdogStart { get; set; }
+
     /// <summary>
     /// Сторож: поднять сервер через паузу. Мир в это время занят (идёт восстановление) — не стартуем, а ждём:
     /// пробуем снова через ту же паузу, пока не освободится или ожидание не отменят.
     /// </summary>
-    private void ScheduleRestart(bool afterCrash = true)
+    /// <param name="previous">Отмена прежнего ожидания, которое продлеваем (мир был занят).</param>
+    private void ScheduleRestart(bool afterCrash = true, CancellationToken previous = default)
     {
         lock (_lock)
         {
+            // «Стоп» успел между отказом занятого мира и этим замком — прежнее ожидание отменено, новое не заводим
+            if (previous.IsCancellationRequested) return;
             if (afterCrash)
             {
                 _crashes.RemoveAll(t => DateTime.Now - t > TimeSpan.FromHours(1));
@@ -355,20 +370,20 @@ public sealed class ServerHost : IAsyncDisposable
             _restartCts = new CancellationTokenSource();
             var ct = _restartCts.Token;
             RestartScheduledAt = DateTime.Now + _options.RestartDelay;
-            _ = Task.Delay(_options.RestartDelay, ct).ContinueWith(async t =>
+            _ = Task.Delay(_options.RestartDelay, ct).ContinueWith(t =>
             {
-                // задержка истекла, а «Стоп» нажали в этот же миг: отмену проверяем под тем же замком, под которым её
-                // ставит «Стоп», — иначе сервер поднялся бы вопреки ему
                 lock (_lock)
                 {
                     if (t.IsCanceled || ct.IsCancellationRequested) return;
                     RestartScheduledAt = null;
                 }
-                try { await StartAsync().ConfigureAwait(false); }
+                BeforeWatchdogStart?.Invoke();
+                // «Стоп» мог прийти и после проверки выше — запуск сверяет отмену ещё раз, под своим замком
+                try { Start(ct); }
                 catch (WorldBusyException ex)
                 {
                     if (afterCrash) Sys(Loc.T("srv.watchdogWaiting", ex.Message)); // один раз за ожидание, без спама
-                    if (!ct.IsCancellationRequested) ScheduleRestart(afterCrash: false);
+                    ScheduleRestart(afterCrash: false, previous: ct);
                 }
                 catch (Exception ex)
                 {
