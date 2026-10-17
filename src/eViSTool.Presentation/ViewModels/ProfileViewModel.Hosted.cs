@@ -24,8 +24,9 @@ public sealed partial class ProfileViewModel
     protected override void OnPropertyChanged(PropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
-        // версию и её источник ставит чтение модов (свойства-контракты); подсказка собрана из них обоих
-        if (e.PropertyName is nameof(HostedGameVersion) or nameof(HostedGameVersionSource) or "")
+        // версию и её источник ставит чтение модов (свойства-контракты); подсказка собрана из них обоих.
+        // null и "" — «поменялось всё»
+        if (e.PropertyName is nameof(HostedGameVersion) or nameof(HostedGameVersionSource) or null or "")
             base.OnPropertyChanged(new PropertyChangedEventArgs(nameof(HostedGameVersionHint)));
     }
 }

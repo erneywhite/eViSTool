@@ -547,4 +547,137 @@ public sealed class HostedConnectViewModelTests
         Assert.Equal("/g123456", existing.Root);
         Assert.True(existing.ActiveMode);
     }
+
+    // ===== разбор адреса: опечатки и секреты =====
+
+    [Theory]
+    [InlineData("203.0.113.40:21:5")]
+    [InlineData("host.example.com:21:22")]
+    [InlineData("203.0.113.40:21:")]
+    [InlineData("[host.example.com]:21")]
+    public void ParseAddress_RejectsExtraColons_UnlessItIsIPv6(string text) => Assert.Null(HostedConnectViewModel.ParseAddress(text));
+
+    [Fact]
+    public void ParseAddress_TakesABareIPv6_AsTheHost()
+    {
+        var parts = HostedConnectViewModel.ParseAddress("2001:db8::1");
+        Assert.NotNull(parts);
+        Assert.Equal("2001:db8::1", parts.Host);
+        Assert.Null(parts.Port);
+    }
+
+    [Fact]
+    public void AddressParts_ToString_DoesNotPrintThePassword()
+    {
+        var parts = HostedConnectViewModel.ParseAddress("ftp://gp_user:made-up-password@203.0.113.40:58021");
+        Assert.NotNull(parts);
+        Assert.Equal("made-up-password", parts.Password);
+        Assert.DoesNotContain("made-up-password", parts.ToString());
+        Assert.DoesNotContain("made-up-password", $"{parts}");
+        Assert.Contains("gp_user", parts.ToString());
+    }
+
+    // ===== правка ссылки после вставки =====
+
+    [Fact]
+    public void EditingTheLink_PutsBackTheFieldsItNoLongerHas()
+    {
+        var vm = Model();
+        vm.Address = "ftps://gp_user:made-up-password@203.0.113.40/g123456";
+        Assert.Equal("990", vm.PortText);
+        Assert.Equal(FtpTls.Implicit, vm.Tls);
+        Assert.Equal("made-up-password", vm.Password);
+        Assert.Equal("/g123456", vm.Root);
+
+        vm.Address = "ftp://gp_user@203.0.113.40"; // убрали пароль и папку, ftps сменили на ftp
+
+        Assert.Equal("21", vm.PortText);
+        Assert.Equal(FtpTls.Auto, vm.Tls);
+        Assert.Equal("", vm.Password);
+        Assert.Equal("/", vm.Root);
+        Assert.Equal("gp_user", vm.User); // логин в ссылке остался
+    }
+
+    [Fact]
+    public void EditingTheLink_KeepsWhatThePersonTypedIntoTheFieldsThemselves()
+    {
+        var vm = Model();
+        vm.Address = "ftp://gp_user:made-up-password@203.0.113.40:58021";
+        vm.Password = "typed-by-hand";
+        vm.PortText = "8821";
+
+        vm.Address = "ftp://gp_user@203.0.113.40";
+
+        Assert.Equal("typed-by-hand", vm.Password);
+        Assert.Equal("8821", vm.PortText);
+    }
+
+    [Fact]
+    public void LeavingTheField_MakesTheLinkFieldsTheirOwn()
+    {
+        var vm = Model();
+        vm.Address = "ftp://gp_user:made-up-password@203.0.113.40:58021";
+        vm.CommitAddress();
+
+        Assert.Equal(Host, vm.Address);
+        Assert.Equal("made-up-password", vm.Password); // адрес стал голым хостом — поля от этого не откатываются
+        Assert.Equal("58021", vm.PortText);
+    }
+
+    [Fact]
+    public void SftpLink_LeavingTheField_DropsLoginAndPasswordFromTheVisibleAddress()
+    {
+        var vm = Model();
+        vm.Address = "sftp://user:made-up-password@203.0.113.40:2022";
+
+        vm.CommitAddress();
+
+        Assert.Equal("sftp://" + Host, vm.Address);
+        Assert.DoesNotContain("made-up-password", vm.Address);
+        Assert.True(vm.IsSftp);
+        Assert.Equal(Loc.T("hosted.sftpLater"), vm.AddressHint);
+    }
+
+    // ===== проверка: причины словами =====
+
+    [Fact]
+    public async Task Edit_UnreadableSavedPassword_CheckSaysSo_InsteadOfConnectingWithAnEmptyOne()
+    {
+        var existing = Existing();
+        existing.Password = "not-a-protected-secret";
+        var calls = 0;
+        var vm = Model((_, _, _) => { calls++; return Task.FromResult(Found()); }, existing);
+
+        await vm.CheckCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, calls);
+        Assert.Equal(Loc.T("hosted.passwordUnreadable"), vm.CheckText);
+        Assert.Equal(RowTone.Danger, vm.CheckTone);
+        Assert.False(vm.IsChecking);
+
+        vm.Password = "new-password"; // ввели заново — проверка идёт
+        await vm.CheckCommand.ExecuteAsync(null);
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task Check_TransportTimeout_IsSaidInTheWindowLanguage()
+    {
+        var vm = Filled((_, _, _) => Task.FromException<HostedCheckResult>(new TaskCanceledException("A task was canceled.")));
+
+        await vm.CheckCommand.ExecuteAsync(null);
+
+        Assert.Equal(Loc.T("hosted.errTimeout"), vm.CheckText);
+        Assert.Equal(RowTone.Danger, vm.CheckTone);
+    }
+
+    [Fact]
+    public async Task Check_TimeoutException_IsSaidInWords()
+    {
+        var vm = Filled((_, _, _) => Task.FromException<HostedCheckResult>(new TimeoutException("The operation has timed out.")));
+
+        await vm.CheckCommand.ExecuteAsync(null);
+
+        Assert.Equal(Loc.T("hosted.errTimeout"), vm.CheckText);
+    }
 }

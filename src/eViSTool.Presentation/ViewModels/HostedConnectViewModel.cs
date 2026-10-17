@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Hosting;
@@ -37,6 +39,9 @@ public sealed partial class HostedConnectViewModel : ObservableObject
     private HostedProtocol _protocol = HostedProtocol.Ftp;
     // поля заполняет сама модель (загрузка, разбор адреса, итог проверки): это не правка человека
     private bool _quiet;
+    // поля, которые сейчас заполнены из ссылки в адресе: что в поле было до неё и что в него положила ссылка.
+    // Убрали часть из ссылки — поле возвращается к прежнему, если человек его с тех пор не трогал
+    private readonly Dictionary<string, (object Before, object Applied)> _fromLink = [];
 
     /// <param name="existing">Готовое подключение (его правят) или null (создают новое). Модель его не меняет.</param>
     /// <param name="okText">Надпись на кнопке «ОК»: «Подключить», «Сохранить».</param>
@@ -179,12 +184,14 @@ public sealed partial class HostedConnectViewModel : ObservableObject
             _quiet = true; // поля заполняются из ссылки: каждое из них не должно отдельно сбрасывать проверку
             try
             {
-                if (p.Port is { } port) PortText = port.ToString(CultureInfo.InvariantCulture);
-                else if (p.Scheme == "ftps") PortText = "990";
-                if (p.Scheme == "ftps") TlsIndex = Array.IndexOf(TlsOrder, FtpTls.Implicit);
-                if (p.User is { Length: > 0 } user) User = user;
-                if (p.Password is { Length: > 0 } password) Password = password;
-                if (p.Path is { Length: > 0 } path && path != "/") { Root = path; IsAdvancedOpen = true; }
+                var port = p.Port?.ToString(CultureInfo.InvariantCulture) ?? (p.Scheme == "ftps" ? "990" : null);
+                FromLink(nameof(PortText), port, PortText, v => PortText = (string)v);
+                FromLink(nameof(TlsIndex), p.Scheme == "ftps" ? Array.IndexOf(TlsOrder, FtpTls.Implicit) : null, TlsIndex, v => TlsIndex = (int)v);
+                FromLink(nameof(User), p.User is { Length: > 0 } ? p.User : null, User, v => User = (string)v);
+                FromLink(nameof(Password), p.Password is { Length: > 0 } ? p.Password : null, Password, v => Password = (string)v);
+                var path = p.Path is { Length: > 0 } and not "/" ? p.Path : null;
+                FromLink(nameof(Root), path, Root, v => Root = (string)v);
+                if (path is not null) IsAdvancedOpen = true;
             }
             finally { _quiet = false; }
         }
@@ -194,14 +201,33 @@ public sealed partial class HostedConnectViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Одно поле из ссылки: часть есть — положить её в поле (и запомнить, что там было до ссылки); части больше нет —
+    /// вернуть прежнее, если в поле всё ещё то, что положила ссылка (своё человек правил сам — его не трогаем).
+    /// </summary>
+    private void FromLink(string field, object? value, object current, Action<object> set)
+    {
+        if (value is not null)
+        {
+            var before = _fromLink.TryGetValue(field, out var was) ? was.Before : current;
+            _fromLink[field] = (before, value);
+            set(value);
+        }
+        else if (_fromLink.Remove(field, out var was) && Equals(current, was.Applied)) set(was.Before);
+    }
+
+    /// <summary>
     /// Человек ушёл из поля адреса (или нажал «Проверить»/«ОК»): из ссылки остаётся один хост, остальное уже лежит в
-    /// своих полях. Ссылка sftp:// остаётся как есть — иначе пропадёт объяснение, почему подключить нельзя.
+    /// своих полях и дальше принадлежит им. У ссылки sftp:// остаётся схема (иначе пропадёт объяснение, почему подключить
+    /// нельзя), но логин и пароль из видимого поля уходят и у неё.
     /// </summary>
     public void CommitAddress()
     {
-        if (IsSftp || Host.Length == 0 || Address.Trim() == Host) return;
+        if (Host.Length == 0) return;
+        var commit = IsSftp ? "sftp://" + Host : Host;
+        if (Address.Trim() == commit) return;
         var keep = _checkedLayout;
-        Address = Host;
+        _fromLink.Clear(); // поля больше не «из ссылки»: адрес станет голым хостом, а заполненное остаётся
+        Address = commit;
         _checkedLayout = keep; // хост тот же — проверка по-прежнему про это подключение
     }
 
@@ -267,6 +293,14 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         CancelCheck();
         SetPending(null);
         _checkedLayout = null;
+        if (EndpointPassword() is not { } password)
+        {
+            // сохранённый пароль не расшифровать (другой компьютер или пользователь): пустым его не шлём — сервер ответил бы
+            // «неверный пароль», а дело не в нём
+            CheckTone = RowTone.Danger;
+            CheckText = Loc.T("hosted.passwordUnreadable");
+            return;
+        }
         _checkCts = new CancellationTokenSource();
         var ct = _checkCts.Token;
         IsChecking = true;
@@ -278,7 +312,7 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         try
         {
             var settings = BuildConnection();
-            var endpoint = BuildEndpoint();
+            var endpoint = BuildEndpoint(password);
             done = await _check(endpoint, settings, ct);
             result = CheckSummary(done);
             ok = true;
@@ -299,7 +333,8 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         catch (Exception ex) when (ex is IOException or InvalidOperationException or HttpRequestException or TaskCanceledException
                                        or TimeoutException or UnauthorizedAccessException)
         {
-            result = HostedSecret.Describe(ex);
+            // отмена не наша (её ловит ветка выше) — у транспорта вышло время ожидания; свой текст у неё по-английски
+            result = ex is OperationCanceledException ? Loc.T("hosted.errTimeout") : HostedSecret.Describe(ex);
         }
         if (ct.IsCancellationRequested) return; // ответ пришёл, но поля уже другие
         _checkCts = null;
@@ -410,12 +445,18 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         return c;
     }
 
-    /// <summary>Подключение с расшифрованным паролем — для одной проверки; пустое поле при правке — прежний пароль.</summary>
-    private HostedEndpoint BuildEndpoint()
-    {
-        var password = Password.Length > 0 ? Password : HostedSecret.Unprotect(_existing?.Password) ?? "";
-        return new HostedEndpoint(HostedProtocol.Ftp, Host, Port ?? 21, Tls, User.Trim(), password, ActiveMode, _trustedCertificate);
-    }
+    /// <summary>
+    /// Пароль для проверки: введённый, а при пустом поле — сохранённый (расшифрованный) или пустой, если его нет.
+    /// null — сохранённый есть, но его не расшифровать.
+    /// </summary>
+    private string? EndpointPassword() =>
+        Password.Length > 0 ? Password
+        : _existing?.Password is { Length: > 0 } saved ? HostedSecret.Unprotect(saved)
+        : "";
+
+    /// <summary>Подключение с расшифрованным паролем — для одной проверки.</summary>
+    private HostedEndpoint BuildEndpoint(string password) =>
+        new(HostedProtocol.Ftp, Host, Port ?? 21, Tls, User.Trim(), password, ActiveMode, _trustedCertificate);
 
     // ===== разбор адреса =====
 
@@ -424,6 +465,10 @@ public sealed partial class HostedConnectViewModel : ObservableObject
     public sealed record AddressParts(string Scheme, string Host, int? Port, string? User, string? Password, string? Path)
     {
         public HostedProtocol Protocol => Scheme == "sftp" ? HostedProtocol.Sftp : HostedProtocol.Ftp;
+
+        /// <summary>Без пароля: ToString, созданный записью, напечатал бы все поля, и пароль из ссылки ушёл бы в журнал.</summary>
+        public override string ToString() =>
+            $"AddressParts {{ Scheme = {Scheme}, Host = {Host}, Port = {Port}, User = {User}, Password = {(Password is null ? "" : "***")}, Path = {Path} }}";
     }
 
     /// <summary>
@@ -466,6 +511,7 @@ public sealed partial class HostedConnectViewModel : ObservableObject
             var close = authority.IndexOf(']');
             if (close < 0) return null;
             host = authority[1..close];
+            if (!IsIPv6(host)) return null; // в скобках бывает только IPv6
             var tail = authority[(close + 1)..];
             if (tail.Length > 0)
             {
@@ -479,9 +525,14 @@ public sealed partial class HostedConnectViewModel : ObservableObject
             host = authority[..colon];
             portText = authority[(colon + 1)..];
         }
-        else host = authority; // без порта (или голый IPv6, в нём двоеточий много)
+        else
+        {
+            host = authority; // без порта
+            // двоеточий больше одного без скобок — только голый IPv6; «203.0.113.40:21:5» — опечатка, а не хост
+            if (host.Contains(':') && !IsIPv6(host)) return null;
+        }
 
-        if (!IsHostName(host)) return null;
+        if (!host.Contains(':') && !IsHostName(host)) return null;
         int? port = null;
         if (!string.IsNullOrEmpty(portText))
         {
@@ -498,5 +549,8 @@ public sealed partial class HostedConnectViewModel : ObservableObject
     }
 
     private static bool IsHostName(string host) =>
-        host.Length > 0 && host[0] is not ('.' or '-') && host.All(c => char.IsLetterOrDigit(c) || c is '.' or '-' or '_' or ':');
+        host.Length > 0 && host[0] is not ('.' or '-') && host.All(c => char.IsLetterOrDigit(c) || c is '.' or '-' or '_');
+
+    private static bool IsIPv6(string host) =>
+        IPAddress.TryParse(host, out var ip) && ip.AddressFamily == AddressFamily.InterNetworkV6;
 }

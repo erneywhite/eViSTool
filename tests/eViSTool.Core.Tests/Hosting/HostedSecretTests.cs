@@ -53,6 +53,10 @@ public sealed class HostedSecretTests
     }
 
     [Fact]
+    public void Describe_Timeout_IsInWords_NotTheRuntimeText() =>
+        HostedTestText.AssertIs("hosted.errTimeout", HostedSecret.Describe(new TimeoutException("The operation has timed out.")));
+
+    [Fact]
     public void RemoteFilesException_IsAnIOException()
     {
         // фильтры catch по всему окну ловят IOException: обрыв FTP не должен попасть в журнал вылетов
