@@ -18,12 +18,17 @@ public interface IRangeSource
 {
     long Length { get; }
 
-    /// <summary>Кусок с позиции; вернулось меньше <paramref name="count"/> — конец файла.
+    /// <summary>Кусок с позиции; вернулось меньше <paramref name="count"/> — конец файла. Чтение до конца файла просит
+    /// на байт больше <see cref="Length"/>: так видно, что файл вырос после листинга (тогда кусок обрывается).
     /// Сервер не читает с позиции — <see cref="RemoteFilesException"/> с <see cref="RemoteFailure.RangeUnsupported"/>:
     /// тогда архив скачивается целиком (<see cref="OpenAllAsync"/>).</summary>
     Task<byte[]> ReadAsync(long offset, int count, CancellationToken ct);
 
-    /// <summary>Весь файл потоком (запасной путь: сервер не читает с позиции или архив необычный).</summary>
+    /// <summary>
+    /// Весь файл потоком (запасной путь: сервер не читает с позиции или архив необычный). Поток без перемотки
+    /// <see cref="ZipProbe"/> копирует в память, поэтому большой файл лучше отдавать перематываемым
+    /// (скачанным в <c>cache/hosted/&lt;id&gt;/dl/&lt;guid&gt;.zip</c>, проект п. 3.3).
+    /// </summary>
     Task<Stream> OpenAllAsync(CancellationToken ct);
 
     /// <summary>
@@ -50,6 +55,10 @@ public sealed record CachedModInfo(string? ModInfoJson, string? ErrorKey);
 public static class ZipProbe
 {
     public const int WholeFileLimit = 256 * 1024, TailSize = 22 + 65_535, MaxModInfoSize = 1024 * 1024;
+
+    /// <summary>Каталог больше — не читаем его куском в память, отдаём архив <see cref="System.IO.Compression.ZipArchive"/>.
+    /// У настоящих модов каталог занимает килобайты, у самых больших — около мегабайта.</summary>
+    public const int MaxCentralDirectorySize = 16 * 1024 * 1024;
 
     /// <summary>По умолчанию <see cref="IRangeSource.ReadThroughLimit"/>: полмегабайта дочитать дешевле переподключения.</summary>
     public const long DefaultReadThroughLimit = 512 * 1024;
@@ -94,6 +103,8 @@ public static class ZipProbe
         {
             if (!stream.CanSeek)
             {
+                // shortcut: поток без перемотки копируется в память целиком; при большом архиве адаптер должен отдавать
+                // FileStream из cache/hosted/<id>/dl (P3), переделать здесь, если адаптер так не сможет
                 var copy = new MemoryStream();
                 await stream.CopyToAsync(copy, ct).ConfigureAwait(false); // сбой сети — наружу, это не «битый архив»
                 copy.Position = 0;
@@ -117,7 +128,14 @@ public static class ZipProbe
             }
             if (entry.Length > MaxModInfoSize) return Corrupt; // защита от zip-бомбы
 
-            using var reader = new StreamReader(entry.Open(), new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true);
+            // размер в каталоге может врать — распаковываем не больше предела, остальное считаем бомбой
+            var bytes = new byte[MaxModInfoSize + 1];
+            var read = 0;
+            using (var data = entry.Open())
+                while (read < bytes.Length && data.Read(bytes, read, bytes.Length - read) is var got and > 0) read += got;
+            if (read > MaxModInfoSize) return Corrupt;
+
+            using var reader = new StreamReader(new MemoryStream(bytes, 0, read), new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true);
             return new CachedModInfo(reader.ReadToEnd(), null);
         }
         catch (Exception ex) when (ex is InvalidDataException or NotSupportedException)
@@ -137,7 +155,7 @@ public static class ZipProbe
         var tailStart = length - Math.Min(length, TailSize);
         var tail = await reader.GetAsync(tailStart, length, ct).ConfigureAwait(false);
         var eocd = FindEocd(tail);
-        if (eocd < 0) throw new InvalidDataException("no end of central directory");
+        if (eocd < 0) throw new InvalidDataException("no end of central directory"); // файл вырос — сюда не дойдёт, см. Reader
         var eocdAt = tailStart + eocd;
         if (eocd >= 20 && BinaryPrimitives.ReadUInt32LittleEndian(tail.AsSpan(eocd - 20)) == Zip64LocatorSig)
             throw new NeedWholeFile();
@@ -158,6 +176,8 @@ public static class ZipProbe
         var cdStart = eocdAt - cdSize;
         var shift = cdStart - cdOffset;
         if (cdStart < 0 || shift < 0) throw new InvalidDataException("central directory outside the file");
+        if (cdSize < (long)entries * CentralSize) throw new InvalidDataException("central directory too small");
+        if (cdSize > MaxCentralDirectorySize) throw new NeedWholeFile(); // битый или необычный — пусть разбирает ZipArchive
 
         // 2. Центральный каталог: если не уместился в хвост — второй кусок, тоже до конца файла.
         var cd = await reader.GetAsync(cdStart, eocdAt, ct).ConfigureAwait(false);
@@ -304,12 +324,14 @@ public static class ZipProbe
 
             var want = Math.Max(end, Math.Min(readAhead, Length));
             var to = Length - want <= Math.Max(0, source.ReadThroughLimit) ? Length : want;
-            if (to - start > int.MaxValue) to = want;
-            if (to - start > int.MaxValue) throw new NeedWholeFile();
+            if (to - start >= int.MaxValue) to = want;
+            if (to - start >= int.MaxValue) throw new NeedWholeFile();
 
+            // до конца файла просим байт сверх длины из листинга: пришёл — файл вырос, хвост прочитан не с того места
             var count = (int)(to - start);
-            var read = await source.ReadAsync(start, count, ct).ConfigureAwait(false);
-            if (read.Length != count) throw new NeedWholeFile(); // файл короче, чем в листинге: поменялся — читаем как есть
+            var ask = to == Length ? count + 1 : count;
+            var read = await source.ReadAsync(start, ask, ct).ConfigureAwait(false);
+            if (read.Length != count) throw new NeedWholeFile(); // файл поменялся после листинга — читаем как есть
             _pieces.Add((start, read));
             return read.AsSpan(0, (int)(end - start)).ToArray();
         }

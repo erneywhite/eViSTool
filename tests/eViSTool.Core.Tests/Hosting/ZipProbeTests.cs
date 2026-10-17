@@ -214,6 +214,42 @@ public sealed class ZipProbeTests : IDisposable
     }
 
     [Fact]
+    public async Task LargeCentralDirectory_ModInfoFirst_CutsOnlyTheEntryRead()
+    {
+        // каталог больше хвоста, а modinfo.json в самом начале: хвост и каталог — до конца файла, запись — с обрывом
+        var files = Enumerable.Range(0, 6000)
+            .Select(i => ($"assets/game/textures/block/some-rather-long-name-{i:D5}.json", "{}"u8.ToArray(), CompressionLevel.Optimal))
+            .Prepend(("modinfo.json", Text(Json), CompressionLevel.Optimal));
+        var zip = Zip(files);
+        Assert.True(zip.Length > ZipProbe.DefaultReadThroughLimit + 64 * 1024);
+        var source = new Source(zip);
+
+        Assert.Equal(Json, (await Probe(source)).ModInfoJson);
+
+        Assert.Equal(0, source.Opened);
+        Assert.Equal(3, source.Reads);
+        Assert.Equal(1, source.Cuts);
+    }
+
+    [Fact]
+    public async Task HugeCentralDirectory_IsNotReadInPieces()
+    {
+        // конец каталога обещает каталог в 17 МБ: такой кусок в память не берём, отдаём архив ZipArchive
+        var size = ZipProbe.MaxCentralDirectorySize + 1024 * 1024;
+        var zip = Zip([("assets/a.bin", Noise(size + 1024, 1), CompressionLevel.NoCompression),
+            ("modinfo.json", Text(Json), CompressionLevel.Optimal)]);
+        var eocd = zip.Length - 22;
+        BinaryPrimitives.WriteUInt32LittleEndian(zip.AsSpan(eocd + 12), (uint)size);
+        BinaryPrimitives.WriteUInt32LittleEndian(zip.AsSpan(eocd + 16), (uint)(eocd - size));
+        var source = new Source(zip);
+
+        Assert.Equal("scan.corrupt", (await Probe(source)).ErrorKey);
+
+        Assert.Equal(1, source.Reads); // только хвост
+        Assert.Equal(1, source.Opened);
+    }
+
+    [Fact]
     public async Task SmallArchive_IsDownloadedWhole()
     {
         var zip = Zip([("modinfo.json", Text(Json), CompressionLevel.Optimal)]);
@@ -245,6 +281,20 @@ public sealed class ZipProbeTests : IDisposable
         Assert.Equal(Json, (await Probe(source)).ModInfoJson);
 
         Assert.Equal(1, source.Opened);
+    }
+
+    [Fact]
+    public async Task FileLongerThanListed_FallsBackToWholeFile()
+    {
+        // файл вырос между листингом и чтением: хвост по старой длине прочитан бы не с того места
+        var zip = BigMod(Where.Middle, CompressionLevel.Optimal);
+        var source = new Source(zip) { FakeLength = zip.Length - 1000 };
+
+        var info = await Probe(source);
+
+        Assert.Equal(Json, info.ModInfoJson);
+        Assert.Equal(1, source.Opened);
+        Assert.Equal(0, source.Cuts);
     }
 
     [Fact]
@@ -418,6 +468,22 @@ public sealed class ZipProbeTests : IDisposable
         // каталог обещает меньше, чем распаковывается: граница от zip-бомбы не обходится враньём в каталоге
         var zip = new RawZip { Pad = Padding }.Add("modinfo.json", Text(Json), method: 8, sizeDelta: -10).Build();
         Assert.Equal("scan.corrupt", (await Probe(new Source(zip))).ErrorKey);
+    }
+
+    [Fact]
+    public async Task SizeLie_SmallFile_IsCorrupt()
+    {
+        // то же враньё в маленьком архиве (качается целиком, разбирает ZipArchive): больше обещанного не распаковывается —
+        // ZipArchive обрезает запись по размеру из каталога, сверху стоит ещё и свой предел MaxModInfoSize
+        var data = new byte[ZipProbe.MaxModInfoSize + 100];
+        var zip = new RawZip().Add("modinfo.json", data, method: 8, sizeDelta: -ZipProbe.MaxModInfoSize).Build();
+        var source = new Source(zip);
+        Assert.True(zip.Length <= ZipProbe.WholeFileLimit);
+
+        var info = await Probe(source);
+
+        Assert.True(info.ErrorKey == "scan.corrupt" || info.ModInfoJson!.Length <= 100, $"{info.ModInfoJson?.Length}");
+        Assert.Equal(1, source.Opened);
     }
 
     // ---------- совпадение с локальным сканером
