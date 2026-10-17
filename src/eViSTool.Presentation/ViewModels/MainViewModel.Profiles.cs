@@ -157,6 +157,7 @@ public sealed partial class MainViewModel
         Profiles.Remove(profile);
         if (ActiveProfile == profile) ActiveProfile = Profiles[0];
         if (EditedProfile == profile) EditedProfile = ActiveProfile;
+        ProfileActions.AfterRemoved(model); // соединение и кэш хостового профиля — когда окно уже ушло с него
         foreach (var p in _settings.Profiles) p.LinkedProfiles.RemoveAll(id => id == model.Id); // связи с удалённым — не нужны
         RefreshLinks();
         Save();

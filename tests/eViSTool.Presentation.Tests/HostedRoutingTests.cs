@@ -72,7 +72,16 @@ public sealed class HostedRoutingTests : IDisposable
         Assert.False(server.ShowNotServer); // у хостового профиля своя плашка, а не «это не сервер»
         Assert.False(server.AgentRunning);
         Assert.Equal(ServerState.Stopped, server.State);
+        // вкладкам раздела профиль не передан: ни расписание, ни игроки, ни журнал не полезут к агенту и в папки
+        foreach (var (name, tab) in new (string, object)[] { ("Schedule", server.Schedule), ("Players", server.Players),
+                     ("Announcements", server.Announcements), ("Stats", server.Stats), ("Journal", server.Journal),
+                     ("Notify", server.Notify), ("Remote", server.Remote) })
+            Assert.True(TabProfile(tab) is null, name);
     });
+
+    /// <summary>Профиль, который вкладка раздела «Сервер» получила последним (поле <c>_profile</c>).</summary>
+    private static GameProfile? TabProfile(object tab) =>
+        (GameProfile?)tab.GetType().GetField("_profile", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(tab);
 
     [Fact]
     public void ServerSection_ClientAndHosted_ThenBack_KeepFlagsInStep() => Sta.Run(() =>
@@ -124,6 +133,8 @@ public sealed class HostedRoutingTests : IDisposable
         Assert.Empty(host.Calls); // и не пытался разобрать метку как код подключения
     });
 
+    // страховка: сейчас хостовый профиль отсеялся бы и без фильтра (IsRemote = false, файла агента нет — TryConnect
+    // вернёт null), но фильтр не даст наблюдателю полезть к агенту, если метку когда-нибудь начнут читать иначе
     [Fact]
     public void CrashWatcher_HostedProfile_IsSkipped() => Sta.Run(() =>
     {
@@ -153,6 +164,7 @@ public sealed class HostedRoutingTests : IDisposable
 
     // ---- «Играть»
 
+    // страховка: PlayTargets.Own уже не даёт цели для хостового профиля, фильтр меню держит это и без него
     [Fact]
     public void PlayMenu_HostedServers_AreNotListed() => Sta.Run(() =>
     {
@@ -245,6 +257,8 @@ public sealed class HostedRoutingTests : IDisposable
         var actions = new ProfileActions([hosted, other], () => null);
 
         Assert.True(Done(actions.PrepareRemoveAsync(hosted)));
+        Assert.True(Directory.Exists(cache)); // пока профиль в списке, следы не трогаем: окно ещё может на нём стоять
+        ProfileActions.AfterRemoved(hosted.Model);
 
         Assert.False(Directory.Exists(cache));
         Assert.False(Directory.Exists(journal));
@@ -263,5 +277,58 @@ public sealed class HostedRoutingTests : IDisposable
         Assert.False(Done(actions.PrepareRemoveAsync(hosted)));
 
         Assert.True(Directory.Exists(cache));
+    });
+
+    [Fact]
+    public void AfterRemoved_OwnProfile_LeavesHostedFoldersAlone() => Sta.Run(() =>
+    {
+        var own = new GameProfile { Id = "hr-" + Guid.NewGuid().ToString("N"), Name = "Свой", Kind = ProfileKind.Server };
+        var cache = Dir(ModInfoCache.DirFor(own.Id));
+
+        ProfileActions.AfterRemoved(own);
+
+        Assert.True(Directory.Exists(cache));
+    });
+
+    // ---- правка подключения
+
+    [Fact]
+    public void EditConnection_SamePlaceNewPassword_KeepsCacheAndJournal() => Sta.Run(() =>
+    {
+        var hosted = Vm(HostedProfile());
+        var cache = Dir(ModInfoCache.DirFor(hosted.Model.Id));
+        var journal = Dir(Path.Combine(AppPaths.Root, "hosted", hosted.Model.Id));
+        var edited = hosted.Model.Hosted!.Clone();
+        edited.Password = HostedSecret.Protect("new");
+        edited.Host = "198.51.100.7 ";
+        edited.Root = "";
+        edited.Tls = FtpTls.Auto;
+        AppWindows.Current = NewProfileViewModelTests.Fake<IAppWindows>.Of((nameof(IAppWindows.AskHostedConnection), _ => edited));
+
+        hosted.EditConnectionCommand.Execute(null);
+
+        Assert.Same(edited, hosted.Model.Hosted);
+        Assert.True(Directory.Exists(cache)); // сервер тот же: прочитанные modinfo годны
+        Assert.True(Directory.Exists(journal)); // прерванную установку доведём на том же сервере
+    });
+
+    [Fact]
+    public void EditConnection_OtherServerOrAccount_ClearsCacheAndJournal() => Sta.Run(() =>
+    {
+        foreach (var change in new Action<HostedConnection>[] { c => c.Host = "203.0.113.9", c => c.Port = 21, c => c.User = "other",
+                     c => c.Root = "/g123456", c => c.Protocol = HostedProtocol.Sftp })
+        {
+            var hosted = Vm(HostedProfile());
+            var cache = Dir(ModInfoCache.DirFor(hosted.Model.Id));
+            var journal = Dir(Path.Combine(AppPaths.Root, "hosted", hosted.Model.Id));
+            var edited = hosted.Model.Hosted!.Clone();
+            change(edited);
+            AppWindows.Current = NewProfileViewModelTests.Fake<IAppWindows>.Of((nameof(IAppWindows.AskHostedConnection), _ => edited));
+
+            hosted.EditConnectionCommand.Execute(null);
+
+            Assert.False(Directory.Exists(cache)); // чужие modinfo не подсовываем
+            Assert.False(Directory.Exists(journal)); // журнал старого сервера на новом не доводим
+        }
     });
 }
