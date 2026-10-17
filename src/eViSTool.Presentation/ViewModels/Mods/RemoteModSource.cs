@@ -52,8 +52,7 @@ internal sealed class RemoteModSource(ModsViewModel owner, MainViewModel main) :
             }
             owner.Rebuild();
             owner.NotifyLocalModsChanged();
-            if (first && main.AutoCheckUpdates && resolved.GameVersion is not null && owner.CheckCommand.CanExecute(null))
-                owner.CheckCommand.Execute(null);
+            if (first) owner.AutoCheck();
             await CountConfigsAsync(agent, profile);
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)

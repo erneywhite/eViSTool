@@ -354,8 +354,34 @@ public sealed partial class ModsViewModel : ObservableObject
         }
         ReloadLocal();
         StatusText = Loc.T("mods.readFromDisk");
-        if (_main.AutoCheckUpdates && Profile?.GameVersion is not null && CheckCommand.CanExecute(null))
+        AutoCheck();
+    }
+
+    /// <summary>
+    /// Автопроверка обновлений открытого профиля, если она включена и версия игры известна: при смене профиля, у удалённого
+    /// сервера и у хостера — после первого чтения модов. Проверку прежнего профиля смена отменяет, но её задача кончается
+    /// позже, продолжением в потоке окна, и до тех пор команда занята. Тогда новая проверка начинается сразу после неё,
+    /// а не пропадает молча, как раньше.
+    /// </summary>
+    internal void AutoCheck()
+    {
+        if (!_main.AutoCheckUpdates || Profile?.GameVersion is null || _main.ActiveProfile is not { } profile) return;
+        if (CheckCommand.CanExecute(null))
+        {
             CheckCommand.Execute(null);
+            return;
+        }
+        // идёт неотменённая проверка — она про этот же профиль: смена профиля отменяет прежнюю. Так бывает у хостера,
+        // когда первое чтение модов запустила сама проверка
+        if (!CheckCommand.IsCancellationRequested || CheckCommand.ExecutionTask is not { IsCompleted: false } running) return;
+        _ = CheckAfterAsync(running, profile);
+    }
+
+    private async Task CheckAfterAsync(Task previous, ProfileViewModel profile)
+    {
+        await Task.WhenAny(previous); // итог отменённой проверки (и её ошибку) показывает она сама
+        // профиль за это время сменили ещё раз — проверку нового запустит уже та смена
+        if (_main.ActiveProfile == profile) AutoCheck();
     }
 
     /// <summary>Перечитать папки модов (без сети) и перестроить таблицу с уже известными статусами.</summary>

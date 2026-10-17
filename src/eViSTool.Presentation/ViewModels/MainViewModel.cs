@@ -152,7 +152,11 @@ public sealed partial class MainViewModel : ObservableObject
         if (ActiveProfile?.Model.Id == profile.Id) SelectedTab = tab;
     }
 
-    public MainViewModel()
+    public MainViewModel() : this(new ModDbClient()) { }
+
+    /// <summary>Главная модель с данной модбазой (у «Моих модов» и каталога она общая).</summary>
+    /// <param name="db">Тесты дают поддельную, чтобы проверка обновлений шла без сети.</param>
+    internal MainViewModel(ModDbClient db)
     {
         // наблюдатели за игрой, падениями серверов и exe на диске — до всего остального, чтобы модели ниже могли спрашивать
         // их уже при сборке; запускаются в конце конструктора, рядом с агентами удалённого доступа
@@ -183,7 +187,6 @@ public sealed partial class MainViewModel : ObservableObject
         _editedProfile = _activeProfile;
         OnEditedProfileChanged(_editedProfile); // поле выше задано мимо свойства — связи и копии миров собрать самим
 
-        var db = new ModDbClient();
         Mods = new ModsViewModel(this, db);
         Catalog = new CatalogViewModel(this, db);
         ModConfig = new ModConfigViewModel(this);

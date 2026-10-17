@@ -133,8 +133,7 @@ internal sealed class HostedModSource : IModSource
             _owner.Rebuild();
             _owner.NotifyLocalModsChanged();
             ShowWarnings(profile.Model.Id, resolved.Warnings);
-            if (first && _main.AutoCheckUpdates && resolved.GameVersion is not null && _owner.CheckCommand.CanExecute(null))
-                _owner.CheckCommand.Execute(null);
+            if (first) _owner.AutoCheck();
             return true;
         }
         catch (OperationCanceledException)
