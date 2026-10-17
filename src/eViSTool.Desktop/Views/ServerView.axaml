@@ -51,7 +51,24 @@
                                Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
             </DockPanel>
-            <views:ServerHostedView DataContext="{Binding Hosted}" />
+
+            <!-- виды раздела у хостера: обзор (лог, состояние, игроки) и оповещения — те же вкладки, что у своего сервера -->
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,16,0,0">
+                <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="HostedMode" FontSize="15" Content="{local:Tr server.hostedTabOverview}"
+                             IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Console}"
+                             AutomationProperties.AutomationId="HostedTabOverview" />
+                <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="HostedMode" FontSize="15" Content="{local:Tr srvnotify.tab}"
+                             IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Notify}"
+                             AutomationProperties.AutomationId="HostedTabNotify" />
+            </StackPanel>
+            <Panel>
+                <Panel IsVisible="{Binding !IsNotifyTab}">
+                    <views:ServerHostedView DataContext="{Binding Hosted}" />
+                </Panel>
+                <Panel IsVisible="{Binding IsNotifyTab}">
+                    <views:ServerNotifyTab DataContext="{Binding HostedNotify}" />
+                </Panel>
+            </Panel>
         </DockPanel>
 
         <DockPanel>

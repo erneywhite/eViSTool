@@ -124,6 +124,8 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
                     ? importer.ApplyAsync(pack, plan, profile, mirror, applyConfig,
                         ModBackupStore.ForProfile(profile.Profile), progress, confirmChanged: AskChanged)
                     : importer.ApplyToTargetAsync(pack, plan, target, mirror, applyConfig, progress, confirmChanged: AskChanged));
+                // поставленное на сервер у хостера — в оповещение «Обновлены моды» (уйдёт с итогом операции)
+                owner.HostedWatch?.ModsChanged(target, result.Done, []);
 
                 // моды пака, нужные и в других профилях (сервер ↔ клиент), — как у «Добавить»
                 var zips = Directory.Exists(keep) ? Directory.GetFiles(keep, "*.zip", SearchOption.AllDirectories) : [];

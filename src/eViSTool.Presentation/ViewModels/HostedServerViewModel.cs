@@ -1,5 +1,7 @@
 using System.Collections;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Net.Http;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Hosting;
@@ -24,7 +26,8 @@ public sealed record HostedPlayerRow(string Name, string SinceText);
 /// повтор не вылечит (неверный пароль, недоверенный сертификат), опрос не повторяет, пока подключение не поправят или
 /// раздел не откроют заново. Новый вылет показывается тем же окном, что у своего сервера. Сам лог — <see cref="HostedLogs"/>
 /// (один на профиль, <see cref="HostedLogsPool"/>), строки консоли и их цвет — те же <see cref="ConsoleLineViewModel"/>,
-/// что у своей консоли.
+/// что у своей консоли. Сервер по логу остановлен, а для модов вышли обновления — плашка «Обновить всё»: самое время
+/// обновить их перед запуском.
 /// </summary>
 public sealed partial class HostedServerViewModel : ObservableObject
 {
@@ -63,6 +66,11 @@ public sealed partial class HostedServerViewModel : ObservableObject
     private readonly List<string> _current = [];                   // строки текущего запуска, пока смотрят прошлый
     private IReadOnlyList<OnlinePlayer> _online = [];
     private readonly HashSet<string> _seenCrashes = new(StringComparer.Ordinal);
+    private HostedModUpdates? _updates;        // проверки обновлений, заданные тестом (иначе — общие окна)
+    private HostedModUpdates? _updatesWatched; // на чьи перемены подписаны
+    private Func<ModTarget, IReadOnlyList<UpdateQueueItem>, Task<IReadOnlyList<UpdateQueueItem>>>? _runUpdates;
+    private DateTime? _updatesTried;           // последняя попытка проверить обновления (UTC): не удалась — не раньше чем через UpdatesRetry
+    private List<UpdateQueueItem>? _updating;  // пункты очереди, которые сейчас ставят «Обновить всё»
 
     /// <param name="main">Главная модель: окно вылета выключает мод через неё.</param>
     public HostedServerViewModel(MainViewModel main)
@@ -136,6 +144,7 @@ public sealed partial class HostedServerViewModel : ObservableObject
         var same = profile is not null && _profile?.Id == profile.Id
                    && (target is null ? _logs is null : _logs is not null && HostedLogsPool.SameServer(_logs.Target, target));
         _profile = profile is { IsHosted: true } ? profile : null;
+        WatchUpdates();
         if (same) return;
 
         Reset();
@@ -205,12 +214,22 @@ public sealed partial class HostedServerViewModel : ObservableObject
         State = HostedServerState.Unknown;
         ShowState();
         OnPropertyChanged(nameof(ShowEmpty));
+        // плашка обновлений — про прежний профиль; его очередь, если идёт, доставит «Мои моды»
+        if (_updating is { } items) foreach (var item in items) item.PropertyChanged -= OnUpdateItemChanged;
+        _updating = null;
+        IsUpdating = false;
+        UpdatesCount = 0;
+        UpdatesNote = "";
+        UpdatesProgressText = "";
+        _updatesTried = null;
     }
 
     /// <summary>Сменился язык: тексты, собранные в коде, — заново.</summary>
     public void OnLanguageChanged()
     {
         ShowState();
+        OnPropertyChanged(nameof(UpdatesText));
+        ShowUpdateProgress();
         if (_error is not null) StatusText = ErrorText(_error);
         if (_past is not null) RunNote = Outcome(_past);
         if (_logs is { } logs && Runs.Count > 0)
@@ -270,6 +289,8 @@ public sealed partial class HostedServerViewModel : ObservableObject
             var crashCheck = update.Restarted || _crashAgain
                              || (update.State == HostedServerState.Crashed ? !logs.CurrentCrashReported : archiveDue);
             if (crashCheck) await CheckCrashAsync(logs, profile, generation, ct);
+            // вылет мог найти и сторож оповещений, пока раздел был закрыт: логи отдают вылет один раз — он у них в списке
+            foreach (var crash in logs.FoundCrashes) ShowCrash(profile, crash);
         }
         finally
         {
@@ -318,6 +339,7 @@ public sealed partial class HostedServerViewModel : ObservableObject
         State = update.State;
         ShowState();
         OnPropertyChanged(nameof(ShowEmpty));
+        _ = RefreshUpdatesAsync();
     }
 
     /// <summary>Консоль — строки текущего запуска (раздел открыт заново, вернулись из прошлого запуска).</summary>
@@ -377,9 +399,10 @@ public sealed partial class HostedServerViewModel : ObservableObject
 
     /// <summary>
     /// Ошибка, которую повтор не вылечит: неверный логин или пароль, недоверенный сертификат или ключ сервера, протокол,
-    /// который программа не умеет, беда с файлом ключа SFTP. Это правят в «Настройках».
+    /// который программа не умеет, беда с файлом ключа SFTP. Это правят в «Настройках». Тем же правилом сторож оповещений
+    /// бросает опрос (<see cref="HostedWatch"/>).
     /// </summary>
-    private static bool IsHopeless(Exception ex) =>
+    internal static bool IsHopeless(Exception ex) =>
         ex is RemoteFilesException
         {
             Kind: RemoteFailure.Auth or RemoteFailure.CertificateUntrusted or RemoteFailure.Unsupported or RemoteFailure.KeyFile
@@ -505,8 +528,200 @@ public sealed partial class HostedServerViewModel : ObservableObject
         }
         if (generation == _generation) _crashAgain = false;
         // профиль могли сменить, пока искали, — вылет всё равно настоящий: логи профиля второй раз его не отдадут
-        if (crash is null || !_seenCrashes.Add(crash.Info.Id) || crash.Info.At < CrashesSince) return;
+        if (crash is not null) ShowCrash(profile, crash);
+    }
+
+    /// <summary>Окно вылета — один раз на вылет; случившийся до открытия окна не показываем.</summary>
+    private void ShowCrash(GameProfile profile, HostedCrash crash)
+    {
+        if (!_seenCrashes.Add(crash.Info.Id) || crash.Info.At < CrashesSince) return;
         AppWindows.Current.ShowServerCrash(_main, profile, crash.Info);
+    }
+
+    // ---------- обновления модов перед запуском
+
+    /// <summary>Какой давности проверке обновлений плашка ещё верит; старше — проверить заново.</summary>
+    public static readonly TimeSpan UpdatesFreshFor = TimeSpan.FromMinutes(30);
+
+    /// <summary>Проверка не удалась — следующая не раньше чем через столько: опрос идёт раз в 3 с.</summary>
+    public static readonly TimeSpan UpdatesRetry = TimeSpan.FromMinutes(5);
+
+    /// <summary>Проверки обновлений — общие со сторожем оповещений (<see cref="MainViewModel.HostedUpdates"/>); тесты ставят свои.</summary>
+    public HostedModUpdates? Updates
+    {
+        get => _updates ?? _main?.HostedUpdates;
+        set
+        {
+            _updates = value;
+            WatchUpdates();
+        }
+    }
+
+    /// <summary>Пункт очереди для обновления — релиз модбазы. Тесты ставят сохранённую копию, чтобы не скачивать.</summary>
+    internal Func<ModTarget, ModCheckResult, UpdateQueueItem> QueueItem { get; set; } = (target, r) =>
+        new UpdateQueueItem(target, r.Local.Info!.ModId, ModUpdatesDue.Name(r), r.Local.Info.Version ?? "", r.LatestCompatible!.ModVersion ?? "?",
+            r.LatestCompatible, null);
+
+    /// <summary>
+    /// «Обновить всё» очередью «Моих модов»: пункты очереди, которые ставят эти обновления (мод, уже стоявший в очереди,
+    /// — тем пунктом); пусто — не начали (отказались, вкладка занята другим).
+    /// </summary>
+    internal Func<ModTarget, IReadOnlyList<UpdateQueueItem>, Task<IReadOnlyList<UpdateQueueItem>>>? RunUpdates
+    {
+        get => _runUpdates ?? (_main is { } main ? (target, items) => main.Mods.UpdateAllAsync(target, items) : null);
+        set => _runUpdates = value;
+    }
+
+    /// <summary>Сколько обновлений модов известно (последняя проверка).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowUpdates), nameof(UpdatesText))]
+    [NotifyCanExecuteChangedFor(nameof(UpdateAllCommand))]
+    private int _updatesCount;
+
+    /// <summary>Обновления ставятся: на плашке — ход, кнопка недоступна.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowUpdates))]
+    [NotifyCanExecuteChangedFor(nameof(UpdateAllCommand))]
+    private bool _isUpdating;
+
+    [ObservableProperty] private double _updatesProgress;
+    [ObservableProperty] private string _updatesProgressText = "";
+
+    /// <summary>Итог «Обновить всё»: «Установлено: 3, ошибок: 0 · Готово. Запусти сервер в панели хостера…».</summary>
+    [ObservableProperty] private string _updatesNote = "";
+
+    /// <summary>Плашка «Обновления модов: N»: сервер по логу остановлен или вылетел, а обновления есть — или как раз ставятся.</summary>
+    public bool ShowUpdates => IsUpdating || UpdatesCount > 0 && HostedLogs.IsSurelyDown(State);
+
+    public string UpdatesText => Loc.T("server.hostedUpdates", UpdatesCount);
+
+    partial void OnStateChanged(HostedServerState value)
+    {
+        OnPropertyChanged(nameof(ShowUpdates));
+        UpdateAllCommand.NotifyCanExecuteChanged();
+        if (!HostedLogs.IsSurelyDown(value) && !IsUpdating) UpdatesNote = ""; // сервер запустили — «запусти сервер» уже не к месту
+    }
+
+    /// <summary>Подписаться на перемены проверок обновлений (моды поменяли — прежняя проверка устарела).</summary>
+    private void WatchUpdates()
+    {
+        if (Updates is not { } updates || ReferenceEquals(updates, _updatesWatched)) return;
+        if (_updatesWatched is { } old) old.Changed -= OnUpdatesChanged;
+        updates.Changed += OnUpdatesChanged;
+        _updatesWatched = updates;
+    }
+
+    private void OnUpdatesChanged(string profileId)
+    {
+        if (_profile?.Id != profileId) return;
+        _updatesTried = null;
+        if (Updates?.Known(profileId) is { } found) UpdatesCount = found.Due.Count;
+        else _ = RefreshUpdatesAsync(); // моды поменяли — что осталось, узнаем заново
+    }
+
+    /// <summary>
+    /// После опроса: сервер по логу остановлен или вылетел — обновления модов должны быть известны. Есть свежая проверка
+    /// (общая со сторожем оповещений) — по ней; нет — проверить: скан по FTP и модбаза, без скачивания.
+    /// </summary>
+    private async Task RefreshUpdatesAsync()
+    {
+        if (!HostedLogs.IsSurelyDown(State) || IsUpdating || _profile is not { } profile || Updates is not { } updates) return;
+        if (updates.Fresh(profile.Id, UpdatesFreshFor) is { } fresh)
+        {
+            UpdatesCount = fresh.Due.Count;
+            return;
+        }
+        var now = DateTime.UtcNow;
+        if (_updatesTried is { } tried && now - tried < UpdatesRetry) return;
+        if (ModTarget.For(profile) is not { IsHosted: true } target) return;
+        _updatesTried = now;
+        var generation = _generation;
+        try
+        {
+            var found = await updates.CheckAsync(target, _cts.Token);
+            if (generation != _generation) return;
+            UpdatesCount = found.Due.Count;
+            _updatesTried = null; // пауза — только после неудачи: устаревшую проверку повторяем сразу
+        }
+        catch (Exception ex) when (IsExpected(ex) || ex is HttpRequestException or Newtonsoft.Json.JsonException)
+        {
+            // модбаза или FTP не ответили — плашки нет, попробуем позже
+        }
+    }
+
+    private bool CanUpdateAll() => !IsUpdating && UpdatesCount > 0 && HostedLogs.IsSurelyDown(State);
+
+    /// <summary>
+    /// «Обновить всё» — та же операция, что в «Моих модах»: вопрос со списком, очередь (копии прежних версий, журнал,
+    /// история), итог «Готово. Запусти сервер в панели хостера». Вопрос «останови сервер» не задаётся: проверка по логу
+    /// перед очередью видит, что он остановлен. Пока ставится — ход на плашке и кнопка недоступна; поставилось —
+    /// проверка устаревает, и плашка показывает, что осталось (обычно — ничего, и она исчезает).
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanUpdateAll))]
+    private async Task UpdateAllAsync()
+    {
+        if (_profile is not { } profile || Updates?.Known(profile.Id) is not { Due.Count: > 0 } found || RunUpdates is not { } run
+            || ModTarget.For(profile) is not { IsHosted: true } target) return;
+        var items = found.Due.Select(r => QueueItem(target, r)).ToList();
+        UpdatesNote = "";
+        IsUpdating = true;
+        Track(items);
+        var queued = await run(target, items);
+        if (!ReferenceEquals(_updating, items)) return; // пока спрашивали, профиль сменили — плашку уже сбросили
+        if (queued.Count == 0)
+        {
+            FinishUpdates(items, report: false); // отказались или вкладка занята — ничего не начато
+            return;
+        }
+        // мод, который уже ждал или ставился в очереди «Моих модов», второй раз не встаёт: следим за тем пунктом,
+        // иначе свой ждал бы вечно и плашка не кончилась бы никогда
+        var tracked = queued.ToList();
+        Track(tracked);
+        if (tracked.All(IsFinal)) FinishUpdates(tracked, report: true);
+    }
+
+    /// <summary>Следить за ходом этих пунктов (прежние — отпустить).</summary>
+    private void Track(List<UpdateQueueItem> items)
+    {
+        if (_updating is { } old) foreach (var item in old) item.PropertyChanged -= OnUpdateItemChanged;
+        _updating = items;
+        foreach (var item in items) item.PropertyChanged += OnUpdateItemChanged;
+        ShowUpdateProgress();
+    }
+
+    private static bool IsFinal(UpdateQueueItem item) => item.State is QueueState.Done or QueueState.Failed or QueueState.Cancelled;
+
+    private void OnUpdateItemChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_updating is not { } items || e.PropertyName is not (nameof(UpdateQueueItem.State) or nameof(UpdateQueueItem.Progress))) return;
+        ShowUpdateProgress();
+        if (items.All(IsFinal)) FinishUpdates(items, report: true);
+    }
+
+    /// <summary>Ход на плашке: «Установка модов · 1 из 3» и полоса — как у очереди «Моих модов».</summary>
+    private void ShowUpdateProgress()
+    {
+        if (_updating is not { } items) return;
+        var finished = items.Count(IsFinal);
+        UpdatesProgressText = Loc.T("queue.titleRunning", finished, items.Count);
+        UpdatesProgress = items.Count == 0 ? 0 : (finished + items.Where(i => i.IsWorking).Sum(i => i.Progress)) / items.Count;
+    }
+
+    private void FinishUpdates(List<UpdateQueueItem> items, bool report)
+    {
+        if (!ReferenceEquals(_updating, items)) return;
+        foreach (var item in items) item.PropertyChanged -= OnUpdateItemChanged;
+        _updating = null;
+        var done = items.Count(i => i.State == QueueState.Done);
+        if (report)
+        {
+            UpdatesNote = ModsViewModel.WithStartHint(Loc.T("queue.finished", done, items.Count(i => i.State == QueueState.Failed)), done > 0);
+            // до свежей проверки (очередь устарит прежнюю, когда закончит) — без поставленных
+            UpdatesCount = Math.Max(0, UpdatesCount - done);
+        }
+        IsUpdating = false;
+        UpdatesProgressText = "";
+        UpdatesProgress = 0;
     }
 
     /// <summary>«Копировать выделенные строки» в меню консоли — как у своей консоли.</summary>

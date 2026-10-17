@@ -172,6 +172,27 @@ public sealed class HostedSetEnabledTests : IDisposable
     }
 
     [Fact]
+    public async Task HostRewroteTheConfigOnStart_ABackgroundPeek_LeavesTheWarningToMyMods()
+    {
+        await ModTargets.InstallAsync(_host.Target, _host.Zip("beta_1.0.0.zip", "beta", "1.0.0")); // в истории есть что делить на запуски
+        await ModTargets.SetEnabledAsync(_host.Target, await AlphaAsync(), enabled: false);
+        ServerStarted("""[{"id":"game","version":"1.22.7"},{"id":"alpha","version":"1.0.0"}]""", []); // DisabledMods снова null
+        var writes = _host.Server.Writes.Count;
+        var history = ModHistory.ReadEntries(ModHistory.FileFor(_host.Profile.Id)).Count;
+
+        // фоновая проверка обновлений (оповещение, плашка «Обновить всё») — раньше, чем «Мои моды»
+        var (peeked, _) = await new HostedMods(_host.Target).PeekAsync(default);
+
+        Assert.DoesNotContain(peeked.Warnings, w => HostedTestText.Of("hosted.configReverted").Contains(w));
+        Assert.Equal(writes, _host.Server.Writes.Count);
+        Assert.Equal(history, ModHistory.ReadEntries(ModHistory.FileFor(_host.Profile.Id)).Count); // и запуск не отмечен
+
+        var (profile, _) = await ModTargets.ScanAsync(_host.Target);
+        Assert.Contains(profile.Warnings, w => HostedTestText.Of("hosted.configReverted").Contains(w));
+        Assert.True(ModHistory.ReadEntries(ModHistory.FileFor(_host.Profile.Id))[^1].IsLaunch);
+    }
+
+    [Fact]
     public async Task HostKeptTheDisabledMod_NoWarning_AndTheLaunchSplitsHistory()
     {
         await ModTargets.ScanAsync(_host.Target); // запомнили LastLaunchMods

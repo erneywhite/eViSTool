@@ -161,12 +161,15 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
             });
             if (outcome is null) return false;
             installed.Add(outcome.Text);
+            main.HostedWatch?.ModsChanged(target, [outcome.Text], []); // у хостера — в оповещение «Обновлены моды»
             return true;
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException
                                        or HttpRequestException or TaskCanceledException)
         {
-            problems.Add($"{Path.GetFileName(zip)}: {(target.IsHosted ? ModTargets.Describe(target, ex) : ex.Message)}");
+            var problem = $"{Path.GetFileName(zip)}: {(target.IsHosted ? ModTargets.Describe(target, ex) : ex.Message)}";
+            problems.Add(problem);
+            main.HostedWatch?.ModsChanged(target, [], [problem]);
             return false;
         }
     }
@@ -188,7 +191,9 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or TaskCanceledException)
         {
-            problems.Add(Loc.T("dl.failed", name, release.ModVersion, ex.Message));
+            var problem = Loc.T("dl.failed", name, release.ModVersion, ex.Message);
+            problems.Add(problem);
+            main.HostedWatch?.ModsChanged(target, [], [problem]);
             return false;
         }
         finally
