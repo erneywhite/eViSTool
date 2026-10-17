@@ -46,8 +46,10 @@ public static class HostedSessions
                     await session.CloseAsync().ConfigureAwait(false);
                     if (!readOnly || attempt > 0 || ct.IsCancellationRequested) throw;
                 }
-                catch when (!files.IsConnected)
+                catch (Exception ex) when (ex is OperationCanceledException || !files.IsConnected)
                 {
+                    // отмена посреди передачи у иных серверов роняет и управляющее соединение (G-Portal), а адаптер
+                    // узнает об этом только на следующей команде — такое соединение в пул не возвращаем
                     await session.CloseAsync().ConfigureAwait(false);
                     throw;
                 }

@@ -1500,6 +1500,8 @@
   "hosted.errNoConnection": "The FTP connection is not set — set it up in Settings.",
   "hosted.errConfigBusy": "serverconfig.json on the server keeps changing — is the server running? Stop it in the host’s panel and try again.",
   "hosted.configReverted": "The host seems to have rewritten serverconfig.json when the server started: a mod you disabled is enabled again.",
+  "hosted.configRestored": "The previous serverconfig.json has been put back on the server: the last change to it did not go through.",
+  "hosted.errPendingInstall": "The interrupted installation of {0} is not finished yet: the server did not let eViSTool finish or undo it. Check the free space and permissions on the server, then refresh the list.",
   "hosted.noConfig": "serverconfig.json was not found on the server: the mods are listed, but they cannot be enabled or disabled.",
   "hosted.noMods": "No mods folder was found on the server.",
   "hosted.modPathHidden": "The mods folder {0} from serverconfig.json is not visible over FTP.",

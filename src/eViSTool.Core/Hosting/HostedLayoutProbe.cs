@@ -57,8 +57,8 @@ public static class HostedLayoutProbe
     public static async Task<HostedSnapshot> ReadAsync(IRemoteFiles files, HostedConnection settings, CancellationToken ct,
         HostedListings? listings = null)
     {
-        var ls = listings ?? new HostedListings(files);
         var root = Root(settings);
+        var ls = listings ?? new HostedListings(files, root);
         var warnings = new List<string>();
         var pinnedGone = false;
 

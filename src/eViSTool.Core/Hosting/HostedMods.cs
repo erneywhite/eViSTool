@@ -34,6 +34,7 @@ public sealed partial class HostedMods(ModTarget target)
 
     private HostedTarget Hosted => Target.Hosted!;
     private string Id => Target.ProfileId;
+    private string Root => HostedLayoutProbe.Root(Hosted.Settings);
 
     /// <summary>Что нашёл скан: профиль и моды, плюс то, что нужно операциям (записи листинга, папки-моды).</summary>
     private sealed record Scan(ResolvedProfile Profile, IReadOnlyList<LocalMod> Mods, HostedSnapshot Snapshot,
@@ -101,11 +102,11 @@ public sealed partial class HostedMods(ModTarget target)
     public Task<string> StampAsync(CancellationToken ct) =>
         HostedSessions.UseAsync(Id, Hosted.Endpoint, async files =>
         {
-            var root = HostedLayoutProbe.Root(Hosted.Settings);
+            var root = Root;
             var layout = LastLayouts.TryGetValue(Id, out var known) && known.Root == root
                 ? known
                 : (await HostedLayoutProbe.ReadAsync(files, Hosted.Settings, ct).ConfigureAwait(false)).Layout;
-            var ls = new HostedListings(files);
+            var ls = new HostedListings(files, root);
             var text = new StringBuilder();
             foreach (var dir in layout.ModDirs)
             {
@@ -132,13 +133,34 @@ public sealed partial class HostedMods(ModTarget target)
             try
             {
                 var name = pending.Name ?? pending.ModId;
-                warnings.Add(await HostedJournal.FinishAsync(files, Id, pending, ct).ConfigureAwait(false)
+                warnings.Add(await HostedJournal.FinishAsync(files, Id, pending, ct, Root).ConfigureAwait(false)
                     ? Loc.T("hosted.recovered", name)
                     : Loc.T("hosted.rolledBack", name));
             }
-            catch (RemoteFilesException ex) when (ex.Kind is not (RemoteFailure.Connect or RemoteFailure.Timeout))
+            catch (Exception ex) when (IsNotADrop(ex))
             {
-                // сервер не дал довести (права, место) — журнал остаётся, попробуем при следующем скане
+                // сервер не дал довести (права, место) или подвёл диск этой машины — журнал остаётся, попробуем при
+                // следующем скане; новую установку до тех пор не начинаем (InstallCoreAsync)
+            }
+        }
+
+        // запись конфига сорвалась посередине: прежний конфиг остался только как bak — возвращаем его на место
+        if (HostedJournal.ConfigSwap(Id) is { } swapped)
+        {
+            try
+            {
+                var ls = new HostedListings(files, Root);
+                if (await ls.FileAsync(swapped, ct).ConfigureAwait(false) is null
+                    && await ls.FileAsync(swapped + BakSuffix, ct).ConfigureAwait(false) is not null)
+                {
+                    await files.RenameAsync(swapped + BakSuffix, swapped, ct).ConfigureAwait(false);
+                    warnings.Add(Loc.T("hosted.configRestored"));
+                }
+                HostedJournal.ClearConfigSwap(Id);
+            }
+            catch (Exception ex) when (IsNotADrop(ex))
+            {
+                // не вышло — отметка остаётся, попробуем при следующем скане
             }
         }
 
@@ -269,31 +291,52 @@ public sealed partial class HostedMods(ModTarget target)
     }
 
     /// <summary>
-    /// Запуски сервера — по LastLaunchMods (его пишет сервер при старте): поменялся — отметка запуска в истории (история
-    /// разбивается на сеансы по запускам). Если перед этим мы сами выключали моды, а после запуска они снова включены, —
-    /// предупреждение: хостер, похоже, переписал конфиг при старте.
+    /// Запуски сервера — по LastLaunchMods: сервер пишет туда при старте включённые моды, нужные клиенту, и только если
+    /// набор поменялся (ServerSystemHeartbeat.OnBeginRunGame игры). Поменялся — отметка запуска в истории (история
+    /// разбивается на сеансы по запускам).
+    /// <para>
+    /// Проверка «хостер переписал конфиг» от этого не зависит: если хостер при старте вернул прежний конфиг, сервер
+    /// загрузит тот же набор, что и в прошлый раз, и LastLaunchMods не изменится. Поэтому сравниваем то, что мы сами
+    /// записали в DisabledMods, с тем, что там сейчас: нашей записи нет — предупреждение. Второй признак — после нашей
+    /// записи сервер запускался (LastLaunchMods другой) и всё равно загрузил выключенный мод.
+    /// </para>
     /// </summary>
     private void TrackLaunches(HostedSnapshot snapshot, IReadOnlyList<string> disabled, List<string> warnings)
     {
-        if (snapshot.ConfigJson?["LastLaunchMods"] is not { Type: not JTokenType.Null } token) return;
-        var launch = token.Type == JTokenType.String ? (string)token! : token.ToString(Formatting.None);
+        if (snapshot.ConfigJson is not { } config) return; // конфига нет или он битый — сравнивать не с чем
+        var launch = config["LastLaunchMods"] is { Type: not JTokenType.Null } token
+            ? token.Type == JTokenType.String ? (string)token! : token.ToString(Formatting.None)
+            : null;
         var state = HostedState.Load(Id);
-        if (launch == state.LastLaunch) return;
+        var changed = false;
 
-        // отметка — на момент, когда запуск заметили: время файла конфига у FTP грубое (до секунды или минуты, LIST — ещё
-        // и в поясе сервера) и могло бы встать раньше изменений, сделанных до запуска. Свои изменения после запуска
-        // раньше скана не бывают: каждая операция сначала сканирует
-        if (state.LastLaunch is not null) ModHistory.MarkLaunch(ModHistory.FileFor(Id));
-        if (state.WrittenDisabled is { Count: > 0 } written && launch != state.LaunchAtWrite)
+        if (state.WrittenDisabled is { Count: > 0 } written)
         {
-            var loaded = LaunchedIds(launch);
-            if (written.Any(w => !disabled.Any(d => IsEntryOf(d, w)) || loaded.Contains(w)))
-                warnings.Add(Loc.T("hosted.configReverted"));
-            state.WrittenDisabled = null;
-            state.LaunchAtWrite = null;
+            var reverted = written.Any(w => !disabled.Any(d => IsEntryOf(d, w)));
+            var launchedSince = launch is not null && launch != state.LaunchAtWrite;
+            if (!reverted && launchedSince) reverted = written.Any(LaunchedIds(launch!).Contains);
+            if (reverted) warnings.Add(Loc.T("hosted.configReverted"));
+            if (reverted || launchedSince)
+            {
+                // предупреждаем один раз; запись пережила запуск — следить дальше не за чем
+                state.WrittenDisabled = null;
+                state.LaunchAtWrite = null;
+                changed = true;
+            }
         }
-        state.LastLaunch = launch;
-        state.Save(Id);
+
+        if (launch is not null && launch != state.LastLaunch)
+        {
+            // отметка — на момент, когда запуск заметили: время файла конфига у FTP грубое (до секунды или минуты, LIST —
+            // ещё и в поясе сервера) и могло бы встать раньше изменений, сделанных до запуска. Свои изменения после
+            // запуска раньше скана не бывают: каждая операция сначала сканирует.
+            // shortcut: запуск с тем же набором модов не виден (LastLaunchMods не меняется) и отметки не получает;
+            // переделать, если найдётся надёжный признак запуска (например, время начала лога сервера)
+            if (state.LastLaunch is not null) ModHistory.MarkLaunch(ModHistory.FileFor(Id));
+            state.LastLaunch = launch;
+            changed = true;
+        }
+        if (changed) state.Save(Id);
     }
 
     /// <summary>id модов из LastLaunchMods (то, что сервер загрузил при запуске).</summary>
@@ -375,14 +418,22 @@ public sealed partial class HostedMods(ModTarget target)
         throw new IOException(Loc.T("hosted.errConfigBusy"));
     }
 
+    private const string BakSuffix = ".evistool.bak";
+
+    /// <summary>Сбой, после которого соединение ещё живо: сервер отказал или подвёл диск этой машины.</summary>
+    private static bool IsNotADrop(Exception ex) =>
+        ex is UnauthorizedAccessException
+        || ex is IOException && ex is not RemoteFilesException { Kind: RemoteFailure.Connect or RemoteFailure.Timeout };
+
     /// <summary>
     /// Записать конфиг через временный файл. Многие серверы (G-Portal тоже) не переименовывают поверх — тогда прежний
-    /// файл уходит в .evistool.bak, временный встаёт на место, а при сбое bak возвращается.
+    /// файл уходит в .evistool.bak, временный встаёт на место, а при сбое bak возвращается. Сорвался и возврат — на
+    /// этой машине остаётся отметка (<see cref="HostedJournal.MarkConfigSwap"/>), по ней bak вернёт следующий скан.
     /// </summary>
-    private static async Task WriteConfigAsync(IRemoteFiles files, string configPath, string text, CancellationToken ct)
+    private async Task WriteConfigAsync(IRemoteFiles files, string configPath, string text, CancellationToken ct)
     {
         var tmp = configPath + ".evistool.tmp";
-        var bak = configPath + ".evistool.bak";
+        var bak = configPath + BakSuffix;
         await files.WriteTextAsync(tmp, text, ct).ConfigureAwait(false);
         try
         {
@@ -391,12 +442,21 @@ public sealed partial class HostedMods(ModTarget target)
                 await files.RenameAsync(tmp, configPath, ct).ConfigureAwait(false);
                 return;
             }
-            catch (RemoteFilesException ex) when (ex.Kind == RemoteFailure.Exists)
+            catch (RemoteFilesException ex) when (ex.Kind is not (RemoteFailure.Connect or RemoteFailure.Timeout))
             {
-                // поверх не переименовывает — через bak
+                // поверх не переименовывает. По договору это Exists, но 550 сервера («path already exists») адаптер
+                // может перевести и как Denied — тогда смотрим сами: временный файл и конфиг на месте — идём через bak
+                if (ex.Kind != RemoteFailure.Exists)
+                {
+                    var ls = new HostedListings(files, Root);
+                    if (await ls.FileAsync(tmp, ct).ConfigureAwait(false) is null
+                        || await ls.FileAsync(configPath, ct).ConfigureAwait(false) is null)
+                        throw;
+                }
             }
-            if (await new HostedListings(files).FileAsync(bak, ct).ConfigureAwait(false) is not null)
+            if (await new HostedListings(files, Root).FileAsync(bak, ct).ConfigureAwait(false) is not null)
                 await files.DeleteFileAsync(bak, ct).ConfigureAwait(false);
+            HostedJournal.MarkConfigSwap(Id, configPath);
             await files.RenameAsync(configPath, bak, ct).ConfigureAwait(false);
             try
             {
@@ -404,9 +464,10 @@ public sealed partial class HostedMods(ModTarget target)
             }
             catch (Exception ex) when (ex is IOException or OperationCanceledException)
             {
-                await QuietlyAsync(() => files.RenameAsync(bak, configPath, CancellationToken.None)).ConfigureAwait(false);
+                if (await PutBackAsync(files, bak, configPath).ConfigureAwait(false)) HostedJournal.ClearConfigSwap(Id);
                 throw;
             }
+            HostedJournal.ClearConfigSwap(Id);
         }
         catch (Exception ex) when (ex is IOException or OperationCanceledException)
         {
@@ -440,6 +501,20 @@ public sealed partial class HostedMods(ModTarget target)
             ? t.Type == JTokenType.String ? (string)t! : t.ToString(Formatting.None)
             : null;
         state.Save(Id);
+    }
+
+    /// <summary>Вернуть bak на место конфига; false — не вышло (отметка остаётся для следующего скана).</summary>
+    private static async Task<bool> PutBackAsync(IRemoteFiles files, string bak, string configPath)
+    {
+        try
+        {
+            await files.RenameAsync(bak, configPath, CancellationToken.None).ConfigureAwait(false);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
     }
 
     private static async Task QuietlyAsync(Func<Task> step)

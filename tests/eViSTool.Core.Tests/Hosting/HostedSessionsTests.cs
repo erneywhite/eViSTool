@@ -76,6 +76,23 @@ public sealed class HostedSessionsTests : IDisposable
     }
 
     [Fact]
+    public async Task CancelledOperation_DoesNotLeaveItsConnectionInThePool()
+    {
+        await ModTargets.ScanAsync(_host.Target);
+        using var cts = new CancellationTokenSource();
+
+        // отмена посреди передачи: адаптер ещё считает соединение живым, а сервер его уже уронил
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => HostedSessions.UseAsync<int>(_host.Profile.Id, _host.Endpoint, _ =>
+        {
+            cts.Cancel();
+            throw new OperationCanceledException(cts.Token);
+        }, cts.Token));
+
+        await ModTargets.ScanAsync(_host.Target);
+        Assert.Equal(2, _host.Server.Connects);
+    }
+
+    [Fact]
     public async Task ChangedPassword_OpensANewConnection()
     {
         await ModTargets.ScanAsync(_host.Target);

@@ -187,6 +187,73 @@ public sealed class HostedSetEnabledTests : IDisposable
         Assert.Equal("beta", entries[0].ModId);
     }
 
+    [Fact]
+    public async Task HostPutBackTheOldConfig_TheSameModsLoaded_IsStillReported()
+    {
+        // alpha грузился при прошлом запуске; хостер при старте вернул конфиг, сервер загрузил тот же набор — и
+        // LastLaunchMods не изменился (сервер пишет его, только когда набор другой)
+        const string launch = """[{"id":"game","version":"1.22.7"},{"id":"alpha","version":"1.0.0"}]""";
+        ServerStarted(launch, null);
+        await ModTargets.ScanAsync(_host.Target);
+        await ModTargets.SetEnabledAsync(_host.Target, await AlphaAsync(), enabled: false);
+
+        var (untouched, _) = await ModTargets.ScanAsync(_host.Target);
+        Assert.DoesNotContain(untouched.Warnings, w => HostedTestText.Of("hosted.configReverted").Contains(w));
+
+        ServerStarted(launch, []); // DisabledMods снова null, LastLaunchMods тот же
+        var (profile, _) = await ModTargets.ScanAsync(_host.Target);
+        Assert.Contains(profile.Warnings, w => HostedTestText.Of("hosted.configReverted").Contains(w));
+    }
+
+    [Fact]
+    public async Task RenameOverRefusedAsDenied_StillGoesThroughBak()
+    {
+        // адаптер перевёл «550 path already exists» как Denied, а не Exists
+        var alpha = await AlphaAsync();
+        _host.Server.FailOn = (op, path) => op == "rename" && path == "/serverconfig.json.evistool.tmp" && _host.Server.Has("/serverconfig.json");
+
+        await ModTargets.SetEnabledAsync(_host.Target, alpha, enabled: false);
+
+        Assert.Equal(["alpha"], DisabledMods());
+        Assert.False(_host.Server.Has("/serverconfig.json.evistool.tmp"));
+    }
+
+    [Fact]
+    public async Task RenameRefusedForReal_TheConfigStaysAsItWas()
+    {
+        var before = ConfigText;
+        var alpha = await AlphaAsync();
+        // переименовывать не даёт ничего: попытка через bak тоже срывается, конфиг остаётся как был
+        _host.Server.FailOn = (op, _) => op == "rename";
+
+        await Assert.ThrowsAsync<RemoteFilesException>(() => ModTargets.SetEnabledAsync(_host.Target, alpha, enabled: false));
+
+        Assert.Equal(before, ConfigText);
+        Assert.False(_host.Server.Has("/serverconfig.json.evistool.bak"));
+        Assert.False(_host.Server.Has("/serverconfig.json.evistool.tmp"));
+    }
+
+    [Fact]
+    public async Task BothRenamesFail_TheNextScanPutsTheConfigBack()
+    {
+        var before = ConfigText;
+        var alpha = await AlphaAsync();
+        _host.Server.FailOn = (op, path) => op == "rename"
+            && (path == "/serverconfig.json.evistool.tmp" && _host.Server.Has("/serverconfig.json.evistool.bak") || path == "/serverconfig.json.evistool.bak");
+
+        await Assert.ThrowsAsync<RemoteFilesException>(() => ModTargets.SetEnabledAsync(_host.Target, alpha, enabled: false));
+        Assert.False(_host.Server.Has("/serverconfig.json")); // остался только bak
+        _host.Server.FailOn = null;
+
+        var (profile, _) = await ModTargets.ScanAsync(_host.Target);
+
+        Assert.Equal(before, ConfigText);
+        Assert.False(_host.Server.Has("/serverconfig.json.evistool.bak"));
+        Assert.Contains(profile.Warnings, w => HostedTestText.Of("hosted.configRestored").Contains(w));
+        Assert.Null(HostedJournal.ConfigSwap(_host.Profile.Id));
+        Assert.DoesNotContain(profile.Warnings, w => HostedTestText.Of("hosted.noConfig").Contains(w));
+    }
+
     // ---------- ToText
 
     [Fact]

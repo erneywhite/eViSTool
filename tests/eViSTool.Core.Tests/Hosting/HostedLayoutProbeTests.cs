@@ -207,4 +207,23 @@ public sealed class HostedLayoutProbeTests : IDisposable
         Assert.Null(await HostedLayoutProbe.MatchAsync(ls, "/home/../etc/Mods", "/", null, null, default));
         Assert.Null(await HostedLayoutProbe.MatchAsync(ls, "/home/x/NoSuch", "/", null, null, default));
     }
+
+    [Fact]
+    public async Task RootInASubfolder_WorksWhenTheFoldersAboveItCannotBeListed()
+    {
+        _host.Server.Put("/home/vs/serverconfig.json", Config(new[] { "Mods" }));
+        _host.Server.MakeDir("/home/vs/Mods");
+        _host.PutMod("/home/vs/Mods/alpha_1.0.0.zip", "alpha", "1.0.0");
+        // хостер не даёт листать ничего выше корня сервера
+        _host.Server.FailOn = (op, path) => op == "list" && path is "/" or "/home";
+
+        var layout = await DetectAsync(new HostedConnection { Host = _host.Host, Port = 21, User = "user", Root = "/home/vs" });
+
+        Assert.Equal("/home/vs/serverconfig.json", layout.ConfigPath);
+        Assert.Equal(["/home/vs/Mods"], layout.ModDirs);
+        var ls = new HostedListings(_host.Server, "/home/vs");
+        Assert.Equal("/home/vs/Mods", await ls.DirectoryIgnoreCaseAsync("/home/vs/mods", default));
+        Assert.True(await ls.IsDirectoryAsync("/home", default));
+        Assert.Null(await new HostedListings(_host.Server).FileAsync("/home/vs/serverconfig.json", default)); // без корня — не видно
+    }
 }

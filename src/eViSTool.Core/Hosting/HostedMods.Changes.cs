@@ -27,6 +27,9 @@ public sealed partial class HostedMods
         CancellationToken ct)
     {
         var scan = await ScanCoreAsync(files, null, ct).ConfigureAwait(false);
+        // прерванную установку скан довести не смог — новая затёрла бы её журнал, и копию старой версии никто бы не вернул
+        if (HostedJournal.Read(Id) is { } stuck)
+            throw new IOException(Loc.T("hosted.errPendingInstall", stuck.Name ?? stuck.ModId));
         var listing = new List<RemoteEntry>();
         foreach (var dir in scan.Profile.ModDirs)
             listing.AddRange(await scan.Snapshot.Listings.ListAsync(dir, ct).ConfigureAwait(false) ?? []);
@@ -38,7 +41,7 @@ public sealed partial class HostedMods
         var targetDir = RemotePath.Parent(plan.TargetPath);
 
         // ---- перепроверка по свежему листингу: пока человек отвечал на вопросы, файлы могли поменять
-        var fresh = new HostedListings(files);
+        var fresh = new HostedListings(files, Root);
         var replaced = plan.Replaces.Select(r => r.Path).ToHashSet(StringComparer.Ordinal);
         if (await fresh.EntryAsync(plan.TargetPath, ct).ConfigureAwait(false) is not null && !replaced.Contains(plan.TargetPath))
             throw new IOException(Loc.T("err.installTargetTaken", RemotePath.Name(plan.TargetPath)));
@@ -110,16 +113,19 @@ public sealed partial class HostedMods
         }
         catch (Exception ex) when (ex is IOException or OperationCanceledException)
         {
+            var inPlace = false;
             try
             {
-                await HostedJournal.RollBackAsync(files, pending, CancellationToken.None).ConfigureAwait(false);
-                HostedJournal.Delete(Id, pending);
+                // false — переименование на самом деле прошло (потерялся только ответ): откатывать нечего
+                if (await HostedJournal.RollBackAsync(files, pending, CancellationToken.None, Root).ConfigureAwait(false))
+                    HostedJournal.Delete(Id, pending);
+                else inPlace = true;
             }
             catch (Exception rollback) when (rollback is IOException or UnauthorizedAccessException)
             {
                 // откат не вышел (связь оборвалась) — журнал остаётся, его доведёт следующий скан
             }
-            throw;
+            if (!inPlace) throw;
         }
 
         // ---- готово: копии — в хранилище версий, изменение — в историю, архив — в кэш modinfo
