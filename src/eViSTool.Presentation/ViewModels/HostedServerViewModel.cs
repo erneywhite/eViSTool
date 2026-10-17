@@ -376,18 +376,24 @@ public sealed partial class HostedServerViewModel : ObservableObject
         : Loc.T("server.hostedRetry", Describe(ex), (int)RetryInterval.TotalSeconds);
 
     /// <summary>
-    /// Ошибка, которую повтор не вылечит: неверный логин или пароль, недоверенный сертификат, протокол, который программа
-    /// не умеет. Это правят в «Настройках».
+    /// Ошибка, которую повтор не вылечит: неверный логин или пароль, недоверенный сертификат или ключ сервера, протокол,
+    /// который программа не умеет, беда с файлом ключа SFTP. Это правят в «Настройках».
     /// </summary>
     private static bool IsHopeless(Exception ex) =>
-        ex is RemoteFilesException { Kind: RemoteFailure.Auth or RemoteFailure.CertificateUntrusted or RemoteFailure.Unsupported };
+        ex is RemoteFilesException
+        {
+            Kind: RemoteFailure.Auth or RemoteFailure.CertificateUntrusted or RemoteFailure.Unsupported or RemoteFailure.KeyFile
+                or RemoteFailure.KeyPassphrase,
+        };
 
     /// <summary>
-    /// Что случилось — законченным предложением: за ним в строке идёт «попробую снова…». Сертификату здесь доверить
-    /// нельзя (это делают в «Настройках»), поэтому совет «доверяй, только если…» не к месту — свой текст.
+    /// Что случилось — законченным предложением: за ним в строке идёт «попробую снова…». Сертификату и ключу сервера
+    /// здесь доверить нельзя (это делают в «Настройках»), поэтому совет «доверяй, только если…» не к месту — свой текст.
     /// </summary>
     private static string Describe(Exception ex)
     {
+        if (ex is RemoteFilesException { Kind: RemoteFailure.CertificateUntrusted, IsHostKey: true } hostKey)
+            return hostKey.HostKeyChanged ? Loc.T("server.hostedHostKeyChanged") : Loc.T("server.hostedHostKeyUntrusted");
         if (ex is RemoteFilesException { Kind: RemoteFailure.CertificateUntrusted }) return Loc.T("server.hostedCertUntrusted");
         var text = HostedSecret.Describe(ex).TrimEnd();
         return text.Length == 0 || text[^1] is '.' or '!' or '?' or '…' ? text : text + ".";

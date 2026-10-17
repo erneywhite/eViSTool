@@ -15,7 +15,8 @@
   <ItemGroup>
     <ProjectReference Include="..\eViSTool.Core\eViSTool.Core.csproj" />
     <ProjectReference Include="..\eViSTool.Presentation\eViSTool.Presentation.csproj" />
-    <!-- транспорт FTP для серверов у хостера (FluentFTP); только окно, агенту не нужен -->
+    <!-- транспорты FTP и SFTP для серверов у хостера (FluentFTP, SSH.NET); только окно, агенту не нужны.
+         SSH.NET помечен безопасным для обрезки и переживает TrimMode=partial сборки для Linux без своих корней -->
     <ProjectReference Include="..\eViSTool.Hosting\eViSTool.Hosting.csproj" />
   </ItemGroup>
 

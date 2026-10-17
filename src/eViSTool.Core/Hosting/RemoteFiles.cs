@@ -3,20 +3,26 @@ using System.Text;
 namespace eViSTool.Core.Hosting;
 
 /// <summary>Файл или папка на сервере. <paramref name="Path"/> — абсолютный через «/»; <paramref name="Modified"/> —
-/// как отдал листинг (MLSD — UTC, LIST — местное время сервера с точностью до минуты), null — неизвестно.</summary>
+/// как отдал листинг (MLSD и SFTP — UTC, LIST — местное время сервера с точностью до минуты), null — неизвестно.</summary>
 public sealed record RemoteEntry(string Path, string Name, bool IsDirectory, long Size, DateTime? Modified);
 
 /// <summary>Что умеет сервер — выясняется при подключении и пробами (FEAT у хостеров бывает не реализован).</summary>
 /// <param name="RangeReads">Чтение с позиции (REST) работает.</param>
 /// <param name="Utf8">Имена в UTF-8.</param>
-/// <param name="Encrypted">Соединение зашифровано (TLS).</param>
-/// <param name="Banner">Приветствие сервера (строка 220), если было.</param>
+/// <param name="Encrypted">Соединение зашифровано (TLS; у SFTP — всегда).</param>
+/// <param name="Banner">Приветствие сервера (строка 220 у FTP, версия SSH у SFTP), если было.</param>
 public sealed record RemoteFeatures(bool RangeReads, bool Utf8, bool Encrypted, string? Banner);
 
-/// <summary>Что именно не вышло — по нему окно подбирает текст (<see cref="HostedSecret.Describe"/>).</summary>
+/// <summary>
+/// Что именно не вышло — по нему окно подбирает текст (<see cref="HostedSecret.Describe"/>). <see cref="CertificateUntrusted"/> —
+/// сервер не подтвердил, что он тот самый: сертификат TLS у FTPS или ключ сервера SSH у SFTP
+/// (<see cref="RemoteFilesException.IsHostKey"/>). <see cref="KeyFile"/> и <see cref="KeyPassphrase"/> — беда с файлом
+/// ключа SFTP на этом компьютере, до входа на сервер дело не дошло.
+/// </summary>
 public enum RemoteFailure
 {
     Connect, Auth, Timeout, Tls, CertificateUntrusted, NotFound, Denied, Quota, RangeUnsupported, Exists, Protocol, Unsupported,
+    KeyFile, KeyPassphrase,
 }
 
 /// <summary>
@@ -31,12 +37,20 @@ public sealed class RemoteFilesException(RemoteFailure kind, string message, Exc
     /// <summary>Для <see cref="RemoteFailure.CertificateUntrusted"/>: отпечаток SHA-256 сертификата сервера.</summary>
     public string? CertificateSha256 { get; init; }
 
-    /// <summary>Для <see cref="RemoteFailure.CertificateUntrusted"/>: на кого выписан сертификат.</summary>
+    /// <summary>Для <see cref="RemoteFailure.CertificateUntrusted"/>: на кого выписан сертификат (у ключа SSH — его тип).</summary>
     public string? CertificateSubject { get; init; }
+
+    /// <summary>Для <see cref="RemoteFailure.CertificateUntrusted"/>: это ключ сервера SSH (SFTP), а не сертификат TLS;
+    /// отпечаток в <see cref="CertificateSha256"/> — «SHA256:…», как его печатает ssh.</summary>
+    public bool IsHostKey { get; init; }
+
+    /// <summary>Для ключа сервера SSH: профиль доверял другому ключу этого сервера — ключ сменился (или соединение
+    /// перехватили). Подключения нет, пока человек сам не доверится новому ключу.</summary>
+    public bool HostKeyChanged { get; init; }
 }
 
 /// <summary>
-/// Файлы сервера у хостера: FTP сейчас, SFTP — потом. Пути абсолютные через «/». Один экземпляр — одно соединение,
+/// Файлы сервера у хостера по FTP или SFTP. Пути абсолютные через «/». Один экземпляр — одно соединение,
 /// не потокобезопасен (очередь операций — у <see cref="HostedSessions"/>). Любой сбой — <see cref="RemoteFilesException"/>,
 /// отмена — <see cref="OperationCanceledException"/> как есть.
 /// </summary>

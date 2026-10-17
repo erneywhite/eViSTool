@@ -20,7 +20,8 @@
         <TextBlock Classes="dialogTitle" Text="{local:Tr hosted.title}" />
 
         <TextBlock Classes="label" Text="{local:Tr hosted.host}" Margin="0,14,0,0" />
-        <!-- адрес целиком (ftp://логин@host:порт/папка) раскладывается по полям; из поля ушли — остаётся один хост -->
+        <!-- адрес целиком (ftp://логин@host:порт/папка, sftp://…) раскладывается по полям; из поля ушли — остаётся один хост
+             (у sftp:// — со схемой: по ней выбран протокол) -->
         <TextBox Classes="clearButton" Text="{Binding Address}" Margin="0,6,0,0" VerticalContentAlignment="Center"
                  ctl:Focus.OnOpen="True" LostFocus="Address_LostFocus" AutomationProperties.AutomationId="HostedAddress" />
         <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding AddressTone}" Text="{Binding AddressHint}"
@@ -32,11 +33,18 @@
                 <TextBox Text="{Binding PortText}" Margin="0,6,0,0" MaxLength="5" VerticalContentAlignment="Center"
                          AutomationProperties.AutomationId="HostedPort" />
             </StackPanel>
-            <StackPanel Grid.Column="2">
+            <!-- FTP: шифрование; у SFTP оно всегда, на его месте — способ входа -->
+            <StackPanel Grid.Column="2" IsVisible="{Binding !IsSftp}">
                 <TextBlock Classes="label" Text="{local:Tr hosted.tls}" />
                 <ComboBox ItemsSource="{Binding TlsOptions}" SelectedIndex="{Binding TlsIndex}" HorizontalAlignment="Stretch" Margin="0,6,0,0"
                           ctl:WheelToParent.IsEnabled="True" AutomationProperties.AutomationId="HostedTls"
                           AutomationProperties.Name="{local:Tr hosted.tls}" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" IsVisible="{Binding IsSftp}">
+                <TextBlock Classes="label" Text="{local:Tr hosted.auth}" />
+                <ComboBox ItemsSource="{Binding AuthOptions}" SelectedIndex="{Binding AuthIndex}" HorizontalAlignment="Stretch" Margin="0,6,0,0"
+                          ctl:WheelToParent.IsEnabled="True" AutomationProperties.AutomationId="HostedAuth"
+                          AutomationProperties.Name="{local:Tr hosted.auth}" />
             </StackPanel>
         </Grid>
         <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding PortTone}" Text="{Binding PortHint}" FontSize="11" TextWrapping="Wrap"
@@ -47,17 +55,38 @@
                 <TextBlock Classes="label" Text="{local:Tr hosted.user}" />
                 <TextBox Text="{Binding User}" Margin="0,6,0,0" VerticalContentAlignment="Center" AutomationProperties.AutomationId="HostedUser" />
             </StackPanel>
-            <StackPanel Grid.Column="2">
+            <StackPanel Grid.Column="2" IsVisible="{Binding !IsKeyLogin}">
                 <TextBlock Classes="label" Text="{local:Tr hosted.password}" />
                 <!-- пароль — секрет: поле скрытое. Точки — из Cascadia Mono (mono), как в окне кода подключения -->
                 <ctl:SecretTextBox Classes="mono" Text="{Binding Password}" PasswordChar="●" Margin="0,6,0,0" VerticalContentAlignment="Center"
                                    AutomationProperties.AutomationId="HostedPassword" />
             </StackPanel>
+            <StackPanel Grid.Column="2" IsVisible="{Binding IsKeyLogin}">
+                <TextBlock Classes="label" Text="{local:Tr hosted.keyPassphrase}" />
+                <ctl:SecretTextBox Classes="mono" Text="{Binding KeyPassphrase}" PasswordChar="●" Margin="0,6,0,0" VerticalContentAlignment="Center"
+                                   AutomationProperties.AutomationId="HostedKeyPassphrase" />
+            </StackPanel>
         </Grid>
         <!-- правка готового подключения: пароль сохранён, пустое поле его не меняет -->
-        <TextBlock Classes="hint" Text="{local:Tr hosted.passwordKeep}" Margin="0,6,0,0" IsVisible="{Binding HasSavedPassword}" />
+        <TextBlock Classes="hint" Text="{local:Tr hosted.passwordKeep}" Margin="0,6,0,0" IsVisible="{Binding ShowPasswordKeep}" />
+        <!-- под паролем ключа: нужен ли он вообще (или «оставь пустым», если сохранён) -->
+        <Grid ColumnDefinitions="*,12,*" IsVisible="{Binding IsKeyLogin}">
+            <TextBlock Grid.Column="2" Classes="hint" Text="{Binding KeyPassphraseNote}" Margin="0,6,0,0" TextWrapping="Wrap" />
+        </Grid>
 
-        <!-- «Дополнительно»: папка сервера на FTP и активный режим -->
+        <!-- вход по ключу: файл закрытого ключа на этом компьютере -->
+        <StackPanel IsVisible="{Binding IsKeyLogin}">
+            <TextBlock Classes="label" Text="{local:Tr hosted.keyFile}" Margin="0,4,0,0" />
+            <DockPanel Margin="0,6,0,0">
+                <Button DockPanel.Dock="Right" Content="{local:Tr common.browse}" Command="{Binding BrowseKeyCommand}" Margin="8,0,0,0"
+                        AutomationProperties.AutomationId="HostedKeyBrowse" />
+                <TextBox Classes="mono" Text="{Binding KeyFile}" VerticalContentAlignment="Center" AutomationProperties.AutomationId="HostedKeyFile" />
+            </DockPanel>
+            <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding KeyFileTone}" Text="{Binding KeyFileHint}" FontSize="11" TextWrapping="Wrap"
+                       Margin="0,6,0,0" />
+        </StackPanel>
+
+        <!-- «Дополнительно»: папка сервера и активный режим FTP -->
         <Button Classes="small" HorizontalAlignment="Left" Padding="0,4" Margin="0,16,0,0" Background="Transparent" BorderThickness="0"
                 Click="Advanced_Click" AutomationProperties.AutomationId="HostedAdvanced">
             <StackPanel Orientation="Horizontal">
@@ -69,7 +98,7 @@
             <TextBlock Classes="label" Text="{local:Tr hosted.root}" Margin="0,8,0,0" />
             <TextBox Classes="mono" Text="{Binding Root}" Margin="0,6,0,0" VerticalContentAlignment="Center" AutomationProperties.AutomationId="HostedRoot" />
             <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding RootTone}" Text="{Binding RootHint}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" />
-            <CheckBox IsChecked="{Binding ActiveMode}" Margin="0,10,0,0" AutomationProperties.AutomationId="HostedActive">
+            <CheckBox IsChecked="{Binding ActiveMode}" Margin="0,10,0,0" IsVisible="{Binding !IsSftp}" AutomationProperties.AutomationId="HostedActive">
                 <TextBlock Text="{local:Tr hosted.activeMode}" FontSize="12" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap" />
             </CheckBox>
         </StackPanel>
@@ -81,11 +110,12 @@
                        TextWrapping="Wrap" Margin="12,8,0,0" AutomationProperties.AutomationId="HostedResult" />
         </DockPanel>
 
-        <!-- сертификат сервера не подтверждён известным центром: показать отпечаток и дать довериться -->
+        <!-- сертификат сервера не подтверждён известным центром (или ключ сервера SFTP незнаком либо сменился):
+             показать отпечаток и дать довериться -->
         <Border Classes="warning" Margin="0,12,0,0" IsVisible="{Binding HasPendingCertificate}">
             <DockPanel>
                 <Button DockPanel.Dock="Right" Classes="small" Padding="12,5" Margin="12,0,0,0" VerticalAlignment="Center"
-                        Content="{local:Tr hosted.trust}" Command="{Binding TrustCertificateCommand}" AutomationProperties.AutomationId="HostedTrust" />
+                        Content="{Binding TrustText}" Command="{Binding TrustCertificateCommand}" AutomationProperties.AutomationId="HostedTrust" />
                 <Path Classes="icon" DockPanel.Dock="Left" Data="{StaticResource Icon.Warning}" Stroke="{DynamicResource Forest.Warn}"
                       VerticalAlignment="Center" Margin="0,0,12,0" />
                 <TextBlock Text="{Binding CertificateText}" Foreground="{DynamicResource Forest.Muted}" FontSize="12" TextWrapping="Wrap"

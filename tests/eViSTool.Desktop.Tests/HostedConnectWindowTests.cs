@@ -95,6 +95,54 @@ public sealed class HostedConnectWindowTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void SftpLink_SwapsTlsForTheSignInChoice_AndConnectAnswersWithTheKey()
+    {
+        var key = Path.Combine(Path.GetTempPath(), "evis-sftp-window-" + Guid.NewGuid().ToString("N"));
+        File.WriteAllText(key, "not a real key");
+        try
+        {
+            var answer = Ask(NewWindow(), window =>
+            {
+                Named<TextBox>(window, "HostedAddress").Text = "sftp://gp_user@203.0.113.40:2022";
+                Dispatcher.UIThread.RunJobs();
+                window.UpdateLayout();
+                Assert.False(Named<ComboBox>(window, "HostedTls").IsEffectivelyVisible); // у SFTP шифрование всегда
+                Assert.False(Named<CheckBox>(window, "HostedActive").IsVisible);
+                Assert.True(Named<ComboBox>(window, "HostedAuth").IsEffectivelyVisible);
+                Assert.True(Named<SecretTextBox>(window, "HostedPassword").IsEffectivelyVisible);
+                Assert.False(Named<TextBox>(window, "HostedKeyFile").IsEffectivelyVisible);
+                Assert.Equal("2022", Named<TextBox>(window, "HostedPort").Text);
+
+                Named<ComboBox>(window, "HostedAuth").SelectedIndex = 1; // по файлу ключа
+                Dispatcher.UIThread.RunJobs();
+                window.UpdateLayout();
+                Assert.False(Named<SecretTextBox>(window, "HostedPassword").IsEffectivelyVisible);
+                Assert.True(Named<TextBox>(window, "HostedKeyFile").IsEffectivelyVisible);
+                Assert.False(Named<Button>(window, "HostedOk").IsEnabled); // без файла ключа войти нечем
+
+                Named<TextBox>(window, "HostedKeyFile").Text = key;
+                Named<SecretTextBox>(window, "HostedKeyPassphrase").Text = "made-up-passphrase";
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(Named<Button>(window, "HostedOk").IsEnabled);
+                Mouse.Click(window, Named<Button>(window, "HostedOk"));
+            });
+
+            Assert.NotNull(answer);
+            Assert.Equal(HostedProtocol.Sftp, answer.Protocol);
+            Assert.Equal(2022, answer.Port);
+            Assert.Equal("gp_user", answer.User);
+            Assert.Equal(key, answer.KeyFile);
+            Assert.Null(answer.Password);
+            Assert.NotEqual("made-up-passphrase", answer.KeyPassphrase); // в подключение уходит только зашифрованный
+            Assert.Equal("made-up-passphrase", HostedSecret.Unprotect(answer.KeyPassphrase));
+        }
+        finally
+        {
+            File.Delete(key);
+        }
+    }
+
+    [AvaloniaFact]
     public void WithoutAHost_ConnectIsUnavailable()
     {
         var window = NewWindow();

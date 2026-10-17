@@ -3,8 +3,7 @@ using Newtonsoft.Json;
 
 namespace eViSTool.Core.Hosting;
 
-/// <summary>Протокол доступа к файлам сервера у хостера. SFTP заведён заранее: окно, прочитав настройки более новой
-/// версии, не должно спотыкаться о незнакомое значение.</summary>
+/// <summary>Протокол доступа к файлам сервера у хостера: FTP/FTPS или SFTP (файлы по SSH).</summary>
 public enum HostedProtocol { Ftp, Sftp }
 
 /// <summary>Шифрование FTP: нет, «если сервер умеет», только явный TLS (AUTH TLS), неявный TLS (обычно порт 990).</summary>
@@ -12,8 +11,8 @@ public enum FtpTls { None, Auto, Explicit, Implicit }
 
 /// <summary>
 /// Подключение к серверу у хостера (G-Portal и другие) — хранится в профиле (<see cref="Profiles.GameProfile.Hosted"/>).
-/// Пароль лежит зашифрованным (<see cref="HostedSecret"/>). Пути — относительно <see cref="Root"/>, чтобы при смене
-/// корня не править каждое поле; null — найти автоматически при чтении.
+/// Пароль и пароль ключа SFTP лежат зашифрованными (<see cref="HostedSecret"/>). Пути — относительно <see cref="Root"/>,
+/// чтобы при смене корня не править каждое поле; null — найти автоматически при чтении.
 /// Перечисления читаются терпимым конвертером: незнакомое значение не сбрасывает все настройки.
 /// </summary>
 public sealed class HostedConnection
@@ -70,6 +69,22 @@ public sealed class HostedConnection
     /// <summary>SHA-256 сертификата FTPS, которому человек доверился (у хостеров сертификат часто свой).</summary>
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     public string? CertificateSha256 { get; set; }
+
+    /// <summary>
+    /// SFTP: отпечаток ключа сервера SSH, которому человек доверился, — «SHA256:…», как его печатает ssh. Отдельно от
+    /// <see cref="CertificateSha256"/>: у сертификата TLS отпечаток другой природы, и при смене протокола один не должен
+    /// сойти за другой.
+    /// </summary>
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public string? HostKeySha256 { get; set; }
+
+    /// <summary>SFTP: файл закрытого ключа на этом компьютере; null — вход по паролю.</summary>
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public string? KeyFile { get; set; }
+
+    /// <summary>SFTP: пароль ключа, зашифрованный <see cref="HostedSecret.Protect"/>, как и <see cref="Password"/>; null — ключ без пароля.</summary>
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public string? KeyPassphrase { get; set; }
 
     /// <summary>Не спрашивать «останови сервер в панели хостера» перед изменением модов.</summary>
     public bool SkipStopReminder { get; set; }
