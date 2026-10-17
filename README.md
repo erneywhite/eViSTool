@@ -442,7 +442,10 @@ computer.
 
 A running server won't see new mods, so before a change eViSTool checks the log: if the server is stopped, it just
 goes ahead, otherwise it asks you to stop it in the host's panel. Starting and stopping the server and console
-commands stay in the host's panel. The password is stored encrypted and is never shown. SFTP is not supported yet.
+commands stay in the host's panel. The password is stored encrypted and is never shown. SFTP works too: write the
+address as `sftp://host:port` and sign in with a password or with a private key file on your computer. You confirm the
+server's key on the first connection, like an FTPS certificate; if the key changes later, eViSTool won't connect until
+you trust the new one.
 
 ## Server on Linux
 
