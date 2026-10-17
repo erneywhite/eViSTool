@@ -89,11 +89,12 @@ public sealed class ModDisabler
         ex is IOException or InvalidOperationException or UnauthorizedAccessException or HttpRequestException or TaskCanceledException;
 
     /// <summary>
-    /// Мод по пути у цели: у удалённого сервера путь — на его машине, агенту хватит пути; у своего профиля архив
-    /// читается сейчас (нужен modid). Не прочитался — мод с ошибкой, и выключение скажет, что не так.
+    /// Мод по пути у цели: у удалённого сервера и у хостера путь — не на этой машине, цели хватит пути (хостер найдёт мод
+    /// в свежем скане); у своего профиля архив читается сейчас (нужен modid). Не прочитался — мод с ошибкой,
+    /// и выключение скажет, что не так.
     /// </summary>
     public static LocalMod ModAt(ModTarget target, string path) =>
-        target.IsRemote ? new LocalMod(path, null, null) : ModScanner.ReadZip(path);
+        target.IsLocal ? ModScanner.ReadZip(path) : new LocalMod(path, null, null);
 
     /// <summary>Выключить мод у цели (по умолчанию для <see cref="ModDisabler"/>).</summary>
     public static Task DisableModAsync(ModTarget target, string path) =>

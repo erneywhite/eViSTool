@@ -117,30 +117,21 @@ internal sealed class ModHistoryActions(ModsViewModel owner, ModInstallService i
         return Loc.T(s.BackupPath is not null ? "hist.stepFromCopy" : "hist.stepFromModDb", s.Change.Title, now, s.Change.Change.From);
     }
 
-    /// <summary>Убрать мод, поставленный в откатываемом сеансе: в корзину (у сервера — в его), с записью в историю.</summary>
-    private async Task RemoveForRevertAsync(ModTarget target, RevertStep step, List<string> problems)
+    /// <summary>
+    /// Убрать мод, поставленный в откатываемом сеансе: в корзину (у сервера — в его, у хостера — с копией на этой
+    /// машине), с записью в историю.
+    /// </summary>
+    private static async Task RemoveForRevertAsync(ModTarget target, RevertStep step, List<string> problems)
     {
         var mod = step.Current!;
         try
         {
-            if (target.Remote is { } code)
-            {
-                using var agent = AgentClient.ForRemote(code);
-                await agent.DeleteModAsync(mod.Path);
-                return;
-            }
-            Ui.Platform.MoveToTrash(mod.Path);
-            if (mod.Info is { } info)
-            {
-                ModHistory.Record(ModHistory.FileFor(target.ProfileId), info.ModId, info.Name, info.Version, null);
-                if (owner.Locals.Count(l => l.Info?.ModId == info.ModId) == 1 && ProfileResolver.Resolve(target.Profile) is { } resolved)
-                    ModConfigEditor.Forget(resolved, info);
-            }
+            await ModTargets.DeleteAsync(target, mod, Ui.Platform.MoveToTrash);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException or InvalidOperationException
                                        or OperationCanceledException)
         {
-            problems.Add(Loc.T("hist.removeFailed", step.Change.Title, ex.Message));
+            problems.Add(Loc.T("hist.removeFailed", step.Change.Title, target.IsHosted ? ModTargets.Describe(target, ex) : ex.Message));
         }
     }
 
