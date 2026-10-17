@@ -342,6 +342,34 @@ public sealed class ServerHostTests : IAsyncLifetime
         Assert.Null(host.RestartScheduledAt);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task StopRightAfterTheCrashIsAnnounced_CancelsTheWatchdog(bool restore)
+    {
+        var host = Host();
+        await host.StartAsync();
+        await Until(() => host.State == ServerState.Running);
+
+        // «Стоп» (или отмена перезапуска из восстановления мира) в тот миг, когда разослано «остановлен», а сторож своё
+        // ожидание раньше ещё не заводил: обработчик события вызывается как раз в этом промежутке
+        var handled = new TaskCompletionSource();
+        host.StateChanged += s =>
+        {
+            if (s != ServerState.Stopped || !host.LastExitCrashed || handled.Task.IsCompleted) return;
+            if (restore) host.CancelPendingRestart();
+            else host.StopAsync().GetAwaiter().GetResult(); // сервер уже лежит — «Стоп» только отменяет ожидание сторожа
+            handled.TrySetResult();
+        };
+        await host.SendCommandAsync("/crash");
+        await handled.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        await Task.Delay(1000); // хватило бы и на паузу сторожа (200 мс), и на запуск
+        Assert.Equal(ServerState.Stopped, host.State);
+        Assert.Null(host.Pid);
+        Assert.Null(host.RestartScheduledAt);
+    }
+
     [Fact]
     public async Task StateHandler_ThatWaitsForAnotherThreadUsingTheHost_DoesNotDeadlock()
     {

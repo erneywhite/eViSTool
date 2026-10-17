@@ -307,6 +307,7 @@ public sealed class ServerHost : IAsyncDisposable
 
         bool unexpected;
         TaskCompletionSource? exited;
+        CancellationToken? restart = null;
         lock (_lock)
         {
             if (!ReferenceEquals(process, _process)) return;
@@ -321,6 +322,7 @@ public sealed class ServerHost : IAsyncDisposable
             ReleaseWorld(); // до «остановлен»: кто увидит это состояние, сразу может занять мир
             SetState(ServerState.Stopped);
             exited = _exited; // под замком: после него новый запуск может завести свой
+            if (unexpected && _options.Watchdog) restart = PlanRestartLocked();
         }
         RaiseStateChanges();
         exited?.TrySetResult(); // после события: кто дождался выхода, видит уже обработанное «остановлен»
@@ -332,7 +334,25 @@ public sealed class ServerHost : IAsyncDisposable
         }
 
         Sys(Loc.T("srv.crashed", code));
-        if (_options.Watchdog) ScheduleRestart();
+        if (!_options.Watchdog) return;
+        if (restart is { } wait) ScheduleRestart(wait);
+        else Sys(Loc.T("srv.watchdogGaveUp", _options.MaxRestartsPerHour));
+    }
+
+    /// <summary>
+    /// Решение сторожа после падения — под <see cref="_lock"/>, тем же, под которым сервер стал «остановлен». Ожидание
+    /// заводится сразу, поэтому «Стоп» или отмена перезапуска (восстановление мира), пришедшие следом, его уже застанут
+    /// и отменят. Раньше оно заводилось после рассылки «остановлен» и сообщений в консоль: «Стоп» в этот промежуток не
+    /// отменял ничего, и сторож поднимал сервер вопреки ему. null — сторож сдался: слишком много падений за час.
+    /// </summary>
+    private CancellationToken? PlanRestartLocked()
+    {
+        _crashes.RemoveAll(t => DateTime.Now - t > TimeSpan.FromHours(1));
+        _crashes.Add(DateTime.Now);
+        if (_crashes.Count > _options.MaxRestartsPerHour) return null;
+        _restartCts = new CancellationTokenSource();
+        RestartScheduledAt = DateTime.Now + _options.RestartDelay;
+        return _restartCts.Token;
     }
 
     private void ReleaseWorld()
@@ -348,27 +368,19 @@ public sealed class ServerHost : IAsyncDisposable
     /// Сторож: поднять сервер через паузу. Мир в это время занят (идёт восстановление) — не стартуем, а ждём:
     /// пробуем снова через ту же паузу, пока не освободится или ожидание не отменят.
     /// </summary>
-    /// <param name="previous">Отмена прежнего ожидания, которое продлеваем (мир был занят).</param>
-    private void ScheduleRestart(bool afterCrash = true, CancellationToken previous = default)
+    /// <param name="ct">
+    /// Отмена ожидания, заведённого <see cref="PlanRestartLocked"/>: одна на всё ожидание, и на продления при занятом мире
+    /// тоже. Её отменяют «Стоп», запуск руками и отмена перезапуска (под <see cref="_lock"/>).
+    /// </param>
+    private void ScheduleRestart(CancellationToken ct, bool afterCrash = true)
     {
         lock (_lock)
         {
-            // «Стоп» успел между отказом занятого мира и этим замком — прежнее ожидание отменено, новое не заводим
-            if (previous.IsCancellationRequested) return;
-            if (afterCrash)
-            {
-                _crashes.RemoveAll(t => DateTime.Now - t > TimeSpan.FromHours(1));
-                _crashes.Add(DateTime.Now);
-                if (_crashes.Count > _options.MaxRestartsPerHour)
-                {
-                    Sys(Loc.T("srv.watchdogGaveUp", _options.MaxRestartsPerHour));
-                    return;
-                }
-                Sys(Loc.T("srv.watchdogRestart", (int)_options.RestartDelay.TotalSeconds));
-            }
+            // «Стоп» успел после того, как ожидание завели (сразу после падения или после отказа занятого мира), —
+            // оно отменено, пауза не начинается
+            if (ct.IsCancellationRequested) return;
+            if (afterCrash) Sys(Loc.T("srv.watchdogRestart", (int)_options.RestartDelay.TotalSeconds));
 
-            _restartCts = new CancellationTokenSource();
-            var ct = _restartCts.Token;
             RestartScheduledAt = DateTime.Now + _options.RestartDelay;
             _ = Task.Delay(_options.RestartDelay, ct).ContinueWith(t =>
             {
@@ -383,7 +395,7 @@ public sealed class ServerHost : IAsyncDisposable
                 catch (WorldBusyException ex)
                 {
                     if (afterCrash) Sys(Loc.T("srv.watchdogWaiting", ex.Message)); // один раз за ожидание, без спама
-                    ScheduleRestart(afterCrash: false, previous: ct);
+                    ScheduleRestart(ct, afterCrash: false);
                 }
                 catch (Exception ex)
                 {
