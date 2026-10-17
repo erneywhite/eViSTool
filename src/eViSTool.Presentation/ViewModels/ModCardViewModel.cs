@@ -46,7 +46,8 @@ public sealed partial class ModCardViewModel : ObservableObject
         var info = row.Local.Info;
         _summary = info?.Description?.Trim() ?? "";
         _author = info?.Authors is { Count: > 0 } a ? string.Join(", ", a) : "";
-        _side = SideText(info?.Side);
+        // мод хостера без modinfo (исходник .cs) работает только на сервере хостера
+        _side = SideText(row.IsHosterMod && info is null ? "server" : info?.Side);
         _compatibility = CompatibilityText(row, game);
         if (row.Result.Remote is { } remote) Apply(remote);
     }

@@ -73,7 +73,8 @@ public sealed class ModRowViewModel
         Changelog = r.Status == ModStatus.UpdateAvailable ? Html.ToPlainText(r.LatestCompatible?.Changelog, 1500) : null;
 
         // сторона — из modinfo.json, как её видит игра; у «обеих сторон» (таких большинство) пометки нет
-        Side = r.Local.Info is { } info ? ModSides.Parse(info.Side) : ModSide.Both;
+        // мод хостера без modinfo (исходник .cs) работает только на сервере хостера
+        Side = r.Local.Info is { } info ? ModSides.Parse(info.Side) : IsHosterMod ? ModSide.Server : ModSide.Both;
         IsUnneeded = ModSides.IsUnneeded(Side, profileKind);
         SideText = Loc.T(Side switch { ModSide.Client => "mods.sideColClient", ModSide.Server => "mods.sideColServer", _ => "mods.sideColBoth" });
         SideNote = Side switch
