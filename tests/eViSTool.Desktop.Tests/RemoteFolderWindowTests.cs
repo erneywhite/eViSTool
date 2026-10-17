@@ -100,17 +100,6 @@ public sealed class RemoteFolderWindowTests : IDisposable
 
     private static void Enter(Window window) => window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
 
-    private static void DoubleClick(Window window, Visual visual)
-    {
-        var point = visual.TranslatePoint(new Point(visual.Bounds.Width / 2, visual.Bounds.Height / 2), window)!.Value;
-        for (var i = 0; i < 2; i++)
-        {
-            window.MouseDown(point, MouseButton.Left);
-            window.MouseUp(point, MouseButton.Left);
-        }
-        Dispatcher.UIThread.RunJobs();
-    }
-
     [AvaloniaFact]
     public async Task Opens_ListingTheStartFolder()
     {
@@ -228,7 +217,7 @@ public sealed class RemoteFolderWindowTests : IDisposable
         var (window, model, data) = await Open();
         var list = Named<ListBox>(window, "RemoteFolderDirs");
 
-        DoubleClick(window, list.ContainerFromIndex(0)!);
+        Mouse.Click(window, list.ContainerFromIndex(0)!, count: 2);
         await model.Navigation;
         Dispatcher.UIThread.RunJobs();
 

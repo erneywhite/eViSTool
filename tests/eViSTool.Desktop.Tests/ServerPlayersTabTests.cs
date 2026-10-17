@@ -100,13 +100,6 @@ public sealed class ServerPlayersTabTests
         }
     }
 
-    private static void Click(Window window, Control control)
-    {
-        var point = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window)!.Value;
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
-    }
-
     [AvaloniaFact]
     public async Task Shows_players_roles_and_both_lists()
     {
@@ -166,7 +159,7 @@ public sealed class ServerPlayersTabTests
         await rig.LoadedAsync();
 
         // «Разбанить» в строке игрока
-        Click(rig.Window, rig.Buttons("players.unban").First());
+        Mouse.Click(rig.Window, rig.Buttons("players.unban").First());
         await Wait.Until(() => rig.Model.Bans.Count == 0 && rig.Model.Players[2].Player.Ban is null);
         await rig.LoadedAsync();
         Assert.Empty(rig.Buttons("players.unban"));
@@ -175,7 +168,7 @@ public sealed class ServerPlayersTabTests
         // «Убрать» в белом списке — у того, кто ни разу не заходил
         var remove = rig.Buttons("players.remove").ToList();
         Assert.Equal(3, remove.Count);
-        Click(rig.Window, remove[^1]); // список по именам: Erney, Marta, NeverJoined
+        Mouse.Click(rig.Window, remove[^1]); // список по именам: Erney, Marta, NeverJoined
         await Wait.Until(() => rig.Model.Whitelist.Count == 2);
         Assert.DoesNotContain(rig.Model.Whitelist, w => w.Name == "NeverJoined");
     }

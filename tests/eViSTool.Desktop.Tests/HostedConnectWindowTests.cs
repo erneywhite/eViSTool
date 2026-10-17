@@ -73,14 +73,6 @@ public sealed class HostedConnectWindowTests : IDisposable
     private static T Named<T>(Visual root, string automationId) where T : Control =>
         root.GetVisualDescendants().OfType<T>().Single(c => AutomationProperties.GetAutomationId(c) == automationId);
 
-    private static void Click(Window window, Control control)
-    {
-        window.UpdateLayout();
-        var point = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window)!.Value;
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
-    }
-
     [AvaloniaFact]
     public void TypedLink_FillsTheFields_AndConnectAnswersWithTheEncryptedPassword()
     {
@@ -91,7 +83,7 @@ public sealed class HostedConnectWindowTests : IDisposable
             Assert.Equal("58021", Named<TextBox>(window, "HostedPort").Text);
             Assert.Equal("gp_user", Named<TextBox>(window, "HostedUser").Text);
             Assert.Equal("made-up-password", Named<SecretTextBox>(window, "HostedPassword").Text);
-            Click(window, Named<Button>(window, "HostedOk"));
+            Mouse.Click(window, Named<Button>(window, "HostedOk"));
         });
 
         Assert.NotNull(answer);

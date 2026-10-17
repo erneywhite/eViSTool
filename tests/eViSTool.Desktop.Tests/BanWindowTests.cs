@@ -60,16 +60,6 @@ public sealed class BanWindowTests : IDisposable
 
     private static RadioButton[] Chips(Window window) => ChipIds.Select(id => Named<RadioButton>(window, id)).ToArray();
 
-    private static void Click(Window window, Control control)
-    {
-        Dispatcher.UIThread.RunJobs();
-        window.UpdateLayout();
-        var point = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window)!.Value;
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
-        Dispatcher.UIThread.RunJobs();
-    }
-
     /// <summary>Закрылось ли окно и с чем: Closed приходит, ответ — в модели (null — без ответа).</summary>
     private static Func<bool> WatchClosed(Window window)
     {
@@ -100,7 +90,7 @@ public sealed class BanWindowTests : IDisposable
         BanTerm[] terms = [BanTerm.Hour, BanTerm.Day, BanTerm.Week, BanTerm.Month, BanTerm.Forever];
         for (var i = 0; i < chips.Length; i++)
         {
-            Click(window, chips[i]);
+            Mouse.Click(window, chips[i]);
             Assert.Equal(terms[i], model.Term);
             Assert.Equal(chips.Select((_, j) => j == i), chips.Select(c => c.IsChecked == true));
         }
@@ -130,9 +120,9 @@ public sealed class BanWindowTests : IDisposable
         var (window, model) = Open("Вася");
         var closed = WatchClosed(window);
         window.KeyTextInput("  спам ");
-        Click(window, Chips(window)[3]); // щелчок уводит фокус на чип, так что причину вводим раньше
+        Mouse.Click(window, Chips(window)[3]); // щелчок уводит фокус на чип, так что причину вводим раньше
 
-        Click(window, Named<Button>(window, "BanOk"));
+        Mouse.Click(window, Named<Button>(window, "BanOk"));
 
         Assert.True(closed());
         Assert.Equal(new BanChoice(30, "day", "спам"), model.Result);
@@ -174,7 +164,7 @@ public sealed class BanWindowTests : IDisposable
     {
         var (window, model) = Open();
         var closed = WatchClosed(window);
-        Click(window, Named<Button>(window, "BanCancel"));
+        Mouse.Click(window, Named<Button>(window, "BanCancel"));
         Assert.True(closed());
         Assert.Null(model.Result);
 

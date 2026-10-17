@@ -43,13 +43,6 @@ public sealed class ServerPasswordWindowTests
     private static Button ButtonWith(Window window, string key) =>
         window.GetVisualDescendants().OfType<Button>().Single(b => Equals(b.Content, Loc.T(key)));
 
-    private static void Click(Window window, Control control)
-    {
-        var point = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window)!.Value;
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
-    }
-
     [AvaloniaFact]
     public void Opens_with_server_in_heading_and_focused_hidden_field()
     {
@@ -72,7 +65,7 @@ public sealed class ServerPasswordWindowTests
         var answer = Ask(NewWindow(), window =>
         {
             Named<SecretTextBox>(window, "ServerPassword").Text = "сезам-2026";
-            Click(window, ButtonWith(window, "common.done"));
+            Mouse.Click(window, ButtonWith(window, "common.done"));
         });
 
         Assert.Equal("сезам-2026", answer);
@@ -81,7 +74,7 @@ public sealed class ServerPasswordWindowTests
     [AvaloniaFact]
     public void Done_with_empty_field_answers_empty_string_not_null()
     {
-        var answer = Ask(NewWindow(), window => Click(window, ButtonWith(window, "common.done")));
+        var answer = Ask(NewWindow(), window => Mouse.Click(window, ButtonWith(window, "common.done")));
 
         Assert.Equal("", answer);
     }
@@ -106,7 +99,7 @@ public sealed class ServerPasswordWindowTests
         var answer = Ask(NewWindow(), window =>
         {
             Named<SecretTextBox>(window, "ServerPassword").Text = "не отдавать";
-            Click(window, ButtonWith(window, "common.cancel"));
+            Mouse.Click(window, ButtonWith(window, "common.cancel"));
         });
 
         Assert.Null(answer);

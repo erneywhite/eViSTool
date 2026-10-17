@@ -13,17 +13,6 @@ namespace eViSTool.Desktop.Tests;
 
 public class DoubleTapTests
 {
-    private static void DoubleClick(Window window, Point point)
-    {
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
-    }
-
-    private static Point Center(Visual visual, Window window) =>
-        visual.TranslatePoint(new Point(visual.Bounds.Width / 2, visual.Bounds.Height / 2), window)!.Value;
-
     private static (Window Window, ListBox List, RecordingCommand Command) ShowList(int count)
     {
         var command = new RecordingCommand();
@@ -38,7 +27,7 @@ public class DoubleTapTests
     public void Row_executes_command_with_its_item()
     {
         var (window, list, command) = ShowList(3);
-        DoubleClick(window, Center(list.ContainerFromIndex(1)!, window));
+        Mouse.Click(window, list.ContainerFromIndex(1)!, count: 2);
 
         Assert.Equal(["item 2"], command.Calls);
         window.Close();
@@ -48,9 +37,7 @@ public class DoubleTapTests
     public void Single_click_does_nothing()
     {
         var (window, list, command) = ShowList(3);
-        var point = Center(list.ContainerFromIndex(0)!, window);
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
+        Mouse.Click(window, list.ContainerFromIndex(0)!);
 
         Assert.Empty(command.Calls);
         window.Close();
@@ -60,7 +47,7 @@ public class DoubleTapTests
     public void Empty_space_below_rows_does_nothing()
     {
         var (window, _, command) = ShowList(2);
-        DoubleClick(window, new Point(150, 280));
+        Mouse.ClickAt(window, new Point(150, 280), count: 2);
 
         Assert.Empty(command.Calls);
         window.Close();
@@ -71,7 +58,7 @@ public class DoubleTapTests
     {
         var (window, list, command) = ShowList(100);
         var bar = list.GetVisualDescendants().OfType<ScrollBar>().First(b => b.Orientation == Orientation.Vertical && b.IsVisible);
-        DoubleClick(window, Center(bar, window));
+        Mouse.Click(window, bar, count: 2);
 
         Assert.Empty(command.Calls);
         window.Close();
@@ -82,7 +69,7 @@ public class DoubleTapTests
     {
         var (window, list, command) = ShowList(3);
         DoubleTap.SetCommandParameter(list, "fixed");
-        DoubleClick(window, Center(list.ContainerFromIndex(0)!, window));
+        Mouse.Click(window, list.ContainerFromIndex(0)!, count: 2);
 
         Assert.Equal(["fixed"], command.Calls);
         window.Close();
@@ -108,10 +95,10 @@ public class DoubleTapTests
         window.Show();
 
         var row = list.ContainerFromIndex(0)!;
-        DoubleClick(window, Center(row.GetVisualDescendants().OfType<Button>().First(), window));
+        Mouse.Click(window, row.GetVisualDescendants().OfType<Button>().First(), count: 2);
         Assert.Empty(command.Calls);
 
-        DoubleClick(window, Center(row.GetVisualDescendants().OfType<TextBlock>().Last(), window));
+        Mouse.Click(window, row.GetVisualDescendants().OfType<TextBlock>().Last(), count: 2);
         Assert.Equal(["a"], command.Calls);
         window.Close();
     }
@@ -134,14 +121,14 @@ public class DoubleTapTests
         window.Show();
 
         var header = grid.GetVisualDescendants().OfType<DataGridColumnHeader>().First(h => h.Bounds.Width > 0);
-        DoubleClick(window, Center(header, window));
+        Mouse.Click(window, header, count: 2);
         Assert.Empty(command.Calls);
 
         var row = grid.GetVisualDescendants().OfType<DataGridRow>().First(r => ReferenceEquals(r.DataContext, mods[1]));
-        DoubleClick(window, Center(row, window));
+        Mouse.Click(window, row, count: 2);
         Assert.Equal([mods[1]], command.Calls);
 
-        DoubleClick(window, new Point(200, 280)); // пустое место под строками
+        Mouse.ClickAt(window, new Point(200, 280), count: 2); // пустое место под строками
         Assert.Single(command.Calls);
         window.Close();
     }

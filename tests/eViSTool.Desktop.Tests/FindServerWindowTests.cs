@@ -115,14 +115,14 @@ public sealed class FindServerWindowTests : IDisposable
             Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(),
                 b => AutomationProperties.GetAutomationId(b) == "BrowseAddManual" && b.IsEffectivelyVisible);
 
-            Click(window, favorites); // нажали «Избранное»
+            Mouse.Click(window, favorites); // нажали «Избранное»
             Assert.True(model.IsFavoritesTab);
             Assert.False(all.IsChecked);
             Assert.False(list.IsEffectivelyVisible);
             Assert.True(ById<Button>(window, "BrowseAddManual").IsEffectivelyVisible);
             Assert.False(ById<TextBox>(window, "BrowseSearch").IsEffectivelyVisible); // поиск — только для общего списка
 
-            Click(window, all); // и обратно
+            Mouse.Click(window, all); // и обратно
             Assert.False(model.IsFavoritesTab);
             Assert.False(favorites.IsChecked);
             Assert.True(list.IsEffectivelyVisible);
@@ -154,12 +154,12 @@ public sealed class FindServerWindowTests : IDisposable
             Assert.True(byPlayers.IsChecked);
             Assert.False(byName.IsChecked);
 
-            Click(window, byName);
+            Mouse.Click(window, byName);
             Assert.True(model.ByName);
             Assert.False(byPlayers.IsChecked);
             Assert.Equal(new[] { "alpha", "Zeta" }, model.View.Items.Select(r => r.Name));
 
-            Click(window, byPlayers);
+            Mouse.Click(window, byPlayers);
             Assert.False(model.ByName);
             Assert.False(byName.IsChecked);
             Assert.Equal(new[] { "Zeta", "alpha" }, model.View.Items.Select(r => r.Name));
@@ -218,7 +218,7 @@ public sealed class FindServerWindowTests : IDisposable
             Assert.False(RowButton(window, favorite, model.AddToFavoritesCommand).IsEffectivelyVisible);
             Assert.True(RowButton(window, favorite, model.EditFavoriteCommand).IsEffectivelyVisible);
 
-            Click(window, play);
+            Mouse.Click(window, play);
 
             Assert.False(window.IsVisible);
         }
@@ -227,15 +227,6 @@ public sealed class FindServerWindowTests : IDisposable
             if (window.IsVisible) window.Close();
             restore();
         }
-    }
-
-    /// <summary>Щелчок мышью по середине элемента — как человек: переключатели группы и кнопки отрабатывают сами.</summary>
-    private static void Click(Window window, Control control)
-    {
-        var point = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window)!.Value;
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
-        Dispatcher.UIThread.RunJobs();
     }
 
     /// <summary>Подпись кнопки: видимый TextBlock внутри (у «В избранное» их два, виден один).</summary>

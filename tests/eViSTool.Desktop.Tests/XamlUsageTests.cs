@@ -114,12 +114,7 @@ public sealed class XamlUsageTests : IDisposable
 
         // двойной щелчок по строке
         var row = Find<ListBox>("List").ContainerFromIndex(1)!;
-        var point = row.TranslatePoint(new Point(10, row.Bounds.Height / 2), window)!.Value;
-        for (var i = 0; i < 2; i++)
-        {
-            window.MouseDown(point, MouseButton.Left);
-            window.MouseUp(point, MouseButton.Left);
-        }
+        Mouse.Click(window, row, x: 10, count: 2);
         Assert.Equal(["two"], model.Open.Calls);
 
         // поле со списком: выбор пишет Name, у второго — DisplayMemberBinding

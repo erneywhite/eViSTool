@@ -70,14 +70,6 @@ public sealed class DuplicateRoleWindowTests : IDisposable
     private static void Press(Window window, Key key) =>
         window.KeyPress(key, RawInputModifiers.None, key == Key.Enter ? PhysicalKey.Enter : PhysicalKey.Escape, null);
 
-    private static void Click(Window window, Visual visual)
-    {
-        var point = visual.TranslatePoint(new Point(visual.Bounds.Width / 2, visual.Bounds.Height / 2), window)!.Value;
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
-        Dispatcher.UIThread.RunJobs();
-    }
-
     [AvaloniaFact]
     public void Code_field_gets_focus_with_text_selected_and_shows_suggestion()
     {
@@ -149,7 +141,7 @@ public sealed class DuplicateRoleWindowTests : IDisposable
     {
         var (window, model) = Open();
 
-        Click(window, Named<Button>(window, "DuplicateOk"));
+        Mouse.Click(window, Named<Button>(window, "DuplicateOk"));
 
         Assert.False(window.IsVisible);
         Assert.Equal("suplayer2", model.Result?.Code);
@@ -160,7 +152,7 @@ public sealed class DuplicateRoleWindowTests : IDisposable
     {
         var (window, model) = Open();
 
-        Click(window, Named<Button>(window, "DuplicateCancel"));
+        Mouse.Click(window, Named<Button>(window, "DuplicateCancel"));
 
         Assert.False(window.IsVisible);
         Assert.Null(model.Result);

@@ -83,21 +83,6 @@ public sealed class CloneProfileWindowTests : IDisposable
     /// <summary>Переключатели по порядку: «Тот же мир», «Новый мир», «Общая папка модов», «Своя копия модов».</summary>
     private static List<RadioButton> Radios(Window window) => window.GetVisualDescendants().OfType<RadioButton>().ToList();
 
-    private static void Click(Window window, Control control)
-    {
-        // окно меняет высоту по содержимому (появился ход копирования или строка «отменено»). Мышь ищет, куда попала, по
-        // последнему отрисованному кадру, а не по раскладке: под нагрузкой кадр с новой раскладкой не успевал, и нажатие
-        // уходило мимо кнопки. Разложить, отрисовать кадр — и только потом нажимать
-        Dispatcher.UIThread.RunJobs();
-        window.UpdateLayout();
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        Dispatcher.UIThread.RunJobs();
-        var point = control.TranslatePoint(new Point(12, control.Bounds.Height / 2), window)!.Value;
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
-        Dispatcher.UIThread.RunJobs();
-    }
-
     private static Button CancelButton(Window window) =>
         window.GetVisualDescendants().OfType<Button>().Single(b => Equals(b.Content, Loc.T("common.cancel")));
 
@@ -110,17 +95,17 @@ public sealed class CloneProfileWindowTests : IDisposable
         Assert.Equal(4, radios.Count);
         Assert.Equal([true, false, true, false], radios.Select(r => r.IsChecked == true));
 
-        Click(window, radios[1]);
+        Mouse.Click(window, radios[1], x: 12);
         Assert.True(vm.NewWorld);
         Assert.False(radios[0].IsChecked);
-        Click(window, radios[0]);
+        Mouse.Click(window, radios[0], x: 12);
         Assert.False(vm.NewWorld);
         Assert.False(radios[1].IsChecked);
 
-        Click(window, radios[3]);
+        Mouse.Click(window, radios[3], x: 12);
         Assert.False(vm.ShareMods);
         Assert.False(radios[2].IsChecked);
-        Click(window, radios[2]);
+        Mouse.Click(window, radios[2], x: 12);
         Assert.True(vm.ShareMods);
         Assert.False(radios[3].IsChecked);
 
@@ -181,7 +166,7 @@ public sealed class CloneProfileWindowTests : IDisposable
         // «Отмена» во время копирования — прервать его, окно остаётся
         vm.GoCommand.Execute(null);
         await Wait.Until(() => vm.IsCopying);
-        Click(window, CancelButton(window));
+        Mouse.Click(window, CancelButton(window), x: 12);
         await Wait.Until(() => !vm.IsCopying);
         Assert.True(window.IsVisible);
         Assert.Equal(Loc.T("clone.cancelled"), vm.ErrorText);
@@ -196,7 +181,7 @@ public sealed class CloneProfileWindowTests : IDisposable
         await Wait.Until(() => !vm.IsCopying);
 
         // копирования нет — «Отмена» закрывает окно без ответа
-        Click(window, CancelButton(window));
+        Mouse.Click(window, CancelButton(window), x: 12);
         Assert.False(window.IsVisible);
         Assert.Null(vm.Result);
     }

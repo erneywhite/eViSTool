@@ -61,14 +61,6 @@ public sealed class ModErrorsWindowTests
     private static List<T> All<T>(Window window, string automationId) where T : Control =>
         window.GetVisualDescendants().OfType<T>().Where(c => AutomationProperties.GetAutomationId(c) == automationId).ToList();
 
-    private static void Click(Window window, Control button)
-    {
-        // щелчок мышью: команда из привязки выполняется только настоящим нажатием
-        var center = button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window)!.Value;
-        window.MouseDown(center, MouseButton.Left);
-        window.MouseUp(center, MouseButton.Left);
-    }
-
     [AvaloniaFact]
     public void Opens_AsOrdinaryWindow_WithRowsFromModel()
     {
@@ -92,7 +84,7 @@ public sealed class ModErrorsWindowTests
         var (window, _) = Open(Report(Line("a", @"C:\Mods\a.zip"), Line("b", @"C:\Mods\b.zip")));
         var disable = All<Button>(window, "ErrsDisable");
 
-        Click(window, disable[0]);
+        Mouse.Click(window, disable[0]);
 
         var status = All<TextBlock>(window, "ErrsStatus").Single();
         await Wait.Until(() => !string.IsNullOrEmpty(status.Text));
@@ -105,7 +97,7 @@ public sealed class ModErrorsWindowTests
     public void Dismiss_ClosesWindow()
     {
         var (window, host) = Open(Report(Line("a", @"C:\Mods\a.zip")));
-        Click(window, All<Button>(window, "ErrsDismiss").Single());
+        Mouse.Click(window, All<Button>(window, "ErrsDismiss").Single());
         Assert.Equal(["dismiss"], host.Calls);
         Assert.False(window.IsVisible);
     }
@@ -114,7 +106,7 @@ public sealed class ModErrorsWindowTests
     public void Catalog_OpensRowMod_AndClosesWindow()
     {
         var (window, host) = Open(Report(Line("a", @"C:\Mods\a.zip"), Line("b", null)));
-        Click(window, All<Button>(window, "ErrsCatalog")[1]);
+        Mouse.Click(window, All<Button>(window, "ErrsCatalog")[1]);
         Assert.Equal(["catalog b"], host.Calls);
         Assert.False(window.IsVisible);
     }

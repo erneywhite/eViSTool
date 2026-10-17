@@ -87,9 +87,7 @@ public sealed class CrashWindowTests
         var window = Open(new CrashWindowViewModel(View(), () => Task.FromResult(new ModDisableResult("Мод выключен", false)), () => { }, "Найти", new Host()));
         var disable = (Button)Named(window, "CrashDisable");
         // щелчок мышью по кнопке: команда из привязки выполняется только настоящим нажатием, не событием Click
-        var center = disable.TranslatePoint(new Point(disable.Bounds.Width / 2, disable.Bounds.Height / 2), window)!.Value;
-        window.MouseDown(center, MouseButton.Left);
-        window.MouseUp(center, MouseButton.Left);
+        Mouse.Click(window, disable);
         await Wait.Until(() => ((TextBlock)Named(window, "CrashStatus")).Text == "Мод выключен");
         Assert.False(disable.IsEffectivelyEnabled);
         window.Close();

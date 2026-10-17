@@ -65,14 +65,6 @@ public sealed class FavoriteServerWindowTests : IDisposable
     private static T Named<T>(Window window, string automationId) where T : Control =>
         window.GetVisualDescendants().OfType<T>().Single(c => AutomationProperties.GetAutomationId(c) == automationId);
 
-    private static void Click(Window window, Visual visual)
-    {
-        var point = visual.TranslatePoint(new Point(visual.Bounds.Width / 2, visual.Bounds.Height / 2), window)!.Value;
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
-        Dispatcher.UIThread.RunJobs();
-    }
-
     [AvaloniaFact]
     public void New_opens_empty_with_name_focused_and_password_hidden()
     {
@@ -119,7 +111,7 @@ public sealed class FavoriteServerWindowTests : IDisposable
         Assert.Equal("Дом", model.Name);
         Assert.Equal("192.168.1.20", model.Address);
 
-        Click(window, Named<Button>(window, "FavSave"));
+        Mouse.Click(window, Named<Button>(window, "FavSave"));
 
         Assert.Equal([new FavoriteServerChoice("Дом", "192.168.1.20", null)], answers);
         Assert.False(window.IsVisible);
@@ -134,7 +126,7 @@ public sealed class FavoriteServerWindowTests : IDisposable
         window.KeyTextInput("play example.org");
         Dispatcher.UIThread.RunJobs();
 
-        Click(window, Named<Button>(window, "FavSave"));
+        Mouse.Click(window, Named<Button>(window, "FavSave"));
 
         Assert.True(window.IsVisible);
         Assert.Empty(answers);
@@ -175,7 +167,7 @@ public sealed class FavoriteServerWindowTests : IDisposable
     public void Cancel_and_Escape_close_without_an_answer()
     {
         var (byCancel, _, cancelAnswers) = Open(Saved);
-        Click(byCancel, byCancel.GetVisualDescendants().OfType<Button>().Single(b => b.Content as string == Loc.T("common.cancel")));
+        Mouse.Click(byCancel, byCancel.GetVisualDescendants().OfType<Button>().Single(b => b.Content as string == Loc.T("common.cancel")));
         Assert.False(byCancel.IsVisible);
         Assert.Empty(cancelAnswers);
 

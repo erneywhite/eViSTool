@@ -45,14 +45,6 @@ public sealed class ServerCommandsWindowTests
 
     private static void Press(Window window, Key key, PhysicalKey physical) => window.KeyPress(key, RawInputModifiers.None, physical, null);
 
-    private static void DoubleClick(Window window, Point point)
-    {
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
-        window.MouseDown(point, MouseButton.Left); // двойной щелчок срабатывает на втором нажатии — окно может уже закрыться
-        if (window.IsVisible) window.MouseUp(point, MouseButton.Left);
-    }
-
     [AvaloniaFact]
     public async Task Opens_WithRowsByName_StatusAndFocusInSearch()
     {
@@ -172,9 +164,8 @@ public sealed class ServerCommandsWindowTests
     {
         var (window, _, _, accepted) = Open(Tp, Time, Kick);
         var row = Named<ListBox>(window, "CmdsList").ContainerFromIndex(1)!; // «time»
-        var center = row.TranslatePoint(new Point(row.Bounds.Width / 2, row.Bounds.Height / 2), window)!.Value;
 
-        DoubleClick(window, center);
+        Mouse.Click(window, row, count: 2);
 
         Assert.Same(Time, Assert.Single(accepted));
         Assert.False(window.IsVisible);

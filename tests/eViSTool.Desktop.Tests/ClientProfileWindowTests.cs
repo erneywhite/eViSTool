@@ -95,14 +95,6 @@ public sealed class ClientProfileWindowTests : IDisposable
     private static T Named<T>(Window window, string automationId) where T : Control =>
         window.GetVisualDescendants().OfType<T>().Single(c => AutomationProperties.GetAutomationId(c) == automationId);
 
-    private static void Click(Window window, Visual visual)
-    {
-        var point = visual.TranslatePoint(new Point(visual.Bounds.Width / 2, visual.Bounds.Height / 2), window)!.Value;
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
-        Dispatcher.UIThread.RunJobs();
-    }
-
     /// <summary>Копирование, которое идёт, пока его не отменят.</summary>
     private static async Task<GameProfile> CopyUntilCancelled(TaskCompletionSource started, CancellationToken ct)
     {
@@ -192,19 +184,19 @@ public sealed class ClientProfileWindowTests : IDisposable
         var (window, model) = Open((_, _, _) => Task.FromResult(new GameProfile()));
         await Wait.Until(() => model.CanGo);
 
-        Click(window, Named<RadioButton>(window, "CProfileModsCopy"));
+        Mouse.Click(window, Named<RadioButton>(window, "CProfileModsCopy"));
         Assert.Equal(ClientModsMode.Copy, model.Mods);
         Assert.False(Named<RadioButton>(window, "CProfileModsShared").IsChecked);
-        Click(window, Named<RadioButton>(window, "CProfileModsEmpty"));
+        Mouse.Click(window, Named<RadioButton>(window, "CProfileModsEmpty"));
         Assert.Equal(ClientModsMode.Empty, model.Mods);
 
-        Click(window, Named<RadioButton>(window, "CProfileSettingsClean"));
+        Mouse.Click(window, Named<RadioButton>(window, "CProfileSettingsClean"));
         Assert.False(model.CopySettings);
         Assert.False(Named<RadioButton>(window, "CProfileSettingsCopy").IsChecked);
-        Click(window, Named<RadioButton>(window, "CProfileSettingsCopy"));
+        Mouse.Click(window, Named<RadioButton>(window, "CProfileSettingsCopy"));
         Assert.True(model.CopySettings);
         Assert.False(Named<RadioButton>(window, "CProfileSettingsClean").IsChecked);
-        Click(window, Named<RadioButton>(window, "CProfileSettingsClean"));
+        Mouse.Click(window, Named<RadioButton>(window, "CProfileSettingsClean"));
         Assert.False(model.CopySettings); // переключается туда-обратно не один раз
 
         await Wait.Until(() => model.CanGo); // после паузы — пересчитанный план
