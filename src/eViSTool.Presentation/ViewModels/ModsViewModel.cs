@@ -459,13 +459,15 @@ public sealed partial class ModsViewModel : ObservableObject
             Rebuild();
             StatusText = Loc.T("mods.checkedAt", Dates.ClockSeconds(DateTime.Now), game);
         }
-        catch (OperationCanceledException)
+        // отменили сменой профиля (или упала проверка прежнего) — строка состояния уже про новый профиль, не перебиваем её
+        catch (OperationCanceledException) when (_main.ActiveProfile == owner)
         {
             StatusText = Loc.T("mods.checkCancelled");
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex) when (ex is HttpRequestException or IOException)
         {
-            StatusText = Loc.T("common.errorWith", ex.Message);
+            if (_main.ActiveProfile == owner) StatusText = Loc.T("common.errorWith", ex.Message);
         }
     }
 
