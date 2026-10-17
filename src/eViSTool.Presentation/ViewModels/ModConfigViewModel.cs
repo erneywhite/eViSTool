@@ -27,9 +27,10 @@ public sealed class ModConfigRow(ModConfigEntry file)
 /// сервер у хостера — по FTP (<see cref="HostedModConfigSource"/>).
 /// Сохранение проверяет JSON и откладывает прежнюю версию (там же, где файл; у хостера — на этой машине); «Вернуть
 /// предыдущую версию» — шаг назад; «Сбросить к стандартным» — убрать файл, мод создаст его заново. Если файл поменяли с
-/// момента открытия (другое окно, сам мод) — перед записью спрашиваем. У хостера перед каждым изменением — тот же вопрос
-/// «останови сервер в панели хостера», что и перед изменением модов: запущенный сервер при остановке перезапишет свои
-/// конфиги.
+/// момента открытия (другое окно, сам мод) — перед записью спрашиваем. У хостера перед каждым изменением — вопрос
+/// «останови сервер в панели хостера» (память ответа — общая с «Моими модами»): запущенный сервер при остановке
+/// перезапишет свои конфиги. Что операция у хостера заодно починила (вернула файл, запись которого сорвалась), окно
+/// говорит после неё.
 /// </summary>
 public sealed partial class ModConfigViewModel : ObservableObject
 {
@@ -227,6 +228,20 @@ public sealed partial class ModConfigViewModel : ObservableObject
             Apply(null);
             Status = Loc.T("mcfg.readFailed", Describe(ex));
         }
+        finally
+        {
+            ShowRepairs(source);
+        }
+    }
+
+    /// <summary>
+    /// Операция у хостера заодно починила сервер (вернула файл, запись которого сорвалась; скан модов довёл установку…) —
+    /// сказать об этом, каждое по разу. Источник — тот, с которым шла операция: профиль за это время могли сменить.
+    /// </summary>
+    private static void ShowRepairs(IModConfigSource source)
+    {
+        if (source is HostedModConfigSource hosted && hosted.TakeWarnings() is { Count: > 0 } warnings)
+            Ui.Warn(string.Join("\n\n", warnings));
     }
 
     /// <summary>Показать содержимое файла (null — пусто): текст, версии, вид «форма/текст».</summary>
@@ -313,7 +328,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
             Selected = pick; // тот же файл перечитывается: его могли поменять в другом окне
             var noFolder = source.LocalFolder is { } dir ? !Directory.Exists(dir) : source is HostedModConfigSource { FolderExists: false };
             Notice = Rows.Count > 0 ? "" : noFolder ? Loc.T("mcfg.noFolder") : Loc.T("mcfg.empty");
-            if (source is HostedModConfigSource hosted) AfterHostedList(hosted, files);
+            if (source is HostedModConfigSource) AfterHostedList(files);
         }
         catch (Exception ex) when (IsExpected(ex))
         {
@@ -325,19 +340,16 @@ public sealed partial class ModConfigViewModel : ObservableObject
         finally
         {
             IsLoading = false;
+            ShowRepairs(source);
         }
     }
 
-    /// <summary>
-    /// Список с сервера у хостера прочитан: ссылка «Настройки мода» в карточках «Моих модов» — по нему же (без запроса),
-    /// а если чтение вернуло на место файл, запись которого сорвалась, — сказать об этом.
-    /// </summary>
-    private void AfterHostedList(HostedModConfigSource source, IReadOnlyList<ModConfigEntry> files)
+    /// <summary>Список с сервера у хостера прочитан: ссылка «Настройки мода» в карточках «Моих модов» — по нему же (без запроса).</summary>
+    private void AfterHostedList(IReadOnlyList<ModConfigEntry> files)
     {
         if (_main.Mods is { } mods && _main.ActiveProfile?.Model == _profile)
             mods.ShowConfigCounts(files.Where(f => f.ModId is not null).GroupBy(f => f.ModId!, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase));
-        if (source.Warnings.Count > 0) Ui.Warn(string.Join("\n\n", source.Warnings));
     }
 
     private void Clear(string notice)
@@ -358,27 +370,47 @@ public sealed partial class ModConfigViewModel : ObservableObject
         {
             case Answer.Yes:
                 // у хостера сначала «останови сервер»: «Нет» — ничего не пишем и остаёмся с правками
-                if (!ConfirmHostedStop()) return false;
-                // уйти можно только после записи: ждём её на месте, но не дольше 15 секунд (агент недоступен —
-                // ошибка, а не зависшее окно). Ошибку показываем здесь же: из фоновой задачи нельзя обратиться к окну,
-                // пока оно само её ждёт, — это была бы взаимная блокировка
-                var (text, stamp) = (Text, _loadedChangedUtc);
-                try
-                {
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-                    var content = Task.Run(() => SaveCoreAsync(row, text, stamp, interactive: false, cts.Token)).GetAwaiter().GetResult();
-                    return content is not null && Finish(row, text, content);
-                }
-                catch (Exception ex) when (IsExpected(ex))
-                {
-                    Ui.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, Describe(ex)));
-                    return false;
-                }
+                return ConfirmHostedStop() && SaveBeforeLeave(row);
             case Answer.No:
                 _loadedText = Text; // отказались — больше не спрашиваем
                 return true;
             default:
                 return false;
+        }
+    }
+
+    /// <summary>Сколько перед уходом ждать записи (текст mcfg.hostedSaveTimeout называет это число; тесты укорачивают).</summary>
+    internal static TimeSpan LeaveSaveWait { get; set; } = TimeSpan.FromSeconds(15);
+
+    /// <summary>
+    /// Уйти можно только после записи: ждём её на месте, но не дольше <see cref="LeaveSaveWait"/> (агент недоступен или
+    /// соединение с хостером занято — ошибка, а не зависшее окно). Ошибку показываем здесь же: из фоновой задачи нельзя
+    /// обратиться к окну, пока оно само её ждёт, — это была бы взаимная блокировка. false — остаться с правками.
+    /// </summary>
+    private bool SaveBeforeLeave(ModConfigRow row)
+    {
+        var (text, stamp, source) = (Text, _loadedChangedUtc, _source);
+        using var cts = new CancellationTokenSource(LeaveSaveWait);
+        try
+        {
+            var content = Task.Run(() => SaveCoreAsync(row, text, stamp, interactive: false, cts.Token)).GetAwaiter().GetResult();
+            return content is not null && Finish(row, text, content);
+        }
+        catch (OperationCanceledException) when (_hosted is not null && cts.IsCancellationRequested)
+        {
+            // очередь соединения профиля занята (скан модов при холодном кэше modinfo идёт минутами) или сервер молчит.
+            // Отмена посреди записи файл не теряет: его прикрывают bak и отметка. У агента — как раньше, текст его ошибки
+            Ui.Warn(Loc.T("mcfg.hostedSaveTimeout", row.File.FileName));
+            return false;
+        }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            Ui.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, Describe(ex)));
+            return false;
+        }
+        finally
+        {
+            if (source is not null) ShowRepairs(source);
         }
     }
 
@@ -396,9 +428,10 @@ public sealed partial class ModConfigViewModel : ObservableObject
 
     /// <summary>
     /// Сервер у хостера: перед записью, откатом и сбросом — «останови сервер в панели хостера» (запущенный при остановке
-    /// перезапишет свои конфиги). Вопрос и память ответа — общие с «Моими модами». Не хостер — true.
+    /// перезапишет свои конфиги). Вопрос — про настройки модов, память ответа — общая с «Моими модами». Не хостер — true.
     /// </summary>
-    private bool ConfirmHostedStop() => _hosted is not { } target || _main.Mods.ConfirmIfRunning(target);
+    private bool ConfirmHostedStop() =>
+        _hosted is not { } target || _main.Mods.ConfirmIfRunning(target, Loc.T("mcfg.hostedStopAsk", target.Name));
 
     private async Task SaveAsync(ModConfigRow row, string text, DateTime? stamp)
     {
@@ -406,7 +439,15 @@ public sealed partial class ModConfigViewModel : ObservableObject
         if (IsRunning()
             && !Ui.Confirm(Loc.T(_profile!.Kind == ProfileKind.Server ? "mcfg.serverRunning" : "mcfg.gameRunning")))
             return;
-        if (await SaveCoreAsync(row, text, stamp, interactive: true) is { } content) Finish(row, text, content);
+        var source = _source;
+        try
+        {
+            if (await SaveCoreAsync(row, text, stamp, interactive: true) is { } content) Finish(row, text, content);
+        }
+        finally
+        {
+            if (source is not null) ShowRepairs(source);
+        }
     }
 
     /// <summary>
@@ -473,6 +514,10 @@ public sealed partial class ModConfigViewModel : ObservableObject
         {
             Ui.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, Describe(ex)));
         }
+        finally
+        {
+            ShowRepairs(source);
+        }
     }
 
     [RelayCommand(CanExecute = nameof(HasFile))]
@@ -491,6 +536,10 @@ public sealed partial class ModConfigViewModel : ObservableObject
         catch (Exception ex) when (IsExpected(ex))
         {
             Ui.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, Describe(ex)));
+        }
+        finally
+        {
+            ShowRepairs(source);
         }
     }
 

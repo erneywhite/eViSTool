@@ -17,7 +17,8 @@ namespace eViSTool.Core.Hosting;
 /// <item>время файла — из листинга (MLSD — UTC, LIST — местное время сервера) и сравнивается только на равенство;</item>
 /// <item>резервные копии — на этой машине (<see cref="ModConfigBackups"/> профиля): у хостера других мест нет;</item>
 /// <item>запись — через временный файл и bak (<see cref="HostedSafeWrite"/>); сорвалась посередине — файл вернёт на место
-/// следующая операция или скан модов (<see cref="RecoverAsync"/>).</item>
+/// следующая операция или скан модов (<see cref="RecoverAsync"/>);</item>
+/// <item>что операции заодно починили, копится в <see cref="Warnings"/>, пока окно не заберёт (<see cref="TakeWarnings"/>).</item>
 /// </list>
 /// Каждая операция — одна очередь соединения профиля (<see cref="HostedSessions"/>). Пароль сюда приходит только внутри
 /// <see cref="ModTarget"/> и дальше соединения не уходит.
@@ -34,6 +35,8 @@ public sealed class HostedModConfigSource : IModConfigSource
     private static readonly ConcurrentDictionary<string, IReadOnlyList<string>> Listed = new(StringComparer.Ordinal);
 
     private readonly ModConfigBackups _backups;
+    private readonly Lock _warningsGate = new();
+    private List<string> _warnings = [];
 
     public HostedModConfigSource(ModTarget target, ModConfigBackups? backups = null)
     {
@@ -49,8 +52,38 @@ public sealed class HostedModConfigSource : IModConfigSource
     /// <summary>Папка ModConfig нашлась при последнем поиске (false — сервер ещё не запускали с модами, у которых есть настройки).</summary>
     public bool FolderExists { get; private set; } = true;
 
-    /// <summary>Что починила последняя операция («вернулась прежняя версия …») — уже на языке окна.</summary>
-    public IReadOnlyList<string> Warnings { get; private set; } = [];
+    /// <summary>
+    /// Что починили операции («вернулась прежняя версия …», разовые предупреждения скана модов) и ещё не забрал
+    /// <see cref="TakeWarnings"/> — уже на языке окна.
+    /// </summary>
+    public IReadOnlyList<string> Warnings
+    {
+        get
+        {
+            lock (_warningsGate) return [.. _warnings];
+        }
+    }
+
+    /// <summary>
+    /// Забрать накопленные предупреждения: окно показывает их после каждой своей операции, каждое по разу. Они копятся,
+    /// а не перезаписываются: следующая операция (чтение открытого файла сразу после списка) не должна стереть
+    /// предупреждение прошлой, пока его не показали.
+    /// </summary>
+    public IReadOnlyList<string> TakeWarnings()
+    {
+        lock (_warningsGate)
+        {
+            var taken = _warnings;
+            _warnings = [];
+            return taken;
+        }
+    }
+
+    private void Warn(IReadOnlyList<string> warnings)
+    {
+        if (warnings.Count == 0) return;
+        lock (_warningsGate) _warnings.AddRange(warnings);
+    }
 
     // у файлов на FTP нет пути на этой машине: «Показать файл» скрыт
     public string? LocalPath(string relativePath) => null;
@@ -66,9 +99,34 @@ public sealed class HostedModConfigSource : IModConfigSource
     private Task<T> UseAsync<T>(Func<IRemoteFiles, HostedListings, Task<T>> work, bool readOnly, CancellationToken ct) =>
         HostedSessions.UseAsync(Id, Hosted.Endpoint, async files =>
         {
-            Warnings = await RecoverAsync(files, Id, Root, ct).ConfigureAwait(false);
+            Warn(await RecoverAsync(files, Id, Root, ct).ConfigureAwait(false));
             return await work(files, new HostedListings(files, Root)).ConfigureAwait(false);
         }, readOnly, ct);
+
+    /// <summary>
+    /// Операция записи: <paramref name="work"/> зовёт <c>done</c> с итогом, как только файл на сервере уже в новом виде.
+    /// Связь оборвалась или вышло время после этого (на уборке bak, на листинге ради времени файла) — это не «не удалось
+    /// сохранить»: ответ — итог из done. Мёртвое соединение очередь при этом закрывает, как после любого обрыва.
+    /// </summary>
+    private async Task<T> ChangeAsync<T>(Func<IRemoteFiles, HostedListings, Action<T>, Task<T>> work, CancellationToken ct)
+        where T : class
+    {
+        T? done = null;
+        try
+        {
+            return await UseAsync((files, ls) => work(files, ls, result => done = result), readOnly: false, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (done is not null && ex is IOException or OperationCanceledException)
+        {
+            // shortcut: время файла после такой записи не узнали (в итоге его нет) — следующая запись пройдёт без проверки
+            // «поменяли с момента открытия»; переделать, если окно начнёт перечитывать файл после неё
+            return done;
+        }
+    }
+
+    /// <summary>Итог записи без свежего листинга: файл — с этим текстом, время неизвестно.</summary>
+    private ModConfigContent Written(ConfigFile file, string text) =>
+        new(file.Relative, text, true, _backups.Versions(file.Key).Count, null);
 
     public Task<IReadOnlyList<ModConfigEntry>> ListAsync(CancellationToken ct = default) =>
         UseAsync<IReadOnlyList<ModConfigEntry>>(async (files, ls) =>
@@ -79,8 +137,11 @@ public sealed class HostedModConfigSource : IModConfigSource
             if (scan is { } known) (layout, mods) = known;
             else
             {
+                // разовые предупреждения скана (довели установку, вернули конфиг…) второй раз никто не выдаст — их
+                // покажет окно настроек
                 var hosted = new HostedMods(Target);
-                mods = await hosted.ScanModsAsync(files, ct).ConfigureAwait(false);
+                (mods, var once) = await hosted.ScanModsAsync(files, ct).ConfigureAwait(false);
+                Warn(once);
                 layout = hosted.Layout;
             }
             Folder = null; // список — повод поискать папку заново: её могли создать или убрать
@@ -104,7 +165,7 @@ public sealed class HostedModConfigSource : IModConfigSource
         // сломанный JSON не уходит на сервер — проверка до соединения, как у файла на диске
         if (ModConfigs.KindOf(request.Path) == ModConfigKind.Json && ModConfigs.JsonError(request.Text) is { } error)
             return Task.FromException<ModConfigSaveResult>(new InvalidDataException(error));
-        return UseAsync(async (files, ls) =>
+        return ChangeAsync<ModConfigSaveResult>(async (files, ls, done) =>
         {
             var file = PathOf(await FolderAsync(files, ls, null, ct).ConfigureAwait(false), request.Path);
             // shortcut: «поменяли с момента открытия» — только по времени из листинга (MLSD — до секунды, LIST — до минуты):
@@ -122,30 +183,34 @@ public sealed class HostedModConfigSource : IModConfigSource
             }
             var body = Encoding.UTF8.GetBytes(request.Text);
             await WriteAsync(files, ls, file, bom ? [.. Encoding.UTF8.Preamble, .. body] : body, ct).ConfigureAwait(false);
+            done(new ModConfigSaveResult(Written(file, request.Text), Changed: false));
             return new ModConfigSaveResult(await ReadCoreAsync(files, ls, file, ct, request.Text).ConfigureAwait(false), Changed: false);
-        }, readOnly: false, ct);
+        }, ct);
     }
 
     /// <summary>Шаг назад: последняя сохранённая на этой машине версия заливается на сервер и уходит из истории.</summary>
     public Task<ModConfigContent> UndoAsync(string relativePath, CancellationToken ct = default) =>
-        UseAsync(async (files, ls) =>
+        ChangeAsync<ModConfigContent>(async (files, ls, done) =>
         {
             var file = PathOf(await FolderAsync(files, ls, null, ct).ConfigureAwait(false), relativePath);
+            string? written = null;
             if (_backups.Versions(file.Key).FirstOrDefault() is { } last)
             {
                 var bytes = await File.ReadAllBytesAsync(last, ct).ConfigureAwait(false);
                 await WriteAsync(files, ls, file, bytes, ct).ConfigureAwait(false);
                 File.Delete(last);
+                written = Decode(bytes); // залитое — уже известно, снова не качаем
+                done(Written(file, written));
             }
-            return await ReadCoreAsync(files, ls, file, ct).ConfigureAwait(false);
-        }, readOnly: false, ct);
+            return await ReadCoreAsync(files, ls, file, ct, written).ConfigureAwait(false);
+        }, ct);
 
     /// <summary>
     /// Сбросить к стандартным: копия — на эту машину, файл на сервере удаляется (мод создаст его заново при запуске
     /// сервера). Отменяется «Вернуть предыдущую версию».
     /// </summary>
     public Task<ModConfigContent> ResetAsync(string relativePath, CancellationToken ct = default) =>
-        UseAsync(async (files, ls) =>
+        ChangeAsync<ModConfigContent>(async (files, ls, done) =>
         {
             var file = PathOf(await FolderAsync(files, ls, null, ct).ConfigureAwait(false), relativePath);
             if (await ls.FileAsync(file.Remote, ct).ConfigureAwait(false) is not null)
@@ -153,17 +218,37 @@ public sealed class HostedModConfigSource : IModConfigSource
                 _backups.Keep(await DownloadAsync(files, file.Remote, ct).ConfigureAwait(false), file.Key);
                 await files.DeleteFileAsync(file.Remote, ct).ConfigureAwait(false);
                 ls.Forget(RemotePath.Parent(file.Remote));
+                done(new ModConfigContent(file.Relative, "", false, _backups.Versions(file.Key).Count, null));
             }
             return await ReadCoreAsync(files, ls, file, ct).ConfigureAwait(false);
-        }, readOnly: false, ct);
+        }, ct);
 
     // ---------- пути
 
     /// <summary>
-    /// Файл настроек: путь на сервере, путь внутри ModConfig в чистом виде и ключ резервных копий на этой машине (части
-    /// пути — именами, годными для любой ОС: на Linux в имени бывает «:», на Windows — нет).
+    /// Файл настроек: путь на сервере, путь внутри ModConfig в чистом виде и ключ резервных копий на этой машине
+    /// (<see cref="BackupKey"/>).
     /// </summary>
     private sealed record ConfigFile(string Remote, string Relative, string Key);
+
+    /// <summary>
+    /// Ключ резервных копий файла на этой машине: путь внутри ModConfig, части — именами, годными для любой ОС (на Linux
+    /// в имени бывает «:», на Windows — нет). Копии разных файлов не должны смешаться: на сервере «Carry.json» и
+    /// «carry.json» — разные файлы, а папки копий на Windows регистр не различают; SafeLocalName вдобавок сводит
+    /// «a:b.json» и «a_b.json» в одно имя. Поэтому путь не в нижнем регистре или с заменёнными знаками получает к имени
+    /// отпечаток точного пути: «CarryOn.json» → «CarryOn~1a2b3c4d.json».
+    /// </summary>
+    public static string BackupKey(string relativePath)
+    {
+        var parts = relativePath.Split('/').Select(RemotePath.SafeLocalName).ToArray();
+        var key = string.Join('/', parts);
+        if (key == relativePath && relativePath == relativePath.ToLowerInvariant()) return key;
+        var stamp = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(relativePath)))[..8].ToLowerInvariant();
+        var leaf = parts[^1];
+        var ext = Path.GetExtension(leaf);
+        parts[^1] = leaf[..^ext.Length] + "~" + stamp + ext;
+        return string.Join('/', parts);
+    }
 
     /// <summary>
     /// Путь внутри ModConfig («sub/x.json») → файл на сервере. Правила — как у <see cref="ModConfigService.FullPath"/>:
@@ -187,7 +272,7 @@ public sealed class HostedModConfigSource : IModConfigSource
         }
         if (remote == RemotePath.Normalize(folder) || !RemotePath.IsInside(folder, remote) || ModConfigs.KindOf(remote) is null) throw Bad();
         var clean = RemotePath.Relative(folder, remote);
-        return new ConfigFile(remote, clean, string.Join('/', clean.Split('/').Select(RemotePath.SafeLocalName)));
+        return new ConfigFile(remote, clean, BackupKey(clean));
     }
 
     /// <summary>
@@ -252,7 +337,7 @@ public sealed class HostedModConfigSource : IModConfigSource
             FolderExists = true;
         }
         await HostedSafeWrite.WriteAsync(files, Root, file.Remote, content,
-            () => MarkSwap(Id, file.Remote), () => ClearSwap(Id, file.Remote), keepBak: false, ct).ConfigureAwait(false);
+            () => MarkSwap(Id, file.Remote, content), () => ClearSwap(Id, file.Remote), keepBak: false, ct).ConfigureAwait(false);
         ls.Forget(parent);
     }
 
@@ -277,14 +362,15 @@ public sealed class HostedModConfigSource : IModConfigSource
 
     /// <summary>
     /// Запись сорвалась посередине (связь оборвалась между «прежний файл → bak» и «временный → на место», и вернуть bak
-    /// тоже не вышло): по отметкам на этой машине вернуть bak на место. Новый файл всё-таки встал — убрать лишний bak.
-    /// Ответ — что вернули (на языке окна). Сервер отказал — отметка остаётся до следующего раза; обрыв связи —
+    /// тоже не вышло): по отметкам на этой машине вернуть bak на место. Файл на месте уже есть — убрать лишний bak; если
+    /// это не тот файл, что мы заливали (его, пока запись стояла недоделанной, заново создал мод), — сказать об этом.
+    /// Ответ — что случилось (на языке окна). Сервер отказал — отметка остаётся до следующего раза; обрыв связи —
     /// исключение, как у любой операции.
     /// </summary>
     public static async Task<IReadOnlyList<string>> RecoverAsync(IRemoteFiles files, string profileId, string root, CancellationToken ct)
     {
         var warnings = new List<string>();
-        foreach (var (marker, path) in Swaps(profileId))
+        foreach (var (marker, path, fingerprint) in Swaps(profileId))
         {
             try
             {
@@ -300,7 +386,16 @@ public sealed class HostedModConfigSource : IModConfigSource
                         warnings.Add(Loc.T("mcfg.hostedRestored", RemotePath.Name(path)));
                     }
                 }
-                else if (hasBak) await files.DeleteFileAsync(bak, ct).ConfigureAwait(false);
+                else if (hasBak)
+                {
+                    // встал наш новый файл (ответ на переименование потерялся) — bak лишний. Другой — его создал заново мод
+                    // (сервер запускали, он записал стандартные значения): прежняя версия есть в копиях на этой машине
+                    // (до записи без копии ничего не пишем), но человек должен об этом знать
+                    var recreated = fingerprint is not null
+                                    && Fingerprint(await DownloadAsync(files, path, ct).ConfigureAwait(false)) != fingerprint;
+                    await files.DeleteFileAsync(bak, ct).ConfigureAwait(false);
+                    if (recreated) warnings.Add(Loc.T("mcfg.hostedRecreated", RemotePath.Name(path)));
+                }
                 // временный файл той записи (связь оборвалась раньше, чем его убрали) — тоже не нужен
                 if (await ls.FileAsync(tmp, ct).ConfigureAwait(false) is not null) await files.DeleteFileAsync(tmp, ct).ConfigureAwait(false);
                 Quietly(() => File.Delete(marker));
@@ -316,24 +411,30 @@ public sealed class HostedModConfigSource : IModConfigSource
 
     private static string SwapDir(string profileId) => Path.Combine(HostedJournal.DirFor(profileId), SwapDirName);
 
-    /// <summary>Отметка на файл: имя — по пути на сервере, внутри — сам путь.</summary>
+    /// <summary>Отметка на файл: имя — по пути на сервере, внутри — сам путь и отпечаток заливаемого содержимого.</summary>
     private static string SwapFile(string profileId, string path) =>
         Path.Combine(SwapDir(profileId), Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(path)))[..16] + ".txt");
 
+    /// <summary>Отпечаток содержимого: по нему восстановление узнаёт, наш ли файл встал на место.</summary>
+    private static string Fingerprint(byte[] content) => Convert.ToHexString(SHA256.HashData(content));
+
     /// <summary>Отметка «файл сейчас лежит на сервере как bak». Подстраховка: не записалась — запись идёт и без неё.</summary>
-    private static void MarkSwap(string profileId, string path) =>
+    private static void MarkSwap(string profileId, string path, byte[] content) =>
         Quietly(() =>
         {
             Directory.CreateDirectory(SwapDir(profileId));
-            File.WriteAllText(SwapFile(profileId, path), path);
+            File.WriteAllText(SwapFile(profileId, path), path + "\n" + Fingerprint(content));
         });
 
     private static void ClearSwap(string profileId, string path) => Quietly(() => File.Delete(SwapFile(profileId, path)));
 
-    /// <summary>Отметки профиля: файл отметки и путь на сервере. Битая отметка — как нет (и убирается).</summary>
-    private static List<(string Marker, string Path)> Swaps(string profileId)
+    /// <summary>
+    /// Отметки профиля: файл отметки, путь на сервере и отпечаток заливаемого (нет — null). Битая отметка — как нет (и
+    /// убирается).
+    /// </summary>
+    private static List<(string Marker, string Path, string? Fingerprint)> Swaps(string profileId)
     {
-        var found = new List<(string, string)>();
+        var found = new List<(string, string, string?)>();
         var dir = SwapDir(profileId);
         try
         {
@@ -342,7 +443,9 @@ public sealed class HostedModConfigSource : IModConfigSource
             {
                 try
                 {
-                    found.Add((marker, RemotePath.Normalize(File.ReadAllText(marker).Trim())));
+                    var lines = File.ReadAllText(marker).Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                    if (lines.Length == 0) throw new InvalidDataException("empty swap mark");
+                    found.Add((marker, RemotePath.Normalize(lines[0]), lines.ElementAtOrDefault(1)));
                 }
                 catch (InvalidDataException)
                 {

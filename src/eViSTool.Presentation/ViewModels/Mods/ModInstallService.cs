@@ -38,10 +38,11 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
 
     /// <summary>
     /// Игра или сервер цели запущены — спросить, продолжать ли. true — не запущены или ответили «да». У хостера вопрос
-    /// другой: «останови сервер в панели хостера» (Да / Нет); «Да» помнится 10 минут, флажок профиля выключает вопрос.
+    /// другой: «останови сервер в панели хостера» (Да / Нет, текст — <paramref name="hostedQuestion"/>, если задан);
+    /// «Да» помнится 10 минут, флажок профиля выключает вопрос.
     /// </summary>
-    public bool ConfirmIfRunning(ModTarget target) =>
-        target.IsHosted ? _stopReminder.Confirm(target)
+    public bool ConfirmIfRunning(ModTarget target, string? hostedQuestion = null) =>
+        target.IsHosted ? _stopReminder.Confirm(target, hostedQuestion)
         : !IsRunning(target)
           || Confirm(Loc.T("mods.runningContinue"));
 

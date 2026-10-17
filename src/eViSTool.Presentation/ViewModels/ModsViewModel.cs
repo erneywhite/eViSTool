@@ -377,10 +377,10 @@ public sealed partial class ModsViewModel : ObservableObject
     public int ConfigCount(string modId) => _configCounts.GetValueOrDefault(modId);
 
     /// <summary>
-    /// Перед записью настроек модов (вкладка «Настройки модов») — тот же вопрос, что перед изменением модов, и та же
-    /// память ответа: у хостера — «останови сервер в панели хостера».
+    /// Перед записью настроек модов (вкладка «Настройки модов») — та же проверка, что перед изменением модов, и та же
+    /// память ответа: у хостера — «останови сервер в панели хостера» (текст вопроса — <paramref name="hostedQuestion"/>).
     /// </summary>
-    internal bool ConfirmIfRunning(ModTarget target) => _installer.ConfirmIfRunning(target);
+    internal bool ConfirmIfRunning(ModTarget target, string? hostedQuestion = null) => _installer.ConfirmIfRunning(target, hostedQuestion);
 
     /// <summary>Числа конфигов удалённого сервера пришли позже списка модов — ссылка в карточке обновляется.</summary>
     internal void ShowConfigCounts(Dictionary<string, int> counts)

@@ -1,6 +1,7 @@
 using eViSTool.Core.Hosting;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Mods;
+using eViSTool.Core.Profiles;
 using eViSTool.Core.Tests.Hosting;
 using eViSTool.Presentation.ViewModels;
 
@@ -9,11 +10,15 @@ namespace eViSTool.Presentation.Tests;
 /// <summary>
 /// Вкладка «Настройки модов» для сервера у хостера: файлы ModConfig по FTP (поддельный сервер «как G-Portal» над
 /// временной папкой), «Показать файл» скрыт, перед записью, откатом и сбросом — вопрос «останови сервер в панели
-/// хостера» с общей с «Моими модами» памятью ответа; «Нет» ничего не пишет на сервер. Главная модель настоящая.
+/// хостера» с общей с «Моими модами» памятью ответа; «Нет» ничего не пишет на сервер; что операция заодно починила,
+/// окно говорит. Главная модель настоящая.
 /// </summary>
 public sealed class HostedModConfigViewModelTests : IDisposable
 {
     private const string CarryText = "{\n  \"Range\": 3\n}\n";
+    private const string Carry = "/ModConfig/carryon.json";
+    private const string Tmp = Carry + ".evistool.tmp";
+    private const string Bak = Carry + ".evistool.bak";
 
     private readonly HostedFixture _host = new();
     private readonly IAppWindows? _oldWindows = AppWindows.IsSet ? AppWindows.Current : null;
@@ -83,7 +88,7 @@ public sealed class HostedModConfigViewModelTests : IDisposable
         using (var dialogs = new ScriptedDialogs(Answer.No))
         {
             Sta.Wait(model.SaveCommand.ExecuteAsync(null));
-            Assert.Equal([Loc.T("hosted.stopAsk", _host.Profile.Name)], dialogs.Asked);
+            Assert.Equal([Loc.T("mcfg.hostedStopAsk", _host.Profile.Name)], dialogs.Asked);
         }
 
         Assert.Equal(CarryText, ServerText);
@@ -131,7 +136,7 @@ public sealed class HostedModConfigViewModelTests : IDisposable
         using (var dialogs = new ScriptedDialogs(Answer.Yes, Answer.No))
         {
             Sta.Wait(model.SaveCommand.ExecuteAsync(null));
-            Assert.Equal([Loc.T("hosted.stopAsk", _host.Profile.Name), Loc.T("mcfg.changedOutside", "carryon.json")], dialogs.Asked);
+            Assert.Equal([Loc.T("mcfg.hostedStopAsk", _host.Profile.Name), Loc.T("mcfg.changedOutside", "carryon.json")], dialogs.Asked);
         }
 
         Assert.Equal("{ \"Range\": 9 }", ServerText);
@@ -146,7 +151,7 @@ public sealed class HostedModConfigViewModelTests : IDisposable
         using (var dialogs = new ScriptedDialogs(Answer.Yes, Answer.No))
         {
             Sta.Wait(model.ResetCommand.ExecuteAsync(null));
-            Assert.Equal([Loc.T("mcfg.askReset", "carryon.json"), Loc.T("hosted.stopAsk", _host.Profile.Name)], dialogs.Asked);
+            Assert.Equal([Loc.T("mcfg.askReset", "carryon.json"), Loc.T("mcfg.hostedStopAsk", _host.Profile.Name)], dialogs.Asked);
         }
         Assert.Equal(CarryText, ServerText);
         Assert.Empty(_host.Server.Writes);
@@ -165,6 +170,73 @@ public sealed class HostedModConfigViewModelTests : IDisposable
     });
 
     [Fact]
+    public void Restore_AsksToStopTheServer_NoWritesNothing_YesUploadsThePreviousVersion() => Sta.Run(() =>
+    {
+        // прежняя версия уже есть на этой машине (сохраняли раньше)
+        ModConfigBackups.ForProfile(_host.Profile).Keep(System.Text.Encoding.UTF8.GetBytes("{ \"Range\": 1 }"), "carryon.json");
+        var model = Opened(Main());
+        Assert.Equal(1, model.Versions);
+
+        using (var dialogs = new ScriptedDialogs(Answer.No))
+        {
+            Sta.Wait(model.RestorePreviousCommand.ExecuteAsync(null));
+            Assert.Equal([Loc.T("mcfg.hostedStopAsk", _host.Profile.Name)], dialogs.Asked);
+        }
+        Assert.Equal(CarryText, ServerText);
+        Assert.Empty(_host.Server.Writes);
+        Assert.Equal(1, model.Versions);
+
+        using (var dialogs = new ScriptedDialogs(Answer.Yes))
+            Sta.Wait(model.RestorePreviousCommand.ExecuteAsync(null));
+        Assert.Equal("{ \"Range\": 1 }", ServerText);
+        Assert.Equal("{ \"Range\": 1 }", model.Text);
+        Assert.Equal(0, model.Versions);
+    });
+
+    [Fact]
+    public void SwitchingToAnotherFile_WithEdits_SavesThemToTheServer_AfterTheStopQuestion() => Sta.Run(() =>
+    {
+        var model = Opened(Main());
+        model.Text = "{ \"Range\": 5 }";
+
+        using (var dialogs = new ScriptedDialogs(Answer.Yes, Answer.Yes))
+        {
+            model.Selected = model.Rows.Single(r => r.File.RelativePath == "unknown.cfg");
+            Sta.WaitFor(() => model.Text == "x = 1" && model.Status == Loc.T("mcfg.saved", "carryon.json"));
+            Assert.Equal([Loc.T("mcfg.askSave", "carryon.json"), Loc.T("mcfg.hostedStopAsk", _host.Profile.Name)], dialogs.Asked);
+            Assert.Empty(dialogs.Warned);
+        }
+        Assert.Equal("{ \"Range\": 5 }", ServerText);
+        Assert.False(model.IsDirty); // открыт уже другой файл, без правок
+    });
+
+    [Fact]
+    public void AFileReturnedAfterABrokenSave_IsSaidInTheWindow_AlsoWithTheFileOpen() => Sta.Run(() =>
+    {
+        var model = Opened(Main());
+        // запись сорвалась посередине, и вернуть прежний файл тоже не вышло: на сервере остался только bak
+        _host.Server.FailOn = (op, path) => op == "rename" && (path == Tmp && _host.Server.Has(Bak) || path == Bak);
+        model.Text = "{ \"Range\": 5 }";
+        using (var dialogs = new ScriptedDialogs(Answer.Yes))
+        {
+            Sta.Wait(model.SaveCommand.ExecuteAsync(null));
+            Assert.Single(dialogs.Warned); // «не удалось сохранить»
+        }
+        _host.Server.FailOn = null;
+        Assert.False(_host.Server.Has(Carry));
+
+        // «Обновить», файл открыт: список возвращает файл на место, открытый файл перечитывается — окно говорит об этом раз
+        using (var dialogs = new ScriptedDialogs())
+        {
+            Sta.Wait(model.RefreshCommand.ExecuteAsync(null));
+            Sta.WaitFor(() => model.Text == CarryText);
+            Assert.Equal([Loc.T("mcfg.hostedRestored", "carryon.json")], dialogs.Warned);
+        }
+        Assert.Equal(CarryText, ServerText);
+        Assert.False(_host.Server.Has(Bak));
+    });
+
+    [Fact]
     public void LeavingWithEdits_Yes_ButTheServerIsRunning_StaysAndWritesNothing() => Sta.Run(() =>
     {
         var model = Opened(Main());
@@ -174,7 +246,36 @@ public sealed class HostedModConfigViewModelTests : IDisposable
             Assert.False(model.ConfirmLeave());
 
         Assert.Equal(CarryText, ServerText);
+        Assert.Empty(_host.Server.Writes);
         Assert.True(model.IsDirty);
+    });
+
+    [Fact]
+    public void LeavingWithEdits_WhileTheConnectionIsBusy_SaysSoInWords_AndStays() => Sta.Run(() =>
+    {
+        var model = Opened(Main());
+        model.Text = "{ \"Range\": 5 }";
+        // очередь соединения профиля занята (например, долгим сканом модов)
+        var busy = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var holder = HostedSessions.UseAsync(_host.Profile.Id, _host.Endpoint, _ => busy.Task, CancellationToken.None);
+        var wait = ModConfigViewModel.LeaveSaveWait;
+        ModConfigViewModel.LeaveSaveWait = TimeSpan.FromMilliseconds(300);
+        try
+        {
+            using var dialogs = new ScriptedDialogs(Answer.Yes, Answer.Yes);
+            Assert.False(model.ConfirmLeave());
+            // своими словами, а не «The operation was canceled»
+            Assert.Equal([Loc.T("mcfg.hostedSaveTimeout", "carryon.json")], dialogs.Warned);
+        }
+        finally
+        {
+            ModConfigViewModel.LeaveSaveWait = wait;
+            busy.SetResult(0);
+            Sta.Wait(holder);
+        }
+        Assert.True(model.IsDirty);
+        Assert.Equal(CarryText, ServerText);
+        Assert.Empty(_host.Server.Writes);
     });
 
     [Fact]

@@ -46,17 +46,28 @@ public sealed partial class HostedMods(ModTarget target)
             ? (layout, mods)
             : null;
 
-    /// <summary>Скан на уже выданном соединении (для тех, кто сам держит очередь профиля): моды, раскладка — в <see cref="Layout"/>.</summary>
-    internal async Task<IReadOnlyList<LocalMod>> ScanModsAsync(IRemoteFiles files, CancellationToken ct) =>
-        (await ScanCoreAsync(files, null, ct).ConfigureAwait(false)).Mods;
+    /// <summary>
+    /// Скан на уже выданном соединении (для тех, кто сам держит очередь профиля): моды и разовые предупреждения скана
+    /// (довели прерванную установку, вернули конфиг, хостер переписал конфиг). Второй раз скан их не выдаст, поэтому
+    /// показать их должен вызывающий. Постоянные («нет конфига», папки-моды) сюда не входят: их покажут «Мои моды»
+    /// своим сканом. Раскладка — в <see cref="Layout"/>.
+    /// </summary>
+    internal async Task<(IReadOnlyList<LocalMod> Mods, IReadOnlyList<string> Once)> ScanModsAsync(IRemoteFiles files, CancellationToken ct)
+    {
+        var scan = await ScanCoreAsync(files, null, ct).ConfigureAwait(false);
+        return (scan.Mods, scan.Once);
+    }
 
     private HostedTarget Hosted => Target.Hosted!;
     private string Id => Target.ProfileId;
     private string Root => HostedLayoutProbe.Root(Hosted.Settings);
 
-    /// <summary>Что нашёл скан: профиль и моды, плюс то, что нужно операциям (записи листинга, папки-моды).</summary>
+    /// <summary>
+    /// Что нашёл скан: профиль и моды, плюс то, что нужно операциям (записи листинга, папки-моды), и разовые
+    /// предупреждения из <see cref="ResolvedProfile.Warnings"/> — те, что следующий скан уже не повторит.
+    /// </summary>
     private sealed record Scan(ResolvedProfile Profile, IReadOnlyList<LocalMod> Mods, HostedSnapshot Snapshot,
-        IReadOnlyDictionary<string, RemoteEntry> Entries, IReadOnlySet<string> Folders);
+        IReadOnlyDictionary<string, RemoteEntry> Entries, IReadOnlySet<string> Folders, IReadOnlyList<string> Once);
 
     public Task<(ResolvedProfile Profile, IReadOnlyList<LocalMod> Mods)> ScanAsync(IProgress<string>? progress, CancellationToken ct) =>
         HostedSessions.UseAsync<(ResolvedProfile, IReadOnlyList<LocalMod>)>(Id, Hosted.Endpoint, async files =>
@@ -144,6 +155,12 @@ public sealed partial class HostedMods(ModTarget target)
     private async Task<Scan> ScanCoreAsync(IRemoteFiles files, IProgress<string>? progress, CancellationToken ct)
     {
         var warnings = new List<string>();
+        var once = new List<string>(); // разовые: и в warnings, и отдельно (см. ScanModsAsync)
+        void Once(string warning)
+        {
+            warnings.Add(warning);
+            once.Add(warning);
+        }
 
         // прерванная установка (связь оборвалась между «удалить старое» и «переименовать новое») — довести или вернуть
         if (HostedJournal.Read(Id) is { } pending)
@@ -151,7 +168,7 @@ public sealed partial class HostedMods(ModTarget target)
             try
             {
                 var name = pending.Name ?? pending.ModId;
-                warnings.Add(await HostedJournal.FinishAsync(files, Id, pending, ct, Root).ConfigureAwait(false)
+                Once(await HostedJournal.FinishAsync(files, Id, pending, ct, Root).ConfigureAwait(false)
                     ? Loc.T("hosted.recovered", name)
                     : Loc.T("hosted.rolledBack", name));
             }
@@ -172,7 +189,7 @@ public sealed partial class HostedMods(ModTarget target)
                     && await ls.FileAsync(swapped + BakSuffix, ct).ConfigureAwait(false) is not null)
                 {
                     await files.RenameAsync(swapped + BakSuffix, swapped, ct).ConfigureAwait(false);
-                    warnings.Add(Loc.T("hosted.configRestored"));
+                    Once(Loc.T("hosted.configRestored"));
                 }
                 HostedJournal.ClearConfigSwap(Id);
             }
@@ -183,7 +200,7 @@ public sealed partial class HostedMods(ModTarget target)
         }
 
         // то же для настроек модов, записанных из «Настроек модов»
-        warnings.AddRange(await HostedModConfigSource.RecoverAsync(files, Id, Root, ct).ConfigureAwait(false));
+        foreach (var restored in await HostedModConfigSource.RecoverAsync(files, Id, Root, ct).ConfigureAwait(false)) Once(restored);
 
         var settings = Hosted.Settings;
         var snapshot = await HostedLayoutProbe.ReadAsync(files, settings, ct).ConfigureAwait(false);
@@ -243,7 +260,9 @@ public sealed partial class HostedMods(ModTarget target)
             .ToList();
         LastMods[Id] = result;
         if (folders.Count > 0) warnings.Add(Loc.T("hosted.folderModReadOnly"));
+        var tracked = warnings.Count;
         TrackLaunches(snapshot, disabledList, warnings);
+        once.AddRange(warnings.Skip(tracked)); // «хостер переписал конфиг» TrackLaunches выдаёт один раз
 
         var resolved = new ResolvedProfile
         {
@@ -256,7 +275,7 @@ public sealed partial class HostedMods(ModTarget target)
             Warnings = warnings,
             OffMachine = true, // пути — на FTP
         };
-        return new Scan(resolved, result, snapshot, entries, folders);
+        return new Scan(resolved, result, snapshot, entries, folders, once);
     }
 
     /// <summary>modinfo архивов: из кэша, а промахи — с сервера (по возможности не целиком), с прогрессом «N из M».</summary>

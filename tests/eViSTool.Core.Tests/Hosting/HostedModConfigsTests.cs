@@ -87,6 +87,27 @@ public sealed class HostedModConfigsTests : IDisposable
     }
 
     [Fact]
+    public async Task List_WithoutAScan_KeepsTheScansOneTimeWarnings_ForTheWindow()
+    {
+        // правка serverconfig.json сорвалась посередине: конфиг остался только как bak, его вернёт первый же скан
+        var config = Path.Combine(_host.Server.Root, "serverconfig.json");
+        _host.Server.Put("/serverconfig.json.evistool.bak", File.ReadAllBytes(config));
+        File.Delete(config);
+        HostedJournal.MarkConfigSwap(_host.Profile.Id, "/serverconfig.json");
+        var source = Source();
+
+        await source.ListAsync();
+
+        Assert.True(_host.Server.Has("/serverconfig.json"));
+        // второй раз скан этого не скажет — сказать должно окно настроек; постоянных предупреждений скана тут нет
+        var taken = source.TakeWarnings();
+        HostedTestText.AssertIs("hosted.configRestored", taken.Single());
+        Assert.Empty(source.Warnings); // забрали — второй раз окно их не покажет
+        var (profile, _) = await ModTargets.ScanAsync(_host.Target);
+        Assert.DoesNotContain(profile.Warnings, w => HostedTestText.Of("hosted.configRestored").Contains(w));
+    }
+
+    [Fact]
     public async Task List_WithoutModConfigFolder_IsEmpty_AndSaysThereIsNoFolder()
     {
         Directory.Delete(Path.Combine(_host.Server.Root, "ModConfig"), recursive: true);
@@ -167,6 +188,41 @@ public sealed class HostedModConfigsTests : IDisposable
         Assert.False(second.Changed);
         Assert.Equal("{ \"Range\": 6 }", _host.Server.Text(Carry));
         Assert.Equal(2, second.Content!.Versions);
+    }
+
+    [Fact]
+    public async Task Save_FileNameWithCapitals_KeepsItsOwnHistory()
+    {
+        _host.Server.Put("/ModConfig/PrimitiveSurvival.json", "{ \"v\": 1 }");
+        var source = await OpenedAsync();
+
+        var saved = await source.SaveAsync(new ModConfigSaveRequest("PrimitiveSurvival.json", "{ \"v\": 2 }", null));
+
+        Assert.Equal(1, saved.Content!.Versions);
+        var backups = ModConfigBackups.ForProfile(_host.Profile);
+        Assert.Equal("{ \"v\": 1 }", File.ReadAllText(backups.Versions(HostedModConfigSource.BackupKey("PrimitiveSurvival.json")).Single()));
+        // на Windows папки копий регистр не различают: история файла primitivesurvival.json (на сервере — другой файл) — своя
+        Assert.Empty(backups.Versions("primitivesurvival.json"));
+    }
+
+    [Fact]
+    public void BackupKey_KeepsTheCopiesOfDifferentServerFilesApart()
+    {
+        // в нижнем регистре и без особых знаков — как есть
+        Assert.Equal("carryon.json", HostedModConfigSource.BackupKey("carryon.json"));
+        Assert.Equal("sub/x.json", HostedModConfigSource.BackupKey("sub/x.json"));
+        // на сервере (Linux) это разные файлы, а папки копий на Windows регистр не различают
+        var upper = HostedModConfigSource.BackupKey("Carry.json");
+        Assert.NotEqual("carry.json", upper, StringComparer.OrdinalIgnoreCase);
+        Assert.NotEqual(HostedModConfigSource.BackupKey("CARRY.json"), upper, StringComparer.OrdinalIgnoreCase);
+        Assert.StartsWith("Carry~", upper);
+        Assert.EndsWith(".json", upper);
+        Assert.Equal(upper, HostedModConfigSource.BackupKey("Carry.json")); // ключ постоянный
+        Assert.NotEqual(HostedModConfigSource.BackupKey("Sub/x.json"), HostedModConfigSource.BackupKey("sub/x.json"), StringComparer.OrdinalIgnoreCase);
+        // «:» в имени на Windows нельзя, но и в историю «a_b.json» файл «a:b.json» попасть не должен
+        var colon = HostedModConfigSource.BackupKey("a:b.json");
+        Assert.DoesNotContain(':', colon);
+        Assert.NotEqual(HostedModConfigSource.BackupKey("a_b.json"), colon, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -318,6 +374,93 @@ public sealed class HostedModConfigsTests : IDisposable
         Assert.Equal(CarryText, _host.Server.Text(Carry));
         Assert.Contains(HostedTestText.Of("mcfg.hostedRestored").Select(t => string.Format(t, "carryon.json")), w => profile.Warnings.Contains(w));
         Assert.False(HasSwapMarks);
+    }
+
+    /// <summary>Запись сорвалась так, что на сервере остался только bak (оба переименования отказаны).</summary>
+    private async Task OnlyBakLeftAsync(HostedModConfigSource source, string text)
+    {
+        _host.Server.FailOn = (op, path) => op == "rename" && (path == Tmp && _host.Server.Has(Bak) || path == Bak);
+        await Assert.ThrowsAsync<RemoteFilesException>(() => source.SaveAsync(new ModConfigSaveRequest("carryon.json", text, null)));
+        _host.Server.FailOn = null;
+        Assert.False(_host.Server.Has(Carry));
+        Assert.True(_host.Server.Has(Bak));
+    }
+
+    [Fact]
+    public async Task PutBackFailsToo_ThenTheModRecreatedTheFile_TheBakGoes_AndSaysSo()
+    {
+        await OnlyBakLeftAsync(await OpenedAsync(), "{ \"Range\": 5 }");
+        // сервер запустили, пока запись стояла недоделанной: мод создал файл заново со стандартными значениями
+        _host.Server.Put(Carry, "{ \"Range\": 1 }");
+
+        var again = Source();
+        var content = await again.ReadAsync("carryon.json");
+
+        Assert.Equal("{ \"Range\": 1 }", content.Text); // файл мода не трогаем: сервер, может быть, уже работает с ним
+        Assert.False(_host.Server.Has(Bak));
+        Assert.False(HasSwapMarks);
+        AssertText("mcfg.hostedRecreated", again.Warnings.Single(), "carryon.json");
+        // прежняя версия — в копиях на этой машине
+        Assert.Equal(CarryText, File.ReadAllText(ModConfigBackups.ForProfile(_host.Profile).Versions("carryon.json").Single()));
+    }
+
+    [Fact]
+    public async Task PutBackFailsToo_ButOurFileDidLand_TheBakGoesQuietly()
+    {
+        await OnlyBakLeftAsync(await OpenedAsync(), "{ \"Range\": 5 }");
+        // переименование на самом деле прошло, потерялся только ответ: на месте — то, что мы заливали
+        _host.Server.Put(Carry, "{ \"Range\": 5 }");
+
+        var again = Source();
+        Assert.Equal("{ \"Range\": 5 }", (await again.ReadAsync("carryon.json")).Text);
+
+        Assert.False(_host.Server.Has(Bak));
+        Assert.Empty(again.Warnings);
+        Assert.False(HasSwapMarks);
+    }
+
+    [Fact]
+    public async Task ConnectionDropsAfterTheFileIsInPlace_TheSaveStillCounts()
+    {
+        var source = await OpenedAsync();
+        // новый файл уже на месте, связь рвётся на уборке bak
+        _host.Server.OnBefore = (op, path) =>
+        {
+            if (op == "delete" && path == Bak) _host.Server.DropNext = true;
+        };
+
+        var result = await source.SaveAsync(new ModConfigSaveRequest("carryon.json", "{ \"Range\": 5 }", null));
+        _host.Server.OnBefore = null;
+
+        Assert.False(result.Changed);
+        Assert.Equal("{ \"Range\": 5 }", result.Content!.Text);
+        Assert.True(result.Content.Exists);
+        Assert.Equal(1, result.Content.Versions);
+        Assert.Null(result.Content.ChangedUtc); // время файла не узнали
+        Assert.Equal("{ \"Range\": 5 }", _host.Server.Text(Carry));
+        // следующая операция идёт по новому соединению, а оставшийся bak убирает следующая запись
+        Assert.Equal("{ \"Range\": 5 }", (await source.ReadAsync("carryon.json")).Text);
+        await source.SaveAsync(new ModConfigSaveRequest("carryon.json", "{ \"Range\": 6 }", null));
+        Assert.Equal("{ \"Range\": 6 }", _host.Server.Text(Carry));
+        Assert.False(_host.Server.Has(Bak));
+    }
+
+    [Fact]
+    public async Task ConnectionDropsAfterUndoPutTheFileBack_TheUndoStillCounts()
+    {
+        var source = await OpenedAsync();
+        await source.SaveAsync(new ModConfigSaveRequest("carryon.json", "{ \"Range\": 5 }", null));
+        _host.Server.OnBefore = (op, path) =>
+        {
+            if (op == "delete" && path == Bak) _host.Server.DropNext = true;
+        };
+
+        var back = await source.UndoAsync("carryon.json");
+        _host.Server.OnBefore = null;
+
+        Assert.Equal(CarryText, back.Text);
+        Assert.Equal(0, back.Versions);
+        Assert.Equal(CarryText, _host.Server.Text(Carry));
     }
 
     [Fact]
