@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- клиент FTP/FTPS (MIT); на net10 берётся сборка net9.0, своих зависимостей нет -->
+    <PackageReference Include="FluentFTP" Version="55.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="eViSTool.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\eViSTool.Core\eViSTool.Core.csproj" />
+  </ItemGroup>
+
+</Project>

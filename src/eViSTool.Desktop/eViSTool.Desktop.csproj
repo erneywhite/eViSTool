@@ -15,6 +15,8 @@
   <ItemGroup>
     <ProjectReference Include="..\eViSTool.Core\eViSTool.Core.csproj" />
     <ProjectReference Include="..\eViSTool.Presentation\eViSTool.Presentation.csproj" />
+    <!-- транспорт FTP для серверов у хостера (FluentFTP); только окно, агенту не нужен -->
+    <ProjectReference Include="..\eViSTool.Hosting\eViSTool.Hosting.csproj" />
   </ItemGroup>
 
   <ItemGroup>
