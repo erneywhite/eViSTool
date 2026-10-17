@@ -119,8 +119,11 @@ public sealed class RunInlinesTests : IDisposable
     private static List<TextBlock> Cells(Page page, string cls) =>
         page.View.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Classes.Contains(cls)).ToList();
 
-    /// <summary>Подписи-обходы: счётчик, версия с переводом (и она же в заданном размере) и строки таблицы.</summary>
-    private static List<TextBlock> Fixed(Page page) => [Named(page, "Counter"), Named(page, "Translated"), Named(page, "Sized"), .. Cells(page, "row")];
+    /// <summary>
+    /// Подписи-обходы: счётчик, версия с переводом (она же в заданном размере и упёршаяся в MaxWidth) и строки таблицы.
+    /// </summary>
+    private static List<TextBlock> Fixed(Page page) =>
+        [Named(page, "Counter"), Named(page, "Translated"), Named(page, "Sized"), Named(page, "Clamped"), .. Cells(page, "row")];
 
     private static string Expected(TextBlock t) => string.Concat(t.Inlines!.OfType<Run>().Select(r => r.Text));
 

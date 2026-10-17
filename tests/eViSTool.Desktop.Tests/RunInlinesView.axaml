@@ -28,8 +28,14 @@
             <ctl:RunTextBlock x:Name="Counter" Foreground="{DynamicResource Probe.Text}"><Run Text="{Binding ModCount, Mode=OneWay}" FontSize="24" /><Run Text="  " /><Run Text="{Binding InstalledLabel, Mode=OneWay}" Foreground="{DynamicResource Probe.Muted}" FontSize="13" /></ctl:RunTextBlock>
             <!-- перевод в разметке рядом с привязкой -->
             <ctl:RunTextBlock x:Name="Translated" Foreground="{DynamicResource Probe.Text}"><Run Text="{local:Tr about.version}" /><Run Text=" " /><Run Text="{Binding Version, Mode=OneWay}" FontWeight="SemiBold" /></ctl:RunTextBlock>
-            <!-- размер задан: измерение и раскладка получают одно и то же место -->
+            <!-- размер задан: измерение получает то же место, что и прошлая раскладка, поэтому пустая раскладка кадра доживает
+                 до измерения. Ширину подписи задаёт Width, а не текст, а раскладка (TextBlock.ArrangeOverride) собирается
+                 заново всегда, так что сброс в RunTextBlock.MeasureOverride эта подпись не проверяет — его проверяет Clamped -->
             <ctl:RunTextBlock x:Name="Sized" Width="300" Height="20" HorizontalAlignment="Left" Foreground="{DynamicResource Probe.Text}"><Run Text="{local:Tr about.version}" /><Run Text=" " /><Run Text="{Binding Version, Mode=OneWay}" /></ctl:RunTextBlock>
+            <!-- текст длиннее MaxWidth, высота задана: измерение получает то же место, что и прошлая раскладка, а ширину
+                 подписи решает уже измерение (выравнивание влево). Без сброса в RunTextBlock.MeasureOverride измерение взяло бы
+                 пустую раскладку кадра, и подпись получила бы ширину 0 -->
+            <ctl:RunTextBlock x:Name="Clamped" MaxWidth="100" Height="20" HorizontalAlignment="Left" Foreground="{DynamicResource Probe.Text}"><Run Text="{local:Tr about.version}" /><Run Text=" " /><Run Text="{Binding InstalledLabel, Mode=OneWay}" /><Run Text=" " /><Run Text="{Binding Version, Mode=OneWay}" /></ctl:RunTextBlock>
         </StackPanel>
         <DataGrid x:Name="Grid" ItemsSource="{Binding Rows}" AutoGenerateColumns="False" HeadersVisibility="None" CanUserSortColumns="False">
             <DataGrid.Columns>
