@@ -16,22 +16,34 @@ namespace eViSTool.Presentation.ViewModels.Mods;
 /// статуса (<c>setStatus</c>), итоги — в списки installed и problems, которые собирает вызывающий.
 /// </summary>
 /// <param name="gameVersion">Версия игры открытого профиля — для подписи «этот профиль» в окне «Установить также в».</param>
-internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, Action<string> setStatus, Func<ModVersion?> gameVersion)
+/// <param name="now">Часы для памяти ответа «сервер остановлен» (тесты подменяют).</param>
+internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, Action<string> setStatus, Func<ModVersion?> gameVersion,
+    Func<DateTime>? now = null)
 {
+    /// <summary>Вопрос «останови сервер в панели хостера» и память ответа.</summary>
+    private readonly HostedStopReminder _stopReminder = new(now);
+
     /// <summary>Миры, скопированные в текущей операции: попадут в её итоговую строку (<see cref="WithWorldCopies"/>).</summary>
     private readonly List<string> _copiedWorlds = [];
 
     /// <summary>Цель — открытый сейчас профиль.</summary>
     public bool IsActive(ModTarget target) => target.ProfileId == main.ActiveProfile?.Model.Id;
 
-    /// <summary>Игра или сервер цели запущены (свой — по процессу, удалённый — со слов агента, если это активный профиль).</summary>
+    /// <summary>
+    /// Игра или сервер цели запущены (свой — по процессу, удалённый — со слов агента, если это активный профиль).
+    /// У хостера по FTP это не видно — всегда false, вместо этого <see cref="ConfirmIfRunning"/> спрашивает человека.
+    /// </summary>
     public bool IsRunning(ModTarget target) =>
-        target.IsRemote ? IsActive(target) && main.Server.IsServerUp : GameProcess.IsRunning(target.Profile);
+        !target.IsHosted && (target.IsRemote ? IsActive(target) && main.Server.IsServerUp : GameProcess.IsRunning(target.Profile));
 
-    /// <summary>Игра или сервер цели запущены — спросить, продолжать ли. true — не запущены или ответили «да».</summary>
+    /// <summary>
+    /// Игра или сервер цели запущены — спросить, продолжать ли. true — не запущены или ответили «да». У хостера вопрос
+    /// другой: «останови сервер в панели хостера» (Да / Нет); «Да» помнится 10 минут, флажок профиля выключает вопрос.
+    /// </summary>
     public bool ConfirmIfRunning(ModTarget target) =>
-        !IsRunning(target)
-        || Confirm(Loc.T("mods.runningContinue"));
+        target.IsHosted ? _stopReminder.Confirm(target)
+        : !IsRunning(target)
+          || Confirm(Loc.T("mods.runningContinue"));
 
     /// <summary>Итог операции + «сделана копия мира: …», если была; список копий после этого сбрасывается.</summary>
     public string WithWorldCopies(string text)
@@ -51,7 +63,7 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
     public async Task CopyWorldsAsync(ModTarget target, List<string>? problems = null, ModSide side = ModSide.Both)
     {
         // скопированные миры — в итоговую строку статуса операции (иначе её сразу затрёт «мод выключен» и т. п.)
-        if (!main.CopyWorldsBeforeModChanges || target.IsRemote || target.Profile.Kind != ProfileKind.Client
+        if (!main.CopyWorldsBeforeModChanges || !target.IsLocal || target.Profile.Kind != ProfileKind.Client
             || !NeedsWorldCopy(side)) return;
         var data = string.IsNullOrWhiteSpace(target.Profile.DataDir) ? GameInstall.DefaultDataDir : target.Profile.DataDir;
         if (!WorldCopies.AnyToCopy(data)) return;
@@ -114,7 +126,7 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
                             return;
                         }
                     }
-                    if (target.IsRemote) setStatus(Loc.T("mods.uploading", info.Name, info.Version));
+                    if (!target.IsLocal) setStatus(Loc.T("mods.uploading", info.Name, info.Version));
                     go = true;
                 });
                 return go;
@@ -126,7 +138,7 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
         catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException
                                        or HttpRequestException or TaskCanceledException)
         {
-            problems.Add($"{Path.GetFileName(zip)}: {ex.Message}");
+            problems.Add($"{Path.GetFileName(zip)}: {(target.IsHosted ? ModTargets.Describe(target, ex) : ex.Message)}");
             return false;
         }
     }
@@ -231,7 +243,7 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
         if (others.Count == 0) return [];
 
         setStatus(Loc.T("also.checking"));
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var cts = new CancellationTokenSource(others.Max(x => ModTargets.ScanTimeout(x.Target!))); // сервер у хостера читается дольше
         var options = await Task.WhenAll(others.Select(x => AlsoInstall.EvaluateFilesAsync(x.Target!, files, cts.Token)));
         setStatus("");
 

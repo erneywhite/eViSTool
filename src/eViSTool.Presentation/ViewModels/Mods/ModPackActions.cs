@@ -21,7 +21,7 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
 
     public async Task ExportAsync()
     {
-        if (owner.Profile is not { } profile || owner.IsBusy || owner.IsRemote) return;
+        if (owner.Profile is not { } profile || owner.IsBusy || !owner.IsLocalProfile) return;
         var enabled = owner.Locals.Count(l => l.Info is not null && !l.IsDisabled);
         var disabled = owner.Locals.Count(l => l.Info is not null && l.IsDisabled);
         if (enabled + disabled == 0)
@@ -119,10 +119,11 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
                     Ui.Invoke(() => yes = Ui.Confirm(Loc.T("pack.askChanged", string.Join("\n", mods.Select(x => "• " + x))), byDefault: Answer.No, warning: true));
                     return yes;
                 }
-                result = await Task.Run(() => target.IsRemote
-                    ? importer.ApplyToRemoteAsync(pack, plan, target, mirror, applyConfig, progress, confirmChanged: AskChanged)
-                    : importer.ApplyAsync(pack, plan, profile, mirror, applyConfig,
-                        ModBackupStore.ForProfile(profile.Profile), progress, confirmChanged: AskChanged));
+                // не своя машина (агент, хостер) — моды по одному через цель; своя — прямо в папки профиля
+                result = await Task.Run(() => target.IsLocal
+                    ? importer.ApplyAsync(pack, plan, profile, mirror, applyConfig,
+                        ModBackupStore.ForProfile(profile.Profile), progress, confirmChanged: AskChanged)
+                    : importer.ApplyToTargetAsync(pack, plan, target, mirror, applyConfig, progress, confirmChanged: AskChanged));
 
                 // моды пака, нужные и в других профилях (сервер ↔ клиент), — как у «Добавить»
                 var zips = Directory.Exists(keep) ? Directory.GetFiles(keep, "*.zip", SearchOption.AllDirectories) : [];
