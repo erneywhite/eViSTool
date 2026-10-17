@@ -52,8 +52,9 @@ public interface ICtrlCSender
 /// </summary>
 public sealed class ServerHost : IAsyncDisposable
 {
-    private const string ReadyMarker = "now running on Port";      // «Выделенный сервер now running on Port …» — начало переводится
-    private const string StoppingMarker = "Server stop requested";
+    // общие с логом сервера у хостера (Hosting.HostedRunMarks)
+    internal const string ReadyMarker = "now running on Port";      // «Выделенный сервер now running on Port …» — начало переводится
+    internal const string StoppingMarker = "Server stop requested";
 
     private readonly ServerHostOptions _options;
     private readonly ICtrlCSender? _ctrlC;

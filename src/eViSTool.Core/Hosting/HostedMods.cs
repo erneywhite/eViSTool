@@ -32,6 +32,15 @@ public sealed partial class HostedMods(ModTarget target)
     // раскладка последнего скана профиля — для отпечатка: опрос раз в 30 с не должен заново искать папки и читать лог
     private static readonly ConcurrentDictionary<string, HostedLayout> LastLayouts = new(StringComparer.Ordinal);
 
+    // моды последнего скана профиля — для поиска виновника вылета в логе (HostedLogs): там моды заново не читаются
+    private static readonly ConcurrentDictionary<string, IReadOnlyList<LocalMod>> LastMods = new(StringComparer.Ordinal);
+
+    /// <summary>Раскладка, найденная последним сканом профиля (любым экземпляром); не сканировали — null.</summary>
+    public static HostedLayout? LastLayout(string profileId) => LastLayouts.GetValueOrDefault(profileId);
+
+    /// <summary>Моды последнего скана профиля (любым экземпляром); не сканировали — null.</summary>
+    public static IReadOnlyList<LocalMod>? LastScanMods(string profileId) => LastMods.GetValueOrDefault(profileId);
+
     private HostedTarget Hosted => Target.Hosted!;
     private string Id => Target.ProfileId;
     private string Root => HostedLayoutProbe.Root(Hosted.Settings);
@@ -220,6 +229,7 @@ public sealed partial class HostedMods(ModTarget target)
             })
             .OrderBy(m => m.Info?.Name ?? m.FileName, StringComparer.OrdinalIgnoreCase)
             .ToList();
+        LastMods[Id] = result;
         if (folders.Count > 0) warnings.Add(Loc.T("hosted.folderModReadOnly"));
         TrackLaunches(snapshot, disabledList, warnings);
 

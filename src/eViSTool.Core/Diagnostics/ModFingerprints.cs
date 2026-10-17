@@ -34,6 +34,19 @@ public sealed class ModFingerprints
                 return new ModPrint(m.Info!.ModId, m.Info.Name ?? m.Info.ModId, m.Info.Version, m.Path, namespaces, types);
             })]);
 
+    /// <summary>
+    /// Отпечатки модов, файлов которых на этой машине нет (сервер у хостера: пути — на FTP): только modid, имя и версия.
+    /// Виновника тогда называют слово игры и метки в сообщениях, по стеку и строкам перевода — нет (код не прочитан).
+    /// Диск этой машины по таким путям не читается.
+    /// </summary>
+    public static ModFingerprints WithoutCode(IEnumerable<LocalMod> mods) =>
+        new([.. mods.Where(m => m.Info is not null)
+            .Select(m => new ModPrint(m.Info!.ModId, m.Info.Name ?? m.Info.ModId, m.Info.Version, m.Path,
+                new HashSet<string>(StringComparer.Ordinal), new HashSet<string>(StringComparer.Ordinal)))])
+        {
+            _translations = new Dictionary<string, ModPrint>(StringComparer.Ordinal),
+        };
+
     public ModPrint? ByModId(string modId) =>
         _mods.FirstOrDefault(m => string.Equals(m.ModId, modId, StringComparison.OrdinalIgnoreCase));
 
