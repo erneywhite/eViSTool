@@ -8,6 +8,9 @@ using Avalonia.Threading;
 using eViSTool.Desktop.Tests;
 
 [assembly: AvaloniaTestApplication(typeof(TestApp))]
+// одно приложение и один поток окна на все тесты: при пересоздании на каждый тест (PerTest) Avalonia под нагрузкой
+// иногда трогала общий цикл отрисовки из чужого потока — тест падал на уборке («VerifyAccess»), не на своей проверке
+[assembly: AvaloniaTestIsolation(AvaloniaTestIsolationLevel.PerAssembly)]
 // все тесты идут на одном потоке окна, а RemoteImage и жесты держат общее состояние: без параллели надёжнее
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
 

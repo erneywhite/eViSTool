@@ -111,7 +111,7 @@ public sealed class ServerNotifyTests
     }
 
     [Fact]
-    public void Save_IsNotBroken_ByAReaderAtTheSameTime()
+    public async Task Save_IsNotBroken_ByAReaderAtTheSameTime()
     {
         // окно сохраняет, а агент в тот же миг читает: на Windows подмена файла падала, пока чтение держало его открытым
         var dir = Path.Combine(Path.GetTempPath(), "evistool-notify-srv-" + Guid.NewGuid().ToString("N"));
@@ -125,7 +125,7 @@ public sealed class ServerNotifyTests
             });
             for (var i = 0; i < 50; i++) Settings().Save("p1", dir);
             stop.Cancel();
-            reader.Wait();
+            await reader;
             Assert.True(ServerNotifySettings.Load("p1", dir).IsOn(NotifyEvent.PlayerJoined, "b"));
         }
         finally

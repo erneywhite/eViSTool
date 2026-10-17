@@ -85,9 +85,13 @@ public sealed class CloneProfileWindowTests : IDisposable
 
     private static void Click(Window window, Control control)
     {
-        // окно меняет высоту по содержимому (появился ход копирования) — сначала разложить, потом искать точку
+        // окно меняет высоту по содержимому (появился ход копирования или строка «отменено»). Мышь ищет, куда попала, по
+        // последнему отрисованному кадру, а не по раскладке: под нагрузкой кадр с новой раскладкой не успевал, и нажатие
+        // уходило мимо кнопки. Разложить, отрисовать кадр — и только потом нажимать
         Dispatcher.UIThread.RunJobs();
         window.UpdateLayout();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        Dispatcher.UIThread.RunJobs();
         var point = control.TranslatePoint(new Point(12, control.Bounds.Height / 2), window)!.Value;
         window.MouseDown(point, MouseButton.Left);
         window.MouseUp(point, MouseButton.Left);

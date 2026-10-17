@@ -66,7 +66,8 @@ internal sealed class UiThread : SynchronizationContext
     private readonly System.Collections.Concurrent.ConcurrentQueue<(SendOrPostCallback Callback, object? State)> _queue = new();
     private readonly int _threadId = Environment.CurrentManagedThreadId;
 
-    public static UiThread? Current { get => _current; set => _current = value; }
+    // new: очередь этого потока для тестов, а не SynchronizationContext.Current (тот есть у любого контекста)
+    public static new UiThread? Current { get => _current; set => _current = value; }
 
     /// <summary>Поток окна, в котором создана очередь (для Post из таймеров и фоновых задач).</summary>
     public static UiThread? Owner { get; private set; }
@@ -255,7 +256,9 @@ public sealed class TestServers : IAsyncLifetime
         using (var cert = RemoteAccess.EnsureCertificate(profile.Id, AgentsDir)) fingerprint = RemoteAccess.Fingerprint(cert);
         var agent = await AgentLauncher.EnsureRunningAsync(profile, startServer: false, AgentExe, AgentsDir);
         _agents.Add(agent);
-        var until = DateTime.Now.AddSeconds(15);
+        // агент перечитывает удалённый доступ раз в 5 с; под нагрузкой (наборы тестов параллельно) запуск агента и выпуск
+        // сертификата занимали больше 15 с — запас с потолком, в обычном прогоне ожидание столько же короткое
+        var until = DateTime.Now.AddSeconds(60);
         while ((await agent.StatusAsync()).RemotePort != remote.Port)
         {
             if (DateTime.Now > until) throw new TimeoutException(name);

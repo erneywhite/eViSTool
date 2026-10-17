@@ -270,6 +270,15 @@ public sealed class AgentCliTests : IAsyncLifetime
 
         // агент подхватывает файл сам (раз в 5 секунд) — команда дожидается и говорит итог
         var r = await Cli("remote", "enable", "--host", "127.0.0.1");
+        // свободный порт выбран, но пока агент до него добрался, его занял агент соседнего набора тестов (они идут
+        // параллельно) — у человека такой гонки нет. Другой порт — и ещё раз
+        for (var attempt = 0; r.Code != 0 && r.Out.Contains("address already in use", StringComparison.Ordinal) && attempt < 3; attempt++)
+        {
+            await Cli("remote", "disable");
+            // порт запомнен в настройках — сбросить, чтобы включение выбрало другой
+            RemoteAccess.Save(Profile, RemoteAccess.Load(Profile, AgentsDir) with { Port = 0 }, AgentsDir);
+            r = await Cli("remote", "enable", "--host", "127.0.0.1");
+        }
         Assert.True(r.Code == 0, r.Out + r.Err);
         var port = RemoteAccess.Load(Profile, AgentsDir).Port;
         Assert.Contains($"The agent accepts connections on port {port}", r.Out);
