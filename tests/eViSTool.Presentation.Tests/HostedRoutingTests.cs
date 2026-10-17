@@ -151,13 +151,14 @@ public sealed class HostedRoutingTests : IDisposable
     // ---- «Настройки модов»
 
     [Fact]
-    public void ModConfig_HostedProfile_HasNoSourceAndSaysSo() => Sta.Run(() =>
+    public void ModConfig_HostedProfile_GoesToTheServer_NotToTheLocalDisk() => Sta.Run(() =>
     {
         var model = new ModConfigViewModel(MainWith(Vm(HostedProfile())));
 
         Sta.Wait(model.LoadAsync());
 
-        Assert.Equal(Loc.T("mcfg.hostedUnavailable"), model.Notice);
+        // источник — FTP сервера (транспорта FTP в тестах окна нет), а не папка данных игры этого компьютера
+        Assert.Equal(Loc.T("mcfg.hostedFailed", Loc.T("hosted.errNoTransport")), model.Notice);
         Assert.Empty(model.Rows);
         Assert.False(model.CanShowFile); // локальной папки конфигов нет: «Показать файл» ничего не откроет
     });

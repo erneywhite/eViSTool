@@ -6,6 +6,7 @@ using System.Net.Http;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Game;
+using eViSTool.Core.Hosting;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Mods;
 using eViSTool.Core.Profiles;
@@ -22,16 +23,22 @@ public sealed class ModConfigRow(ModConfigEntry file)
 
 /// <summary>
 /// Вкладка «Настройки модов»: конфиги из ModConfig активного профиля — список слева, файл справа (форма или текст).
-/// Файлы — через источник (<see cref="IModConfigSource"/>): свои — с диска, сервер на другой машине — через его агента.
-/// Сохранение проверяет JSON и откладывает прежнюю версию (там же, где файл); «Вернуть предыдущую версию» — шаг назад;
-/// «Сбросить к стандартным» — убрать файл, мод создаст его заново. Если файл поменяли с момента открытия (другое окно,
-/// сам мод) — перед записью спрашиваем.
+/// Файлы — через источник (<see cref="IModConfigSource"/>): свои — с диска, сервер на другой машине — через его агента,
+/// сервер у хостера — по FTP (<see cref="HostedModConfigSource"/>).
+/// Сохранение проверяет JSON и откладывает прежнюю версию (там же, где файл; у хостера — на этой машине); «Вернуть
+/// предыдущую версию» — шаг назад; «Сбросить к стандартным» — убрать файл, мод создаст его заново. Если файл поменяли с
+/// момента открытия (другое окно, сам мод) — перед записью спрашиваем. У хостера перед каждым изменением — тот же вопрос
+/// «останови сервер в панели хостера», что и перед изменением модов: запущенный сервер при остановке перезапишет свои
+/// конфиги.
 /// </summary>
 public sealed partial class ModConfigViewModel : ObservableObject
 {
     private readonly MainViewModel _main;
     private GameProfile? _profile;
     private IModConfigSource? _source;
+
+    /// <summary>Сервер у хостера, чьи настройки открыты (null — свой профиль или удалённый).</summary>
+    private ModTarget? _hosted;
     private string _loadedText = "";
     private DateTime? _loadedChangedUtc;
     private bool _switching;
@@ -160,7 +167,9 @@ public sealed partial class ModConfigViewModel : ObservableObject
     public string Subtitle => Loc.T("mcfg.subtitle", _profile?.Name ?? _main.ActiveProfile?.Name ?? "");
     public bool IsDirty => Selected is not null && Text != _loadedText;
     public string Heading => Selected?.Title ?? "";
-    public string PathText => Selected is null ? "" : Path.Combine(ModConfigs.FolderName, Selected.File.RelativePath);
+    public string PathText => Selected is null ? ""
+        : _source is HostedModConfigSource { Folder: { } folder } ? RemotePath.Combine(folder, Selected.File.RelativePath) // путь на сервере
+        : Path.Combine(ModConfigs.FolderName, Selected.File.RelativePath);
     public string RestoreText => Versions > 0 ? Loc.T("mcfg.restoreN", Versions) : Loc.T("mcfg.restore");
 
     /// <summary>«Показать файл» — только для файлов на этой машине.</summary>
@@ -216,7 +225,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
         {
             if (row != Selected) return;
             Apply(null);
-            Status = Loc.T("mcfg.readFailed", ex.Message);
+            Status = Loc.T("mcfg.readFailed", Describe(ex));
         }
     }
 
@@ -233,9 +242,13 @@ public sealed partial class ModConfigViewModel : ObservableObject
         ChooseView();
     }
 
+    // отмена у FTP — OperationCanceledException (очередь соединения), у агента — TaskCanceledException
     private static bool IsExpected(Exception ex) =>
         ex is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException
-            or HttpRequestException or TaskCanceledException;
+            or HttpRequestException or OperationCanceledException;
+
+    /// <summary>Ошибка словами: у хостера — как у модов (нет связи, неверный пароль…), у остальных — текст исключения.</summary>
+    private string Describe(Exception ex) => _hosted is { } target ? ModTargets.Describe(target, ex) : ex.Message;
 
     private string? _focusModId;
 
@@ -256,15 +269,23 @@ public sealed partial class ModConfigViewModel : ObservableObject
         var profile = _profile;
         if (profile.IsHosted)
         {
-            // shortcut: конфиги модов сервера у хостера пока не правятся; источник по FTP — в следующих пакетах
-            _source = null;
-            OnPropertyChanged(nameof(CanShowFile));
-            Clear(Loc.T("mcfg.hostedUnavailable"));
-            return;
+            // по FTP; подключение не задано или пароль не прочитать на этом компьютере — сказать, что делать
+            _hosted = ModTarget.For(profile);
+            _source = _hosted is not null ? new HostedModConfigSource(_hosted) : null;
+            if (_source is null)
+            {
+                OnPropertyChanged(nameof(CanShowFile));
+                Clear(ModTarget.UnreadableText(profile));
+                return;
+            }
         }
-        _source = ModTarget.For(profile) is { Remote: { } code }
-            ? new RemoteModConfigSource(code)
-            : new LocalModConfigSource(ModConfigService.ForProfile(profile));
+        else
+        {
+            _hosted = null;
+            _source = ModTarget.For(profile) is { Remote: { } code }
+                ? new RemoteModConfigSource(code)
+                : new LocalModConfigSource(ModConfigService.ForProfile(profile));
+        }
         OnPropertyChanged(nameof(CanShowFile));
         var source = _source;
         var keep = Selected?.File.RelativePath;
@@ -290,17 +311,33 @@ public sealed partial class ModConfigViewModel : ObservableObject
                 _switching = false;
             }
             Selected = pick; // тот же файл перечитывается: его могли поменять в другом окне
-            Notice = Rows.Count > 0 ? ""
-                : source.LocalFolder is { } dir && !Directory.Exists(dir) ? Loc.T("mcfg.noFolder") : Loc.T("mcfg.empty");
+            var noFolder = source.LocalFolder is { } dir ? !Directory.Exists(dir) : source is HostedModConfigSource { FolderExists: false };
+            Notice = Rows.Count > 0 ? "" : noFolder ? Loc.T("mcfg.noFolder") : Loc.T("mcfg.empty");
+            if (source is HostedModConfigSource hosted) AfterHostedList(hosted, files);
         }
         catch (Exception ex) when (IsExpected(ex))
         {
-            if (profile == _profile) Clear(Loc.T(profile.IsRemote ? "mcfg.remoteFailed" : "mcfg.readFailed", ex.Message));
+            if (profile != _profile) return;
+            Clear(profile.IsHosted ? Loc.T("mcfg.hostedFailed", Describe(ex))
+                : profile.IsRemote ? Loc.T("mcfg.remoteFailed", ex.Message)
+                : Loc.T("mcfg.readFailed", ex.Message));
         }
         finally
         {
             IsLoading = false;
         }
+    }
+
+    /// <summary>
+    /// Список с сервера у хостера прочитан: ссылка «Настройки мода» в карточках «Моих модов» — по нему же (без запроса),
+    /// а если чтение вернуло на место файл, запись которого сорвалась, — сказать об этом.
+    /// </summary>
+    private void AfterHostedList(HostedModConfigSource source, IReadOnlyList<ModConfigEntry> files)
+    {
+        if (_main.Mods is { } mods && _main.ActiveProfile?.Model == _profile)
+            mods.ShowConfigCounts(files.Where(f => f.ModId is not null).GroupBy(f => f.ModId!, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase));
+        if (source.Warnings.Count > 0) Ui.Warn(string.Join("\n\n", source.Warnings));
     }
 
     private void Clear(string notice)
@@ -320,6 +357,8 @@ public sealed partial class ModConfigViewModel : ObservableObject
         switch (Ui.Ask(Loc.T("mcfg.askSave", row.File.FileName), AskButtons.YesNoCancel))
         {
             case Answer.Yes:
+                // у хостера сначала «останови сервер»: «Нет» — ничего не пишем и остаёмся с правками
+                if (!ConfirmHostedStop()) return false;
                 // уйти можно только после записи: ждём её на месте, но не дольше 15 секунд (агент недоступен —
                 // ошибка, а не зависшее окно). Ошибку показываем здесь же: из фоновой задачи нельзя обратиться к окну,
                 // пока оно само её ждёт, — это была бы взаимная блокировка
@@ -332,7 +371,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
                 }
                 catch (Exception ex) when (IsExpected(ex))
                 {
-                    Ui.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, ex.Message));
+                    Ui.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, Describe(ex)));
                     return false;
                 }
             case Answer.No:
@@ -348,12 +387,22 @@ public sealed partial class ModConfigViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSave))]
     private Task Save() => Selected is { } row ? SaveAsync(row, Text, _loadedChangedUtc) : Task.CompletedTask;
 
-    /// <summary>Игра или сервер профиля запущены: изменение подхватится после перезапуска, а иные моды при выходе перезаписывают конфиг.</summary>
+    /// <summary>
+    /// Игра или сервер профиля запущены: изменение подхватится после перезапуска, а иные моды при выходе перезаписывают
+    /// конфиг. У хостера по процессам не узнать (их на этой машине нет) — там спрашивает <see cref="ConfirmHostedStop"/>.
+    /// </summary>
     private bool IsRunning() =>
-        _profile is { } p && (p.IsRemote ? _main.ActiveProfile?.Model == p && _main.Server.IsServerUp : GameProcess.IsRunning(p));
+        _profile is { IsHosted: false } p && (p.IsRemote ? _main.ActiveProfile?.Model == p && _main.Server.IsServerUp : GameProcess.IsRunning(p));
+
+    /// <summary>
+    /// Сервер у хостера: перед записью, откатом и сбросом — «останови сервер в панели хостера» (запущенный при остановке
+    /// перезапишет свои конфиги). Вопрос и память ответа — общие с «Моими модами». Не хостер — true.
+    /// </summary>
+    private bool ConfirmHostedStop() => _hosted is not { } target || _main.Mods.ConfirmIfRunning(target);
 
     private async Task SaveAsync(ModConfigRow row, string text, DateTime? stamp)
     {
+        if (!ConfirmHostedStop()) return;
         if (IsRunning()
             && !Ui.Confirm(Loc.T(_profile!.Kind == ProfileKind.Server ? "mcfg.serverRunning" : "mcfg.gameRunning")))
             return;
@@ -384,7 +433,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
         }
         catch (Exception ex) when (interactive && IsExpected(ex))
         {
-            Ui.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, ex.Message));
+            Ui.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, Describe(ex)));
             return null;
         }
     }
@@ -412,6 +461,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
     {
         if (Selected is not { } row || _source is not { } source) return;
         if (IsDirty && !Ui.Confirm(Loc.T("mcfg.askDiscard"))) return;
+        if (!ConfirmHostedStop()) return;
         try
         {
             var content = await source.UndoAsync(row.File.RelativePath);
@@ -421,7 +471,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
         }
         catch (Exception ex) when (IsExpected(ex))
         {
-            Ui.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, ex.Message));
+            Ui.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, Describe(ex)));
         }
     }
 
@@ -430,6 +480,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
     {
         if (Selected is not { } row || _source is not { } source) return;
         if (!Ui.Confirm(Loc.T("mcfg.askReset", row.File.FileName))) return;
+        if (!ConfirmHostedStop()) return;
         try
         {
             var content = await source.ResetAsync(row.File.RelativePath);
@@ -439,7 +490,7 @@ public sealed partial class ModConfigViewModel : ObservableObject
         }
         catch (Exception ex) when (IsExpected(ex))
         {
-            Ui.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, ex.Message));
+            Ui.Warn(Loc.T("mcfg.saveFailed", row.File.FileName, Describe(ex)));
         }
     }
 

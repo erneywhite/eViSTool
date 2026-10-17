@@ -193,8 +193,18 @@ internal sealed class HostedModSource : IModSource
         && !_owner.ToggleEnabledCommand.IsRunning && !_owner.DeleteCommand.IsRunning
         && !_owner.RollbackSessionCommand.IsRunning && !_owner.RevertChangeCommand.IsRunning;
 
-    // у сервера у хостера нет папки ModConfig, доступной окну: ссылки «Настройки мода» в карточке нет
-    public Dictionary<string, int> ConfigCounts(IReadOnlyList<LocalMod> mods) => new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>
+    /// Файлы настроек по модам — из списка, который «Настройки модов» уже прочитали с этого сервера: ради ссылки в
+    /// карточке на сервер не ходим. Раздел в этом окне ещё не открывали — ссылки нет.
+    /// </summary>
+    public Dictionary<string, int> ConfigCounts(IReadOnlyList<LocalMod> mods)
+    {
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        if (_resolved?.Profile is not { } profile || HostedModConfigSource.LastListed(profile.Id) is not { } files) return counts;
+        foreach (var modId in files.Select(f => ModConfigs.MatchMod(f, mods)?.ModId).OfType<string>())
+            counts[modId] = counts.GetValueOrDefault(modId) + 1;
+        return counts;
+    }
 
     /// <summary>
     /// Мод только для чтения: мод самого хостера (папка gportal_mods) или распакованная папка — по FTP их можно

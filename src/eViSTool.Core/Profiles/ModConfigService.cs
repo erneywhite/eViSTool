@@ -34,7 +34,8 @@ public sealed class ModConfigService(string dataDir, ModConfigBackups backups, F
 {
     public static ModConfigService ForProfile(GameProfile profile)
     {
-        // у сервера у хостера папки на этом диске нет: пустой DataDir привёл бы к данным игры этого компьютера
+        // у сервера у хостера папки на этом диске нет: пустой DataDir привёл бы к данным игры этого компьютера.
+        // Его настройки — по FTP, источником Hosting.HostedModConfigSource
         if (profile.IsHosted) throw new InvalidOperationException(Loc.T("mcfg.hostedUnavailable"));
         var data = string.IsNullOrWhiteSpace(profile.DataDir) ? Game.GameInstall.DefaultDataDir : profile.DataDir;
         return new ModConfigService(data, ModConfigBackups.ForProfile(profile),
@@ -98,10 +99,13 @@ public sealed class ModConfigService(string dataDir, ModConfigBackups backups, F
     }
 }
 
-/// <summary>Откуда вкладка «Настройки модов» берёт конфиги: файлы этой машины или агент сервера на другой.</summary>
+/// <summary>
+/// Откуда вкладка «Настройки модов» берёт конфиги: файлы этой машины, агент сервера на другой или FTP сервера у хостера
+/// (<see cref="Hosting.HostedModConfigSource"/>).
+/// </summary>
 public interface IModConfigSource
 {
-    /// <summary>Путь на этой машине (кнопка «Показать файл»); у удалённого сервера — null.</summary>
+    /// <summary>Путь на этой машине (кнопка «Показать файл»); у удалённого сервера и сервера у хостера — null.</summary>
     string? LocalPath(string relativePath);
     string? LocalFolder { get; }
     Task<IReadOnlyList<ModConfigEntry>> ListAsync(CancellationToken ct = default);
