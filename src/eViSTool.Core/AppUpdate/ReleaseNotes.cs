@@ -17,6 +17,22 @@ public sealed partial record ReleaseNotes(string? Summary, IReadOnlyList<Release
     /// <summary>Есть ли в тексте релиза пометка «&lt;!-- evistool: recommended --&gt;» (в любой части, любым регистром).</summary>
     public static bool IsRecommended(string? body) => body is not null && RecommendedMark().IsMatch(body);
 
+    /// <summary>
+    /// Текст релиза из ленты GitHub (releases.atom) — там он уже в HTML — обратно в тот вид, что разбирает
+    /// <see cref="Parse"/>: абзацы строками, «&lt;strong&gt;» — «**…**», пункты — «- …», «&lt;hr&gt;» — «---». Лента —
+    /// запасной путь, когда API GitHub упёрся в лимит; без этого окно показывало бы только ссылку на страницу релиза.
+    /// </summary>
+    public static string FromHtml(string? html)
+    {
+        if (string.IsNullOrWhiteSpace(html)) return "";
+        var text = HrTag().Replace(html, "\n---\n");
+        text = LiOpen().Replace(text, "\n- ");
+        text = StrongTag().Replace(text, "**");
+        text = BreakTag().Replace(text, "\n");
+        text = AnyTag().Replace(text, "");
+        return System.Net.WebUtility.HtmlDecode(text);
+    }
+
     /// <param name="russian">Взять русскую часть (вторую после «---»), если она есть; иначе — английскую.</param>
     public static ReleaseNotes Parse(string? body, bool russian)
     {
@@ -77,4 +93,19 @@ public sealed partial record ReleaseNotes(string? Summary, IReadOnlyList<Release
 
     [GeneratedRegex(@"<!--\s*evistool\s*:\s*recommended\s*-->", RegexOptions.IgnoreCase)]
     private static partial Regex RecommendedMark();
+
+    [GeneratedRegex(@"<hr\s*/?>", RegexOptions.IgnoreCase)]
+    private static partial Regex HrTag();
+
+    [GeneratedRegex(@"<li\b[^>]*>", RegexOptions.IgnoreCase)]
+    private static partial Regex LiOpen();
+
+    [GeneratedRegex(@"</?(strong|b)\b[^>]*>", RegexOptions.IgnoreCase)]
+    private static partial Regex StrongTag();
+
+    [GeneratedRegex(@"<br\s*/?>|</p>|</li>|</ul>|<ul\b[^>]*>|<p\b[^>]*>", RegexOptions.IgnoreCase)]
+    private static partial Regex BreakTag();
+
+    [GeneratedRegex(@"<[^>]+>")]
+    private static partial Regex AnyTag();
 }

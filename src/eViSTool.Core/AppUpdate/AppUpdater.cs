@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO.Compression;
 using System.Net;
 using System.Xml.Linq;
@@ -152,6 +153,10 @@ public sealed class AppUpdater
                 Tag = tag,
                 Prerelease = version.IsPrerelease,
                 PageUrl = page,
+                // текст и дата в ленте тоже есть: текст — HTML, его возвращаем к виду, который разбирает окно
+                Notes = ReleaseNotes.FromHtml(entry.Element(atom + "content")?.Value),
+                Published = DateTimeOffset.TryParse(entry.Element(atom + "updated")?.Value, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal, out var updated) ? updated : null,
                 AssetName = asset,
                 AssetUrl = url,
                 ChecksumUrl = url + ".sha256",

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xml:lang="en-US">
+  <id>tag:github.com,2008:https://github.com/erneywhite/eViSTool/releases</id>
+  <link type="text/html" rel="alternate" href="https://github.com/erneywhite/eViSTool/releases"/>
+  <link type="application/atom+xml" rel="self" href="https://github.com/erneywhite/eViSTool/releases.atom"/>
+  <title>Release notes from eViSTool</title>
+  <updated>2026-10-17T17:35:46Z</updated>
+  <entry>
+    <id>tag:github.com,2008:Repository/1396404535/v0.12.1</id>
+    <updated>2026-10-17T17:46:11Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/erneywhite/eViSTool/releases/tag/v0.12.1"/>
+    <title>eViSTool 0.12.1</title>
+    <content type="html">&lt;p&gt;&lt;strong&gt;eViSTool 0.12.1: statistics show how much memory and how many cores the server has.&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;New&lt;/strong&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Server → Statistics: under the memory and CPU tiles, how much the server&#39;s machine has (&quot;of 64 GB&quot;, &quot;of 8 cores&quot;). In a container or a systemd unit with a memory limit, the limit is shown. If the memory peak reaches 90% of it, the line turns yellow: the server is short of memory.&lt;/li&gt;
+&lt;li&gt;On the memory chart a dashed line shows the limit, but only when the peak gets close to it (75%); otherwise the chart looks as before.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;Fixes&lt;/strong&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Hosted server: the game version is remembered in the profile, so it shows right after the window starts, without opening My mods first.&lt;/li&gt;
+&lt;li&gt;Statistics: the memory value fits into its tile (&quot;21.9 / 28.5 GB&quot;), and the lines under the tiles wrap instead of being cut off.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Update from About; then update the agent on the server computer with Update on the server, so it starts sending the machine&#39;s memory and cores.&lt;/p&gt;
+&lt;p&gt;On ModDB: &lt;a href=&quot;https://mods.vintagestory.at/evistoolwin&quot; rel=&quot;nofollow&quot;&gt;eViSTool — Windows&lt;/a&gt; and &lt;a href=&quot;https://mods.vintagestory.at/evistoollinux&quot; rel=&quot;nofollow&quot;&gt;eViSTool — Linux&lt;/a&gt;.&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;Статистика показывает, сколько у сервера памяти и ядер.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Новое&lt;/strong&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;«Сервер» → «Статистика»: под плитками памяти и процессора видно, сколько есть у машины с сервером («из 64 ГБ», «из 8 ядер»). Если сервер в контейнере или в юните systemd с пределом памяти, показывается предел. Когда пик памяти доходит до 90 % от него, строка становится жёлтой: серверу тесно.&lt;/li&gt;
+&lt;li&gt;На графике памяти пунктиром показан предел, но только когда пик к нему подобрался (75 %), иначе график как раньше.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;Исправления&lt;/strong&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Сервер у хостера: версия игры запоминается в профиле и видна сразу после запуска окна, без захода в «Мои моды».&lt;/li&gt;
+&lt;li&gt;Статистика: значение памяти влезает в плитку («21,9 / 28,5 ГБ»), а строки под плитками переносятся, а не обрезаются.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Обнови из «О программе», потом обнови агента на компьютере с сервером кнопкой «Обновить на сервере», чтобы он начал присылать память и ядра машины.&lt;/p&gt;</content>
+    <author>
+      <name>github-actions[bot]</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/in/15368?s=60&amp;v=4"/>
+  </entry>
+</feed>
