@@ -68,9 +68,9 @@ public sealed partial class HostedServerViewModel : ObservableObject
     private readonly HashSet<string> _seenCrashes = new(StringComparer.Ordinal);
     private HostedModUpdates? _updates;        // проверки обновлений, заданные тестом (иначе — общие окна)
     private HostedModUpdates? _updatesWatched; // на чьи перемены подписаны
-    private Func<ModTarget, IReadOnlyList<UpdateQueueItem>, Task<bool>>? _runUpdates;
+    private Func<ModTarget, IReadOnlyList<UpdateQueueItem>, Task<IReadOnlyList<UpdateQueueItem>>>? _runUpdates;
     private DateTime? _updatesTried;           // последняя попытка проверить обновления (UTC): не удалась — не раньше чем через UpdatesRetry
-    private List<UpdateQueueItem>? _updating;  // пункты «Обновить всё», которые сейчас ставятся
+    private List<UpdateQueueItem>? _updating;  // пункты очереди, которые сейчас ставят «Обновить всё»
 
     /// <param name="main">Главная модель: окно вылета выключает мод через неё.</param>
     public HostedServerViewModel(MainViewModel main)
@@ -555,8 +555,11 @@ public sealed partial class HostedServerViewModel : ObservableObject
         new UpdateQueueItem(target, r.Local.Info!.ModId, ModUpdatesDue.Name(r), r.Local.Info.Version ?? "", r.LatestCompatible!.ModVersion ?? "?",
             r.LatestCompatible, null);
 
-    /// <summary>«Обновить всё» очередью «Моих модов»; false — не начали (отказались, вкладка занята другим).</summary>
-    internal Func<ModTarget, IReadOnlyList<UpdateQueueItem>, Task<bool>>? RunUpdates
+    /// <summary>
+    /// «Обновить всё» очередью «Моих модов»: пункты очереди, которые ставят эти обновления (мод, уже стоявший в очереди,
+    /// — тем пунктом); пусто — не начали (отказались, вкладка занята другим).
+    /// </summary>
+    internal Func<ModTarget, IReadOnlyList<UpdateQueueItem>, Task<IReadOnlyList<UpdateQueueItem>>>? RunUpdates
     {
         get => _runUpdates ?? (_main is { } main ? (target, items) => main.Mods.UpdateAllAsync(target, items) : null);
         set => _runUpdates = value;
@@ -655,12 +658,28 @@ public sealed partial class HostedServerViewModel : ObservableObject
         var items = found.Due.Select(r => QueueItem(target, r)).ToList();
         UpdatesNote = "";
         IsUpdating = true;
+        Track(items);
+        var queued = await run(target, items);
+        if (!ReferenceEquals(_updating, items)) return; // пока спрашивали, профиль сменили — плашку уже сбросили
+        if (queued.Count == 0)
+        {
+            FinishUpdates(items, report: false); // отказались или вкладка занята — ничего не начато
+            return;
+        }
+        // мод, который уже ждал или ставился в очереди «Моих модов», второй раз не встаёт: следим за тем пунктом,
+        // иначе свой ждал бы вечно и плашка не кончилась бы никогда
+        var tracked = queued.ToList();
+        Track(tracked);
+        if (tracked.All(IsFinal)) FinishUpdates(tracked, report: true);
+    }
+
+    /// <summary>Следить за ходом этих пунктов (прежние — отпустить).</summary>
+    private void Track(List<UpdateQueueItem> items)
+    {
+        if (_updating is { } old) foreach (var item in old) item.PropertyChanged -= OnUpdateItemChanged;
         _updating = items;
         foreach (var item in items) item.PropertyChanged += OnUpdateItemChanged;
         ShowUpdateProgress();
-        var started = await run(target, items);
-        if (!started) FinishUpdates(items, report: false); // отказались или вкладка занята — ничего не начато
-        else if (items.All(IsFinal)) FinishUpdates(items, report: true);
     }
 
     private static bool IsFinal(UpdateQueueItem item) => item.State is QueueState.Done or QueueState.Failed or QueueState.Cancelled;

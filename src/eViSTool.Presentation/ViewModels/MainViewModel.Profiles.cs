@@ -158,8 +158,8 @@ public sealed partial class MainViewModel
         Profiles.Remove(profile);
         if (ActiveProfile == profile) ActiveProfile = Profiles[0];
         if (EditedProfile == profile) EditedProfile = ActiveProfile;
-        ProfileActions.AfterRemoved(model); // соединение и кэш хостового профиля — когда окно уже ушло с него
-        if (model.IsHosted) HostedWatch?.Refresh(); // и сторож оповещений его отпускает, не дожидаясь своего прохода
+        if (model.IsHosted) HostedWatch?.Refresh(); // сторож оповещений его отпускает сразу (и замок), не дожидаясь прохода
+        ProfileActions.AfterRemoved(model); // соединение, кэш и оповещения хостового профиля — когда окно уже ушло с него
         foreach (var p in _settings.Profiles) p.LinkedProfiles.RemoveAll(id => id == model.Id); // связи с удалённым — не нужны
         RefreshLinks();
         Save();

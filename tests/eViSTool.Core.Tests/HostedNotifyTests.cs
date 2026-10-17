@@ -77,6 +77,25 @@ public sealed class HostedNotifyTests : IDisposable
         Assert.Equal(["alpha: 2.0.0 → 2.1.0", "Zeta: 1.0.0 → 1.1.0"], due.Select(ModUpdatesDue.Line));
     }
 
+    [Fact]
+    public void Due_AtTheHoster_LeavesOutReadOnlyMods_AsUpdateAllInMyModsDoes()
+    {
+        static ModCheckResult At(string path, string modId) => Result(modId, modId, "1.0.0", ModStatus.UpdateAvailable, "1.1.0") with
+        {
+            Local = new LocalMod(path, new ModInfo { ModId = modId, OriginalModId = modId, Name = modId, Version = "1.0.0" }, null),
+        };
+        ModCheckResult[] results =
+        [
+            At("/Mods/alpha.zip", "alpha"),
+            At("/gportal_mods/hostermod.zip", "hostermod"), // мод хостера — по FTP только смотреть
+            At("/Mods/unpacked", "unpacked"),               // распакованная папка — тоже
+        ];
+
+        Assert.Equal(["alpha"], ModUpdatesDue.Of(results, hosted: true).Select(r => r.Local.Info!.ModId));
+        // у своего сервера папку с модом обновить можно — фильтр только у хостера
+        Assert.Equal(["alpha", "hostermod", "unpacked"], ModUpdatesDue.Of(results).Select(r => r.Local.Info!.ModId));
+    }
+
     // ---------- отправка, которую ждёт окно
 
     [Fact]

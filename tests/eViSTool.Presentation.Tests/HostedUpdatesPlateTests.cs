@@ -28,7 +28,10 @@ public sealed class HostedUpdatesPlateTests : IDisposable
     public void Dispose()
     {
         _host.Dispose();
-        try { File.Delete(ServerNotifySettings.FileFor(_host.Profile.Id)); } catch (IOException) { }
+        // главная модель сторожит профиль в папке агентов этой машины (данные рядом с тестами): её файлы — за собой
+        foreach (var file in new[] { ServerNotifySettings.FileFor(_host.Profile.Id), HostedNotifyState.FileFor(_host.Profile.Id),
+                     HostedWatchLease.FileFor(_host.Profile.Id) })
+            try { File.Delete(file); } catch (IOException) { }
     }
 
     private static readonly string[] FatalLines =
@@ -201,6 +204,50 @@ public sealed class HostedUpdatesPlateTests : IDisposable
     });
 
     [Fact]
+    public void UpdateAll_ModAlreadyInTheQueue_ThePlateFollowsThatItem_AndFinishes() => Sta.Run(() =>
+    {
+        PutLog(HostedLogSamples.Stopped);
+        _host.PutMod("/Mods/alpha_1.0.0.zip", "alpha", "1.0.0");
+        var language = Loc.Instance.Language;
+        var main = new MainViewModel { AutoCheckUpdates = false };
+        Loc.Instance.SetLanguage(language);
+        try
+        {
+            main.Profiles.Clear();
+            var hosted = new ProfileViewModel(_host.Profile, _ => { });
+            main.Profiles.Add(hosted);
+            main.ActiveProfile = hosted;
+            var plate = main.Server.Hosted;
+            _due = [Update("alpha", "1.0.0", "1.1.0")];
+            plate.Updates = Updates();
+            var zip = _host.Zip("alpha_1.1.0.zip", "alpha", "1.1.0");
+            plate.QueueItem = (target, r) => new UpdateQueueItem(target, r.Local.Info!.ModId, r.Local.Info.Name, r.Local.Info.Version ?? "",
+                r.LatestCompatible!.ModVersion ?? "", null, zip);
+
+            main.SelectedTab = AppTab.Server;
+            Sta.WaitFor(() => plate.ShowUpdates);
+            main.SelectedTab = AppTab.Mods;
+            Sta.WaitFor(() => !main.Mods.IsBusy);
+            // то же обновление alpha уже ждёт в очереди «Моих модов» (поставили там) — второй раз оно туда не встанет
+            var queued = new UpdateQueueItem(_host.Target, "alpha", "alpha", "1.0.0", "1.1.0", null, zip);
+            main.Mods.Queue.Add(queued);
+            using var dialogs = new ScriptedDialogs(Answer.Yes);
+
+            Sta.Wait(plate.UpdateAllCommand.ExecuteAsync(null));
+            Sta.WaitFor(() => !plate.IsUpdating && !main.Mods.IsQueueRunning);
+
+            Assert.Equal(QueueState.Done, queued.State);
+            Assert.True(_host.Server.Has("/Mods/alpha_1.1.0.zip"));
+            Assert.Equal(ModsViewModel.WithStartHint(Loc.T("queue.finished", 1, 0), true), plate.UpdatesNote);
+            Assert.False(plate.ShowUpdates);
+        }
+        finally
+        {
+            main.HostedWatch.Stop();
+        }
+    });
+
+    [Fact]
     public void UpdateAll_Declined_ChangesNothing() => Sta.Run(() =>
     {
         PutLog(HostedLogSamples.Stopped);
@@ -212,7 +259,7 @@ public sealed class HostedUpdatesPlateTests : IDisposable
             RunUpdates = (_, _) =>
             {
                 started++;
-                return Task.FromResult(false); // «Нет» на вопрос
+                return Task.FromResult<IReadOnlyList<UpdateQueueItem>>([]); // «Нет» на вопрос
             },
         };
         vm.OnProfileSwitched(_host.Profile);

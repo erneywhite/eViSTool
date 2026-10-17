@@ -300,6 +300,32 @@ public sealed class HostedModsTests : IDisposable
     }
 
     [Fact]
+    public async Task Peek_LeavesAnInterruptedInstall_AndItsWarning_ToTheNextScan()
+    {
+        // фоновая проверка обновлений застала прерванную установку: доводить её — дело скана «Моих модов», который
+        // об этом и скажет; фоновой проверке сказать некому, и писать на сервер без спроса она не должна
+        _host.PutMod("/Mods/alpha_1.0.0.zip", "alpha", "1.0.0");
+        var copyDir = Directory.CreateDirectory(Path.Combine(HostedJournal.DirFor(_host.Profile.Id), "old", "t1")).FullName;
+        var copy = Path.Combine(copyDir, "alpha_1.0.0.zip");
+        File.Copy(Path.Combine(_host.Server.Root, "Mods", "alpha_1.0.0.zip"), copy);
+        File.Delete(Path.Combine(_host.Server.Root, "Mods", "alpha_1.0.0.zip"));
+        _host.Server.Put("/Mods/alpha_1.1.0.zip.evistool.tmp", [1, 2, 3]);
+        HostedJournal.Write(_host.Profile.Id, new HostedPending("/Mods/alpha_1.1.0.zip.evistool.tmp", "/Mods/alpha_1.1.0.zip", 999,
+            [new HostedPendingOld("/Mods/alpha_1.0.0.zip", copy, new FileInfo(copy).Length)], "alpha", "alpha", "1.0.0", "1.1.0"));
+
+        var (peeked, _) = await new HostedMods(_host.Target).PeekAsync(default);
+
+        Assert.Empty(_host.Server.Writes);
+        Assert.NotNull(HostedJournal.Read(_host.Profile.Id));
+        Assert.DoesNotContain(peeked.Warnings, w => HostedTestText.Of("hosted.rolledBack").Select(t => t.Replace("{0}", "alpha")).Contains(w));
+        Assert.Null(HostedMods.LastScan(_host.Target)); // недоделанный набор — не «последний скан» для вылетов и настроек
+
+        var (profile, mods) = await ScanAsync();
+        Assert.Contains(profile.Warnings, w => HostedTestText.Of("hosted.rolledBack").Select(t => t.Replace("{0}", "alpha")).Contains(w));
+        Assert.Equal("1.0.0", mods.Single(m => m.Info?.ModId == "alpha").Info!.Version);
+    }
+
+    [Fact]
     public async Task Install_IntoTheHostersFolder_IsRefused()
     {
         _host.PutMod("/gportal_mods/hosterzip.zip", "hosterzip", "1.0.0");

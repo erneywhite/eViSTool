@@ -92,6 +92,30 @@ public sealed class HostedLogsWatchTests : IDisposable
     }
 
     [Fact]
+    public async Task LeavingWhileTheServerStops_IsNotAMove_AsWithTheAgent()
+    {
+        var local = PutLog(Main, HostedLogSamples.Running); // игрок на сервере
+        var logs = Logs();
+        var polls = new List<HostedLogPoll>();
+        await logs.WatchAsync(polls.Add, _ => { }, default);
+        await logs.RefreshAsync(default);
+
+        // остановили из панели, пока игрок был на сервере: его «вышел» сервер пишет уже во время остановки
+        Append(local,
+        [
+            "17.10.2026 13:31:53 [Notification] Server termination event SIGTERM received. Shutting down server",
+            "17.10.2026 13:31:54 [Event] Player Erney left.",
+            "17.10.2026 13:31:54 [Event] Client 3 disconnected.",
+            "17.10.2026 13:31:58 [Event] Stopped the server!",
+        ]);
+        await logs.RefreshAsync(default);
+
+        Assert.Equal(HostedServerState.Stopped, polls[1].State);
+        Assert.Empty(polls[1].Moves);
+        Assert.Empty(polls[1].Players);
+    }
+
+    [Fact]
     public async Task Restart_IsMarked_AndTheRunNameIsTheNewOne()
     {
         PutLog(Main, HostedLogSamples.Stopped);

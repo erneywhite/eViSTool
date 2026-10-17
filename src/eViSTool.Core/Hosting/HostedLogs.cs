@@ -29,6 +29,7 @@ public sealed record HostedPlayerMove(string Name, bool Joined, int Online, Date
 /// </summary>
 /// <param name="Restarted">Сервер запущен заново с прошлого опроса.</param>
 /// <param name="Run">Имя запуска, под которым он ляжет в архив; лога нет или начала не видно — null.</param>
+/// <param name="Moves">Входы и выходы, пока сервер работал: вышедшие во время остановки сюда не попадают.</param>
 /// <param name="Players">Кто на сервере после опроса.</param>
 public sealed record HostedLogPoll(HostedServerState State, bool Restarted, string? Run, IReadOnlyList<HostedLogLine> Lines,
     IReadOnlyList<HostedPlayerMove> Moves, IReadOnlyList<OnlinePlayer> Players);
@@ -385,7 +386,7 @@ public sealed class HostedLogs
     private (HostedLogUpdate Update, HostedLogPoll Poll) Apply(Fetch fetch)
     {
         var now = Time.GetUtcNow().UtcDateTime;
-        var fresh = new List<(string Line, DateTime? Time)>();
+        var fresh = new List<(string Line, DateTime? Time, bool Running)>(); // Running — сервер работал на этой строке
         bool newRun, restarted;
         HostedServerState state;
         string? run;
@@ -426,7 +427,7 @@ public sealed class HostedLogs
                 else if (fetch.FromMiddle) _partial = []; // середину пропустили: недописанная строка уже не продолжится
 
                 var lines = SplitLines(_partial, fetch.Bytes, skipFirst: fetch.FromMiddle, atStart: fetch.From == 0, out _partial);
-                foreach (var line in lines) fresh.Add((line, _marks.Add(line)));
+                foreach (var line in lines) fresh.Add((line, _marks.Add(line), _marks.State(stale: false) == HostedServerState.Running));
                 _lines.AddRange(lines);
                 if (_lines.Count > MaxLines) _lines.RemoveRange(0, _lines.Count - MaxLines);
                 if (restarted)
@@ -452,16 +453,20 @@ public sealed class HostedLogs
 
         // игроки — вне замка: подписчик Changed может читать состояние. Входы и выходы — по строкам, а не по разнице
         // составов до и после опроса: зашёл и вышел между двумя опросами — тоже вход и выход. Опустевший при остановке
-        // или перезапуске сервер — не «все вышли»
+        // или перезапуске сервер — не «все вышли»: как у агента, входы и выходы считаются, только пока сервер работает,
+        // а «вышел», записанное во время остановки, лишь меняет состав
         if (newRun) Players.Reset();
         var moves = new List<HostedPlayerMove>();
         var online = Names(Players.Players);
-        foreach (var (line, time) in fresh)
+        foreach (var (line, time, running) in fresh)
         {
             if (!Players.Process(line, time ?? default)) continue;
             var names = Names(Players.Players);
-            foreach (var name in names.Where(n => !online.Contains(n))) moves.Add(new HostedPlayerMove(name, true, names.Count, time));
-            foreach (var name in online.Where(n => !names.Contains(n))) moves.Add(new HostedPlayerMove(name, false, names.Count, time));
+            if (running)
+            {
+                foreach (var name in names.Where(n => !online.Contains(n))) moves.Add(new HostedPlayerMove(name, true, names.Count, time));
+                foreach (var name in online.Where(n => !names.Contains(n))) moves.Add(new HostedPlayerMove(name, false, names.Count, time));
+            }
             online = names;
         }
         if (IsSurelyDown(state)) Players.Reset(); // упал или остановлен — на нём никого, даже если «вышел» не дописалось

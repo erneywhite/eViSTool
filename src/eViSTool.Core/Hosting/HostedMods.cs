@@ -82,6 +82,35 @@ public sealed partial class HostedMods(ModTarget target)
             return (scan.Profile, scan.Mods);
         }, readOnly: true, ct);
 
+    /// <summary>
+    /// Скан, который ничего не меняет, — для фоновых проверок (обновления модов для оповещения и плашки «Обновить всё»):
+    /// на сервер не пишет, прерванную установку не доводит, конфиг из копии не возвращает, запуски в историю не отмечает
+    /// и «хостер переписал конфиг» не проверяет. Всё это вместе с разовыми предупреждениями достанется следующему
+    /// обычному скану (вкладка «Мои моды», любая операция с модами): тот их покажет, а фоновой проверке показывать
+    /// некому. Последний скан профиля (<see cref="LastScan"/>) тоже не подменяет.
+    /// </summary>
+    public Task<(ResolvedProfile Profile, IReadOnlyList<LocalMod> Mods)> PeekAsync(CancellationToken ct) =>
+        HostedSessions.UseAsync<(ResolvedProfile, IReadOnlyList<LocalMod>)>(Id, Hosted.Endpoint, async files =>
+        {
+            var scan = await ScanCoreAsync(files, null, ct, peek: true).ConfigureAwait(false);
+            return (scan.Profile, scan.Mods);
+        }, readOnly: true, ct);
+
+    /// <summary>
+    /// Мод только для чтения: мод самого хостера (папка gportal_mods) или распакованная папка — по FTP их можно только
+    /// показывать. Ответ — текст причины; null — менять можно.
+    /// </summary>
+    public static string? ReadOnlyReason(LocalMod mod)
+    {
+        if (HostedLayoutProbe.IsHosterDir(RemotePath.Parent(mod.Path))) return Loc.T("hosted.hosterMod");
+        // shortcut: папку-мод узнаём по отсутствию расширения архива или кода; переделать, если ядро начнёт отдавать признак папки
+        var ext = Path.GetExtension(mod.Path);
+        return ext.Equals(".zip", StringComparison.OrdinalIgnoreCase) || ext.Equals(".dll", StringComparison.OrdinalIgnoreCase)
+               || ext.Equals(".cs", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : Loc.T("hosted.folderModReadOnly");
+    }
+
     public Task SetEnabledAsync(string path, bool enabled, CancellationToken ct) =>
         HostedSessions.UseAsync(Id, Hosted.Endpoint, async files =>
         {
@@ -158,7 +187,8 @@ public sealed partial class HostedMods(ModTarget target)
 
     // ---------- скан
 
-    private async Task<Scan> ScanCoreAsync(IRemoteFiles files, IProgress<string>? progress, CancellationToken ct)
+    /// <param name="peek">Только посмотреть (<see cref="PeekAsync"/>): без починки, отметок запусков и последнего скана.</param>
+    private async Task<Scan> ScanCoreAsync(IRemoteFiles files, IProgress<string>? progress, CancellationToken ct, bool peek = false)
     {
         var warnings = new List<string>();
         var once = new List<string>(); // разовые: и в warnings, и отдельно (см. ScanModsAsync)
@@ -168,51 +198,13 @@ public sealed partial class HostedMods(ModTarget target)
             once.Add(warning);
         }
 
-        // прерванная установка (связь оборвалась между «удалить старое» и «переименовать новое») — довести или вернуть
-        if (HostedJournal.Read(Id) is { } pending)
-        {
-            try
-            {
-                var name = pending.Name ?? pending.ModId;
-                Once(await HostedJournal.FinishAsync(files, Id, pending, ct, Root).ConfigureAwait(false)
-                    ? Loc.T("hosted.recovered", name)
-                    : Loc.T("hosted.rolledBack", name));
-            }
-            catch (Exception ex) when (IsNotADrop(ex))
-            {
-                // сервер не дал довести (права, место) или подвёл диск этой машины — журнал остаётся, попробуем при
-                // следующем скане; новую установку до тех пор не начинаем (InstallCoreAsync)
-            }
-        }
-
-        // запись конфига сорвалась посередине: прежний конфиг остался только как bak — возвращаем его на место
-        if (HostedJournal.ConfigSwap(Id) is { } swapped)
-        {
-            try
-            {
-                var ls = new HostedListings(files, Root);
-                if (await ls.FileAsync(swapped, ct).ConfigureAwait(false) is null
-                    && await ls.FileAsync(swapped + BakSuffix, ct).ConfigureAwait(false) is not null)
-                {
-                    await files.RenameAsync(swapped + BakSuffix, swapped, ct).ConfigureAwait(false);
-                    Once(Loc.T("hosted.configRestored"));
-                }
-                HostedJournal.ClearConfigSwap(Id);
-            }
-            catch (Exception ex) when (IsNotADrop(ex))
-            {
-                // не вышло — отметка остаётся, попробуем при следующем скане
-            }
-        }
-
-        // то же для настроек модов, записанных из «Настроек модов»
-        foreach (var restored in await HostedModConfigSource.RecoverAsync(files, Id, Root, ct).ConfigureAwait(false)) Once(restored);
+        if (!peek) await RecoverAsync(files, Once, ct).ConfigureAwait(false);
 
         var settings = Hosted.Settings;
         var snapshot = await HostedLayoutProbe.ReadAsync(files, settings, ct).ConfigureAwait(false);
         var layout = snapshot.Layout;
         Layout = layout;
-        LastLayouts[Id] = layout;
+        if (!peek) LastLayouts[Id] = layout;
         warnings.AddRange(layout.Warnings);
 
         var disabledList = snapshot.ConfigJson is { } json ? ProfileResolver.ReadServerConfig(json).Disabled : [];
@@ -264,10 +256,10 @@ public sealed partial class HostedMods(ModTarget target)
             })
             .OrderBy(m => m.Info?.Name ?? m.FileName, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        LastMods[Id] = result;
+        if (!peek) LastMods[Id] = result;
         if (folders.Count > 0) warnings.Add(Loc.T("hosted.folderModReadOnly"));
         var tracked = warnings.Count;
-        TrackLaunches(snapshot, disabledList, warnings);
+        if (!peek) TrackLaunches(snapshot, disabledList, warnings);
         once.AddRange(warnings.Skip(tracked)); // «хостер переписал конфиг» TrackLaunches выдаёт один раз
 
         var resolved = new ResolvedProfile
@@ -282,6 +274,53 @@ public sealed partial class HostedMods(ModTarget target)
             OffMachine = true, // пути — на FTP
         };
         return new Scan(resolved, result, snapshot, entries, folders, once);
+    }
+
+    /// <summary>
+    /// Починка перед сканом — то, что осталось от операций, оборванных посередине: прерванная установка, конфиг,
+    /// оставшийся только копией, недописанные настройки модов. Что сделано — разовыми предупреждениями в <paramref name="once"/>.
+    /// </summary>
+    private async Task RecoverAsync(IRemoteFiles files, Action<string> once, CancellationToken ct)
+    {
+        // прерванная установка (связь оборвалась между «удалить старое» и «переименовать новое») — довести или вернуть
+        if (HostedJournal.Read(Id) is { } pending)
+        {
+            try
+            {
+                var name = pending.Name ?? pending.ModId;
+                once(await HostedJournal.FinishAsync(files, Id, pending, ct, Root).ConfigureAwait(false)
+                    ? Loc.T("hosted.recovered", name)
+                    : Loc.T("hosted.rolledBack", name));
+            }
+            catch (Exception ex) when (IsNotADrop(ex))
+            {
+                // сервер не дал довести (права, место) или подвёл диск этой машины — журнал остаётся, попробуем при
+                // следующем скане; новую установку до тех пор не начинаем (InstallCoreAsync)
+            }
+        }
+
+        // запись конфига сорвалась посередине: прежний конфиг остался только как bak — возвращаем его на место
+        if (HostedJournal.ConfigSwap(Id) is { } swapped)
+        {
+            try
+            {
+                var ls = new HostedListings(files, Root);
+                if (await ls.FileAsync(swapped, ct).ConfigureAwait(false) is null
+                    && await ls.FileAsync(swapped + BakSuffix, ct).ConfigureAwait(false) is not null)
+                {
+                    await files.RenameAsync(swapped + BakSuffix, swapped, ct).ConfigureAwait(false);
+                    once(Loc.T("hosted.configRestored"));
+                }
+                HostedJournal.ClearConfigSwap(Id);
+            }
+            catch (Exception ex) when (IsNotADrop(ex))
+            {
+                // не вышло — отметка остаётся, попробуем при следующем скане
+            }
+        }
+
+        // то же для настроек модов, записанных из «Настроек модов»
+        foreach (var restored in await HostedModConfigSource.RecoverAsync(files, Id, Root, ct).ConfigureAwait(false)) once(restored);
     }
 
     /// <summary>modinfo архивов: из кэша, а промахи — с сервера (по возможности не целиком), с прогрессом «N из M».</summary>

@@ -633,16 +633,21 @@ public sealed partial class ModsViewModel : ObservableObject
     /// <summary>
     /// «Обновить всё» по готовому списку — для плашки раздела «Сервер» у хостера: тот же вопрос со списком и та же
     /// очередь (копии прежних версий, журнал, история «Обновить всё»), у хостера — та же проверка по логу перед вопросом
-    /// «останови сервер». Возвращает, встали ли пункты в очередь: отказались или вкладка занята другим — false.
+    /// «останови сервер». Возвращает пункты очереди, которые теперь ставят эти обновления: вставшие в очередь, а вместо
+    /// мода, который там уже ждал или ставился (второй раз он не встаёт), — тот пункт. Отказались или вкладка занята
+    /// другим — пусто.
     /// </summary>
-    internal async Task<bool> UpdateAllAsync(ModTarget target, IReadOnlyList<UpdateQueueItem> items)
+    internal async Task<IReadOnlyList<UpdateQueueItem>> UpdateAllAsync(ModTarget target, IReadOnlyList<UpdateQueueItem> items)
     {
-        if (items.Count == 0 || !_queue.CanEnqueue) return false;
+        if (items.Count == 0 || !_queue.CanEnqueue) return [];
         var list = string.Join("\n", items.Select(i => $"• {i.Name}: {i.From} → {i.To}"));
-        if (!Confirm(Loc.T("mods.updateAllConfirm", items.Count, list))) return false;
+        if (!Confirm(Loc.T("mods.updateAllConfirm", items.Count, list))) return [];
         if (target.IsHosted) await EnqueueCheckedAsync([.. items], [target], ModHistorySource.UpdateAll, null);
         else _queue.Enqueue(items, ModHistorySource.UpdateAll);
-        return items.Any(Queue.Contains);
+        return [.. items.Select(i => Queue.Contains(i) ? i : Queue.FirstOrDefault(q => q.State is QueueState.Waiting or QueueState.Working
+                                                                                      && q.Target.ProfileId == i.Target.ProfileId
+                                                                                      && string.Equals(q.ModId, i.ModId, StringComparison.OrdinalIgnoreCase)))
+            .OfType<UpdateQueueItem>().Distinct()];
     }
 
     private static UpdateQueueItem QueueItemFor(ModTarget target, ModRowViewModel row, ModDbRelease release) =>
@@ -959,7 +964,7 @@ public sealed partial class ModsViewModel : ObservableObject
         hostedChanged ? text + " · " + Loc.T("hosted.startHint") : text;
 
     /// <summary>Почему этот мод на сервере у хостера нельзя менять (мод хостера, папка); null — можно или это не хостер.</summary>
-    private string? HostReadOnlyReason(ModRowViewModel row) => IsHosted ? HostedModSource.ReadOnlyReason(row.Local) : null;
+    private string? HostReadOnlyReason(ModRowViewModel row) => IsHosted ? Core.Hosting.HostedMods.ReadOnlyReason(row.Local) : null;
 
     /// <summary>Мод на сервере у хостера только для чтения — сказать об этом в статусе; true — действие не делаем.</summary>
     private bool RejectHostReadOnly(ModRowViewModel row)

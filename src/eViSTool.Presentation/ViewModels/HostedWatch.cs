@@ -73,6 +73,7 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
     private readonly Dictionary<string, (GameProfile Profile, List<string> Done, List<string> Failed)> _changed = new(StringComparer.Ordinal);
     private IUiTimer? _timer;
     private bool _ticking;
+    private bool _again; // Refresh пришёл посреди прохода — пройти ещё раз, как только этот кончится
 
     /// <summary>Отправка в канал; null — настоящая. Тесты перехватывают сообщения здесь.</summary>
     internal Func<NotifyChannel, NotifyMessage, Task>? Send { get; set; }
@@ -104,13 +105,22 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
         Ui.PostIdle(() => _ = TickAsync());
     }
 
-    /// <summary>Настройки оповещений профиля поменяли — пересобрать список сразу, не дожидаясь таймера.</summary>
-    public void Refresh() => _ = TickAsync();
+    /// <summary>
+    /// Профили или их оповещения поменяли: кого больше не сторожить (удалён, не у хостера, маршруты выключены) —
+    /// отпустить сразу, даже посреди прохода (его опрос или проверка модов прерываются и ничего не шлют); новых —
+    /// взять проходом сейчас или сразу после идущего, не дожидаясь таймера.
+    /// </summary>
+    public void Refresh()
+    {
+        Release(Wanted());
+        if (_ticking) _again = true;
+        else _ = TickAsync();
+    }
 
     /// <summary>
     /// Один проход: кого сторожить (хостовый профиль с включённым маршрутом), а кого отпустить (удалён, не у хостера,
     /// маршруты выключены — без висящих подписок и замков); тем, кому пора, — опрос лога и проверка обновлений модов.
-    /// Пока предыдущий проход не кончился, новый не начинается.
+    /// Пока предыдущий проход не кончился, новый по таймеру не начинается.
     /// </summary>
     public async Task TickAsync()
     {
@@ -118,26 +128,53 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
         _ticking = true;
         try
         {
-            var wanted = new Dictionary<string, (GameProfile Profile, ServerNotifySettings Settings)>(StringComparer.Ordinal);
-            foreach (var profile in profiles.Select(p => p.Model).Where(p => p.IsHosted).ToList())
+            do
             {
-                var settings = ServerNotifySettings.Load(profile.Id, _agentsDir);
-                if (settings.Routes.Values.Any(v => v.Count > 0)) wanted[profile.Id] = (profile, settings);
+                _again = false;
+                var wanted = Wanted();
+                Release(wanted);
+                foreach (var id in wanted.Keys)
+                {
+                    // пока сторожили прежний профиль, этот могли удалить или выключить ему оповещения — берём, что сейчас
+                    if (Want(id) is not { } want) continue;
+                    var (profile, settings) = want;
+                    if (!_watches.TryGetValue(id, out var watch)) _watches[id] = watch = new ProfileWatch(this, profile);
+                    await watch.TickAsync(profile, settings);
+                }
             }
-            foreach (var id in _watches.Keys.Where(id => !wanted.ContainsKey(id)).ToList())
-            {
-                _watches[id].Dispose();
-                _watches.Remove(id);
-            }
-            foreach (var (id, (profile, settings)) in wanted)
-            {
-                if (!_watches.TryGetValue(id, out var watch)) _watches[id] = watch = new ProfileWatch(this, profile);
-                await watch.TickAsync(profile, settings);
-            }
+            while (_again);
         }
         finally
         {
             _ticking = false;
+        }
+    }
+
+    /// <summary>Кого сторожить: хостовые профили, у которых включён хоть один маршрут.</summary>
+    private Dictionary<string, (GameProfile Profile, ServerNotifySettings Settings)> Wanted()
+    {
+        var wanted = new Dictionary<string, (GameProfile Profile, ServerNotifySettings Settings)>(StringComparer.Ordinal);
+        foreach (var profile in profiles.Select(p => p.Model).Where(p => p.IsHosted).ToList())
+            if (Want(profile) is { } want) wanted[profile.Id] = want;
+        return wanted;
+    }
+
+    private (GameProfile Profile, ServerNotifySettings Settings)? Want(string profileId) =>
+        profiles.Select(p => p.Model).FirstOrDefault(p => p.Id == profileId && p.IsHosted) is { } profile ? Want(profile) : null;
+
+    private (GameProfile Profile, ServerNotifySettings Settings)? Want(GameProfile profile)
+    {
+        var settings = ServerNotifySettings.Load(profile.Id, _agentsDir);
+        return settings.Routes.Values.Any(v => v.Count > 0) ? (profile, settings) : null;
+    }
+
+    /// <summary>Отпустить сторожей тех, кого сторожить больше не нужно: подписки, замки, их опросы и проверки.</summary>
+    private void Release(Dictionary<string, (GameProfile Profile, ServerNotifySettings Settings)> wanted)
+    {
+        foreach (var id in _watches.Keys.Where(id => !wanted.ContainsKey(id)).ToList())
+        {
+            _watches[id].Dispose();
+            _watches.Remove(id);
         }
     }
 
@@ -237,8 +274,10 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
         private DateTime _lastPoll = DateTime.MinValue; // последний опрос лога, кто бы его ни сделал (UTC)
         private DateTime _retryAt = DateTime.MinValue;
         private TimeSpan _retry = TimeSpan.Zero;
-        private bool _halted;              // ошибка, которую повтор не вылечит: ждём правки подключения
+        private HostedEndpoint? _haltedOn; // ошибка, которую повтор не вылечит, — с этим подключением: ждём его правки или удачного чтения лога
         private bool _crashAgain;          // поиск вылета сорвался из-за сети
+        private int _polls;                // опросы, пришедшие сторожу (считаются в потоке опроса)
+        private int _pollsAtFailure;       // сколько их было к последнему сбою: паузу и отказ снимает только опрос после него
         private string? _endPending;       // запуск кончился между опросами: упал он или остановлен — скажет поиск вылета
         private DateTime _modsNotBefore = owner.UtcNow + ModsFirstDelay;
 
@@ -247,6 +286,9 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
         public HostedLogs? Logs { get; private set; }
 
         public bool IsIdle => !_busy && !_processing && _queue.Count == 0;
+
+        /// <summary>Можно в сеть: вход не отказан и пауза после сбоя прошла.</summary>
+        private bool CanConnect => _haltedOn is null && owner.UtcNow >= _retryAt;
 
         public async Task TickAsync(GameProfile current, ServerNotifySettings settings)
         {
@@ -263,17 +305,23 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
                     Detach();
                     return;
                 }
+                // подключение поправили (пароль, сертификат) — прежний отказ во входе уже не про него
+                if (_haltedOn is { } halted && halted != target.Hosted!.Endpoint) _haltedOn = null;
                 if (LogEvents.Any(e => settings.ChannelsFor(e).Any()))
                 {
                     var logs = HostedLogsPool.For(target); // подключение поменяли — экземпляр новый: подписаться заново
                     if (!ReferenceEquals(logs, Logs)) await AttachAsync(logs);
-                    if (Logs is { } attached && !_halted && owner.UtcNow >= _retryAt && owner.UtcNow - _lastPoll >= Interval - Slack)
-                        await PollAsync(attached);
-                    if (Logs is { } l && (_crashAgain || l.State == HostedServerState.Crashed && !l.CurrentCrashReported))
-                        Enqueue(null); // поиск вылета — в общей очереди с разбором опросов
+                    var polled = Logs is { } attached && CanConnect && owner.UtcNow - _lastPoll >= Interval - Slack && await PollAsync(attached);
+                    // поиск вылета — в общей очереди с разбором опросов. Сорвался из-за сети — повтор с той же паузой, что у
+                    // опроса. Вылет текущего запуска ещё не отдан — ищем только после своего опроса: пока лог читает раздел
+                    // «Сервер», вылет ищет он сам, а поиск сразу за поиском не оставил бы логам времени подождать
+                    // недописанный отчёт (FindCrashAsync ждёт его один вызов); свой следующий опрос — через минуту
+                    if (!_disposed && Logs is { } l && CanConnect
+                        && (_crashAgain || polled && l.State == HostedServerState.Crashed && !l.CurrentCrashReported))
+                        Enqueue(null);
                 }
                 else Detach();
-                if (settings.ChannelsFor(NotifyEvent.ModUpdates).Any()) await CheckModsAsync(target);
+                if (!_disposed && settings.ChannelsFor(NotifyEvent.ModUpdates).Any()) await CheckModsAsync(target);
             }
             finally
             {
@@ -286,7 +334,11 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
         private async Task AttachAsync(HostedLogs logs)
         {
             Detach();
-            Action<HostedLogPoll> polled = poll => Ui.Post(() => OnPolled(logs, poll));
+            Action<HostedLogPoll> polled = poll =>
+            {
+                var number = Interlocked.Increment(ref _polls);
+                Ui.Post(() => OnPolled(logs, poll, number));
+            };
             Action<HostedCrash> crashed = crash => Ui.Post(() => OnCrashed(logs, crash));
             // экземпляр запоминаем до подписки: опрос, начатый сразу после неё, уже наш
             (Logs, _polled, _crashed) = (logs, polled, crashed);
@@ -295,9 +347,9 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
             _run = null;
             _overloads = new OverloadWatch();
             _since = owner._time.GetLocalNow().DateTime;
-            _lastPoll = _retryAt = DateTime.MinValue;
-            _retry = TimeSpan.Zero;
-            _halted = _crashAgain = false;
+            _lastPoll = DateTime.MinValue;
+            Recovered();
+            _crashAgain = false;
             _endPending = null;
             try
             {
@@ -317,35 +369,58 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
             _queue.Clear();
         }
 
-        /// <summary>Свой опрос — только если лог давно никто не читал. Сбой сети — тихий повтор с паузой побольше.</summary>
-        private async Task PollAsync(HostedLogs logs)
+        /// <summary>Свой опрос — только если лог давно никто не читал. Удался — true; сбой — см. <see cref="Failed"/>.</summary>
+        private async Task<bool> PollAsync(HostedLogs logs)
         {
             try
             {
                 await logs.RefreshAsync(_cts.Token); // строки придут в OnPolled, как от любого опроса
                 _lastPoll = owner.UtcNow;
-                _retry = TimeSpan.Zero;
-                _retryAt = DateTime.MinValue;
+                Recovered();
+                return true;
             }
             catch (Exception ex) when (IsExpected(ex))
             {
-                if (_disposed || _cts.IsCancellationRequested) return;
-                // неверный пароль раз в минуту — тысячи неудачных входов в сутки, хостер может закрыть адрес
-                if (IsHopeless(ex)) _halted = true;
-                else
-                {
-                    _retry = _retry == TimeSpan.Zero ? FirstRetry : TimeSpan.FromTicks(Math.Min(_retry.Ticks * 2, MaxRetry.Ticks));
-                    _retryAt = owner.UtcNow + _retry;
-                }
+                Failed(ex, logs.Target);
+                return false;
             }
+        }
+
+        /// <summary>
+        /// Сбой сети или входа — у опроса и у поиска вылета одно правило. Неверный пароль, недоверенный сертификат: в сеть
+        /// больше не ходим, пока подключение не поправят или лог не прочитают удачно (раздел «Сервер»), — раз в минуту
+        /// это тысячи неудачных входов в сутки, и хостер может закрыть адрес. Остальное — тихий повтор с паузой побольше.
+        /// </summary>
+        private void Failed(Exception ex, ModTarget target)
+        {
+            if (_disposed || _cts.IsCancellationRequested) return;
+            // опрос внутри поиска вылета мог удаться до сбоя, а его разбор придёт позже — сбой он не отменяет
+            _pollsAtFailure = Volatile.Read(ref _polls);
+            if (IsHopeless(ex)) _haltedOn = target.Hosted!.Endpoint;
+            else
+            {
+                _retry = _retry == TimeSpan.Zero ? FirstRetry : TimeSpan.FromTicks(Math.Min(_retry.Ticks * 2, MaxRetry.Ticks));
+                _retryAt = owner.UtcNow + _retry;
+            }
+        }
+
+        /// <summary>Лог прочитан: связь и вход в порядке — пауз и отказа во входе больше нет.</summary>
+        private void Recovered()
+        {
+            _haltedOn = null;
+            _retry = TimeSpan.Zero;
+            _retryAt = DateTime.MinValue;
         }
 
         // ---------- разбор опросов
 
-        private void OnPolled(HostedLogs logs, HostedLogPoll poll)
+        /// <param name="number">Номер опроса у сторожа: по нему видно, был ли опрос после последнего сбоя.</param>
+        private void OnPolled(HostedLogs logs, HostedLogPoll poll, int number)
         {
             if (_disposed || !ReferenceEquals(logs, Logs)) return;
             _lastPoll = owner.UtcNow;
+            // лог прочитали после сбоя (кто угодно: раздел после обслуживания у хостера) — сторож снова может ходить сам
+            if (number > _pollsAtFailure) Recovered();
             Enqueue(poll);
         }
 
@@ -409,11 +484,10 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
                     Notify(NotifyEvent.Overloaded, Loc.T("notify.ev.overloaded"),
                         Line("◷", Loc.T("notify.lbl.warnings"), Loc.T("notify.ev.overloadCount", count, (int)OverloadWatch.Window.TotalMinutes)),
                         Line("⚑", Loc.T("notify.lbl.hint"), Loc.T("notify.ev.overloadHostedHint")));
-            // упал — это не «остановлен»: о вылете скажет его разбор
+            // упал — это не «остановлен»: о вылете скажет его разбор. Вылет ищет не этот разбор, а тот, кто опрашивал:
+            // раздел «Сервер» — сам, сторож — после своего опроса (TickAsync)
             if (poll.State == HostedServerState.Stopped && from != HostedServerState.Stopped)
                 Notify(NotifyEvent.ServerStopped, Loc.T("notify.ev.stopped"));
-            if (poll.State == HostedServerState.Crashed && from != HostedServerState.Crashed)
-                await CheckCrashAsync(logs);
         }
 
         /// <summary>Состояние и запуск после опроса. Лог пропал (сервер как раз запускается заново) — прежнее остаётся.</summary>
@@ -441,6 +515,7 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
             catch (Exception ex) when (IsExpected(ex))
             {
                 _crashAgain = !_disposed && !_cts.IsCancellationRequested; // найдётся на следующем проходе
+                Failed(ex, logs.Target);
                 return;
             }
             _crashAgain = false;
@@ -471,12 +546,12 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
 
         /// <summary>
         /// Раз в 6 часов (время прошлой проверки — в файле, переживает перезапуск окна): вышли обновления — список, как у
-        /// агента; тот же список второй раз не приходит.
+        /// агента; тот же список второй раз не приходит. Пока опрос лога знает, что вход отказан, — не проверяем.
         /// </summary>
         private async Task CheckModsAsync(ModTarget target)
         {
             var now = owner.UtcNow;
-            if (now < _modsNotBefore) return;
+            if (_haltedOn is not null || now < _modsNotBefore) return;
             var state = HostedNotifyState.Load(Id, owner._agentsDir);
             if (state.ModsCheckedAt is { } at && now - at < ModsInterval) return;
             HostedUpdatesFound found;
@@ -486,7 +561,10 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
             }
             catch (Exception ex) when (IsExpected(ex))
             {
-                _modsNotBefore = owner.UtcNow + ModsRetry; // нет связи или модбаза молчит — не повод тревожить
+                if (_disposed) return;
+                // нет связи или модбаза молчит — не повод тревожить. Вход отказан — снова только в срок следующей проверки:
+                // без опроса лога (включены одни моды) удачного чтения, которое сняло бы отказ, не будет
+                _modsNotBefore = owner.UtcNow + (IsHopeless(ex) ? ModsInterval : ModsRetry);
                 return;
             }
             if (_disposed) return;

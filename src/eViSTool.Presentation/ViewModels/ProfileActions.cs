@@ -159,12 +159,21 @@ public sealed class ProfileActions(IReadOnlyList<ProfileViewModel> profiles, Fun
     }
 
     /// <summary>
-    /// После удаления профиля из списка (окно уже переключилось на другой): у профиля у хостера — закрыть соединение,
-    /// убрать кэш и журнал установки. Для остальных профилей всё сделал <see cref="PrepareRemoveAsync"/>.
+    /// После удаления профиля из списка (окно уже переключилось на другой, сторож оповещений его отпустил): у профиля у
+    /// хостера — закрыть соединение, убрать кэш и журнал установки, а ещё оповещения, которые слало за него окно:
+    /// настройки (в них каналы с токенами), что помнит сторож, и его замок. Для остальных профилей всё сделал
+    /// <see cref="PrepareRemoveAsync"/>.
     /// </summary>
-    public static void AfterRemoved(GameProfile model)
+    public static void AfterRemoved(GameProfile model, string? agentsDir = null)
     {
-        if (model.IsHosted) ForgetHosted(model.Id);
+        if (!model.IsHosted) return;
+        ForgetHosted(model.Id);
+        foreach (var file in new[] { Core.Notifications.ServerNotifySettings.FileFor(model.Id, agentsDir),
+                     Core.Notifications.HostedNotifyState.FileFor(model.Id, agentsDir), Core.Hosting.HostedWatchLease.FileFor(model.Id, agentsDir) })
+        {
+            try { File.Delete(file); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } // замок ещё держит другое окно — не беда
+        }
     }
 
     /// <summary>

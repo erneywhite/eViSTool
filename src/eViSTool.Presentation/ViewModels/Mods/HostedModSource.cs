@@ -206,21 +206,6 @@ internal sealed class HostedModSource : IModSource
         return counts;
     }
 
-    /// <summary>
-    /// Мод только для чтения: мод самого хостера (папка gportal_mods) или распакованная папка — по FTP их можно
-    /// только показывать. Ответ — текст причины; null — менять можно.
-    /// </summary>
-    public static string? ReadOnlyReason(LocalMod mod)
-    {
-        if (HostedLayoutProbe.IsHosterDir(RemotePath.Parent(mod.Path))) return Loc.T("hosted.hosterMod");
-        // shortcut: папку-мод узнаём по отсутствию расширения архива или кода; переделать, если ядро начнёт отдавать признак папки
-        var ext = Path.GetExtension(mod.Path);
-        return ext.Equals(".zip", StringComparison.OrdinalIgnoreCase) || ext.Equals(".dll", StringComparison.OrdinalIgnoreCase)
-               || ext.Equals(".cs", StringComparison.OrdinalIgnoreCase)
-            ? null
-            : Loc.T("hosted.folderModReadOnly");
-    }
-
     /// <summary>Предупреждения скана (довели прерванную установку, нет конфига…) — окном, но каждое по разу, пока не пропадёт.</summary>
     private void ShowWarnings(string profileId, IReadOnlyList<string> warnings)
     {
