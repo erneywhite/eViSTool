@@ -27,7 +27,8 @@
 eViSTool keeps your Vintage Story mods up to date, lets you browse and install mods from the ModDB,
 and runs your dedicated server from one window: console, players, configuration, backups, scheduled restarts,
 notifications and statistics.
-A server on another computer is managed the same way, with a single connection code.
+A server on another computer is managed the same way, with a single connection code,
+and a server rented from a host (G-Portal and others) over FTP: its mods, mod settings and server log.
 It works on Windows and Linux: the same window on both, with the game installed from the archive or from Flatpak.
 On a Linux server eViSTool runs as a service without a window, and you control it from the window on your computer.
 
