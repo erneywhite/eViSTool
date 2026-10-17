@@ -147,4 +147,6 @@ jobs:
           $v = '${{ steps.version.outputs.version }}'
           $files = Get-ChildItem dist -File | Where-Object { $_.Name -like "eViSTool-$v-*" } | ForEach-Object { $_.FullName }
           if (($files | Where-Object { $_ -like '*.sig' }).Count -ne 3) { throw 'Подписей должно быть три: win zip, linux tar.gz, linux zip' }
-          gh release create '${{ github.ref_name }}' --title "eViSTool $v" --notes-file "dist/notes-$v.md" --verify-tag @files
+          # бета (0.12.0-beta.1) — pre-release: на GitHub не станет «последней», окно предложит её только тем, кто сам на бете
+          $pre = if ($v.Contains('-')) { @('--prerelease') } else { @() }
+          gh release create '${{ github.ref_name }}' --title "eViSTool $v" --notes-file "dist/notes-$v.md" --verify-tag @pre @files
