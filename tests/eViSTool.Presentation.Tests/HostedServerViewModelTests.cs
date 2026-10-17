@@ -450,8 +450,10 @@ public sealed class HostedServerViewModelTests : IDisposable
     public void Subtitle_LeavesTheGameVersionOut_UntilItIsKnown() => Sta.Run(() =>
     {
         var (main, hosted, _) = Open();
-        var where = _host.Settings.Describe();
+        // в шапке только хост и порт: логин FTP попадал бы на каждый скриншот
+        var where = $"{_host.Settings.Host}:{_host.Settings.Port}";
         Assert.Equal(Loc.T("server.subtitleHosted", hosted.Name, where, "1.22.7"), main.Server.HeaderSubtitle);
+        Assert.DoesNotContain(_host.Settings.User + "@", main.Server.HeaderSubtitle);
 
         hosted.HostedGameVersion = null;     // чтение модов версию ещё не нашло
         Assert.Equal(Loc.T("server.subtitleHostedNoVersion", hosted.Name, where), main.Server.HeaderSubtitle);

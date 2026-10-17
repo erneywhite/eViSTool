@@ -4,6 +4,7 @@ using System.Net.Http;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Game;
+using eViSTool.Core.Hosting;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Server;
@@ -110,12 +111,18 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         Core.Versioning.ModVersion.TryParse(s.AgentVersion, out var agent)
         && Core.Versioning.ModVersion.TryParse(AgentProtocol.AppVersion, out var app) && agent.CompareTo(app) > 0;
 
+    /// <summary>
+    /// Адрес сервера у хостера для подзаголовка: только хост и порт, как у удалённого. Логин FTP в шапке ни к чему — он
+    /// попадал бы на каждый скриншот раздела; целиком подключение видно в «Подключение…».
+    /// </summary>
+    private static string HostedAddress(HostedConnection? hosted) => hosted is null ? "?" : $"{hosted.Host}:{hosted.Port}";
+
     /// <summary>Подзаголовок: профиль и версия игры; путь к данным — в подсказке.</summary>
     public string HeaderSubtitle => _main.ActiveProfile is not { } p ? ""
         // версию игры у хостера узнаёт чтение модов: пока не узнали — без неё, а не «Vintage Story узнаю при чтении модов»
         : p.Model.IsHosted ? (p.Model.Hosted?.GameVersion ?? p.HostedGameVersion) is { Length: > 0 } hostedVersion
-            ? Loc.T("server.subtitleHosted", p.Name, p.Model.Hosted?.Describe() ?? "?", hostedVersion)
-            : Loc.T("server.subtitleHostedNoVersion", p.Name, p.Model.Hosted?.Describe() ?? "?")
+            ? Loc.T("server.subtitleHosted", p.Name, HostedAddress(p.Model.Hosted), hostedVersion)
+            : Loc.T("server.subtitleHostedNoVersion", p.Name, HostedAddress(p.Model.Hosted))
         : p.Model.IsRemote ? Loc.T("server.subtitleRemote", p.Name,
             (RemoteSecret.Unprotect(p.Model.RemoteCode) is { } c ? $"{c.Host}:{c.Port}" : "?") + (_remoteOs is { Length: > 0 } os ? " · " + os : ""),
             _remoteGameVersion ?? "?")
