@@ -58,6 +58,9 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     /// <summary>Оповещения: какие события в какие каналы — последний вид раздела.</summary>
     public ServerNotifyViewModel Notify { get; }
 
+    /// <summary>Сервер у хостера: лог, состояние и игроки по FTP — вместо всех видов своего сервера.</summary>
+    public HostedServerViewModel Hosted { get; }
+
     /// <summary>Какой вид раздела открыт. Консоль продолжает получать строки при любом.</summary>
     [ObservableProperty] private ServerTab _tab;
 
@@ -81,7 +84,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     /// <summary>Сервер на другом компьютере: всё через агента по сети, своих папок у профиля нет.</summary>
     [ObservableProperty] private bool _isRemoteProfile;
 
-    /// <summary>Сервер у хостера: управляет им панель хостера, здесь — только плашка и переход к модам.</summary>
+    /// <summary>Сервер у хостера: управляет им панель хостера, здесь — лог, состояние и игроки (<see cref="Hosted"/>) и переход к модам.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowNotServer))]
     private bool _isHostedProfile;
@@ -109,6 +112,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
 
     /// <summary>Подзаголовок: профиль и версия игры; путь к данным — в подсказке.</summary>
     public string HeaderSubtitle => _main.ActiveProfile is not { } p ? ""
+        : p.Model.IsHosted ? Loc.T("server.subtitleHosted", p.Name, p.Model.Hosted?.Describe() ?? "?", p.GameVersionText)
         : p.Model.IsRemote ? Loc.T("server.subtitleRemote", p.Name,
             (RemoteSecret.Unprotect(p.Model.RemoteCode) is { } c ? $"{c.Host}:{c.Port}" : "?") + (_remoteOs is { Length: > 0 } os ? " · " + os : ""),
             _remoteGameVersion ?? "?")
@@ -158,6 +162,17 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         Stats = new ServerStatsViewModel(this);
         Journal = new ServerJournalViewModel(this);
         Notify = new ServerNotifyViewModel(this);
+        Hosted = new HostedServerViewModel(main);
+    }
+
+    /// <summary>
+    /// Раздел «Сервер» открыт или закрыт. Лог сервера у хостера читается по FTP только пока раздел открыт; своему
+    /// серверу это не нужно — его наблюдатель работает всегда.
+    /// </summary>
+    public void SetSectionActive(bool open)
+    {
+        if (open && IsHostedProfile) OnPropertyChanged(nameof(HeaderSubtitle)); // версию игры могло найти чтение модов
+        Hosted.SetActive(open);
     }
 
     partial void OnTabChanged(ServerTab value)
@@ -234,6 +249,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         Remote.OnLanguageChanged();
         Players.OnLanguageChanged();
         Notify.OnLanguageChanged();
+        Hosted.OnLanguageChanged();
     }
 
     /// <summary>Сменился профиль: отключиться от старого агента, подключиться к агенту нового (если он работает).</summary>
@@ -259,8 +275,9 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         _console.Reset();
 
         IsHostedProfile = _main.ActiveProfile?.Model.IsHosted == true;
-        // хостовый профиль — Kind = Server, но серверным разделом это не считается: монитора и вкладок нет
+        // хостовый профиль — Kind = Server, но серверным разделом это не считается: монитора и вкладок нет, свой вид — Hosted
         IsServerProfile = _main.ActiveProfile?.Kind == ProfileKind.Server && !IsHostedProfile;
+        Hosted.OnProfileSwitched(IsHostedProfile ? _main.ActiveProfile?.Model : null);
         IsRemoteProfile = _main.ActiveProfile?.Model.IsRemote == true;
         _remoteGameVersion = null;
         _remoteOs = null;

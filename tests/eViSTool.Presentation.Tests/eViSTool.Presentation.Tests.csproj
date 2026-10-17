@@ -23,12 +23,16 @@
     <None Include="..\eViSTool.Core.Tests\TestData\serverconfig-real.json" Link="TestData\serverconfig-real.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- сервер у хостера: серверный конфиг G-Portal для поддельного FTP -->
     <None Include="..\eViSTool.Core.Tests\TestData\gportal-serverconfig-after-start.json" Link="TestData\gportal-serverconfig-after-start.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- настоящие логи G-Portal для раздела «Сервер» у хостера — те же, что у тестов ядра -->
+    <None Include="..\eViSTool.Core.Tests\TestData\Hosting\gportal-server-main.log" Link="TestData\Hosting\gportal-server-main.log" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\eViSTool.Core.Tests\TestData\Hosting\gportal-server-main-archived.log" Link="TestData\Hosting\gportal-server-main-archived.log" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- поддельный FTP над папкой и стенд «сервер у хостера» — те же файлы, что у тестов ядра (проект 7.1) -->
     <Compile Include="..\eViSTool.Core.Tests\Hosting\FolderRemoteFiles.cs" Link="Hosting\FolderRemoteFiles.cs" />
     <Compile Include="..\eViSTool.Core.Tests\Hosting\HostedFixture.cs" Link="Hosting\HostedFixture.cs" />
+    <Compile Include="..\eViSTool.Core.Tests\Hosting\HostedLogSamples.cs" Link="Hosting\HostedLogSamples.cs" />
   </ItemGroup>
 
   <ItemGroup>

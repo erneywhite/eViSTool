@@ -472,8 +472,9 @@ public sealed partial class ModsViewModel : ObservableObject
 
         if (target.IsHosted)
         {
-            // у хостера запущен ли сервер, не видно: спрашиваем «останови в панели хостера»; мод хостера и папку менять нельзя
-            if (RejectHostReadOnly(row) || !_installer.ConfirmIfRunning(target))
+            // у хостера запущен ли сервер, видно только по логу: не остановлен — спрашиваем «останови в панели хостера»;
+            // мод хостера и папку менять нельзя
+            if (RejectHostReadOnly(row) || !await _installer.ConfirmIfRunningAsync(target))
             {
                 Rebuild(); // вернуть галочку как было (без сети)
                 return;
@@ -522,7 +523,7 @@ public sealed partial class ModsViewModel : ObservableObject
             : Loc.T("mods.deleteConfirm", row.Name, row.Installed) + (_installer.IsRunning(target) ? "\n\n" + Loc.T("mods.deleteRunning") : "");
         if (!Confirm(question))
             return;
-        if (target.IsHosted && !_installer.ConfirmIfRunning(target)) return;
+        if (target.IsHosted && !await _installer.ConfirmIfRunningAsync(target)) return;
         await _installer.CopyWorldsAsync(target, side: ModSides.Parse(row.Local.Info?.Side));
 
         using var history = ModHistory.Begin(ModHistorySource.Manual);
@@ -669,8 +670,23 @@ public sealed partial class ModsViewModel : ObservableObject
     /// Поставить в очередь; уже ждущий или ставящийся мод той же цели второй раз не добавляется.
     /// У каждого пункта своя цель: пункты разных профилей ставятся каждый в свой.
     /// </summary>
-    public void Enqueue(IEnumerable<UpdateQueueItem> items, string source, string? undoes = null, bool runningConfirmed = false) =>
-        _queue.Enqueue(items, source, undoes, runningConfirmed);
+    public void Enqueue(IEnumerable<UpdateQueueItem> items, string source, string? undoes = null, bool runningConfirmed = false)
+    {
+        var list = items.ToList();
+        List<ModTarget> hosted = runningConfirmed ? [] : [.. list.Select(i => i.Target).Where(t => t.IsHosted).DistinctBy(t => t.ProfileId)];
+        if (hosted.Count == 0) _queue.Enqueue(list, source, undoes, runningConfirmed);
+        else _ = EnqueueCheckedAsync(list, hosted, source, undoes);
+    }
+
+    /// <summary>
+    /// У хостера вопрос очереди — после быстрой проверки по логу: сервер остановлен — очередь не спросит. Вопрос
+    /// выключен или «Да» помнится — проверки нет, и пункты встают в очередь сразу, как раньше.
+    /// </summary>
+    private async Task EnqueueCheckedAsync(List<UpdateQueueItem> items, List<ModTarget> hosted, string source, string? undoes)
+    {
+        foreach (var target in hosted) await _installer.CheckHostedAsync(target);
+        _queue.Enqueue(items, source, undoes);
+    }
 
     [RelayCommand]
     private void StopQueue() => _queue.Stop();
@@ -696,7 +712,8 @@ public sealed partial class ModsViewModel : ObservableObject
 
         public bool IsActive(ModTarget target) => owner._installer.IsActive(target);
 
-        public bool ConfirmIfRunning(ModTarget target) => owner._installer.ConfirmIfRunning(target);
+        // у хостера проверку по логу уже сделал Enqueue вкладки: остановлен — без вопроса
+        public bool ConfirmIfRunning(ModTarget target) => owner._installer.ConfirmChecked(target);
 
         public Task<bool> InstallZipAsync(ModTarget target, string zip, List<string> installed, List<string> problems) =>
             owner._installer.InstallZipAsync(target, zip, interactive: false, installed, problems);

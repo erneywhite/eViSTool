@@ -55,6 +55,32 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
     }
 
     /// <summary>
+    /// То же, что <see cref="ConfirmIfRunning"/>, но у хостера сначала быстрая проверка по логу сервера (асинхронно, не
+    /// дольше 5 с): по логу остановлен — без вопроса. Свой профиль и удалённый — как раньше, без ожидания.
+    /// </summary>
+    public async Task<bool> ConfirmIfRunningAsync(ModTarget target)
+    {
+        await CheckHostedAsync(target);
+        return ConfirmChecked(target);
+    }
+
+    /// <summary>У хостера — только проверка по логу: её итог учтёт ближайший вопрос (<see cref="ConfirmChecked"/>).</summary>
+    public Task CheckHostedAsync(ModTarget target) => target.IsHosted ? _stopReminder.CheckAsync(target) : Task.CompletedTask;
+
+    /// <summary>Вопрос после проверки (<see cref="CheckHostedAsync"/>): сервер у хостера по логу только что остановлен — не спрашиваем.</summary>
+    public bool ConfirmChecked(ModTarget target) => (target.IsHosted && _stopReminder.IsKnownStopped(target)) || ConfirmIfRunning(target);
+
+    /// <summary>Те из пунктов, чью цель можно менять: у каждой — проверка и вопрос, как в <see cref="ConfirmIfRunningAsync"/>.</summary>
+    public async Task<List<T>> ConfirmedAsync<T>(IEnumerable<T> items, Func<T, ModTarget> target)
+    {
+        var ok = new List<T>();
+        foreach (var item in items)
+            if (await ConfirmIfRunningAsync(target(item)))
+                ok.Add(item);
+        return ok;
+    }
+
+    /// <summary>
     /// Перед изменением модов игрового профиля — копии одиночных миров, в которые играли с прошлой копии (настройка).
     /// Повторный вызов в той же операции ничего не копирует: миры с тех пор не менялись. Сбой копии изменение
     /// не останавливает — уходит в problems (нет списка — в строку статуса). Свои серверы и удалённые — не трогаем:

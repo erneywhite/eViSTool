@@ -43,7 +43,7 @@ internal sealed class ModHistoryActions(ModsViewModel owner, ModInstallService i
             Error(Loc.T("hist.allProblems", lines));
             return;
         }
-        if (!Confirm(Loc.T("hist.confirm", session.When, lines)) || !installer.ConfirmIfRunning(target)) return;
+        if (!Confirm(Loc.T("hist.confirm", session.When, lines)) || !await installer.ConfirmIfRunningAsync(target)) return;
 
         // откат — одно действие в истории, со ссылкой на сеанс, который он откатывает
         var history = ModHistory.NewScope(ModHistorySource.Rollback, session.Session.Id);

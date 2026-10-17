@@ -1,0 +1,462 @@
+using System.Collections;
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using eViSTool.Core.Hosting;
+using eViSTool.Core.Localization;
+using eViSTool.Core.Mods;
+using eViSTool.Core.Profiles;
+using eViSTool.Core.Server;
+
+namespace eViSTool.Presentation.ViewModels;
+
+/// <summary>Запуск в выборе над консолью: текущий (<see cref="Run"/> = null) или прошлый из Logs/Archive.</summary>
+public sealed record HostedRunOption(HostedRun? Run, string Text);
+
+/// <summary>Игрок на сервере у хостера: имя и «с 13:31 · 12 мин» по часам этой машины.</summary>
+public sealed record HostedPlayerRow(string Name, string SinceText);
+
+/// <summary>
+/// Раздел «Сервер» у сервера у хостера: что сервер пишет в server-main.log (по FTP, только чтение), его состояние по
+/// логу, кто на нём и прошлые запуски из Logs/Archive. Запускают, останавливают и командуют сервером в панели хостера —
+/// здесь только смотрят. Лог опрашивается раз в <see cref="PollInterval"/> и только пока раздел открыт, а профиль
+/// активен и у хостера; ушли с раздела — опрос стоит, вернулись — продолжается с того же места лога. Новый вылет
+/// показывается тем же окном, что у своего сервера. Сам лог — <see cref="HostedLogs"/> (один на профиль,
+/// <see cref="HostedLogsPool"/>), строки консоли и их цвет — те же <see cref="ConsoleLineViewModel"/>, что у своей консоли.
+/// </summary>
+public sealed partial class HostedServerViewModel : ObservableObject
+{
+    /// <summary>Как часто читать лог, пока раздел открыт.</summary>
+    public static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(3);
+
+    /// <summary>Пауза после ошибки сети: связь пропала — не стучимся каждые три секунды.</summary>
+    public static readonly TimeSpan RetryInterval = TimeSpan.FromSeconds(10);
+
+    /// <summary>Сколько строк текущего запуска держит консоль — как у своей.</summary>
+    public const int MaxLines = ServerConsoleViewModel.MaxLines;
+
+    /// <summary>Сколько строк прошлого запуска показывать: его лог читается до 8 МБ, это десятки тысяч строк.</summary>
+    public const int PastMaxLines = 20_000;
+
+    private readonly MainViewModel _main;
+    private IUiTimer? _timer;
+    private GameProfile? _profile;
+    private HostedLogs? _logs;
+    private CancellationTokenSource _cts = new();
+    private int _generation;
+    private bool _sectionOpen;
+    private bool _polling;
+    private bool _attached;            // первый опрос после подключения к логам профиля был: дальше — только новые строки
+    private DateTime? _updatedAt;      // последний удачный опрос, время этой машины
+    private Exception? _error;         // последний опрос не удался — текст в статусе (пересобирается при смене языка)
+    private int _runRequest;           // номер запроса прошлого запуска: ответ на устаревший выбор не показываем
+    private bool _quietSelection;      // выбор запуска меняет сам раздел (список пересобран) — не читать лог заново
+    private HostedRunLog? _past;       // показанный прошлый запуск
+    private readonly List<string> _current = [];                   // строки текущего запуска, пока смотрят прошлый
+    private IReadOnlyList<OnlinePlayer> _online = [];
+    private readonly HashSet<string> _seenCrashes = new(StringComparer.Ordinal);
+
+    /// <param name="main">Главная модель: окно вылета выключает мод через неё.</param>
+    public HostedServerViewModel(MainViewModel main)
+    {
+        _main = main;
+        ShowState();
+    }
+
+    /// <summary>Строки консоли: текущего запуска (растут) или выбранного прошлого (как прочитаны).</summary>
+    public ObservableCollection<ConsoleLineViewModel> Lines { get; } = [];
+
+    /// <summary>Автопрокрутка, как у своей консоли: true — прокрутить в любом случае (первая порция, другой запуск).</summary>
+    public event Action<bool>? LinesAppended;
+
+    /// <summary>«Текущий запуск» и прошлые из Logs/Archive, новые сверху.</summary>
+    public ObservableCollection<HostedRunOption> Runs { get; } = [];
+
+    /// <summary>Выбор запуска виден: список запусков уже прочитан.</summary>
+    public bool HasRuns => Runs.Count > 0;
+
+    [ObservableProperty] private HostedRunOption? _selectedRun;
+
+    /// <summary>Открыт прошлый запуск: консоль статична, новые строки текущего копятся в стороне.</summary>
+    [ObservableProperty] private bool _isPast;
+
+    /// <summary>Чем кончился открытый прошлый запуск (или что он читается, или почему не прочитался).</summary>
+    [ObservableProperty] private string _runNote = "";
+
+    /// <summary>Кто на сервере, по времени входа.</summary>
+    public ObservableCollection<HostedPlayerRow> Players { get; } = [];
+
+    [ObservableProperty] private string _playersEmptyText = "—";
+    public bool HasPlayers => Players.Count > 0;
+
+    /// <summary>Состояние сервера по логу. Надёжны только «остановлен» и «вылетел» (см. <see cref="HostedServerState"/>).</summary>
+    [ObservableProperty] private HostedServerState _state = HostedServerState.Unknown;
+
+    [ObservableProperty] private string _stateText = "";
+    [ObservableProperty] private RowTone _stateTone = RowTone.Muted;
+
+    /// <summary>Под состоянием: «по логу сервера · 13:31:42» — откуда знаем и когда последний раз прочитали.</summary>
+    [ObservableProperty] private string _stateNote = "";
+
+    [ObservableProperty] private string _uptimeText = "—";
+    [ObservableProperty] private string _playersText = "—";
+    [ObservableProperty] private string _playerNames = "";
+
+    /// <summary>Лог не читается (нет связи, пароль не прочитать): что случилось и что дальше. Пусто — всё в порядке.</summary>
+    [ObservableProperty] private string _statusText = "";
+
+    /// <summary>Консоль текущего запуска пуста: лога нет или сервер ещё не запускали.</summary>
+    public bool ShowEmpty => !IsPast && Lines.Count == 0 && _attached;
+
+    /// <summary>Опрос по таймеру идёт (раздел открыт, профиль у хостера).</summary>
+    public bool IsPolling => _timer?.IsEnabled == true;
+
+    /// <summary>Вылеты раньше этого (время этой машины) не показываем: окно не тревожит задним числом. По умолчанию — когда раздел создан.</summary>
+    public DateTime CrashesSince { get; set; } = DateTime.Now;
+
+    partial void OnIsPastChanged(bool value) => OnPropertyChanged(nameof(ShowEmpty));
+
+    // ---------- профиль и раздел
+
+    /// <summary>
+    /// Сменился активный профиль или его настройки. Тот же сервер (поменяли имя, флажок) — всё остаётся как есть; другой
+    /// профиль или другое подключение — консоль, игроки и запуски с чистого листа. null — профиль не у хостера.
+    /// </summary>
+    public void OnProfileSwitched(GameProfile? profile)
+    {
+        var target = profile is { IsHosted: true } ? ModTarget.For(profile) : null;
+        var same = profile is not null && _profile?.Id == profile.Id
+                   && (target is null ? _logs is null : _logs is not null && HostedLogsPool.SameServer(_logs.Target, target));
+        _profile = profile is { IsHosted: true } ? profile : null;
+        if (same) return;
+
+        Reset();
+        _logs = target is { IsHosted: true } ? HostedLogsPool.For(target) : null;
+        if (_profile is not null && _logs is null) StatusText = ModTarget.UnreadableText(_profile);
+        ShowState(); // «читаю лог сервера…» до первого опроса
+        UpdatePolling();
+    }
+
+    /// <summary>Раздел «Сервер» открыт или закрыт.</summary>
+    public void SetActive(bool open)
+    {
+        _sectionOpen = open;
+        UpdatePolling();
+    }
+
+    private void UpdatePolling()
+    {
+        if (!_sectionOpen || _logs is null)
+        {
+            _timer?.Stop();
+            OnPropertyChanged(nameof(IsPolling));
+            return;
+        }
+        if (_timer is null)
+        {
+            _timer = Ui.Timer(PollInterval);
+            _timer.Tick += (_, _) => _ = PollAsync();
+        }
+        if (_timer.IsEnabled) return;
+        _timer.Interval = _error is null ? PollInterval : RetryInterval;
+        _timer.Start();
+        OnPropertyChanged(nameof(IsPolling));
+        _ = PollAsync(); // раздел открыли — сразу, не через три секунды
+    }
+
+    private void Reset()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+        _cts = new CancellationTokenSource();
+        _generation++;
+        _polling = false;
+        _attached = false;
+        _updatedAt = null;
+        _error = null;
+        _past = null;
+        _runRequest++;
+        _current.Clear();
+        _online = [];
+        Lines.Clear();
+        _quietSelection = true;
+        Runs.Clear();
+        SelectedRun = null;
+        _quietSelection = false;
+        OnPropertyChanged(nameof(HasRuns));
+        IsPast = false;
+        RunNote = "";
+        StatusText = "";
+        State = HostedServerState.Unknown;
+        ShowState();
+        OnPropertyChanged(nameof(ShowEmpty));
+    }
+
+    /// <summary>Сменился язык: тексты, собранные в коде, — заново.</summary>
+    public void OnLanguageChanged()
+    {
+        ShowState();
+        if (_error is not null) StatusText = ErrorText(_error);
+        if (_past is not null) RunNote = Outcome(_past);
+        if (_logs is { } logs && Runs.Count > 0)
+        {
+            var chosen = SelectedRun?.Run?.Name;
+            FillRuns(logs, [.. Runs.Select(r => r.Run).OfType<HostedRun>()], chosen);
+        }
+    }
+
+    // ---------- опрос
+
+    /// <summary>
+    /// Один опрос лога: новые строки — в консоль, состояние и игроки — в плитки. Сервер запущен заново — консоль с чистого
+    /// листа и свежий список запусков. Вылетел (или перезапущен после вылета) — найти вылет и показать окно. Сбой сети —
+    /// строкой в статусе, следующий опрос — через <see cref="RetryInterval"/>.
+    /// </summary>
+    public async Task PollAsync()
+    {
+        if (_polling || _logs is not { } logs || _profile is not { } profile) return;
+        _polling = true;
+        var generation = _generation;
+        var ct = _cts.Token;
+        try
+        {
+            HostedLogUpdate update;
+            try
+            {
+                update = await logs.PollAsync(ct);
+            }
+            catch (Exception ex) when (IsExpected(ex))
+            {
+                if (generation != _generation || ct.IsCancellationRequested) return;
+                _error = ex;
+                StatusText = ErrorText(ex);
+                SetInterval(RetryInterval);
+                return;
+            }
+            if (generation != _generation) return; // пока читали, профиль сменили
+            _error = null;
+            StatusText = "";
+            SetInterval(PollInterval);
+
+            var first = !_attached;
+            Apply(logs, update);
+            if (first || update.Restarted) await LoadRunsAsync(logs, generation, ct);
+            if (update.State == HostedServerState.Crashed || update.Restarted) await CheckCrashAsync(logs, profile, ct);
+        }
+        finally
+        {
+            if (generation == _generation) _polling = false;
+        }
+    }
+
+    // таймер окна при смене интервала отсчитывает заново — меняем, только когда интервал правда другой
+    private void SetInterval(TimeSpan interval)
+    {
+        if (_timer is not null && _timer.Interval != interval) _timer.Interval = interval;
+    }
+
+    private void Apply(HostedLogs logs, HostedLogUpdate update)
+    {
+        if (!_attached)
+        {
+            // логи профиля могли читать и раньше (раздел уже открывали, проверка перед изменением модов) — тогда в опросе
+            // только новое, а консоли нужен весь текущий запуск: он у логов есть целиком.
+            // shortcut: проверка из другой вкладки, успевшая прочитать лог между этим опросом и снимком строк, отдаст свои
+            // строки ещё раз со следующим опросом — в консоли они повторятся. Переделать, если станет заметно
+            _attached = true;
+            _current.Clear();
+            _current.AddRange(Tail(logs.Lines, MaxLines));
+            if (!IsPast) ShowCurrent();
+        }
+        else
+        {
+            if (update.Restarted)
+            {
+                _current.Clear();
+                if (!IsPast) Lines.Clear();
+            }
+            _current.AddRange(update.NewLines);
+            if (_current.Count > MaxLines) _current.RemoveRange(0, _current.Count - MaxLines);
+            if (!IsPast && (update.NewLines.Count > 0 || update.Restarted))
+            {
+                var fresh = Lines.Count == 0;
+                foreach (var line in update.NewLines) Lines.Add(Line(line));
+                while (Lines.Count > MaxLines) Lines.RemoveAt(0);
+                LinesAppended?.Invoke(fresh);
+            }
+        }
+        _updatedAt = DateTime.Now;
+        _online = update.Players;
+        State = update.State;
+        ShowState();
+        OnPropertyChanged(nameof(ShowEmpty));
+    }
+
+    /// <summary>Консоль — строки текущего запуска (раздел открыт заново, вернулись из прошлого запуска).</summary>
+    private void ShowCurrent()
+    {
+        Lines.Clear();
+        foreach (var line in _current) Lines.Add(Line(line));
+        LinesAppended?.Invoke(true);
+        OnPropertyChanged(nameof(ShowEmpty));
+    }
+
+    /// <summary>Строка лога — как строка своей консоли: тот же цвет по уровню, та же отсечка огромных строк.</summary>
+    private static ConsoleLineViewModel Line(string text)
+    {
+        if (text.Length > ServerConsole.MaxLineLength) text = string.Concat(text.AsSpan(0, ServerConsole.MaxLineLength), "…");
+        return new ConsoleLineViewModel(new ConsoleLine(0, default, ConsoleLineKind.Output, text));
+    }
+
+    private static IEnumerable<string> Tail(IReadOnlyList<string> lines, int count) => lines.Skip(Math.Max(0, lines.Count - count));
+
+    /// <summary>Плитки: состояние с пометкой «по логу», время работы, игроки.</summary>
+    private void ShowState()
+    {
+        (StateText, StateTone) = State switch
+        {
+            HostedServerState.Starting => (Loc.T("server.stateStarting"), RowTone.Update),
+            HostedServerState.Running => (Loc.T("server.stateRunning"), RowTone.Good),
+            HostedServerState.Stopping => (Loc.T("server.stateStopping"), RowTone.Warn),
+            HostedServerState.Stopped => (Loc.T("server.stateStopped"), RowTone.Muted),
+            HostedServerState.Crashed => (Loc.T("server.hostedStateCrashed"), RowTone.Danger),
+            _ => (Loc.T("server.hostedStateUnknown"), RowTone.Muted),
+        };
+        StateNote = _updatedAt is { } at ? Loc.T("server.hostedByLog", Dates.ClockSeconds(at))
+            : _logs is not null ? Loc.T("server.hostedReadingLog")
+            : "";
+
+        var up = State is HostedServerState.Starting or HostedServerState.Running or HostedServerState.Stopping;
+        UptimeText = up && _logs?.RunStarted is { } started ? Dates.Uptime(DateTime.Now - _logs.ToLocal(started)) : "—";
+        PlayersText = up ? _online.Count.ToString() : "—";
+        PlayerNames = !up ? "" : _online.Count == 0 ? Loc.T("server.playersNone") : string.Join(" · ", _online.Select(p => p.Name));
+        PlayersEmptyText = up ? Loc.T("server.playersNone")
+            : State is HostedServerState.Stopped or HostedServerState.Crashed ? Loc.T("server.hostedPlayersDown")
+            : "—";
+        Players.Clear();
+        if (_logs is { } logs)
+            foreach (var p in _online)
+            {
+                var since = logs.ToLocal(p.Since);
+                Players.Add(new HostedPlayerRow(p.Name, Loc.T("server.hostedPlayerSince", Dates.Clock(since), Dates.Uptime(DateTime.Now - since))));
+            }
+        OnPropertyChanged(nameof(HasPlayers));
+    }
+
+    private static string ErrorText(Exception ex) =>
+        Loc.T("server.hostedRetry", HostedSecret.Describe(ex), (int)RetryInterval.TotalSeconds);
+
+    // ---------- прошлые запуски
+
+    private async Task LoadRunsAsync(HostedLogs logs, int generation, CancellationToken ct)
+    {
+        IReadOnlyList<HostedRun> runs;
+        try
+        {
+            runs = await logs.RunsAsync(ct);
+        }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            return; // список запусков подождёт следующего перезапуска или смены профиля; консоль это не задевает
+        }
+        if (generation != _generation) return;
+        FillRuns(logs, runs, SelectedRun?.Run?.Name);
+    }
+
+    private void FillRuns(HostedLogs logs, IReadOnlyList<HostedRun> runs, string? chosen)
+    {
+        _quietSelection = true;
+        Runs.Clear();
+        Runs.Add(new HostedRunOption(null, Loc.T("server.hostedRunCurrent")));
+        foreach (var run in runs) Runs.Add(new HostedRunOption(run, Dates.Relative(logs.ToLocal(run.Started))));
+        SelectedRun = Runs.FirstOrDefault(r => chosen is not null && r.Run?.Name == chosen) ?? Runs[0];
+        _quietSelection = false;
+        OnPropertyChanged(nameof(HasRuns));
+        if (SelectedRun.Run is null && IsPast) BackToCurrent(); // открытый прошлый запуск пропал из архива
+    }
+
+    partial void OnSelectedRunChanged(HostedRunOption? value)
+    {
+        if (_quietSelection || value is null) return;
+        if (value.Run is null) BackToCurrent();
+        else _ = ShowPastAsync(value.Run);
+    }
+
+    private void BackToCurrent()
+    {
+        _runRequest++;
+        _past = null;
+        RunNote = "";
+        IsPast = false;
+        ShowCurrent();
+    }
+
+    /// <summary>Прошлый запуск — по требованию: его server-main.log целиком (большой — конец) и чем он кончился.</summary>
+    private async Task ShowPastAsync(HostedRun run)
+    {
+        if (_logs is not { } logs) return;
+        var request = ++_runRequest;
+        var ct = _cts.Token;
+        IsPast = true;
+        _past = null;
+        Lines.Clear();
+        RunNote = Loc.T("server.hostedRunReading");
+        try
+        {
+            var log = await logs.ReadRunAsync(run, ct);
+            if (request != _runRequest) return; // пока читали, выбрали другой запуск
+            _past = log;
+            foreach (var line in Tail(log.Lines, PastMaxLines)) Lines.Add(Line(line));
+            RunNote = Outcome(log);
+            LinesAppended?.Invoke(true);
+        }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            if (request == _runRequest && !ct.IsCancellationRequested) RunNote = Loc.T("server.hostedRunFailed", HostedSecret.Describe(ex));
+        }
+    }
+
+    private static string Outcome(HostedRunLog log)
+    {
+        var text = log.Outcome switch
+        {
+            HostedServerState.Crashed => Loc.T("server.hostedRunCrashed"),
+            HostedServerState.Stopped => Loc.T("server.hostedRunStopped"),
+            _ => Loc.T("server.hostedRunCut"),
+        };
+        return log.Truncated || log.Lines.Count > PastMaxLines ? text + " " + Loc.T("server.hostedRunTruncated") : text;
+    }
+
+    // ---------- вылеты
+
+    /// <summary>
+    /// Вылет нашёлся — то же окно, что у своего сервера (с виновником, если нашёлся; выключить его можно прямо из окна).
+    /// Каждый вылет — один раз за окно; случившийся до открытия окна не показываем. Ищем только пока идёт опрос, то есть
+    /// пока раздел открыт.
+    /// </summary>
+    private async Task CheckCrashAsync(HostedLogs logs, GameProfile profile, CancellationToken ct)
+    {
+        HostedCrash? crash;
+        try
+        {
+            crash = await logs.FindCrashAsync(ct);
+        }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            return; // найдётся при следующем опросе
+        }
+        // профиль могли сменить, пока искали, — вылет всё равно настоящий: логи профиля второй раз его не отдадут
+        if (crash is null || !_seenCrashes.Add(crash.Info.Id) || crash.Info.At < CrashesSince) return;
+        AppWindows.Current.ShowServerCrash(_main, profile, crash.Info);
+    }
+
+    /// <summary>«Копировать выделенные строки» в меню консоли — как у своей консоли.</summary>
+    [RelayCommand]
+    private void CopyLines(IList? selected)
+    {
+        if (ConsoleLineViewModel.SelectedText(Lines, selected) is { } text) Ui.Platform.SetClipboard(text);
+    }
+
+    private static bool IsExpected(Exception ex) =>
+        ex is IOException or InvalidOperationException or UnauthorizedAccessException or OperationCanceledException or TimeoutException;
+}

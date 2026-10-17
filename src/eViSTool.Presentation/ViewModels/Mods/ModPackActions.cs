@@ -95,7 +95,7 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
                 return;
             }
             if (AppWindows.Current.ConfirmPackImport(plan) is not { } packChoice) return;
-            if (!installer.ConfirmIfRunning(target)) return;
+            if (!await installer.ConfirmIfRunningAsync(target)) return;
 
             owner.IsBusy = true;
             PackImportResult result;
@@ -128,7 +128,7 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
                 // моды пака, нужные и в других профилях (сервер ↔ клиент), — как у «Добавить»
                 var zips = Directory.Exists(keep) ? Directory.GetFiles(keep, "*.zip", SearchOption.AllDirectories) : [];
                 if (zips.Length > 0 && await installer.PickAlsoForFilesAsync(target, zips) is { Count: > 0 } also)
-                    foreach (var a in also.Where(a => installer.ConfirmIfRunning(a.Target)))
+                    foreach (var a in await installer.ConfirmedAsync(also, x => x.Target))
                         foreach (var (zipPath, _) in a.ToInstall)
                             await ModInstallService.Labelled(a.Target, label: true, alsoDone, alsoProblems,
                                 () => installer.InstallZipAsync(a.Target, zipPath, interactive: false, alsoDone, alsoProblems));

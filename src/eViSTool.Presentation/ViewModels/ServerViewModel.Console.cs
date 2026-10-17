@@ -110,9 +110,6 @@ public sealed partial class ServerViewModel
     [RelayCommand]
     private void CopyLines(IList? selected)
     {
-        if (selected is not { Count: > 0 }) return;
-        var chosen = selected.OfType<ConsoleLineViewModel>().ToHashSet(ReferenceEqualityComparer.Instance);
-        var text = string.Join(Environment.NewLine, Lines.Where(chosen.Contains).Select(l => l.Text));
-        if (text.Length > 0) Ui.Platform.SetClipboard(text);
+        if (ConsoleLineViewModel.SelectedText(Lines, selected) is { } text) Ui.Platform.SetClipboard(text);
     }
 }

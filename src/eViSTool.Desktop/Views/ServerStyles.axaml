@@ -1,0 +1,54 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+        Общее у видов раздела «Сервер»: плитки-показатели и консоль. Свой сервер (ServerView) и сервер у хостера
+        (ServerHostedView) подключают их одинаково — плитки и строки консоли у них выглядят одинаково.
+    -->
+
+    <!-- плитка-показатель над консолью -->
+    <Style Selector="Border.tile">
+        <Setter Property="Padding" Value="16,12" />
+        <Setter Property="Margin" Value="0,0,12,0" />
+    </Style>
+    <Style Selector="TextBlock.tileLabel">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+    </Style>
+    <Style Selector="TextBlock.tileValue">
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+        <Setter Property="Margin" Value="0,4,0,0" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <!-- точка состояния сервера: цвет — от тона (Ellipse.tone в теме), размер крупнее -->
+    <Style Selector="Ellipse.tone.stateDot">
+        <Setter Property="Width" Value="9" />
+        <Setter Property="Height" Value="9" />
+        <Setter Property="Margin" Value="0,0,9,0" />
+    </Style>
+    <!-- консоль: строки плотно, с переносом; выделение — лесное (кисти выделения списков — в теме) -->
+    <Style Selector="ListBox.console ListBoxItem">
+        <Setter Property="Padding" Value="6,1" />
+        <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <!-- цвет строки по смыслу (ConsoleTint): ошибки — розоватые, предупреждения — янтарь, ввод — песок,
+         сообщения eViSTool — дымчато-голубые, чат — зелёный; без оттенка — светлый текст консоли -->
+    <Style Selector="TextBlock.line">
+        <Setter Property="Foreground" Value="#D8DCCF" />
+    </Style>
+    <Style Selector="TextBlock.line.error">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Danger}" />
+    </Style>
+    <Style Selector="TextBlock.line.warning">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
+    </Style>
+    <Style Selector="TextBlock.line.input">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
+    </Style>
+    <Style Selector="TextBlock.line.system">
+        <Setter Property="Foreground" Value="#9FB7C9" />
+    </Style>
+    <Style Selector="TextBlock.line.chat">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Good}" />
+    </Style>
+</Styles>

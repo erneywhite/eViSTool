@@ -62,6 +62,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(PageTitle));
         Mods.SetActive(value == AppTab.Mods);
+        Server.SetSectionActive(value == AppTab.Server); // лог сервера у хостера читается, только пока раздел открыт
         if (value == AppTab.Catalog) _ = Catalog.EnsureLoadedAsync(); // каталог грузим только когда он нужен
         if (value == AppTab.ModConfig) _ = ModConfig.LoadAsync();    // конфиги — тоже, и свежие при каждом заходе
     }

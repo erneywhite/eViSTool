@@ -4,7 +4,6 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
-using Avalonia.VisualTree;
 using eViSTool.Core.Server;
 using eViSTool.Presentation.ViewModels;
 
@@ -18,17 +17,17 @@ namespace eViSTool.Desktop.Views;
 public partial class ServerView : UserControl
 {
     private ServerViewModel? _vm;
+    private readonly ConsoleAutoScroll _scroll;
 
     public ServerView()
     {
         InitializeComponent();
+        _scroll = new ConsoleAutoScroll(ConsoleList);
         // на спуске: свои клавиши поля (Enter, стрелки, Tab) — раньше самого TextBox и перехода фокуса по Tab
         CommandBox.AddHandler(KeyDownEvent, CommandBox_KeyDown, RoutingStrategies.Tunnel);
         CommandBox.LostFocus += CommandBox_LostFocus;
         // щелчок по подсказке: пункт выделяется сам и событие помечает обработанным — берём и такие
         SuggestionList.AddHandler(PointerReleasedEvent, SuggestionList_PointerReleased, RoutingStrategies.Tunnel, handledEventsToo: true);
-        // прокрутку консоли меняет и пользователь, и рост списка — ScrollChanged доходит сюда из прокрутки списка
-        ConsoleList.AddHandler(ScrollViewer.ScrollChangedEvent, ConsoleScroll_Changed);
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -61,40 +60,7 @@ public partial class ServerView : UserControl
 
     // ---------- консоль: прилипает к низу, как терминал, пока пользователь сам не отмотал вверх ----------
 
-    private bool _stick = true;
-    private bool _endPosted;
-
-    private ScrollViewer? Scroll => ConsoleList.FindDescendantOfType<ScrollViewer>();
-
-    private void OnLinesAppended(bool force)
-    {
-        if (force) _stick = true;
-        if (_stick) ScrollToEndLater();
-    }
-
-    // докручиваем после разметки: до неё высота списка ещё старая (особенно с переносом длинных строк)
-    private void ScrollToEndLater()
-    {
-        if (_endPosted) return;
-        _endPosted = true;
-        Dispatcher.UIThread.Post(() =>
-        {
-            _endPosted = false;
-            if (_stick) Scroll?.ScrollToEnd();
-        }, DispatcherPriority.Background);
-    }
-
-    // Внизу — прилипли. Позиция ушла вверх или сдвинулась без изменения высоты — это крутил пользователь: отлипли.
-    // Высота выросла, пока прилипли (новые строки, строки досчитались при прокрутке виртуального списка, окно сжали) —
-    // догоняем низ. Сами мы прокручиваем только вниз, к концу, поэтому сдвиг вверх — всегда человек.
-    private void ConsoleScroll_Changed(object? sender, ScrollChangedEventArgs e)
-    {
-        if (e.Source is not ScrollViewer sv) return;
-        var bottom = Math.Max(0, sv.Extent.Height - sv.Viewport.Height);
-        if (sv.Offset.Y >= bottom - 1) _stick = true;
-        else if (e.OffsetDelta.Y < 0 || (e.ExtentDelta.Y == 0 && e.ViewportDelta.Y == 0)) _stick = false;
-        else if (_stick) ScrollToEndLater();
-    }
+    private void OnLinesAppended(bool force) => _scroll.Appended(force);
 
     // ---------- поле команды ----------
 

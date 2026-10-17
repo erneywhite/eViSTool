@@ -31,19 +31,20 @@ internal sealed class ModInstallActions(ModsViewModel owner, ModInstallService i
             return;
         }
 
-        if (owner.CurrentTarget() is not { } target || !installer.ConfirmIfRunning(target)) return;
+        if (owner.CurrentTarget() is not { } target) return;
 
         var installed = new List<string>();
         var problems = new List<string>();
-        // занято — сразу, до первого await: второе быстрое перетаскивание, пока идёт выбор «поставить также в»,
-        // иначе прошло бы проверку выше и запустило вторую установку
+        // занято — сразу, до первого await: второе быстрое перетаскивание, пока идёт проверка сервера у хостера или выбор
+        // «поставить также в», иначе прошло бы проверку выше и запустило вторую установку
         owner.IsBusy = true;
         try
         {
+            if (!await installer.ConfirmIfRunningAsync(target)) return;
             // моды, нужные и в других профилях (сервер ↔ клиент), — предложить поставить и туда
             var also = await installer.PickAlsoForFilesAsync(target, zips);
             if (also is null) return; // отменили
-            also = [.. also.Where(a => installer.ConfirmIfRunning(a.Target))];
+            also = await installer.ConfirmedAsync(also, a => a.Target);
 
             using var history = ModHistory.Begin(ModHistorySource.Zip);
             foreach (var zip in zips)
@@ -81,7 +82,7 @@ internal sealed class ModInstallActions(ModsViewModel owner, ModInstallService i
 
         var list = string.Join("\n", owner.DependencyIssues.Select(i => "• " + i.Describe()));
         if (!Confirm(Loc.T("mods.fixDepsConfirm", list))) return;
-        if (!installer.ConfirmIfRunning(target)) return;
+        if (!await installer.ConfirmIfRunningAsync(target)) return;
 
         var installed = new List<string>();
         var problems = new List<string>();
@@ -106,8 +107,19 @@ internal sealed class ModInstallActions(ModsViewModel owner, ModInstallService i
         IReadOnlyList<(ModTarget Target, ModDbRelease Release)>? also)
     {
         if (owner.Profile is not { } profile || owner.IsBusy || owner.CurrentTarget() is not { } target) return false;
-        if (!installer.ConfirmIfRunning(target)) return false;
-        var extra = (also ?? []).Where(a => installer.ConfirmIfRunning(a.Target)).ToList(); // игра или сервер там запущены — спросить
+        // занято до первого await: второй щелчок, пока идёт проверка сервера у хостера, не начнёт вторую установку
+        owner.IsBusy = true;
+        List<(ModTarget Target, ModDbRelease Release)>? extra = null;
+        try
+        {
+            if (await installer.ConfirmIfRunningAsync(target))
+                extra = await installer.ConfirmedAsync(also ?? [], a => a.Target); // игра или сервер там запущены — спросить
+        }
+        finally
+        {
+            if (extra is null) owner.IsBusy = false; // не ставим — свободно; ставим — занято и дальше, без мигания
+        }
+        if (extra is null) return false;
 
         var installed = new List<string>();
         var problems = new List<string>();
