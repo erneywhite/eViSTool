@@ -532,6 +532,129 @@ public sealed class FluentFtpFilesTests
         }
     }
 
+    [Fact]
+    public async Task Pasv_RetryThatDidNotHelp_IsNotKept()
+    {
+        var options = MiniFtpOptions.GPortal().Fail("MLSD", null, null); // и по верному адресу передача не пойдёт
+        options.NotImplemented.Add("EPSV");
+        options.PassiveIp = "127.0.0.2";
+        await using var server = new MiniFtpServer(options);
+        await using var files = await ConnectAsync(server, Endpoint(server, timeoutSeconds: 1.5));
+
+        await Assert.ThrowsAsync<RemoteFilesException>(() => files.ListAsync("/", None));
+        Assert.False(files.PassiveUsesControlAddress);
+    }
+
+    [Fact]
+    public async Task ControlTimeout_WithCorrectPasvAddress_DoesNotSwitchToControlAddress()
+    {
+        var options = MiniFtpOptions.GPortal().Fail("MLSD", null, null, once: true);
+        options.NotImplemented.Add("EPSV"); // PASV называет 127.0.0.1 — тот же адрес, что у управляющего соединения
+        await using var server = new MiniFtpServer(options);
+        server.Put("/Mods/a.zip", [1]);
+        await using var files = await ConnectAsync(server, Endpoint(server, timeoutSeconds: 1.5));
+
+        var ex = await Assert.ThrowsAsync<RemoteFilesException>(() => files.ListAsync("/Mods", None));
+        Assert.Equal(RemoteFailure.Timeout, ex.Kind);
+        Assert.False(files.PassiveUsesControlAddress);
+        Assert.Single(await files.ListAsync("/Mods", None));
+    }
+
+    [Fact]
+    public async Task Download_ToNonSeekableStream_IsNotRetried()
+    {
+        var options = MiniFtpOptions.GPortal();
+        options.NotImplemented.Add("EPSV");
+        options.PassiveIp = "127.0.0.2";
+        await using var server = new MiniFtpServer(options);
+        server.Put("/a.zip", [1, 2, 3]);
+        await using var files = await ConnectAsync(server, Endpoint(server, timeoutSeconds: 1.5));
+
+        await Assert.ThrowsAsync<RemoteFilesException>(() => files.DownloadAsync("/a.zip", new ForwardOnlyStream(), null, None));
+        Assert.False(files.PassiveUsesControlAddress);
+        Assert.Equal(1, server.Count("PASV")); // передачу открывали один раз, без повтора
+    }
+
+    [Theory, MemberData(nameof(Modes))]
+    public async Task PathWithDotDot_IsRemoteFilesException(string mode)
+    {
+        await using var server = new MiniFtpServer(Options(mode));
+        await using var files = await ConnectAsync(server);
+        var operations = new Func<Task>[]
+        {
+            () => files.ListAsync("/Mods/../etc", None),
+            () => files.StatAsync("/../a", None),
+            () => files.ReadRangeAsync("/a/../b", 0, 1, None),
+            () => files.DownloadAsync("/..", new MemoryStream(), null, None),
+            () => files.UploadAsync(new MemoryStream([1]), "/../x", null, None),
+            () => files.RenameAsync("/a", "/../b", None),
+            () => files.DeleteFileAsync("/../a", None),
+            () => files.CreateDirectoryAsync("/a/..", None),
+        };
+        foreach (var operation in operations)
+            Assert.Equal(RemoteFailure.Denied, (await Assert.ThrowsAsync<RemoteFilesException>(operation)).Kind);
+    }
+
+    [Theory, MemberData(nameof(Modes))]
+    public async Task Rename_MissingSource_OccupiedTarget_IsNotFound(string mode)
+    {
+        await using var server = new MiniFtpServer(Options(mode));
+        server.Put("/to.zip", [1]);
+        await using var files = await ConnectAsync(server);
+        var ex = await Assert.ThrowsAsync<RemoteFilesException>(() => files.RenameAsync("/from.zip", "/to.zip", None));
+        Assert.Equal(RemoteFailure.NotFound, ex.Kind);
+    }
+
+    [Theory, MemberData(nameof(Modes))]
+    public async Task CreateDirectory_OverFile_IsExists(string mode)
+    {
+        await using var server = new MiniFtpServer(Options(mode));
+        server.Put("/file", [1]);
+        await using var files = await ConnectAsync(server);
+        var ex = await Assert.ThrowsAsync<RemoteFilesException>(() => files.CreateDirectoryAsync("/file", None));
+        Assert.Equal(RemoteFailure.Exists, ex.Kind);
+    }
+
+    [Theory, MemberData(nameof(Modes))]
+    public async Task List_OfFile_IsNotFound_FolderWithSameNamedFileIsListed(string mode)
+    {
+        await using var server = new MiniFtpServer(Options(mode));
+        server.Put("/Mods/a.zip", [1]);
+        server.Put("/Mods/Mods", [2]); // папка, где лежит файл с её же именем
+        await using var files = await ConnectAsync(server);
+        var ex = await Assert.ThrowsAsync<RemoteFilesException>(() => files.ListAsync("/Mods/a.zip", None));
+        Assert.Equal(RemoteFailure.NotFound, ex.Kind);
+        Assert.Equal(2, (await files.ListAsync("/Mods", None)).Count);
+    }
+
+    [Fact]
+    public void Translate_PasswordOnlyInInnerException_DropsChain()
+    {
+        const string password = "глубоко-спрятанный-42";
+        var endpoint = new HostedEndpoint(HostedProtocol.Ftp, "127.0.0.1", 21, FtpTls.None, "u", password, false, null);
+        var files = new FluentFtpFiles(endpoint);
+        var ex = new IOException("connection reset", new InvalidOperationException("wrapped", new Exception("server said " + password)));
+
+        var error = files.Translate(ex, "list", "/Mods");
+        Assert.Equal(RemoteFailure.Connect, error.Kind);
+        Assert.DoesNotContain(password, error.ToString());
+    }
+
+    /// <summary>Поток только вперёд, как сетевой: перемотать нельзя.</summary>
+    private sealed class ForwardOnlyStream : Stream
+    {
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) { }
+    }
+
     // ---------- регистрация
 
     [Fact]

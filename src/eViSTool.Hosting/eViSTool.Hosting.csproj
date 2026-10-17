@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- клиент FTP/FTPS (MIT); на net10 берётся сборка net8, своих зависимостей нет -->
+    <!-- клиент FTP/FTPS (MIT); на net10 берётся сборка net9.0, своих зависимостей нет -->
     <PackageReference Include="FluentFTP" Version="55.0.0" />
   </ItemGroup>
 

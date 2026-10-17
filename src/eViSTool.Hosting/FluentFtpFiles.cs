@@ -1,7 +1,9 @@
+using System.Net;
 using System.Net.Security;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using eViSTool.Core.Hosting;
 using FluentFTP;
 
@@ -15,7 +17,7 @@ namespace eViSTool.Hosting;
 /// на LIST; время файла — из MLSD, MDTM не нужен. Прерванная посреди файла передача у G-Portal убивает управляющее
 /// соединение, поэтому после неё соединение сразу бросается и открывается заново при следующей операции.</para>
 /// </summary>
-public sealed class FluentFtpFiles(HostedEndpoint endpoint) : IRemoteFiles
+public sealed partial class FluentFtpFiles(HostedEndpoint endpoint) : IRemoteFiles
 {
     /// <summary>Сколько соединение может простоять, прежде чем перед операцией его проверят командой PWD.</summary>
     internal TimeSpan IdleCheck { get; init; } = TimeSpan.FromSeconds(30);
@@ -25,6 +27,7 @@ public sealed class FluentFtpFiles(HostedEndpoint endpoint) : IRemoteFiles
     private bool? _mlsd;              // null — ещё не пробовали; сервер может уметь MLSD, не объявляя его в FEAT
     private bool _rangeReads = true;  // REST пробуем, пока сервер не откажет
     private bool _passiveConnectionIp; // PASV назвал недоступный адрес — данные идут на адрес управляющего соединения
+    private IPAddress? _controlAddress; // куда на самом деле подключено управляющее соединение
     private string? _banner;
     private DateTime _lastUse;
     private (string Sha256, string Subject)? _rejectedCertificate;
@@ -46,6 +49,7 @@ public sealed class FluentFtpFiles(HostedEndpoint endpoint) : IRemoteFiles
         try
         {
             await client.Connect(ct).ConfigureAwait(false);
+            _controlAddress = client.SocketRemoteEndPoint is IPEndPoint control ? Unmap(control.Address) : null;
             _banner = client.LastReplies?.LastOrDefault(r => r.Code == "220") is { } hello ? "220 " + hello.Message : null;
             await ProbeFeaturesAsync(client, ct).ConfigureAwait(false);
         }
@@ -145,20 +149,23 @@ public sealed class FluentFtpFiles(HostedEndpoint endpoint) : IRemoteFiles
 
     // ---------- чтение
 
+    /// <summary>Перечислить папку. Папки нет или по пути лежит файл — <see cref="RemoteFailure.NotFound"/>.</summary>
     public async Task<IReadOnlyList<RemoteEntry>> ListAsync(string dir, CancellationToken ct)
     {
         dir = CheckPath(dir);
         try
         {
             var list = await ListCoreAsync(dir, ct).ConfigureAwait(false);
-            // vsftpd на LIST несуществующей папки отвечает пустым списком, а не 550
-            if (list.Count == 0 && dir != "/" && await StatCoreAsync(dir, ct).ConfigureAwait(false) is not { IsDirectory: true })
+            // vsftpd на LIST несуществующей папки отвечает пустым списком, а не 550, а на LIST файла — строкой про сам
+            // файл. В обоих случаях смотрим листинг родителя: папка ли это на самом деле
+            var maybeFile = list is [{ IsDirectory: false } only] && only.Name == RemotePath.Name(dir);
+            if ((list.Count == 0 || maybeFile) && dir != "/" && await StatCoreAsync(dir, ct).ConfigureAwait(false) is not { IsDirectory: true })
                 throw new RemoteFilesException(RemoteFailure.NotFound, $"list {dir}: no such directory");
             return list;
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            throw await RefineAsync(Translate(ex, "list", dir), dir, ct).ConfigureAwait(false);
+            throw await RefineAsync(Translate(ex, "list", dir), dir, ct, directory: true).ConfigureAwait(false);
         }
     }
 
@@ -321,7 +328,7 @@ public sealed class FluentFtpFiles(HostedEndpoint endpoint) : IRemoteFiles
                 if (!await client.DownloadStream(destination, path, 0, Bytes(progress), ct).ConfigureAwait(false))
                     throw new RemoteFilesException(RemoteFailure.Protocol, $"download {path}: transfer failed");
                 return true;
-            }, ct).ConfigureAwait(false);
+            }, ct, canRetry: destination.CanSeek).ConfigureAwait(false); // без перемотки повтор дописал бы файл второй раз
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
@@ -370,11 +377,12 @@ public sealed class FluentFtpFiles(HostedEndpoint endpoint) : IRemoteFiles
         {
             var error = Translate(ex, "rename", from);
             if (error.Kind is not (RemoteFailure.NotFound or RemoteFailure.Denied or RemoteFailure.Protocol)) throw error;
+            // сначала источник: нет его — переименовывать нечего, чем бы ни было занято назначение
+            if (await ExistsQuietAsync(from, ct).ConfigureAwait(false) == false)
+                throw new RemoteFilesException(RemoteFailure.NotFound, $"rename {from}: not found", error.InnerException);
             // G-Portal поверх не переименовывает: «550 path already exists»
             if (await ExistsQuietAsync(to, ct).ConfigureAwait(false) == true)
-                throw new RemoteFilesException(RemoteFailure.Exists, $"rename {from} -> {to}: target exists", ex);
-            if (await ExistsQuietAsync(from, ct).ConfigureAwait(false) == false)
-                throw new RemoteFilesException(RemoteFailure.NotFound, $"rename {from}: not found", ex);
+                throw new RemoteFilesException(RemoteFailure.Exists, $"rename {from} -> {to}: target exists", error.InnerException);
             throw error;
         }
     }
@@ -406,6 +414,7 @@ public sealed class FluentFtpFiles(HostedEndpoint endpoint) : IRemoteFiles
             if (reply.Success) return;
             var existing = await StatCoreAsync(path, ct).ConfigureAwait(false);
             if (existing is { IsDirectory: true }) return;
+            if (existing is not null) throw new RemoteFilesException(RemoteFailure.Exists, $"mkdir {path}: a file with this name exists");
             if (existing is null && await StatCoreAsync(RemotePath.Parent(path), ct).ConfigureAwait(false) is null)
             {
                 await CreateDirectoryAsync(RemotePath.Parent(path), ct).ConfigureAwait(false);
@@ -433,22 +442,55 @@ public sealed class FluentFtpFiles(HostedEndpoint endpoint) : IRemoteFiles
 
     // ---------- общее
 
-    /// <summary>Передача не открылась: если PASV назвал адрес, до которого не достучаться (NAT хостера), — один повтор
-    /// с адресом управляющего соединения.</summary>
+    /// <summary>Данные идут на адрес управляющего соединения, а не на адрес из PASV (для тестов).</summary>
+    internal bool PassiveUsesControlAddress => _passiveConnectionIp;
+
+    /// <summary>Передача не открылась, а PASV назвал не тот адрес, к которому подключено управляющее соединение (NAT
+    /// хостера), — один повтор с адресом управляющего соединения. Помогло — так и дальше; не помогло — снова по PASV.</summary>
     private async Task<T> WithDataRetryAsync<T>(Func<Task<T>> work, CancellationToken ct, bool canRetry = true)
     {
         try { return await work().ConfigureAwait(false); }
-        catch (Exception ex) when (canRetry && !endpoint.ActiveMode && !_passiveConnectionIp && !ct.IsCancellationRequested && IsDataConnectFailure(ex))
+        catch (Exception ex) when (canRetry && !endpoint.ActiveMode && !_passiveConnectionIp && !ct.IsCancellationRequested
+                                   && IsDataConnectFailure(ex) && PasvNamedOtherAddress(_client))
         {
             // shortcut: PASVEX работает только по IPv4; если появятся хостеры с FTP по IPv6 — повторять через EPSV
-            _passiveConnectionIp = true;
-            if (_client is { } client) client.Config.DataConnectionType = FtpDataConnectionType.PASVEX;
-            return await work().ConfigureAwait(false);
+            SetPassiveConnectionIp(true);
+            try { return await work().ConfigureAwait(false); }
+            catch
+            {
+                SetPassiveConnectionIp(false);
+                throw;
+            }
         }
+    }
+
+    private void SetPassiveConnectionIp(bool on)
+    {
+        _passiveConnectionIp = on;
+        if (_client is { } client)
+            client.Config.DataConnectionType = on ? FtpDataConnectionType.PASVEX : FtpDataConnectionType.AutoPassive;
     }
 
     private static bool IsDataConnectFailure(Exception ex) =>
         TranslateStatic(ex, "").Kind is RemoteFailure.Connect or RemoteFailure.Timeout && ex is not RemoteFilesException;
+
+    /// <summary>Последний ответ 227 назвал адрес, отличный от адреса управляющего соединения. Нет 227 (шёл EPSV, а он и
+    /// так ведёт на адрес управляющего соединения), соединение брошено посреди передачи или адрес тот же — повтор через
+    /// PASVEX ничего не изменит: сбой не в адресе.</summary>
+    private bool PasvNamedOtherAddress(AsyncFtpClient? client)
+    {
+        // LastReplies — несколько последних ответов, свежий первым
+        if (client?.LastReplies?.FirstOrDefault(r => r.Code == "227") is not { } pasv) return false;
+        var match = PasvAddress().Match(pasv.Message ?? "");
+        if (!match.Success || !IPAddress.TryParse(match.Groups[1].Value.Replace(',', '.'), out var named)) return false;
+        return _controlAddress is null || !named.Equals(_controlAddress);
+    }
+
+    // адрес — по скобкам, текст вокруг у хостеров свой («227 listen socket already exists (h1,h2,h3,h4,p1,p2)»)
+    [GeneratedRegex(@"\((\d{1,3}(?:,\d{1,3}){3}),\d{1,3},\d{1,3}\)")]
+    private static partial Regex PasvAddress();
+
+    private static IPAddress Unmap(IPAddress address) => address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address;
 
     private static IProgress<FtpProgress>? Bytes(IProgress<long>? progress) =>
         progress is null ? null : new BytesProgress(progress);
@@ -459,24 +501,27 @@ public sealed class FluentFtpFiles(HostedEndpoint endpoint) : IRemoteFiles
         public void Report(FtpProgress value) => target.Report(value.TransferredBytes);
     }
 
-    /// <summary>Путь из Core уже нормализован; здесь — страховка от перевода строки в команде FTP.</summary>
+    /// <summary>Путь из Core уже нормализован; здесь — страховка от перевода строки в команде FTP и от «..».</summary>
     private static string CheckPath(string path)
     {
         if (path.AsSpan().IndexOfAny('\r', '\n') >= 0) throw new RemoteFilesException(RemoteFailure.Denied, "bad path");
-        return RemotePath.Normalize(path);
+        try { return RemotePath.Normalize(path); }
+        catch (InvalidDataException ex) { throw new RemoteFilesException(RemoteFailure.Denied, $"bad path: {ex.Message}", ex); }
     }
 
-    private async Task<bool?> ExistsQuietAsync(string path, CancellationToken ct)
+    /// <summary>Есть ли путь (при <paramref name="directory"/> — есть ли там папка); не удалось узнать — null.</summary>
+    private async Task<bool?> ExistsQuietAsync(string path, CancellationToken ct, bool directory = false)
     {
-        try { return await StatCoreAsync(path, ct).ConfigureAwait(false) is not null; }
+        try { return await StatCoreAsync(path, ct).ConfigureAwait(false) is { } entry && (!directory || entry.IsDirectory); }
         catch (Exception ex) when (ex is not OperationCanceledException) { return null; }
     }
 
-    /// <summary>550 бывает и «нет такого», и «нельзя»: уточняем по листингу.</summary>
-    private async Task<RemoteFilesException> RefineAsync(RemoteFilesException error, string path, CancellationToken ct)
+    /// <summary>550 бывает и «нет такого», и «нельзя»: уточняем по листингу. Для листинга <paramref name="directory"/>:
+    /// файл на месте папки — тоже «нет такого».</summary>
+    private async Task<RemoteFilesException> RefineAsync(RemoteFilesException error, string path, CancellationToken ct, bool directory = false)
     {
         if (error.Kind is not (RemoteFailure.NotFound or RemoteFailure.Denied)) return error;
-        return await ExistsQuietAsync(path, ct).ConfigureAwait(false) switch
+        return await ExistsQuietAsync(path, ct, directory).ConfigureAwait(false) switch
         {
             false when error.Kind != RemoteFailure.NotFound => new RemoteFilesException(RemoteFailure.NotFound, error.Message, error.InnerException),
             true when error.Kind != RemoteFailure.Denied => new RemoteFilesException(RemoteFailure.Denied, error.Message, error.InnerException),
@@ -499,23 +544,27 @@ public sealed class FluentFtpFiles(HostedEndpoint endpoint) : IRemoteFiles
 
     /// <summary>Любое исключение FluentFTP и сети — в <see cref="RemoteFilesException"/>. Пароль в текст не попадает:
     /// сообщения строятся из ответа сервера, пути и текста ошибки сокета, а на всякий случай ещё и вычищаются.</summary>
-    private RemoteFilesException Translate(Exception ex, string op, string? path)
+    internal RemoteFilesException Translate(Exception ex, string op, string? path)
     {
         var where = path is null ? op : $"{op} {path}";
         if (ex is RemoteFilesException rfe) return rfe;
+        // пароль хоть где-то в цепочке (и во внутренних исключениях) — цепочку не прикладываем вовсе
+        var leaks = Leaks(ex.ToString());
         if (_rejectedCertificate is { } cert && Chain(ex).Any(e => e is AuthenticationException or FluentFTP.Exceptions.FtpInvalidCertificateException))
         {
-            return new RemoteFilesException(RemoteFailure.CertificateUntrusted, Scrub($"{where}: untrusted certificate {cert.Subject}"), ex)
+            return new RemoteFilesException(RemoteFailure.CertificateUntrusted, Scrub($"{where}: untrusted certificate {cert.Subject}"), leaks ? null : ex)
             {
                 CertificateSha256 = cert.Sha256,
                 CertificateSubject = cert.Subject,
             };
         }
         var translated = TranslateStatic(ex, where);
-        return translated.Message.Contains(endpoint.Password, StringComparison.Ordinal) && endpoint.Password.Length > 0
+        return leaks || Leaks(translated.Message)
             ? new RemoteFilesException(translated.Kind, Scrub(translated.Message), null)
             : translated;
     }
+
+    private bool Leaks(string text) => endpoint.Password.Length > 0 && text.Contains(endpoint.Password, StringComparison.Ordinal);
 
     private static RemoteFilesException TranslateStatic(Exception ex, string where)
     {
