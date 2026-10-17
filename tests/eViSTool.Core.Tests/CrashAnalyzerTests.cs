@@ -193,6 +193,25 @@ public sealed class CrashAnalyzerTests : IDisposable
     }
 
     [Fact]
+    public void HostedServer_ProcessCrash_WithTheGamesCrashReport_NamesTheModByTheStack()
+    {
+        // настоящий вылет процесса на G-Portal: исключение в фоновом потоке мода, отчёт server-crash.log без списка
+        // модов («Loaded Mods:» пуст) и с датой в американском формате; код модов на FTP не читается
+        var mods = ModFingerprints.WithoutCode([
+            ModScanner.FromModInfo("/Mods/evistoolcrashtest_1.0.1.zip",
+                """{ "modid": "evistoolcrashtest", "name": "eViSTool crash test", "version": "1.0.1" }"""),
+        ]);
+        var report = File.ReadAllText(Path.Combine(Data, "hosted-process-crash.log"));
+
+        var finding = CrashAnalyzer.AnalyzeServer(Log("hosted-process-crash-main.log"), report, crashedExit: true, mods);
+
+        Assert.NotNull(finding);
+        Assert.Equal("evistoolcrashtest", finding.Culprit?.ModId);
+        Assert.Equal("1.0.1", finding.Culprit?.Version);
+        Assert.Contains("deliberate process crash", finding.Error);
+    }
+
+    [Fact]
     public void ModsWithoutReadCode_AreGuessedByTheNamespaceName_OnlyOnAFullMatch()
     {
         // у хостера код модов не читается: стек «EvistoolCrashTest.…» узнаётся по modid, а похожие имена — нет

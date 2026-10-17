@@ -1,0 +1,6 @@
+Game Version: v1.22.7 (Stable)
+10/17/2026 20:53:23: Critical error occurred
+Loaded Mods: 
+System.InvalidOperationException: eViSTool crash test: deliberate process crash
+   at EvistoolCrashTest.CrashTestSystem.Boom()
+   at System.Threading.Thread.StartCallback()
