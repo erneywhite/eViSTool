@@ -13,7 +13,8 @@ namespace eViSTool.Presentation.ViewModels;
 /// фоновых наблюдателей; профили — в MainViewModel.Profiles.cs, «Играть» — в MainViewModel.Play.cs, настройки
 /// программы — в MainViewModel.Settings.cs. Работа без привязок вынесена в свои классы: наблюдение за игрой
 /// (<see cref="GameWatcher"/>), за падениями серверов (<see cref="ServerCrashWatcher"/>), агенты удалённого доступа
-/// (<see cref="RemoteAgentKeeper"/>), обновление программы (<see cref="UpdatePrompt"/>, <see cref="DiskUpdateWatcher"/>),
+/// (<see cref="RemoteAgentKeeper"/>), оповещения серверов у хостера (<see cref="HostedWatch"/>), обновление программы
+/// (<see cref="UpdatePrompt"/>, <see cref="DiskUpdateWatcher"/>),
 /// окна и файлы при добавлении и удалении профилей (<see cref="ProfileActions"/>), сборка меню «Играть» (<see cref="PlayMenu"/>).
 /// </summary>
 public sealed partial class MainViewModel : ObservableObject
@@ -69,6 +70,12 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Каналы оповещений этого компьютера — карточка в «Настройках».</summary>
     public NotifyChannelsViewModel Notify { get; } = new();
+
+    /// <summary>Проверки обновлений модов серверов у хостера: общие у сторожа оповещений и плашки «Обновить всё».</summary>
+    public HostedModUpdates HostedUpdates { get; }
+
+    /// <summary>Оповещения серверов у хостера: агента там нет, шлёт само окно, пока открыто.</summary>
+    public HostedWatch HostedWatch { get; }
 
     // ---- наблюдение за запущенной игрой (сама работа — в GameWatcher)
 
@@ -184,6 +191,9 @@ public sealed partial class MainViewModel : ObservableObject
         OnEditedProfileChanged(_editedProfile); // поле выше задано мимо свойства — связи и копии миров собрать самим
 
         var db = new ModDbClient();
+        // обновления модов у хостера — тем же путём, что «Проверить» в «Моих модах», с той же настройкой пре-релизов
+        HostedUpdates = new HostedModUpdates((target, ct) => Core.Mods.ModUpdatesDue.CheckAsync(target, new Core.Mods.ModUpdateService(db), AllowUnstable, ct));
+        HostedWatch = new HostedWatch(Profiles, HostedUpdates);
         Mods = new ModsViewModel(this, db);
         Catalog = new CatalogViewModel(this, db);
         ModConfig = new ModConfigViewModel(this);
@@ -204,6 +214,7 @@ public sealed partial class MainViewModel : ObservableObject
         _diskUpdate.Start();
         LoadErrorReport();
         _serverCrashes.Start();
+        HostedWatch.Start(); // у хостера оповещения шлёт окно: лог раз в минуту, обновления модов раз в 6 часов
         _ = CheckGameAsync();
         _ = _remoteAgents.KeepAsync();
     }

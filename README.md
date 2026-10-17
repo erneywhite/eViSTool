@@ -444,6 +444,15 @@ A running server won't see new mods, so before a change eViSTool checks the log:
 goes ahead, otherwise it asks you to stop it in the host's panel. Starting and stopping the server and console
 commands stay in the host's panel. The password is stored encrypted and is never shown. SFTP is not supported yet.
 
+When the log says the server is stopped and mod updates are out, the Server section shows an Update all bar. It is
+the same operation as in My mods, old versions are kept for rollback. Then you start the server in the host's panel.
+
+Notifications are set up on the Notifications tab of the Server section, with the same channels as for your own
+server. There is no agent at the host, so eViSTool itself sends them while it is open on your computer: it reads the
+log once a minute and checks mod updates every 6 hours. It tells you when the server crashed (and which mod is to
+blame, if one is found), started or stopped, a player joined or left, the server can't keep up, mod updates are out or
+mods were updated. Once eViSTool is closed, nobody is watching the server.
+
 ## Server on Linux
 
 Dedicated Vintage Story servers often live on Linux. eViSTool goes there next to the server: an agent without a window

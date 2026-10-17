@@ -188,6 +188,9 @@ public sealed partial class ModsViewModel : ObservableObject
         _hosted.SetActive(active);
     }
 
+    /// <summary>Сторож оповещений серверов у хостера: ему — что окно поставило на сервер («Обновлены моды»).</summary>
+    internal HostedWatch? HostedWatch => _main.HostedWatch;
+
     /// <summary>Источник модов сервера у хостера — тесты сверяют с ним часы и опрос.</summary>
     internal HostedModSource HostedSource => _hosted;
 
@@ -570,6 +573,7 @@ public sealed partial class ModsViewModel : ObservableObject
     /// <summary>Итог операции: таблица перечитана, итоговая строка — в статус, что требует внимания — отдельным окном.</summary>
     internal async Task ReportAsync(string title, List<string> installed, List<string> problems)
     {
+        _main.HostedWatch?.ModsChangeDone(); // поставленное на сервер у хостера — оповещением «Обновлены моды»
         await ReloadAsync();
         _ = FetchNewModsAsync();
         // зависимости — по итоговому состоянию, а не на момент установки каждого мода
@@ -624,6 +628,21 @@ public sealed partial class ModsViewModel : ObservableObject
         var list = string.Join("\n", todo.Select(r => $"• {r.Name}: {r.Installed} → {r.Latest}"));
         if (CurrentTarget() is not { } target || !Confirm(Loc.T("mods.updateAllConfirm", todo.Count, list))) return;
         Enqueue(todo.Select(r => QueueItemFor(target, r, r.Result.LatestCompatible!)), ModHistorySource.UpdateAll);
+    }
+
+    /// <summary>
+    /// «Обновить всё» по готовому списку — для плашки раздела «Сервер» у хостера: тот же вопрос со списком и та же
+    /// очередь (копии прежних версий, журнал, история «Обновить всё»), у хостера — та же проверка по логу перед вопросом
+    /// «останови сервер». Возвращает, встали ли пункты в очередь: отказались или вкладка занята другим — false.
+    /// </summary>
+    internal async Task<bool> UpdateAllAsync(ModTarget target, IReadOnlyList<UpdateQueueItem> items)
+    {
+        if (items.Count == 0 || !_queue.CanEnqueue) return false;
+        var list = string.Join("\n", items.Select(i => $"• {i.Name}: {i.From} → {i.To}"));
+        if (!Confirm(Loc.T("mods.updateAllConfirm", items.Count, list))) return false;
+        if (target.IsHosted) await EnqueueCheckedAsync([.. items], [target], ModHistorySource.UpdateAll, null);
+        else _queue.Enqueue(items, ModHistorySource.UpdateAll);
+        return items.Any(Queue.Contains);
     }
 
     private static UpdateQueueItem QueueItemFor(ModTarget target, ModRowViewModel row, ModDbRelease release) =>
@@ -743,9 +762,12 @@ public sealed partial class ModsViewModel : ObservableObject
             set => owner.IsBusy = value;
         }
 
-        // итог прогона: на сервере у хостера что-то поставилось — напомнить запустить его в панели
-        public void SetStatus(string text) => owner.StatusText =
-            WithStartHint(text, owner._queue.Items.Any(i => i.State == QueueState.Done && i.Target.IsHosted));
+        // итог прогона: на сервере у хостера что-то поставилось — напомнить запустить его в панели и оповестить
+        public void SetStatus(string text)
+        {
+            owner._main.HostedWatch?.ModsChangeDone();
+            owner.StatusText = WithStartHint(text, owner._queue.Items.Any(i => i.State == QueueState.Done && i.Target.IsHosted));
+        }
 
         public bool IsActive(ModTarget target) => owner._installer.IsActive(target);
 

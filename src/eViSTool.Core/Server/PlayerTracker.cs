@@ -27,12 +27,16 @@ public sealed partial class PlayerTracker
         get { lock (_lock) return [.. _online.Values.OrderBy(p => p.Since)]; }
     }
 
-    /// <summary>Разобрать строку консоли сервера (с отметкой времени и уровнем или без них).</summary>
-    public void Process(string line, DateTime time)
+    /// <summary>
+    /// Разобрать строку консоли сервера (с отметкой времени и уровнем или без них). true — список изменился (в том числе
+    /// новое время входа у того, кто вошёл повторно, не выйдя).
+    /// </summary>
+    public bool Process(string line, DateTime time)
     {
         bool changed;
         lock (_lock) changed = Apply(line, time);
         if (changed) Changed?.Invoke();
+        return changed;
     }
 
     /// <summary>Сервер остановлен или запускается заново — на нём никого.</summary>

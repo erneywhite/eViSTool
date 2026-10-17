@@ -20,8 +20,8 @@
             <TextBlock Text="{Binding ErrorText}" FontSize="12" Foreground="{DynamicResource Forest.Danger}" TextWrapping="Wrap" Margin="2,0,0,10"
                        IsVisible="{Binding ErrorText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" AutomationProperties.AutomationId="SrvNotifyError" />
 
-            <!-- чат игры → Discord -->
-            <Border Classes="card notifyCard">
+            <!-- чат игры → Discord (только у своего сервера: у хостера моста чата нет) -->
+            <Border Classes="card notifyCard" IsVisible="{Binding !IsHosted}" AutomationProperties.AutomationId="ChatCard">
                 <StackPanel>
                     <TextBlock Text="{local:Tr chat.title}" Classes="cardTitle" />
                     <TextBlock Text="{local:Tr chat.hint}" Classes="hint" />
@@ -45,12 +45,15 @@
             <Border Classes="card notifyCard">
                 <StackPanel>
                     <DockPanel>
-                        <Button DockPanel.Dock="Right" Content="{local:Tr srvnotify.test}" Command="{Binding TestCommand}" Padding="12,6" VerticalAlignment="Top"
-                                ToolTip.Tip="{local:Tr srvnotify.testTip}" ToolTip.ShowOnDisabled="True" Margin="16,0,0,0"
+                        <Button DockPanel.Dock="Right" Content="{Binding TestText}" Command="{Binding TestCommand}" Padding="12,6" VerticalAlignment="Top"
+                                ToolTip.Tip="{Binding TestTip}" ToolTip.ShowOnDisabled="True" Margin="16,0,0,0"
                                 AutomationProperties.AutomationId="SrvNotifyTest" />
                         <StackPanel>
                             <TextBlock Text="{local:Tr srvnotify.title}" Classes="cardTitle" />
-                            <TextBlock Text="{local:Tr srvnotify.hint}" Classes="hint" />
+                            <TextBlock Text="{local:Tr srvnotify.hint}" Classes="hint" IsVisible="{Binding !IsHosted}" />
+                            <!-- у хостера шлёт само окно: закрыто — никто не следит -->
+                            <TextBlock Text="{local:Tr srvnotify.hostedHint}" Classes="hint" IsVisible="{Binding IsHosted}"
+                                       AutomationProperties.AutomationId="SrvNotifyHostedHint" />
                         </StackPanel>
                     </DockPanel>
 

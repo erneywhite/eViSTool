@@ -6,6 +6,7 @@ using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using eViSTool.Core;
+using eViSTool.Core.Localization;
 using eViSTool.Core.Notifications;
 using eViSTool.Core.Profiles;
 using eViSTool.Desktop.Platform;
@@ -63,8 +64,12 @@ public sealed class ServerNotifyTabTests : IDisposable
         app.Styles.Add(_themeStyles);
     }
 
-    /// <summary>Вкладка на экране: каналы и настройки сервера записаны на диск, модель прочитала их при открытии вкладки.</summary>
-    private async Task<(Window Window, ServerNotifyViewModel Model)> Open(IReadOnlyList<NotifyChannel> channels, ServerNotifySettings? settings = null)
+    /// <summary>
+    /// Вкладка на экране: каналы и настройки сервера записаны на диск, модель прочитала их при открытии вкладки.
+    /// <paramref name="hosted"/> — вкладка сервера у хостера.
+    /// </summary>
+    private async Task<(Window Window, ServerNotifyViewModel Model)> Open(IReadOnlyList<NotifyChannel> channels, ServerNotifySettings? settings = null,
+        bool hosted = false)
     {
         Assert.SkipUnless(AppPaths.IsPortable, "данные рядом с тестами недоступны для записи — настоящие данные пользователя не трогаем");
         AddTheme();
@@ -72,8 +77,11 @@ public sealed class ServerNotifyTabTests : IDisposable
         NotifyChannels.Save(AppPaths.Root, channels);
         (settings ?? new ServerNotifySettings()).Save(_profileId);
 
-        var model = new ServerNotifyViewModel(new ServerViewModel(null!));
-        model.OnProfileSwitched(new GameProfile { Id = _profileId, Name = "Стенд", Kind = ProfileKind.Server });
+        var model = new ServerNotifyViewModel(new ServerViewModel(null!), hosted);
+        model.OnProfileSwitched(hosted
+            ? new GameProfile { Id = _profileId, Name = "Стенд", Kind = ProfileKind.Server, RemoteCode = GameProfile.HostedMarker,
+                Hosted = new Core.Hosting.HostedConnection { Host = "198.51.100.7", Port = 58021, User = "gp_user" } }
+            : new GameProfile { Id = _profileId, Name = "Стенд", Kind = ProfileKind.Server });
         model.SetActive(true);
         Assert.True(model.Loaded);
 
@@ -149,6 +157,28 @@ public sealed class ServerNotifyTabTests : IDisposable
         Assert.True(open.IsEffectivelyVisible);
         Assert.False(table.IsEffectivelyVisible);
         Assert.False(Named(window, "ChatChannel").IsEffectivelyVisible); // Discord-каналов нет — выбирать нечего
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task Hosted_server_has_only_its_events_no_game_chat_and_says_the_window_sends_them()
+    {
+        var (window, model) = await Open([Telegram, Server], hosted: true);
+
+        Assert.False(Named(window, "ChatCard").IsVisible); // мост чата в Discord — только у своего сервера
+        var hint = (TextBlock)Named(window, "SrvNotifyHostedHint");
+        Assert.True(hint.IsEffectivelyVisible);
+        Assert.Equal(Loc.T("srvnotify.hostedHint"), hint.Text); // шлёт окно: закрыто — никто не следит
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == Loc.T("srvnotify.hint") && t.IsEffectivelyVisible);
+        Assert.Equal(HostedWatch.Events.Order(), model.Rows.Select(r => r.Event).Order());
+        Assert.Equal(Loc.T("notify.test"), ((Button)Named(window, "SrvNotifyTest")).Content); // проверочное — отсюда, не «с сервера»
+
+        var switches = window.GetVisualDescendants().OfType<CheckBox>()
+            .Where(c => AutomationProperties.GetName(c) is "Telegram: админы" or "Discord: сервер").ToList();
+        Assert.Equal(HostedWatch.Events.Count * 2, switches.Count);
+        switches[0].IsChecked = true; // «Сервер упал» → Telegram
+        await Wait.Until(() => ServerNotifySettings.Load(_profileId).IsOn(NotifyEvent.ServerCrashed, "tg1"));
+        Assert.Null(ServerNotifySettings.Load(_profileId).ChatChannelId);
         window.Close();
     }
 

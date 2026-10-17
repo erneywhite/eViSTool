@@ -122,9 +122,11 @@ public sealed record ServerNotifyUpload
 
 /// <summary>
 /// Отправка оповещений сервера: по настройкам (читаются при каждом событии — правки из окна действуют сразу), в фоне,
-/// ошибки — в <paramref name="report"/> (агент пишет их в консоль сервера).
+/// ошибки — в <paramref name="report"/> (агент пишет их в консоль сервера, окно — в строку вкладки «Оповещения»).
 /// </summary>
-public sealed class ServerNotifier(Func<ServerNotifySettings> settings, HttpClient http, Action<string, string> report)
+/// <param name="send">Отправка в канал; null — настоящая (<see cref="Notifier"/>). Тесты перехватывают сообщения здесь.</param>
+public sealed class ServerNotifier(Func<ServerNotifySettings> settings, HttpClient http, Action<string, string> report,
+    Func<NotifyChannel, NotifyMessage, Task>? send = null)
 {
     /// <summary>Цвет события: проблемы — красные, «скоро перезапуск» — жёлтый, моды — синие, запуск — зелёный.</summary>
     public static NotifySeverity SeverityOf(NotifyEvent e) => e switch
@@ -137,8 +139,14 @@ public sealed class ServerNotifier(Func<ServerNotifySettings> settings, HttpClie
     };
 
     /// <summary>Сообщить о событии; ничего не ждёт.</summary>
-    public void Notify(NotifyEvent e, string title, params NotifyLine[] details) =>
-        _ = SendAsync(settings().ChannelsFor(e).ToList(), SeverityOf(e), title, details);
+    public void Notify(NotifyEvent e, string title, params NotifyLine[] details) => _ = NotifyAsync(e, title, details);
+
+    /// <summary>
+    /// Сообщить о событии и дождаться отправки во все его каналы. Ошибки каналов — в report, сам вызов не падает от
+    /// них: окно шлёт оповещения одного сервера по очереди, чтобы они приходили в том же порядке, что события.
+    /// </summary>
+    public Task NotifyAsync(NotifyEvent e, string title, params NotifyLine[] details) =>
+        SendAsync(settings().ChannelsFor(e).ToList(), SeverityOf(e), title, details);
 
     /// <summary>Проверочное во все каналы, включённые хоть для одного события.</summary>
     public Task<IReadOnlyList<string>> TestAsync(string title, params NotifyLine[] details)
@@ -156,7 +164,7 @@ public sealed class ServerNotifier(Func<ServerNotifySettings> settings, HttpClie
         var errors = new List<string>();
         foreach (var channel in channels)
         {
-            try { await new Notifier(http).SendAsync(channel, message).ConfigureAwait(false); }
+            try { await (send?.Invoke(channel, message) ?? new Notifier(http).SendAsync(channel, message)).ConfigureAwait(false); }
             catch (NotifyException ex)
             {
                 errors.Add($"{channel.Name}: {ex.Message}");
