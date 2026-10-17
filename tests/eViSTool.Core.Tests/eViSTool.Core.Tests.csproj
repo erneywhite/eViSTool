@@ -23,10 +23,14 @@
     <None Update="TestData\*.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- настоящие логи вылетов со стенда (личное вычищено) и тестовый мод, который их вызвал -->
     <None Update="TestData\Crash\*" CopyToOutputDirectory="PreserveNewest" />
+    <!-- сырые ответы настоящего FTP G-Portal (зонд 2026-10-17): MiniFtpServer отдаёт их как есть -->
+    <None Update="TestData\Hosting\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\eViSTool.Core\eViSTool.Core.csproj" />
+    <!-- адаптер FluentFTP: тесты гоняют его на своём MiniFtpServer -->
+    <ProjectReference Include="..\..\src\eViSTool.Hosting\eViSTool.Hosting.csproj" />
     <!-- поддельный сервер VS для тестов ServerHost: только собрать, ссылаться не нужно -->
     <ProjectReference Include="..\FakeVsServer\FakeVsServer.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\src\eViSTool.Agent\eViSTool.Agent.csproj" ReferenceOutputAssembly="false" />

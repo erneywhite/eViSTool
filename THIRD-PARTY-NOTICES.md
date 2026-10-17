@@ -50,6 +50,7 @@ with the copyright line given below.
 | Avalonia, Avalonia.Controls.DataGrid (the window on Windows and Linux) | © AvaloniaUI OÜ | https://github.com/AvaloniaUI/Avalonia |
 | SkiaSharp, HarfBuzzSharp (drawing and text shaping in the Avalonia window) | © 2015-2016 Xamarin, Inc.; © 2017-2018 Microsoft Corporation | https://github.com/mono/SkiaSharp |
 | Tmds.DBus (file dialogs and the file manager on Linux) | © Tom Deseyn | https://github.com/tmds/Tmds.DBus |
+| FluentFTP (FTP and FTPS for servers at a hosting provider; the window only, not the agent) | © 2015 Robin Rodricks and FluentFTP Contributors | https://github.com/robinrodricks/FluentFTP |
 
 ## Fonts
 
