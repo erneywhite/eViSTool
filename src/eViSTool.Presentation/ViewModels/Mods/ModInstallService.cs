@@ -38,10 +38,11 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
 
     /// <summary>
     /// Игра или сервер цели запущены — спросить, продолжать ли. true — не запущены или ответили «да». У хостера вопрос
-    /// другой: «останови сервер в панели хостера» (Да / Нет); «Да» помнится 10 минут, флажок профиля выключает вопрос.
+    /// другой: «останови сервер в панели хостера» (Да / Нет, текст — <paramref name="hostedQuestion"/>, если задан);
+    /// «Да» помнится 10 минут, флажок профиля выключает вопрос.
     /// </summary>
-    public bool ConfirmIfRunning(ModTarget target) =>
-        target.IsHosted ? _stopReminder.Confirm(target)
+    public bool ConfirmIfRunning(ModTarget target, string? hostedQuestion = null) =>
+        target.IsHosted ? _stopReminder.Confirm(target, hostedQuestion)
         : !IsRunning(target)
           || Confirm(Loc.T("mods.runningContinue"));
 
@@ -58,17 +59,18 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
     /// То же, что <see cref="ConfirmIfRunning"/>, но у хостера сначала быстрая проверка по логу сервера (асинхронно, не
     /// дольше 5 с): по логу остановлен — без вопроса. Свой профиль и удалённый — как раньше, без ожидания.
     /// </summary>
-    public async Task<bool> ConfirmIfRunningAsync(ModTarget target)
+    public async Task<bool> ConfirmIfRunningAsync(ModTarget target, string? hostedQuestion = null)
     {
         await CheckHostedAsync(target);
-        return ConfirmChecked(target);
+        return ConfirmChecked(target, hostedQuestion);
     }
 
     /// <summary>У хостера — только проверка по логу: её итог учтёт ближайший вопрос (<see cref="ConfirmChecked"/>).</summary>
     public Task CheckHostedAsync(ModTarget target) => target.IsHosted ? _stopReminder.CheckAsync(target) : Task.CompletedTask;
 
     /// <summary>Вопрос после проверки (<see cref="CheckHostedAsync"/>): сервер у хостера по логу только что остановлен — не спрашиваем.</summary>
-    public bool ConfirmChecked(ModTarget target) => (target.IsHosted && _stopReminder.IsKnownStopped(target)) || ConfirmIfRunning(target);
+    public bool ConfirmChecked(ModTarget target, string? hostedQuestion = null) =>
+        (target.IsHosted && _stopReminder.IsKnownStopped(target)) || ConfirmIfRunning(target, hostedQuestion);
 
     /// <summary>Те из пунктов, чью цель можно менять: у каждой — проверка и вопрос, как в <see cref="ConfirmIfRunningAsync"/>.</summary>
     public async Task<List<T>> ConfirmedAsync<T>(IEnumerable<T> items, Func<T, ModTarget> target)

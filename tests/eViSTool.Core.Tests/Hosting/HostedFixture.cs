@@ -108,7 +108,8 @@ internal sealed class HostedFixture : IDisposable
     {
         _registration.Dispose();
         HostedSessions.Forget(Profile.Id);
-        foreach (var dir in new[] { Dir, ModInfoCache.DirFor(Profile.Id), HostedJournal.DirFor(Profile.Id), Path.Combine(AppPaths.ModBackups, Profile.Id) })
+        foreach (var dir in new[] { Dir, ModInfoCache.DirFor(Profile.Id), HostedJournal.DirFor(Profile.Id), Path.Combine(AppPaths.ModBackups, Profile.Id),
+                     Path.Combine(AppPaths.ModConfigBackups, Profile.Id) })
             try
             {
                 if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);

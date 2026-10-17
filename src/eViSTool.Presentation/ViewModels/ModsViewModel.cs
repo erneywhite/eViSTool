@@ -376,6 +376,12 @@ public sealed partial class ModsViewModel : ObservableObject
 
     public int ConfigCount(string modId) => _configCounts.GetValueOrDefault(modId);
 
+    /// <summary>
+    /// Перед записью настроек модов (вкладка «Настройки модов») — та же проверка, что перед изменением модов, и та же
+    /// память ответа: у хостера — «останови сервер в панели хостера» (текст вопроса — <paramref name="hostedQuestion"/>).
+    /// </summary>
+    internal bool ConfirmIfRunning(ModTarget target, string? hostedQuestion = null) => _installer.ConfirmIfRunning(target, hostedQuestion);
+
     /// <summary>Числа конфигов удалённого сервера пришли позже списка модов — ссылка в карточке обновляется.</summary>
     internal void ShowConfigCounts(Dictionary<string, int> counts)
     {
@@ -716,7 +722,8 @@ public sealed partial class ModsViewModel : ObservableObject
     /// Можно ли менять моды цели: свой профиль и удалённый — вопрос, если игра или сервер запущены; у хостера — проверка
     /// по логу и вопрос «останови сервер в панели хостера» с общей памятью ответа «Да» (окно вылета спрашивает так же).
     /// </summary>
-    internal Task<bool> ConfirmIfRunningAsync(ModTarget target) => _installer.ConfirmIfRunningAsync(target);
+    internal Task<bool> ConfirmIfRunningAsync(ModTarget target, string? hostedQuestion = null) =>
+        _installer.ConfirmIfRunningAsync(target, hostedQuestion);
 
     [RelayCommand]
     private void StopQueue() => _queue.Stop();

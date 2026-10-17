@@ -22,11 +22,12 @@ internal sealed class HostedStopReminder(Func<DateTime>? now = null, Func<ModTar
     private readonly Dictionary<string, DateTime> _until = new(StringComparer.Ordinal);
 
     /// <summary>true — можно менять моды: сервер остановлен (ответили «Да» сейчас или недавно) или вопрос выключен.</summary>
-    public bool Confirm(ModTarget target)
+    /// <param name="question">Свой текст вопроса (перед правкой настроек модов); память ответа — общая.</param>
+    public bool Confirm(ModTarget target, string? question = null)
     {
         if (target.Hosted?.Settings.SkipStopReminder == true) return true;
         if (_until.TryGetValue(target.ProfileId, out var until) && _now() < until) return true;
-        if (!Ui.Confirm(Loc.T("hosted.stopAsk", target.Name), byDefault: Answer.No, warning: true)) return false;
+        if (!Ui.Confirm(question ?? Loc.T("hosted.stopAsk", target.Name), byDefault: Answer.No, warning: true)) return false;
         _until[target.ProfileId] = _now() + Memory;
         return true;
     }

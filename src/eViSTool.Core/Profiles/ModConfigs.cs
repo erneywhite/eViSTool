@@ -64,6 +64,27 @@ public static partial class ModConfigs
                    .ToList();
     }
 
+    /// <summary>
+    /// Конфиги, прочитанные не с диска этой машины (листинг FTP сервера у хостера): те же виды файлов, та же привязка
+    /// к модам и тот же порядок, что у <see cref="List"/>. Время — как отдал источник.
+    /// </summary>
+    public static IReadOnlyList<ModConfigEntry> Entries(IEnumerable<(string RelativePath, long Size, DateTime ChangedUtc)> files,
+        IReadOnlyList<LocalMod> mods)
+    {
+        var keys = ModKeys(mods);
+        var list = new List<ModConfigEntry>();
+        foreach (var (rel, size, changed) in files)
+        {
+            if (KindOf(rel) is not { } kind) continue;
+            var mod = Match(rel, keys);
+            list.Add(new ModConfigEntry(rel, kind, mod?.ModId, mod is null ? null : mod.Name is { Length: > 0 } n ? n : mod.ModId, size, changed));
+        }
+        return list.OrderBy(f => f.ModName is null)
+                   .ThenBy(f => f.ModName, StringComparer.CurrentCultureIgnoreCase)
+                   .ThenBy(f => f.RelativePath, StringComparer.OrdinalIgnoreCase)
+                   .ToList();
+    }
+
     private sealed record ModKey(string Key, ModInfo Info);
 
     /// <summary>Ключи для сравнения: modid и название мода, только буквы и цифры в нижнем регистре.</summary>
@@ -241,16 +262,23 @@ public sealed class ModConfigBackups(string root, int keep = 5)
     private string DirFor(string relativePath) => System.IO.Path.Combine(Root, relativePath.Replace('/', System.IO.Path.DirectorySeparatorChar));
 
     /// <summary>Сохранить текущую версию файла.</summary>
-    public void Keep(string path, string relativePath)
+    public void Keep(string path, string relativePath) =>
+        Store(relativePath, System.IO.Path.GetExtension(path), target => File.Copy(path, target, overwrite: true));
+
+    /// <summary>Сохранить версию, которой нет файлом на этой машине (скачанную с сервера у хостера).</summary>
+    public void Keep(byte[] content, string relativePath) =>
+        Store(relativePath, System.IO.Path.GetExtension(relativePath), target => File.WriteAllBytes(target, content));
+
+    private void Store(string relativePath, string extension, Action<string> write)
     {
         var dir = Directory.CreateDirectory(DirFor(relativePath)).FullName;
         // две записи в одну миллисекунду (на быстром диске так и бывает) не должны затирать друг друга:
         // имя занято — следующая миллисекунда, порядок версий по имени сохраняется
         var at = DateTime.Now;
         string target;
-        while (File.Exists(target = System.IO.Path.Combine(dir, at.ToString("yyyyMMdd-HHmmss-fff") + System.IO.Path.GetExtension(path))))
+        while (File.Exists(target = System.IO.Path.Combine(dir, at.ToString("yyyyMMdd-HHmmss-fff") + extension)))
             at = at.AddMilliseconds(1);
-        File.Copy(path, target, overwrite: true);
+        write(target);
         foreach (var old in Versions(relativePath).Skip(keep)) File.Delete(old);
     }
 
