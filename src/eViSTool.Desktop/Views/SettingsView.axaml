@@ -34,6 +34,10 @@
         <Style Selector="Path.profileKind.server">
             <Setter Property="Data" Value="{StaticResource Icon.Server}" />
         </Style>
+        <!-- сервер у хостера — облако (после .server: хостовый профиль серверный, оба класса стоят) -->
+        <Style Selector="Path.profileKind.hosted">
+            <Setter Property="Data" Value="{StaticResource Icon.Cloud}" />
+        </Style>
         <!-- состояние в карточке оповещений: обычное — акцентом, ошибка — красным -->
         <Style Selector="TextBlock.notifyStatus">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
@@ -99,7 +103,7 @@
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:ProfileViewModel">
                                 <DockPanel>
-                                    <Path Classes="icon profileKind" Classes.server="{Binding IsServer}" DockPanel.Dock="Left" VerticalAlignment="Center"
+                                    <Path Classes="icon profileKind" Classes.server="{Binding IsServer}" Classes.hosted="{Binding IsHosted}" DockPanel.Dock="Left" VerticalAlignment="Center"
                                           Margin="0,0,12,0" />
                                     <StackPanel>
                                         <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
@@ -145,7 +149,30 @@
                                             </DockPanel>
                                         </StackPanel>
 
-                                        <StackPanel IsVisible="{Binding !IsRemote}">
+                                        <!-- сервер у хостера: вместо папок — куда подключаемся по FTP (пароль не показываем), версия игры сервера, напоминание -->
+                                        <StackPanel IsVisible="{Binding IsHosted}">
+                                            <TextBlock Text="{local:Tr settings.hostedTarget}" Classes="label" />
+                                            <TextBlock Classes="hint" Text="{local:Tr settings.hostedTargetHint}" />
+                                            <DockPanel Margin="0,6,0,0">
+                                                <Button DockPanel.Dock="Right" Content="{local:Tr settings.hostedEdit}" Command="{Binding EditConnectionCommand}" Margin="8,0,0,0"
+                                                        AutomationProperties.AutomationId="HostedEdit" />
+                                                <TextBox Classes="mono" Text="{Binding HostedTarget, Mode=OneWay}" IsReadOnly="True" VerticalContentAlignment="Center"
+                                                         AutomationProperties.AutomationId="HostedTarget" />
+                                            </DockPanel>
+
+                                            <TextBlock Text="{local:Tr settings.hostedGameVersion}" Classes="label" />
+                                            <TextBlock Classes="hint" Text="{Binding HostedGameVersionHint}" />
+                                            <TextBox Classes="mono" Text="{Binding ManualGameVersion, UpdateSourceTrigger=LostFocus}" Margin="0,6,0,0"
+                                                     MaxLength="32" VerticalContentAlignment="Center" AutomationProperties.AutomationId="HostedGameVersion"
+                                                     AutomationProperties.Name="{local:Tr settings.hostedGameVersion}" />
+
+                                            <CheckBox IsChecked="{Binding RemindStopServer}" Margin="0,16,0,0" AutomationProperties.AutomationId="HostedRemindStop">
+                                                <TextBlock Text="{local:Tr settings.hostedRemindStop}" FontSize="13" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap" />
+                                            </CheckBox>
+                                        </StackPanel>
+
+                                        <!-- папки и то, что прочитано из файлов игры, — только у профиля на этой машине -->
+                                        <StackPanel IsVisible="{Binding IsLocal}">
                                             <TextBlock Text="{local:Tr settings.gameDir}" Classes="label" />
                                             <TextBlock Classes="hint" Text="{local:Tr settings.gameDirHint}" />
                                             <DockPanel>

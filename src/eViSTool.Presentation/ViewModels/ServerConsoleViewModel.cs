@@ -16,7 +16,8 @@ namespace eViSTool.Presentation.ViewModels;
 /// <param name="client">Текущая связь с агентом (null — агента нет или связи нет).</param>
 internal sealed partial class ServerConsoleViewModel(Func<AgentClient?> client) : ObservableObject
 {
-    private const int MaxLines = 5000;
+    /// <summary>Сколько строк держит консоль (столько же — консоль сервера у хостера).</summary>
+    internal const int MaxLines = 5000;
 
     private long _lastSeq;
     private int _agentPid;
@@ -234,4 +235,16 @@ public sealed class ConsoleLineViewModel(ConsoleLine line)
 
     public double Opacity { get; } = line.Kind == ConsoleLineKind.Output
                                      && line.Level?.EndsWith("Notification", StringComparison.Ordinal) == true ? 0.75 : 1;
+
+    /// <summary>
+    /// Выделенные строки консоли одним текстом — для буфера обмена. Ctrl и Shift выделяют вразнобой, поэтому строки идут
+    /// в том порядке, в каком стоят в консоли. Ничего не выделено — null.
+    /// </summary>
+    internal static string? SelectedText(IEnumerable<ConsoleLineViewModel> lines, System.Collections.IList? selected)
+    {
+        if (selected is not { Count: > 0 }) return null;
+        var chosen = selected.OfType<ConsoleLineViewModel>().ToHashSet(ReferenceEqualityComparer.Instance);
+        var text = string.Join(Environment.NewLine, lines.Where(chosen.Contains).Select(l => l.Text));
+        return text.Length > 0 ? text : null;
+    }
 }

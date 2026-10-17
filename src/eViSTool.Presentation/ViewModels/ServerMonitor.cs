@@ -108,7 +108,7 @@ internal sealed class ServerMonitor(IServerMonitorHost host)
             try
             {
                 var profile = host.Profile;
-                if (profile is null) return;
+                if (profile is null || profile.IsHosted) return; // у хостера агента нет: нечего слушать
 
                 if (profile.IsRemote)
                 {

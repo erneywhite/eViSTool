@@ -61,6 +61,7 @@ public static class PlayTargets
     public static PlayTarget? Own(GameProfile server, int? knownGamePort = null)
     {
         if (server.Kind != ProfileKind.Server) return null;
+        if (server.IsHosted) return null; // адрес для игры у хостера пока не знаем
         if (server.IsRemote)
         {
             if (RemoteSecret.Unprotect(server.RemoteCode) is not { } code) return null;

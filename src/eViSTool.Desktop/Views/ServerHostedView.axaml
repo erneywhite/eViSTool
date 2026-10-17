@@ -1,0 +1,149 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:eViSTool.Presentation.ViewModels"
+             xmlns:local="using:eViSTool.Desktop"
+             xmlns:ctl="using:eViSTool.Desktop.Controls"
+             x:Class="eViSTool.Desktop.Views.ServerHostedView"
+             x:DataType="vm:HostedServerViewModel">
+    <UserControl.Styles>
+        <!-- плитки и строки консоли — те же, что у своего сервера -->
+        <StyleInclude Source="avares://eViSTool/Views/ServerStyles.axaml" />
+    </UserControl.Styles>
+
+    <!--
+        Сервер у хостера: плашка «управляет хостер», плитки состояния (по логу сервера), консоль только для чтения с выбором
+        запуска и игроки онлайн рядом. Поля команды нет: команды — в панели хостера.
+    -->
+    <DockPanel>
+        <!-- ===== кто управляет сервером ===== -->
+        <Border DockPanel.Dock="Top" Classes="card" Padding="14,12" Margin="0,16,0,0" AutomationProperties.AutomationId="HostedPlate">
+            <DockPanel>
+                <Border DockPanel.Dock="Left" Width="38" Height="38" CornerRadius="9" Background="{DynamicResource Forest.Raised}"
+                        BorderBrush="{DynamicResource Forest.Line}" BorderThickness="1" VerticalAlignment="Center">
+                    <Path Classes="icon" Data="{StaticResource Icon.Cloud}" Stroke="{DynamicResource Forest.Accent}" Width="18" Height="18" />
+                </Border>
+                <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="{local:Tr server.hostedTitle}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />
+                    <TextBlock Text="{local:Tr server.hostedHint}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap"
+                               Margin="0,2,0,0" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- ===== показатели: состояние по логу, время работы, игроки ===== -->
+        <Grid DockPanel.Dock="Top" Margin="0,14,-12,0" ColumnDefinitions="1.3*,*,*">
+            <Border Classes="card tile" AutomationProperties.AutomationId="HostedState">
+                <StackPanel>
+                    <TextBlock Classes="tileLabel" Text="{local:Tr server.tileState}" />
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <Ellipse Classes="tone stateDot" ctl:EnumClass.Value="{Binding StateTone}" />
+                        <TextBlock Classes="tileValue" Text="{Binding StateText}" Margin="0" AutomationProperties.AutomationId="HostedStateText" />
+                    </StackPanel>
+                    <!-- откуда знаем и когда последний раз прочитали лог -->
+                    <TextBlock Text="{Binding StateNote}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0"
+                               TextTrimming="CharacterEllipsis" AutomationProperties.AutomationId="HostedStateNote"
+                               IsVisible="{Binding StateNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Classes="card tile">
+                <StackPanel>
+                    <TextBlock Classes="tileLabel" Text="{local:Tr server.tileUptime}" />
+                    <TextBlock Classes="tileValue" Text="{Binding UptimeText}" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Classes="card tile">
+                <StackPanel>
+                    <TextBlock Classes="tileLabel" Text="{local:Tr server.tilePlayers}" />
+                    <TextBlock Classes="tileValue" Text="{Binding PlayersText}" />
+                    <TextBlock Text="{Binding PlayerNames}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0"
+                               TextTrimming="CharacterEllipsis" IsVisible="{Binding PlayerNames, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ===== лог не читается: что случилось и когда попробуем снова ===== -->
+        <TextBlock DockPanel.Dock="Top" Text="{Binding StatusText}" Foreground="{DynamicResource Forest.Warn}" TextWrapping="Wrap" Margin="0,12,0,0"
+                   IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   AutomationProperties.AutomationId="HostedStatus" />
+
+        <!-- ===== консоль (только чтение) и игроки онлайн ===== -->
+        <Grid Margin="0,14,0,12" ColumnDefinitions="*,280">
+            <Border Classes="card" ClipToBounds="True">
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="16,10,10,8">
+                        <!-- какой запуск показан: текущий или прошлый из Logs/Archive -->
+                        <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding Runs}" SelectedItem="{Binding SelectedRun}" MinWidth="200" FontSize="12"
+                                  ToolTip.Tip="{local:Tr server.hostedRunTip}" IsVisible="{Binding HasRuns}"
+                                  AutomationProperties.AutomationId="HostedRuns">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:HostedRunOption">
+                                    <TextBlock Text="{Binding Text}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock DockPanel.Dock="Left" Text="{local:Tr server.console}" Foreground="{DynamicResource Forest.Text}" FontWeight="SemiBold"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Text="{local:Tr server.hostedReadOnly}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" VerticalAlignment="Center"
+                                   Margin="10,0,16,0" TextTrimming="CharacterEllipsis" ToolTip.Tip="{local:Tr server.hostedConsoleTip}" />
+                    </DockPanel>
+
+                    <!-- прошлый запуск: чем кончился (или что читается) -->
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding RunNote}" FontSize="12" Foreground="{DynamicResource Forest.Accent}" TextWrapping="Wrap"
+                               Margin="16,0,16,8" IsVisible="{Binding RunNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                               AutomationProperties.AutomationId="HostedRunNote" />
+
+                    <Border Background="#151C17" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="6,4">
+                        <Panel>
+                            <!-- строки — виртуализированный список с переносом, как у своей консоли -->
+                            <ListBox x:Name="ConsoleList" Classes="console" ItemsSource="{Binding Lines}" Background="Transparent" BorderThickness="0"
+                                     FontFamily="{DynamicResource Forest.Mono}" FontSize="12.5" SelectionMode="Multiple"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.AutomationId="HostedConsole">
+                                <ListBox.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="{local:Tr server.copy}" Command="{Binding CopyLinesCommand}"
+                                                  CommandParameter="{Binding #ConsoleList.SelectedItems}" />
+                                    </ContextMenu>
+                                </ListBox.ContextMenu>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ConsoleLineViewModel">
+                                        <TextBlock Classes="line" ctl:EnumClass.Value="{Binding Tint}" Text="{Binding Text}" TextWrapping="Wrap"
+                                                   Opacity="{Binding Opacity}" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock Text="{local:Tr server.hostedConsoleEmpty}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap"
+                                       Margin="10,8" IsHitTestVisible="False" IsVisible="{Binding ShowEmpty}"
+                                       AutomationProperties.AutomationId="HostedConsoleEmpty" />
+                        </Panel>
+                    </Border>
+                </DockPanel>
+            </Border>
+
+            <!-- кто на сервере: только просмотр -->
+            <Border Grid.Column="1" Classes="card" Margin="12,0,0,0" Padding="16,12" AutomationProperties.AutomationId="HostedPlayers">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="{local:Tr server.hostedPlayersTitle}" />
+                    <TextBlock DockPanel.Dock="Bottom" Classes="hint" Text="{local:Tr server.hostedPlayersHint}" Margin="0,10,0,0" />
+                    <Panel Margin="0,10,0,0">
+                        <TextBlock Text="{Binding PlayersEmptyText}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" IsVisible="{Binding !HasPlayers}"
+                                   AutomationProperties.AutomationId="HostedPlayersEmpty" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasPlayers}">
+                            <ItemsControl ItemsSource="{Binding Players}" AutomationProperties.AutomationId="HostedPlayerList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:HostedPlayerRow">
+                                        <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1" Padding="0,7">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{DynamicResource Forest.Text}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding SinceText}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Panel>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</UserControl>

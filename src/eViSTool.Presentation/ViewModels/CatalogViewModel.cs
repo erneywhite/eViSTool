@@ -177,6 +177,9 @@ public sealed partial class CatalogViewModel : ObservableObject
         await EnsureLoadedAsync();
         if (!_loaded) return false;
 
+        // пустой modid или имя (мод без modinfo) совпал бы с любым модом каталога, у которого в списке modid есть ""
+        if (string.IsNullOrWhiteSpace(modId)) modId = null;
+        if (string.IsNullOrWhiteSpace(name)) name = null;
         var item = (assetId is > 0 ? _catalog.Items.FirstOrDefault(i => i.AssetId == assetId) : null)
                    ?? (modId is null ? null : _catalog.Items.FirstOrDefault(i =>
                        i.ModIdStrs.Any(s => string.Equals(s, modId, StringComparison.OrdinalIgnoreCase))))
@@ -378,7 +381,8 @@ public sealed partial class CatalogViewModel : ObservableObject
         if (others.Count == 0) return [];
 
         StatusText = Loc.T("also.checking");
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)); // удалённый сервер не на связи — не ждать вечно
+        // удалённый сервер не на связи — не ждать вечно; сервер у хостера читается дольше
+        using var cts = new CancellationTokenSource(others.Max(x => ModTargets.ScanTimeout(x.Target!)));
         var options = await Task.WhenAll(others.Select(x => AlsoInstall.EvaluateAsync(x.Target!, id, mod.Releases, release, cts.Token)));
         StatusText = "";
         var game = AlsoInstall.GameText(_main.Mods.GameVersion);

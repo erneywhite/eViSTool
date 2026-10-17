@@ -16,6 +16,8 @@ public static class ModConfigEditor
     /// <summary>Выключает (enabled=false) или включает мод. Возвращает false, если менять нечего.</summary>
     public static bool SetEnabled(ResolvedProfile profile, ModInfo mod, bool enabled)
     {
+        // страховка: конфиг такого профиля не на этом диске — правит его агент или ModTargets по FTP
+        if (profile.OffMachine) throw new InvalidOperationException("the profile is not on this computer");
         var path = profile.ConfigPath ?? throw new InvalidOperationException(
             profile.Profile.Kind == ProfileKind.Server
                 ? Loc.T("cfg.noServerConfigRun")
@@ -24,30 +26,36 @@ public static class ModConfigEditor
         // прочитать, поменять и записать — под замком файла: иначе одновременная запись из окна или агента затёрла бы правку
         using var held = ConfigFileLock.Take(path);
         var root = Load(path);
-        var list = GetOrCreateList(root, profile.Profile.Kind);
+        var changed = SetEnabled(root, profile.Profile.Kind, mod, enabled);
+        if (changed) SaveLocked(path, root);
+        return changed;
+    }
+
+    /// <summary>
+    /// То же правило по дереву конфига, без файла (конфиг сервера у хостера читается и пишется по FTP): включение убирает
+    /// обе формы записи («modid» и «modid@версия»), выключение пишет голый modid. Списка нет или там null — заводится.
+    /// false — менять нечего.
+    /// </summary>
+    public static bool SetEnabled(JObject root, ProfileKind kind, ModInfo mod, bool enabled)
+    {
+        var list = GetOrCreateList(root, kind);
 
         // игра принимает и "modid", и "modid@версия" — при включении убираем обе формы
         var existing = list
             .Where(t => t.Type == JTokenType.String && Matches(t.ToString(), mod.OriginalModId))
             .ToList();
 
-        bool changed;
         if (enabled)
         {
             existing.ForEach(t => t.Remove());
-            changed = existing.Count > 0;
-        }
-        else
-        {
-            // выключаем по голому modid: так мод останется выключенным и после обновления
-            var plain = existing.Any(t => t.ToString() == mod.OriginalModId);
-            existing.Where(t => t.ToString() != mod.OriginalModId).ToList().ForEach(t => t.Remove());
-            if (!plain) list.Add(mod.OriginalModId);
-            changed = !plain || existing.Count > 1;
+            return existing.Count > 0;
         }
 
-        if (changed) SaveLocked(path, root);
-        return changed;
+        // выключаем по голому modid: так мод останется выключенным и после обновления
+        var plain = existing.Any(t => t.ToString() == mod.OriginalModId);
+        existing.Where(t => t.ToString() != mod.OriginalModId).ToList().ForEach(t => t.Remove());
+        if (!plain) list.Add(mod.OriginalModId);
+        return !plain || existing.Count > 1;
     }
 
     /// <summary>Убирает мод из списка выключенных совсем (например, после удаления мода).</summary>
@@ -96,6 +104,36 @@ public static class ModConfigEditor
         return JObject.Load(reader);
     }
 
+    /// <summary>Текст конфига → дерево (для конфига, прочитанного не с диска, — например, по FTP).</summary>
+    public static JObject ParseText(string text) => Parse(text);
+
+    /// <summary>
+    /// Дерево → текст в том же виде, что у прежнего текста: тот же перевод строки, тот же отступ, перевод строки в
+    /// конце — если он был. Значения и порядок ключей сохраняются (<see cref="ParseText"/> не трогает даты и дроби),
+    /// поэтому меняется только то, что поправили. Прежнего текста нет — отступ в два пробела и перевод строки системы.
+    /// </summary>
+    public static string ToText(JObject root, string? previousText)
+    {
+        var newLine = previousText is null ? null : NewLineOfText(previousText);
+        var (indentChar, indent) = previousText is null ? (' ', 2) : IndentOf(previousText);
+        var text = new StringWriter(System.Globalization.CultureInfo.InvariantCulture) { NewLine = newLine ?? Environment.NewLine };
+        using (var writer = new JsonTextWriter(text) { Formatting = Formatting.Indented, IndentChar = indentChar, Indentation = indent })
+            root.WriteTo(writer);
+        // писатель JSON закрывает StringWriter — перевод строки в конце добавляем к готовому тексту
+        return previousText is not null && previousText.EndsWith('\n') ? text + text.NewLine : text.ToString();
+    }
+
+    /// <summary>Отступ по первой строке, которая начинается с пробела или табуляции; не нашлось — два пробела.</summary>
+    private static (char Char, int Count) IndentOf(string text)
+    {
+        foreach (var line in text.Split('\n'))
+        {
+            var count = line.TakeWhile(c => c is ' ' or '\t').Count();
+            if (count > 0 && count < line.TrimEnd('\r').Length) return (line[0], line[0] == '\t' ? 1 : count);
+        }
+        return (' ', 2);
+    }
+
     /// <summary>
     /// Резервная копия предыдущего состояния рядом (*.evistool.bak) и атомарная запись. Переводы строк — как в прежнем
     /// файле: конфиг с Windows на Linux (и наоборот) не перекраивается целиком; нового файла — как принято в системе.
@@ -121,9 +159,10 @@ public static class ModConfigEditor
     }
 
     /// <summary>Перевод строки файла по первой строке: «\r\n» или «\n»; строк нет — null.</summary>
-    private static string? NewLineOf(string path)
+    private static string? NewLineOf(string path) => NewLineOfText(File.ReadAllText(path));
+
+    private static string? NewLineOfText(string text)
     {
-        var text = File.ReadAllText(path);
         var at = text.IndexOf('\n');
         return at < 0 ? null : at > 0 && text[at - 1] == '\r' ? "\r\n" : "\n";
     }

@@ -34,9 +34,87 @@ public sealed partial class ProfileViewModel : ObservableObject
     /// <summary>Тип задаётся при создании профиля и дальше не меняется.</summary>
     public bool IsServer => Kind == ProfileKind.Server;
 
-    public string KindText => Loc.T(Model.IsRemote ? "profile.kindRemote" : Kind == ProfileKind.Server ? "profile.kindServer" : "profile.kindClient");
+    public string KindText => Model.IsHosted ? Loc.T("profile.kindHosted")
+        : Loc.T(Model.IsRemote ? "profile.kindRemote" : Kind == ProfileKind.Server ? "profile.kindServer" : "profile.kindClient");
 
     public bool IsRemote => Model.IsRemote;
+
+    /// <summary>Сервер у хостера: моды по FTP, запуск и консоль — в панели хостера.</summary>
+    public bool IsHosted => Model.IsHosted;
+
+    /// <summary>Профиль на этой машине: папки игры и данных показываются и выбираются.</summary>
+    public bool IsLocal => Model.IsLocal;
+
+    /// <summary>Куда ведёт подключение к хостеру: «ftp://логин@host:21 · без шифрования» (пароль не показываем).
+    /// Auto не обещает шифрования: сервер без TLS (G-Portal) оставляет профиль на Auto, и пароль идёт открытым текстом.</summary>
+    public string HostedTarget => Model.Hosted is not { } h ? Loc.T("hosted.errNoConnection")
+        : h.Describe() + " · " + h.Tls switch
+        {
+            Core.Hosting.FtpTls.Explicit or Core.Hosting.FtpTls.Implicit => Loc.T("hosted.encrypted"),
+            Core.Hosting.FtpTls.Auto => Loc.T("hosted.encryptionIfSupported"),
+            _ => Loc.T("hosted.noEncryption"),
+        };
+
+    /// <summary>Изменить подключение к хостеру (адрес, логин, пароль, папки).</summary>
+    [RelayCommand]
+    private void EditConnection()
+    {
+        if (AppWindows.Current.AskHostedConnection(Model.Hosted, Loc.T("settings.hostedEditOk")) is not { } connection) return;
+        // живое соединение со старыми данными (пароль, шифрование) не должно пережить правку; другой сервер или
+        // учётная запись — ещё и кэш с журналом установки: прерванную установку старого сервера на новом не доводим
+        if (connection.IsSameServer(Model.Hosted)) Core.Hosting.HostedSessions.Forget(Model.Id);
+        else ProfileActions.ForgetHosted(Model.Id);
+        Model.Hosted = connection;
+        Model.RemoteCode = GameProfile.HostedMarker;
+        OnPropertyChanged(nameof(HostedTarget));
+        OnPropertyChanged(nameof(ManualGameVersion));
+        OnPropertyChanged(nameof(RemindStopServer));
+        OnPropertyChanged(nameof(GameVersionText));
+        _changed(this);
+    }
+
+    /// <summary>Версия игры сервера у хостера, указанная вручную; пусто — определяется по файлам сервера.</summary>
+    public string ManualGameVersion
+    {
+        get => Model.Hosted?.GameVersion ?? "";
+        set
+        {
+            if (Model.Hosted is not { } h) return;
+            var v = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            if (h.GameVersion == v) return;
+            h.GameVersion = v;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(GameVersionText));
+            _changed(this);
+        }
+    }
+
+    /// <summary>Спрашивать «останови сервер в панели хостера» перед изменением модов (по умолчанию — да).</summary>
+    public bool RemindStopServer
+    {
+        get => Model.Hosted is not { SkipStopReminder: true };
+        set
+        {
+            if (Model.Hosted is not { } h || h.SkipStopReminder == !value) return;
+            h.SkipStopReminder = !value;
+            OnPropertyChanged();
+            _changed(this);
+        }
+    }
+
+    /// <summary>Версия игры сервера у хостера, которую нашло чтение модов (null — ещё не читали или не нашлась).</summary>
+    public string? HostedGameVersion
+    {
+        get;
+        set { if (field == value) return; field = value; OnPropertyChanged(); OnPropertyChanged(nameof(GameVersionText)); }
+    }
+
+    /// <summary>Откуда взялась <see cref="HostedGameVersion"/> — «из serverconfig.json» и т. п.; пусто — неизвестно.</summary>
+    public string HostedGameVersionSource
+    {
+        get;
+        set { if (field == value) return; field = value; OnPropertyChanged(); }
+    } = "";
 
     /// <summary>Куда ведёт код подключения удалённого профиля (сам код не показываем).</summary>
     public string RemoteTarget => Core.Server.Remote.RemoteSecret.Unprotect(Model.RemoteCode) is { } c ? $"{c.Host}:{c.Port}" : Loc.T("remote.errDecrypt");
@@ -50,7 +128,9 @@ public sealed partial class ProfileViewModel : ObservableObject
         OnPropertyChanged(nameof(RemoteTarget));
         _changed(this);
     }
-    public string GameVersionText => Model.IsRemote ? RemoteGameVersion ?? Loc.T("profile.remoteVersion")
+    public string GameVersionText => Model.IsHosted
+            ? Model.Hosted?.GameVersion ?? HostedGameVersion ?? Loc.T("profile.hostedVersion")
+        : Model.IsRemote ? RemoteGameVersion ?? Loc.T("profile.remoteVersion")
         : Resolved.GameVersion?.ToString() ?? Loc.T("common.notFound");
 
     /// <summary>Версия игры удалённого сервера — из статуса его агента (пока связи не было — неизвестна).</summary>

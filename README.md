@@ -46,6 +46,7 @@ It is portable: unzip it anywhere and run. Nothing is installed into the system 
 - [Crashes and mod errors](#crashes-and-mod-errors)
 - [Dedicated server](#dedicated-server)
 - [Remote management](#remote-management)
+- [Hosted server](#hosted-server)
 - [Server on Linux](#server-on-linux)
 - [Disk cleanup](#disk-cleanup)
 - [Updates, data and uninstalling](#updates-data-and-uninstalling)
@@ -420,6 +421,27 @@ Passwords and tokens never go into the journal.
 **Over the internet** you also need to forward the port on your router to the server computer.
 A VPN (Tailscale, ZeroTier, WireGuard and the like) is simpler and safer: use the VPN address of the server computer,
 and nothing is exposed to the internet.
+
+## Hosted server
+
+*Since 0.12.0.* If your server is rented from a host (G-Portal and others), eViSTool manages its mods over
+FTP. New profile → Hosted server: take the FTP address, port, login and password from the host's panel, then press
+Check connection. eViSTool finds the mods folders, serverconfig.json and the game version by itself.
+
+From there it works like your own server: the mod list, updates, installing from the catalog, rolling back to another
+version, turning mods off and deleting them. Turning a mod off changes only `WorldConfig.DisabledMods` in
+serverconfig.json, the rest stays as the host's panel wrote it. Before every replacement or deletion the old version
+is downloaded to your computer, so a mod can be brought back from History. The host's own mods (G-Portal's
+`gportal_mods` folder) are shown, but cannot be changed.
+
+In the Server section eViSTool reads the server log over FTP: whether the server is running, who is on it, what it
+writes to the console and how past runs ended. When the server crashes, the same crash window as for a local server
+opens. Mod settings edits the configs in the server's ModConfig folder, the copies for rollback are kept on your
+computer.
+
+A running server won't see new mods, so before a change eViSTool checks the log: if the server is stopped, it just
+goes ahead, otherwise it asks you to stop it in the host's panel. Starting and stopping the server and console
+commands stay in the host's panel. The password is stored encrypted and is never shown. SFTP is not supported yet.
 
 ## Server on Linux
 

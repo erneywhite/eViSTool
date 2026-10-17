@@ -1,0 +1,10 @@
+-rwxrwx--- 1 none none 1129704 Sep 28 17:56 VSSurvivalMod.pdb
+-rwxrwx--- 1 none none 189 Sep 28 17:56 do_not_add_mods_here.txt
+-rwxrwx--- 1 none none 26697 Oct 17 10:23 absoluteprospecting_1.500.7.zip
+-rwxrwx--- 1 none none 2001828 Oct 17 10:23 Auto_Map_Markers_5.0.3_-_Vintage_Story_1.22.zip
+-rwxrwx--- 1 none none 420060 Sep 28 17:56 VSEssentials.pdb
+-rwxrwx--- 1 none none 56280 Sep 28 17:56 VSCreativeMod.pdb
+-rwxrwx--- 1 none none 1186816 Sep 28 17:56 VSEssentials.dll
+-rwxrwx--- 1 none none 168960 Sep 28 17:56 VSCreativeMod.dll
+-rwxrwx--- 1 none none 5635 Oct 17 10:23 BetterSticks_v1.2.1.zip
+-rwxrwx--- 1 none none 3113472 Sep 28 17:56 VSSurvivalMod.dll

@@ -109,6 +109,19 @@
             </DockPanel>
         </Border>
 
+        <!-- ===== сервер у хостера: версия игры не определилась — без неё не подобрать совместимые версии модов ===== -->
+        <Border DockPanel.Dock="Top" Classes="warning" Margin="0,14,0,0" IsVisible="{Binding HostedVersionMissing}"
+                AutomationProperties.AutomationId="HostedVersionMissing">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Classes="small" Padding="12,5" Margin="12,0,0,0" VerticalAlignment="Center"
+                        Content="{local:Tr nav.settings}" Command="{Binding OpenHostedSettingsCommand}" />
+                <Path Classes="icon" DockPanel.Dock="Left" Data="{StaticResource Icon.Warning}" Stroke="{DynamicResource Forest.Warn}"
+                      VerticalAlignment="Center" Margin="0,0,12,0" />
+                <TextBlock Text="{Binding HostedVersionMissingText}" Foreground="{DynamicResource Forest.Warn}" FontSize="13" TextWrapping="Wrap"
+                           VerticalAlignment="Center" />
+            </DockPanel>
+        </Border>
+
         <!-- ===== зависимости ===== -->
         <Border DockPanel.Dock="Top" Classes="warning" Margin="0,14,0,0" IsVisible="{Binding HasDependencyIssues}">
             <DockPanel>
@@ -281,16 +294,16 @@
                             <!-- контекстное меню строки: всё, что умеет вкладка; строка под курсором выделяется до открытия меню -->
                             <DataGrid.ContextMenu>
                                 <ContextMenu Opening="RowMenu_Opening">
-                                    <MenuItem Header="{local:Tr menu.toggle}" Command="{Binding ToggleEnabledCommand}" CommandParameter="{Binding Selected}" />
-                                    <MenuItem Header="{local:Tr menu.delete}" Command="{Binding DeleteCommand}" CommandParameter="{Binding Selected}" />
+                                    <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.toggle}" Command="{Binding ToggleEnabledCommand}" CommandParameter="{Binding Selected}" />
+                                    <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.delete}" Command="{Binding DeleteCommand}" CommandParameter="{Binding Selected}" />
                                     <Separator />
                                     <MenuItem Header="{local:Tr menu.update}" Command="{Binding UpdateOneCommand}" CommandParameter="{Binding Selected}" />
-                                    <MenuItem Header="{local:Tr menu.rollback}" Command="{Binding RollbackCommand}" CommandParameter="{Binding Selected}" />
-                                    <MenuItem Header="{local:Tr menu.pin}" Command="{Binding TogglePinCommand}" CommandParameter="{Binding Selected}" />
-                                    <MenuItem Header="{local:Tr menu.skip}" Command="{Binding SkipVersionCommand}" CommandParameter="{Binding Selected}" />
-                                    <MenuItem Header="{local:Tr menu.unskip}" Command="{Binding ClearSkippedCommand}" CommandParameter="{Binding Selected}" />
+                                    <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.rollback}" Command="{Binding RollbackCommand}" CommandParameter="{Binding Selected}" />
+                                    <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.pin}" Command="{Binding TogglePinCommand}" CommandParameter="{Binding Selected}" />
+                                    <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.skip}" Command="{Binding SkipVersionCommand}" CommandParameter="{Binding Selected}" />
+                                    <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.unskip}" Command="{Binding ClearSkippedCommand}" CommandParameter="{Binding Selected}" />
                                     <Separator />
-                                    <MenuItem Header="{local:Tr menu.showInCatalog}" Command="{Binding ShowInCatalogCommand}" CommandParameter="{Binding Selected}" />
+                                    <MenuItem IsEnabled="{Binding Selected.CanFindInCatalog, FallbackValue=False}" Header="{local:Tr menu.showInCatalog}" Command="{Binding ShowInCatalogCommand}" CommandParameter="{Binding Selected}" />
                                     <MenuItem Header="{local:Tr menu.openPage}" Command="{Binding OpenPageCommand}" CommandParameter="{Binding Selected}" />
                                     <MenuItem Header="{local:Tr menu.showFile}" Command="{Binding ShowFileCommand}" CommandParameter="{Binding Selected}"
                                               IsVisible="{Binding IsLocalProfile}" />
@@ -303,7 +316,7 @@
                                         <DataTemplate x:DataType="vm:ModRowViewModel">
                                             <CheckBox Theme="{StaticResource Forest.Switch}" IsChecked="{Binding IsEnabled, Mode=OneWay}" Focusable="False"
                                                       Command="{Binding $parent[DataGrid].((vm:ModsViewModel)DataContext).ToggleEnabledCommand}"
-                                                      CommandParameter="{Binding}" ToolTip.Tip="{local:Tr col.onTip}"
+                                                      CommandParameter="{Binding}" ToolTip.Tip="{local:Tr col.onTip}" IsEnabled="{Binding CanChange}"
                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
@@ -520,9 +533,13 @@
                                                 <!-- проблема с зависимостями — текстом -->
                                                 <TextBlock Text="{Binding Row.Note}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Forest.Warn}" Margin="0,8,0,0"
                                                            IsVisible="{Binding Row.IsProblem}" />
+                                                <!-- мод хостера: почему его нельзя менять — спокойным цветом, это не проблема -->
+                                                <TextBlock Text="{Binding Row.Note}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Forest.Muted}" Margin="0,8,0,0"
+                                                           IsVisible="{Binding Row.IsHosterMod}" />
 
                                                 <!-- включён ли мод в этом профиле -->
-                                                <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,1" Padding="0,12" Margin="0,14,0,0">
+                                                <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,1" Padding="0,12" Margin="0,14,0,0"
+                                                        IsVisible="{Binding Row.CanChange}">
                                                     <DockPanel>
                                                         <CheckBox DockPanel.Dock="Right" Theme="{StaticResource Forest.Switch}" VerticalAlignment="Center"
                                                                   IsChecked="{Binding Row.IsEnabled, Mode=OneWay}"
@@ -543,7 +560,7 @@
                                                         <TextBlock Text="{Binding UpdateText}" />
                                                     </StackPanel>
                                                 </Button>
-                                                <Grid Margin="0,8,0,0" ColumnDefinitions="*,8,*">
+                                                <Grid Margin="0,8,0,0" ColumnDefinitions="*,8,*" IsVisible="{Binding Row.CanChange}">
                                                     <Button Content="{Binding PinText}" Command="{Binding Owner.TogglePinCommand}" CommandParameter="{Binding Row}"
                                                             HorizontalAlignment="Stretch" ToolTip.Tip="{local:Tr mcard.pinTip}" />
                                                     <Button Grid.Column="2" Content="{local:Tr mcard.skip}" Command="{Binding Owner.SkipVersionCommand}" CommandParameter="{Binding Row}"
@@ -551,13 +568,14 @@
                                                 </Grid>
                                                 <Button Content="{local:Tr mcard.chooseVersion}" Margin="0,8,0,0" HorizontalAlignment="Stretch"
                                                         Command="{Binding Owner.RollbackCommand}" CommandParameter="{Binding Row}"
-                                                        IsEnabled="{Binding Owner.CanQueue}" />
+                                                        IsEnabled="{Binding Owner.CanQueue}" IsVisible="{Binding Row.CanChange}" />
 
                                                 <WrapPanel Margin="0,14,0,0">
                                                     <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr mcard.modDb}" Margin="0,0,14,4"
                                                             Command="{Binding Owner.OpenPageCommand}" CommandParameter="{Binding Row}"
                                                             IsVisible="{Binding Row.PageUrl, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                                                     <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr mcard.inCatalog}" Margin="0,0,14,4"
+                                                            IsVisible="{Binding Row.CanFindInCatalog}"
                                                             Command="{Binding Owner.ShowInCatalogCommand}" CommandParameter="{Binding Row}" />
                                                     <Button Theme="{StaticResource Forest.LinkButton}" Content="{Binding ConfigText}" Margin="0,0,14,4"
                                                             IsVisible="{Binding HasConfigs}"
@@ -567,7 +585,7 @@
                                                             IsVisible="{Binding Owner.IsLocalProfile}"
                                                             Command="{Binding Owner.ShowFileCommand}" CommandParameter="{Binding Row}" />
                                                     <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr menu.delete}" Margin="0,0,14,4"
-                                                            Foreground="{DynamicResource Forest.Danger}"
+                                                            Foreground="{DynamicResource Forest.Danger}" IsVisible="{Binding Row.CanChange}"
                                                             Command="{Binding Owner.DeleteCommand}" CommandParameter="{Binding Row}" />
                                                 </WrapPanel>
 

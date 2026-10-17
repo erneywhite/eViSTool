@@ -31,4 +31,12 @@
     <ProjectReference Include="..\..\src\eViSTool.Desktop\eViSTool.Desktop.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- раздел «Сервер» у хостера: поддельный FTP над папкой и настоящие логи G-Portal — те же, что у тестов ядра -->
+    <Compile Include="..\eViSTool.Core.Tests\Hosting\FolderRemoteFiles.cs" Link="Hosting\FolderRemoteFiles.cs" />
+    <Compile Include="..\eViSTool.Core.Tests\Hosting\HostedFixture.cs" Link="Hosting\HostedFixture.cs" />
+    <Compile Include="..\eViSTool.Core.Tests\Hosting\HostedLogSamples.cs" Link="Hosting\HostedLogSamples.cs" />
+    <None Include="..\eViSTool.Core.Tests\TestData\Hosting\gportal-server-main.log" Link="TestData\Hosting\gportal-server-main.log" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

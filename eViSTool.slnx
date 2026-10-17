@@ -3,6 +3,7 @@
     <Project Path="src/eViSTool.Agent/eViSTool.Agent.csproj" />
     <Project Path="src/eViSTool.Core/eViSTool.Core.csproj" />
     <Project Path="src/eViSTool.Desktop/eViSTool.Desktop.csproj" />
+    <Project Path="src/eViSTool.Hosting/eViSTool.Hosting.csproj" />
     <Project Path="src/eViSTool.Presentation/eViSTool.Presentation.csproj" />
   </Folder>
   <Folder Name="/tests/">

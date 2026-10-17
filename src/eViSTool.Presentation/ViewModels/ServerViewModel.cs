@@ -4,6 +4,7 @@ using System.Net.Http;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Game;
+using eViSTool.Core.Hosting;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Server;
@@ -58,6 +59,9 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     /// <summary>Оповещения: какие события в какие каналы — последний вид раздела.</summary>
     public ServerNotifyViewModel Notify { get; }
 
+    /// <summary>Сервер у хостера: лог, состояние и игроки по FTP — вместо всех видов своего сервера.</summary>
+    public HostedServerViewModel Hosted { get; }
+
     /// <summary>Какой вид раздела открыт. Консоль продолжает получать строки при любом.</summary>
     [ObservableProperty] private ServerTab _tab;
 
@@ -74,10 +78,20 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     // состояние сервера профиля выяснено (первый проход слежения после смены профиля завершён)
     private bool _stateKnown;
 
-    [ObservableProperty] private bool _isServerProfile;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowNotServer))]
+    private bool _isServerProfile;
 
     /// <summary>Сервер на другом компьютере: всё через агента по сети, своих папок у профиля нет.</summary>
     [ObservableProperty] private bool _isRemoteProfile;
+
+    /// <summary>Сервер у хостера: управляет им панель хостера, здесь — лог, состояние и игроки (<see cref="Hosted"/>) и переход к модам.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowNotServer))]
+    private bool _isHostedProfile;
+
+    /// <summary>Плашка «это не серверный профиль»: у сервера у хостера своя плашка.</summary>
+    public bool ShowNotServer => !IsServerProfile && !IsHostedProfile;
     private string? _remoteGameVersion;
     private string? _remoteOs; // система машины с сервером — в подзаголовке
     [ObservableProperty] private ServerState _state = ServerState.Stopped;
@@ -97,8 +111,18 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         Core.Versioning.ModVersion.TryParse(s.AgentVersion, out var agent)
         && Core.Versioning.ModVersion.TryParse(AgentProtocol.AppVersion, out var app) && agent.CompareTo(app) > 0;
 
+    /// <summary>
+    /// Адрес сервера у хостера для подзаголовка: только хост и порт, как у удалённого. Логин FTP в шапке ни к чему — он
+    /// попадал бы на каждый скриншот раздела; целиком подключение видно в «Подключение…».
+    /// </summary>
+    private static string HostedAddress(HostedConnection? hosted) => hosted is null ? "?" : $"{hosted.Host}:{hosted.Port}";
+
     /// <summary>Подзаголовок: профиль и версия игры; путь к данным — в подсказке.</summary>
     public string HeaderSubtitle => _main.ActiveProfile is not { } p ? ""
+        // версию игры у хостера узнаёт чтение модов: пока не узнали — без неё, а не «Vintage Story узнаю при чтении модов»
+        : p.Model.IsHosted ? (p.Model.Hosted?.GameVersion ?? p.HostedGameVersion) is { Length: > 0 } hostedVersion
+            ? Loc.T("server.subtitleHosted", p.Name, HostedAddress(p.Model.Hosted), hostedVersion)
+            : Loc.T("server.subtitleHostedNoVersion", p.Name, HostedAddress(p.Model.Hosted))
         : p.Model.IsRemote ? Loc.T("server.subtitleRemote", p.Name,
             (RemoteSecret.Unprotect(p.Model.RemoteCode) is { } c ? $"{c.Host}:{c.Port}" : "?") + (_remoteOs is { Length: > 0 } os ? " · " + os : ""),
             _remoteGameVersion ?? "?")
@@ -148,6 +172,17 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         Stats = new ServerStatsViewModel(this);
         Journal = new ServerJournalViewModel(this);
         Notify = new ServerNotifyViewModel(this);
+        Hosted = new HostedServerViewModel(main);
+    }
+
+    /// <summary>
+    /// Раздел «Сервер» открыт или закрыт. Лог сервера у хостера читается по FTP только пока раздел открыт; своему
+    /// серверу это не нужно — его наблюдатель работает всегда.
+    /// </summary>
+    public void SetSectionActive(bool open)
+    {
+        if (open && IsHostedProfile) OnPropertyChanged(nameof(HeaderSubtitle)); // версию игры могло найти чтение модов
+        Hosted.SetActive(open);
     }
 
     partial void OnTabChanged(ServerTab value)
@@ -224,6 +259,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         Remote.OnLanguageChanged();
         Players.OnLanguageChanged();
         Notify.OnLanguageChanged();
+        Hosted.OnLanguageChanged();
     }
 
     /// <summary>Сменился профиль: отключиться от старого агента, подключиться к агенту нового (если он работает).</summary>
@@ -231,8 +267,9 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     {
         // правки конфига старого профиля — сохранить, пока связь с его агентом ещё открыта
         var next = _main.ActiveProfile?.Model;
-        var nextServer = next?.Kind == ProfileKind.Server;
-        Config.BeforeSwitch(nextServer && next is { IsRemote: false } ? next.DataDir : null, nextServer && next!.IsRemote ? next : null);
+        // у профиля у хостера нет ни папок на этой машине, ни агента: серверных вкладок для него нет
+        var nextServer = next?.Kind == ProfileKind.Server && next.IsHosted == false;
+        Config.BeforeSwitch(nextServer && next is { IsLocal: true } ? next.DataDir : null, nextServer && next!.IsRemote ? next : null);
 
         _stateKnown = false;
         _monitor.Stop();
@@ -247,7 +284,10 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         OnPropertyChanged(nameof(DataDir));
         _console.Reset();
 
-        IsServerProfile = _main.ActiveProfile?.Kind == ProfileKind.Server;
+        IsHostedProfile = _main.ActiveProfile?.Model.IsHosted == true;
+        // хостовый профиль — Kind = Server, но серверным разделом это не считается: монитора и вкладок нет, свой вид — Hosted
+        IsServerProfile = _main.ActiveProfile?.Kind == ProfileKind.Server && !IsHostedProfile;
+        Hosted.OnProfileSwitched(IsHostedProfile ? _main.ActiveProfile?.Model : null);
         IsRemoteProfile = _main.ActiveProfile?.Model.IsRemote == true;
         _remoteGameVersion = null;
         _remoteOs = null;

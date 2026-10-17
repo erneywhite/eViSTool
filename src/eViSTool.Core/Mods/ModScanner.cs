@@ -12,6 +12,9 @@ public sealed record LocalMod(string Path, ModInfo? Info, string? Error)
 
     /// <summary>Выключен в настройках игры (disabledMods / WorldConfig.DisabledMods).</summary>
     public bool IsDisabled { get; init; }
+
+    /// <summary>Мод самого хостера (у G-Portal — папка gportal_mods): показываем, но не обновляем, не удаляем, не выключаем.</summary>
+    public bool IsHosterMod { get; init; }
 }
 
 /// <summary>Сканирует папку модов: zip-архивы и распакованные папки с modinfo.json.</summary>
@@ -80,6 +83,21 @@ public static class ModScanner
             return new LocalMod(zipPath, null, Loc.T("scan.readFailed", ex.Message));
         }
     }
+
+    /// <summary>Мод по тексту modinfo.json (архив прочитан не с диска — например, с сервера у хостера): те же проверки
+    /// modid, что у сканера папки.</summary>
+    public static LocalMod FromModInfo(string path, string json) => Read(path, () => json);
+
+    /// <summary>Мод по записи кэша (<see cref="Hosting.ModInfoCache"/>): текст modinfo.json или ключ ошибки.
+    /// Ключ пришёл из файла на диске, поэтому в Loc.T идут только известные ключи-литералы; незнакомый (кэш битый или
+    /// записан более новой версией) — «архив повреждён», а не сырой ключ в окне.</summary>
+    public static LocalMod FromCached(string path, Hosting.CachedModInfo cached) =>
+        cached.ModInfoJson is { } json ? FromModInfo(path, json) : new LocalMod(path, null, cached.ErrorKey switch
+        {
+            "scan.noModInfo" => Loc.T("scan.noModInfo"),
+            "scan.nestedModInfo" => Loc.T("scan.nestedModInfo"),
+            _ => Loc.T("scan.corrupt"),
+        });
 
     private static LocalMod Read(string path, Func<string> readJson)
     {

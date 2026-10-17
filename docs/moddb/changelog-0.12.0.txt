@@ -1,0 +1,33 @@
+eViSTool 0.12.0: mods, mod settings and the server log of a server rented from a host (G-Portal and others), over FTP.
+
+Checked on a real G-Portal server. Other hosts may lay out their files differently: if something goes wrong, please write in the comments which host you use.
+
+New
+- New profile → "Hosted server": enter the FTP address, port, login and password from the host's panel and press Check connection. eViSTool finds serverconfig.json, the mods folders and the game version by itself.
+- My mods: the list, update checks, install, update, rollback to another version, turning a mod off and on, and deleting work the same as for a local server. Turning a mod off changes only WorldConfig.DisabledMods in serverconfig.json, everything else in the file stays as the host's panel wrote it. Before every replacement or deletion the old version is saved on this computer, so a mod can be brought back from History. The host's own mods (G-Portal's gportal_mods folder) are shown, but cannot be changed.
+- Server: the server log read over FTP while the section is open: whether the server is running, starting, stopping, stopped or crashed, the console (read-only), players online, and the logs of past runs from Logs/Archive. When the server crashes, the same crash window as for a local server opens and names the mod at fault when it can.
+- Mod settings: the configs in the server's ModConfig folder can be edited, with "Restore previous version" and "Reset"; the copies are kept on this computer.
+- Before changing mods or mod settings eViSTool checks the server log: if the server is stopped, it just goes ahead, otherwise it asks you to stop the server in the host's panel (the answer is remembered for 10 minutes, the reminder can be turned off in the profile settings).
+- The password is stored encrypted for the current Windows user and is never shown.
+- Starting and stopping the server and console commands stay in the host's panel. SFTP is not supported yet.
+
+Fixes
+- "In catalog" no longer opens a random mod for a mod without a modid.
+
+---
+
+eViSTool 0.12.0: моды, настройки модов и лог сервера у хостера (G-Portal и другие) по FTP.
+
+Проверено на настоящем сервере G-Portal. У других хостеров файлы могут лежать иначе: если что-то пошло не так, напиши в комментариях, какой у тебя хостер.
+
+Новое
+- «Новый профиль» → «Сервер у хостера»: введи адрес FTP, порт, логин и пароль из панели хостера и нажми «Проверить подключение». eViSTool сам найдёт serverconfig.json, папки модов и версию игры.
+- «Мои моды»: список, проверка обновлений, установка, обновление, откат на другую версию, выключение и удаление работают так же, как у своего сервера. При выключении мода в serverconfig.json меняется только WorldConfig.DisabledMods, остальное остаётся как записала панель хостера. Перед каждой заменой и удалением старая версия сохраняется на этом компьютере, и мод можно вернуть из «Истории». Моды самого хостера (папка gportal_mods у G-Portal) видны, но менять их нельзя.
+- «Сервер»: пока раздел открыт, eViSTool читает лог сервера по FTP и показывает, запущен ли сервер, запускается, останавливается, остановлен или упал, консоль (только чтение), игроков онлайн и логи прошлых запусков из Logs/Archive. Если сервер упал, открывается то же окно вылета, что у своего сервера, и по возможности называет виноватый мод.
+- «Настройки модов»: конфиги из папки ModConfig на сервере можно править, есть «Вернуть предыдущую версию» и «Сброс», копии хранятся на этом компьютере.
+- Перед изменением модов и их настроек eViSTool смотрит в лог сервера: если сервер остановлен, просто делает, иначе просит остановить его в панели хостера (ответ помнится 10 минут, напоминание отключается в настройках профиля).
+- Пароль хранится зашифрованным для текущего пользователя Windows и нигде не показывается.
+- Запуск и остановка сервера и команды консоли остаются в панели хостера. SFTP пока нет.
+
+Исправления
+- «В каталоге» больше не открывает случайный мод для мода без modid.

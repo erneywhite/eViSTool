@@ -86,7 +86,10 @@ public sealed partial class CrashWindowViewModel : ObservableObject
         }, Loc.T("crash.showInMods"), host);
     }
 
-    /// <summary>Окно падения сервера: мод выключается в конфиге сервера (свой — на диске, удалённый — через агента).</summary>
+    /// <summary>
+    /// Окно падения сервера: мод выключается в конфиге сервера (свой — на диске, удалённый — через агента, у хостера — по
+    /// FTP после проверки по логу или вопроса «останови сервер в панели хостера»).
+    /// </summary>
     public static CrashWindowViewModel ForServer(MainViewModel main, GameProfile profile, ServerCrashInfo crash) =>
         ForServer(profile, crash, new ModDisabler(main), new MainHost(main));
 

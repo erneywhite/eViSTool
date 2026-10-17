@@ -2,6 +2,7 @@ using System.Net.Http;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Mods;
 using eViSTool.Core.Profiles;
+using eViSTool.Presentation.ViewModels.Mods;
 
 namespace eViSTool.Presentation.ViewModels;
 
@@ -12,7 +13,8 @@ public sealed record ModDisableResult(string Message, bool Failed);
 /// Выключить мод профиля из окна вылета или из «Ошибок модов» — так же, как это делает менеджер модов игры: у своего
 /// профиля — в его файле настроек, у удалённого сервера — через агента (мод там знают по пути на машине сервера, читать
 /// архив не нужно). Пока игра профиля открыта, выключение откладывается до её закрытия: при выходе она перезапишет свои
-/// настройки, и список выключенных модов вместе с ними. После выключения моды активного профиля перечитываются.
+/// настройки, и список выключенных модов вместе с ними. У сервера у хостера — как в «Моих модах»: по логу остановлен —
+/// сразу, иначе вопрос «останови сервер в панели хостера». После выключения моды активного профиля перечитываются.
 /// </summary>
 public sealed class ModDisabler
 {
@@ -21,13 +23,17 @@ public sealed class ModDisabler
     private readonly Action<GameProfile> _reloadIfActive;
     private readonly Func<GameProfile, ModTarget?> _targetFor;
     private readonly Func<ModTarget, string, Task> _disable;
+    private readonly Func<ModTarget, Task<bool>> _confirmHosted;
 
-    /// <summary>Выключатель главного окна программы: игра профиля, отложенные до её выхода дела, «Мои моды».</summary>
+    /// <summary>
+    /// Выключатель главного окна программы: игра профиля, отложенные до её выхода дела, «Мои моды». Вопрос «останови
+    /// сервер в панели хостера» — тот же, что у «Моих модов», с той же памятью ответа «Да».
+    /// </summary>
     public ModDisabler(MainViewModel main)
         : this(main.IsGameRunningFor, main.RunAfterGameExit, profile =>
         {
             if (main.ActiveProfile?.Model.Id == profile.Id) main.Mods.ReloadLocal();
-        })
+        }, confirmHosted: target => main.Mods.ConfirmIfRunningAsync(target))
     {
     }
 
@@ -37,14 +43,18 @@ public sealed class ModDisabler
     /// <param name="targetFor">Куда ставятся моды профиля; null — выключать нечем (код удалённого сервера не прочитать
     /// на этой машине). По умолчанию — <see cref="ModTarget.For"/>; тесты подменяют.</param>
     /// <param name="disable">Выключить мод по пути у цели; по умолчанию — <see cref="DisableModAsync"/> (тесты подменяют).</param>
+    /// <param name="confirmHosted">Можно ли менять моды сервера у хостера: проверка по логу и вопрос «останови сервер в
+    /// панели хостера»; false — не выключаем. По умолчанию — свой <see cref="HostedStopReminder"/> (без общей памяти ответа).</param>
     public ModDisabler(Func<GameProfile, bool> isGameRunning, Action<GameProfile, Func<Task>> runAfterGameExit,
-        Action<GameProfile> reloadIfActive, Func<GameProfile, ModTarget?>? targetFor = null, Func<ModTarget, string, Task>? disable = null)
+        Action<GameProfile> reloadIfActive, Func<GameProfile, ModTarget?>? targetFor = null, Func<ModTarget, string, Task>? disable = null,
+        Func<ModTarget, Task<bool>>? confirmHosted = null)
     {
         _isGameRunning = isGameRunning;
         _runAfterGameExit = runAfterGameExit;
         _reloadIfActive = reloadIfActive;
         _targetFor = targetFor ?? ModTarget.For;
         _disable = disable ?? DisableModAsync;
+        _confirmHosted = confirmHosted ?? new HostedStopReminder().ConfirmAsync;
     }
 
     /// <summary>
@@ -71,6 +81,10 @@ public sealed class ModDisabler
                 _runAfterGameExit(profile, () => _disable(target, modPath));
                 return new ModDisableResult(Loc.T("crash.disableAfterExit", modName), Failed: false);
             }
+            // у хостера запущен ли сервер, видно только по логу: вылетевший панель хостера могла уже запустить снова, а
+            // запущенный при остановке перезапишет serverconfig.json вместе с выключенным модом. Не остановлен — кнопку вернуть
+            if (target.IsHosted && !await _confirmHosted(target))
+                return new ModDisableResult(Loc.T("crash.disableNotStopped"), Failed: true);
             await _disable(target, modPath);
             _reloadIfActive(profile);
             return new ModDisableResult(Loc.T(profile.Kind == ProfileKind.Server ? "crash.disabledServer" : "crash.disabled", modName), Failed: false);
@@ -89,11 +103,12 @@ public sealed class ModDisabler
         ex is IOException or InvalidOperationException or UnauthorizedAccessException or HttpRequestException or TaskCanceledException;
 
     /// <summary>
-    /// Мод по пути у цели: у удалённого сервера путь — на его машине, агенту хватит пути; у своего профиля архив
-    /// читается сейчас (нужен modid). Не прочитался — мод с ошибкой, и выключение скажет, что не так.
+    /// Мод по пути у цели: у удалённого сервера и у хостера путь — не на этой машине, цели хватит пути (хостер найдёт мод
+    /// в свежем скане); у своего профиля архив читается сейчас (нужен modid). Не прочитался — мод с ошибкой,
+    /// и выключение скажет, что не так.
     /// </summary>
     public static LocalMod ModAt(ModTarget target, string path) =>
-        target.IsRemote ? new LocalMod(path, null, null) : ModScanner.ReadZip(path);
+        target.IsLocal ? ModScanner.ReadZip(path) : new LocalMod(path, null, null);
 
     /// <summary>Выключить мод у цели (по умолчанию для <see cref="ModDisabler"/>).</summary>
     public static Task DisableModAsync(ModTarget target, string path) =>

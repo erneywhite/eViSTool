@@ -37,6 +37,7 @@ public partial class App : Application
 
         Ui.Platform = new AvaloniaUiPlatform(); // модели спрашивают, открывают файлы и ставят таймеры через него
         AppWindows.Current = new AvaloniaAppWindows(); // и открывают окна программы
+        Hosting.HostedTransports.Register(); // FTP для серверов у хостера
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

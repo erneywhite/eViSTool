@@ -19,6 +19,7 @@ public sealed class ModRowViewModel
         Kind = r.Status;
         IsDuplicate = r.IsDuplicate;
         IsEnabled = !r.Local.IsDisabled;
+        IsHosterMod = r.Local.IsHosterMod;
         IsPinned = pinned;
         Name = r.Local.Info?.Name is { Length: > 0 } n ? n : r.Local.FileName;
         ModId = r.Local.Info?.ModId ?? "";
@@ -39,10 +40,11 @@ public sealed class ModRowViewModel
         // мод требует игру новее, чем у профиля, — игра его не загрузит (выключенному — не важно)
         NeedsGame = IsEnabled ? r.Local.Info?.NeedsNewerGame(game) : null;
 
-        IsProblem = IsDuplicate || DependencyIssues.Count > 0 || NeedsGame is not null
-                    || r.Status is ModStatus.NoCompatibleRelease or ModStatus.Unreadable or ModStatus.CheckFailed;
+        IsProblem = !IsHosterMod && (IsDuplicate || DependencyIssues.Count > 0 || NeedsGame is not null
+                    || r.Status is ModStatus.NoCompatibleRelease or ModStatus.Unreadable or ModStatus.CheckFailed);
 
-        (StatusText, Tone) = NeedsGame is { } need ? (Loc.T("state.needsGame", need), RowTone.Danger)
+        (StatusText, Tone) = IsHosterMod ? (Loc.T("status.hosterMod"), RowTone.Muted)
+            : NeedsGame is { } need ? (Loc.T("state.needsGame", need), RowTone.Danger)
             : DependencyIssues.Count > 0 && IsEnabled ? (Loc.T("state.dependency"), RowTone.Danger)
             : IsDuplicate ? (Loc.T("state.duplicate"), RowTone.Danger)
             : r.Status switch
@@ -62,6 +64,7 @@ public sealed class ModRowViewModel
 
         Note = string.Join(" · ", new[]
         {
+            IsHosterMod ? Loc.T("hosted.hosterMod") : null,
             NeedsGame is { } needed ? Loc.T("note.needsGame", needed, game) : null,
             r.Message,
             r.LatestAny is { } any ? Loc.T("note.newerElsewhere", any.ModVersion, string.Join(", ", any.GameVersions.TakeLast(1))) : null,
@@ -70,7 +73,8 @@ public sealed class ModRowViewModel
         Changelog = r.Status == ModStatus.UpdateAvailable ? Html.ToPlainText(r.LatestCompatible?.Changelog, 1500) : null;
 
         // сторона — из modinfo.json, как её видит игра; у «обеих сторон» (таких большинство) пометки нет
-        Side = r.Local.Info is { } info ? ModSides.Parse(info.Side) : ModSide.Both;
+        // мод хостера без modinfo (исходник .cs) работает только на сервере хостера
+        Side = r.Local.Info is { } info ? ModSides.Parse(info.Side) : IsHosterMod ? ModSide.Server : ModSide.Both;
         IsUnneeded = ModSides.IsUnneeded(Side, profileKind);
         SideText = Loc.T(Side switch { ModSide.Client => "mods.sideColClient", ModSide.Server => "mods.sideColServer", _ => "mods.sideColBoth" });
         SideNote = Side switch
@@ -101,6 +105,15 @@ public sealed class ModRowViewModel
     public bool IsEnabled { get; }
     public bool IsPinned { get; }
 
+    /// <summary>Мод самого хостера: только показываем, переключатель и действия недоступны.</summary>
+    public bool IsHosterMod { get; }
+
+    /// <summary>Мод можно выключать, закреплять, откатывать и удалять (не мод хостера).</summary>
+    public bool CanChange => !IsHosterMod;
+
+    /// <summary>Мод можно искать в каталоге: есть номер на модбазе, modid или имя из modinfo (у мода хостера ничего).</summary>
+    public bool CanFindInCatalog => !IsHosterMod && (Result.Remote?.AssetId is > 0 || ModId.Length > 0 || Local.Info?.Name is { Length: > 0 });
+
     public string Name { get; }
     public string ModId { get; }
     public string FileName { get; }
@@ -119,7 +132,7 @@ public sealed class ModRowViewModel
     public bool CanUpdate { get; }
 
     /// <summary>Предлагается новая версия — её можно пропустить.</summary>
-    public bool CanSkip => Kind == ModStatus.UpdateAvailable;
+    public bool CanSkip => Kind == ModStatus.UpdateAvailable && !IsHosterMod;
 
     /// <summary>Требует внимания: дубликат, зависимость, нужна игра новее, нет версии под игру, не читается, ошибка проверки.</summary>
     public bool IsProblem { get; }

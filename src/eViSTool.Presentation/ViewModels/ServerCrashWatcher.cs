@@ -49,7 +49,7 @@ public sealed class ServerCrashWatcher(
         _checking = true;
         try
         {
-            foreach (var profile in profiles.Where(p => p.Model.Kind == ProfileKind.Server).Select(p => p.Model).ToList())
+            foreach (var profile in profiles.Where(p => p.Model.Kind == ProfileKind.Server && !p.Model.IsHosted).Select(p => p.Model).ToList())
             {
                 ServerCrashInfo? crash;
                 ModErrorReport? modErrors;

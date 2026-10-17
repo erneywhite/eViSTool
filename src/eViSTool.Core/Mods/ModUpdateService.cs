@@ -11,6 +11,7 @@ public sealed class ModUpdateService(ModDbClient db)
     /// <summary>Моды профиля на диске, с отметкой «выключен». Быстро, без сети.</summary>
     public static IReadOnlyList<LocalMod> ScanLocal(ResolvedProfile profile)
     {
+        if (profile.OffMachine) return []; // пути чужой машины или сервера у хостера: на этом диске их не читаем
         var disabled = new HashSet<string>(profile.DisabledMods); // игра сравнивает с учётом регистра
         return ModScanner.Scan(profile.ModDirs)
             .Select(l => l with { IsDisabled = IsDisabled(l, disabled) })

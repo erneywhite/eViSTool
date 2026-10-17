@@ -114,8 +114,9 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
                     > 0 => PackItemAction.Downgrade,
                     _ => PackItemAction.Update,
                 };
-                // та же версия, но файл другой — ставим файл из пака, чтобы у всех было одинаково
-                if (action == PackItemAction.Same && !Directory.Exists(have.Path)
+                // та же версия, но файл другой — ставим файл из пака, чтобы у всех было одинаково. У сервера у хостера
+                // файл на FTP: путь «/Mods/x.zip» на этой машине читать нельзя — сравниваем только версии
+                if (action == PackItemAction.Same && !profile.Profile.IsHosted && !Directory.Exists(have.Path)
                     && !string.Equals(PackBuilder.Sha256Of(have.Path), m.Sha256, StringComparison.OrdinalIgnoreCase))
                     action = PackItemAction.Update;
             }
@@ -183,7 +184,21 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
         bool mirror, bool applyConfig, IProgress<string>? progress = null, CancellationToken ct = default,
         Func<IReadOnlyList<string>, bool>? confirmChanged = null)
     {
-        if (target.Remote is not { } code) throw new InvalidOperationException("not a remote target");
+        if (target.Remote is null) throw new InvalidOperationException("not a remote target");
+        return ApplyToTargetAsync(pack, plan, target, mirror, applyConfig, progress, ct, confirmChanged);
+    }
+
+    /// <summary>
+    /// Применить план к профилю не на этой машине: серверу через агента или серверу у хостера (по FTP). Моды — по одному
+    /// через <see cref="ModTargets"/> (прежние версии — в хранилище для отката), включение и выключение — так же.
+    /// Настройки модов: агенту — по файлу, серверу у хостера пока никак — об этом строка в отчёте.
+    /// </summary>
+    public Task<PackImportResult> ApplyToTargetAsync(PackFile pack, PackImportPlan plan, ModTarget target,
+        bool mirror, bool applyConfig, IProgress<string>? progress = null, CancellationToken ct = default,
+        Func<IReadOnlyList<string>, bool>? confirmChanged = null)
+    {
+        if (target.IsLocal) throw new InvalidOperationException("a local target: use ApplyAsync");
+        var code = target.Remote;
         var pt = new PackTarget(
             Install: async (file, c) =>
             {
@@ -203,6 +218,9 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
             },
             ApplyConfig: async (p, c) =>
             {
+                // shortcut: настройки модов на сервер у хостера не переносятся (нет источника ModConfig по FTP) — сделать
+                // вместе с редактором «Настройки модов» для хостера
+                if (code is null) return p.ConfigEntries.Any() ? [Loc.T("pack.hostedConfigSkipped")] : [];
                 var skipped = new List<string>();
                 var source = new RemoteModConfigSource(code);
                 foreach (var entry in p.ConfigEntries)

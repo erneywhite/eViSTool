@@ -48,6 +48,13 @@ public static partial class CrashAnalyzer
         lines.Select(l => CrashFileLine().Match(l)).FirstOrDefault(m => m.Success)?.Groups["path"].Value;
 
     /// <summary>
+    /// Строка вывода сервера, по которой видно вылет: сервер назвал мод-виновника, выключился от числа ошибок или
+    /// записал отчёт о вылете. Те же признаки, по которым <see cref="AnalyzeServer"/> находит вылет без падения процесса.
+    /// </summary>
+    public static bool IsServerCrashLine(string line) =>
+        line.Contains(TooManyErrors, StringComparison.Ordinal) || CriticalMod().IsMatch(line) || CrashFileLine().IsMatch(line);
+
+    /// <summary>
     /// Выделенный сервер остановился не по нашей команде: разбор его вывода за этот запуск. Отчёт о вылете (сервер сам
     /// назвал мод), «too many errors» или просто падение процесса (<paramref name="crashedExit"/>) — находка; тихая
     /// остановка без ошибок (админ набрал /stop в игре) — null.

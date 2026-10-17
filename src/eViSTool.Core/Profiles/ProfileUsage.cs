@@ -28,7 +28,7 @@ public static class ProfileUsage
         var found = new List<ProfileDependency>();
         foreach (var p in others)
         {
-            if (p.IsRemote || string.IsNullOrWhiteSpace(p.DataDir)) continue; // удалённый живёт на другой машине
+            if (!p.IsLocal || string.IsNullOrWhiteSpace(p.DataDir)) continue; // удалённый и у хостера живут не здесь
             if (IsSameOrInside(p.DataDir, dir))
             {
                 found.Add(new ProfileDependency(p, ProfileUseKind.Data, Full(p.DataDir)));

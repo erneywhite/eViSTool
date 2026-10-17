@@ -22,7 +22,7 @@ public enum ModFilter { All, Updates, Problems, Pinned, Disabled, Unneeded, Hist
 /// <summary>
 /// Вкладка «Мои моды»: к ней привязано окно — таблица модов открытого профиля с чипами и поиском, карточка выбранного,
 /// очередь установки, история. Сама вкладка держит то, что видно, и команды; работу делают её части:
-/// откуда берутся моды — <see cref="LocalModSource"/> и <see cref="RemoteModSource"/>, установка в цель —
+/// откуда берутся моды — <see cref="LocalModSource"/>, <see cref="RemoteModSource"/> и <see cref="HostedModSource"/>, установка в цель —
 /// <see cref="ModInstallService"/>, установка сразу (архивы, каталог, зависимости) — <see cref="ModInstallActions"/>,
 /// очередь — <see cref="ModInstallQueue"/>, модпаки — <see cref="ModPackActions"/>, код набора — <see cref="ModCodeActions"/>,
 /// откат по истории — <see cref="ModHistoryActions"/>, видимость и порядок строк таблицы — <see cref="ModListRules"/>.
@@ -38,6 +38,7 @@ public sealed partial class ModsViewModel : ObservableObject
     private readonly ModInstallQueue _queue;
     private readonly LocalModSource _disk;
     private readonly RemoteModSource _agent;
+    private readonly HostedModSource _hosted;
     private readonly ModPackActions _packs;
     private readonly ModCodeActions _codes;
     private readonly ModHistoryActions _historyActions;
@@ -45,7 +46,7 @@ public sealed partial class ModsViewModel : ObservableObject
     /// <summary>Последний ответ модбазы (modid → что там есть): после локальных операций статусы не теряются.</summary>
     internal Dictionary<string, ModDbResult> ModDbAnswers { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Моды открытого профиля: с диска этой машины или со слов агента удалённого сервера.</summary>
+    /// <summary>Моды открытого профиля: с диска этой машины, со слов агента удалённого сервера или по FTP у хостера.</summary>
     internal IReadOnlyList<LocalMod> Locals { get; set; } = [];
 
     public ObservableCollection<ModRowViewModel> Rows { get; } = [];
@@ -59,7 +60,10 @@ public sealed partial class ModsViewModel : ObservableObject
     [ObservableProperty] private int _sortIndex;
 
     /// <summary>Выбранный в таблице мод и его карточка справа.</summary>
-    [ObservableProperty] private ModRowViewModel? _selected;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanChangeSelected))] private ModRowViewModel? _selected;
+
+    /// <summary>Пункты контекстного меню, которые меняют мод: у мода хостера недоступны.</summary>
+    public bool CanChangeSelected => Selected is not { CanChange: false };
     [ObservableProperty] private ModCardViewModel? _card;
     private CancellationTokenSource? _cardLoad;
 
@@ -167,6 +171,7 @@ public sealed partial class ModsViewModel : ObservableObject
         _queue.PropertyChanged += OnQueueChanged;
         _disk = new LocalModSource(this, main);
         _agent = new RemoteModSource(this, main);
+        _hosted = new HostedModSource(this, main);
         _packs = new ModPackActions(this, _installer, _service, db, updater);
         _installs = new ModInstallActions(this, _installer, _packs);
         _codes = new ModCodeActions(this, _packs, _service, db);
@@ -177,7 +182,17 @@ public sealed partial class ModsViewModel : ObservableObject
     }
 
     /// <summary>Вкладка «Мои моды» открыта — следим за папками модов (закрыта — не тратим на это время).</summary>
-    public void SetActive(bool active) => _disk.SetActive(active);
+    public void SetActive(bool active)
+    {
+        _disk.SetActive(active);
+        _hosted.SetActive(active);
+    }
+
+    /// <summary>Источник модов сервера у хостера — тесты сверяют с ним часы и опрос.</summary>
+    internal HostedModSource HostedSource => _hosted;
+
+    /// <summary>Один опрос «поменяли ли моды на сервере со стороны» — то, что делает таймер вкладки раз в 30 с.</summary>
+    internal Task PollHostedAsync() => _hosted.PollAsync();
 
     partial void OnFilterChanged(ModFilter value)
     {
@@ -234,8 +249,8 @@ public sealed partial class ModsViewModel : ObservableObject
 
     // ---------- профиль и откуда берутся моды ----------
 
-    /// <summary>Моды берутся с диска этой машины или — у удалённого сервера — у его агента по сети.</summary>
-    private IModSource Source => IsRemote ? _agent : _disk;
+    /// <summary>Моды берутся с диска этой машины, у агента удалённого сервера по сети или по FTP у хостера.</summary>
+    private IModSource Source => IsHosted ? _hosted : IsRemote ? _agent : _disk;
 
     /// <summary>Профиль открытых модов: папки и версия игры (у удалённого — со слов агента, пути — на той машине).</summary>
     internal ResolvedProfile? Profile => Source.Resolved;
@@ -250,7 +265,19 @@ public sealed partial class ModsViewModel : ObservableObject
     internal bool IsRemote => _main.ActiveProfile?.Model.IsRemote == true;
 
     /// <summary>Профиль на этой машине: папку модов можно открыть, модпаки — собрать и поставить.</summary>
-    public bool IsLocalProfile => !IsRemote;
+    public bool IsLocalProfile => _main.ActiveProfile?.Model.IsLocal ?? true;
+
+    /// <summary>Открыт сервер у хостера: моды — по FTP.</summary>
+    public bool IsHosted => _main.ActiveProfile?.Model.IsHosted == true;
+
+    /// <summary>У сервера у хостера не определилась версия игры: плашка «укажи её в настройках профиля».</summary>
+    public bool HostedVersionMissing => IsHosted && _hosted.Resolved is { GameVersion: null };
+
+    public string HostedVersionMissingText => Loc.T("hosted.versionMissing");
+
+    /// <summary>Перейти к настройкам профиля (подключение, версия игры сервера у хостера).</summary>
+    [RelayCommand]
+    private void OpenHostedSettings() => _main.SelectedTab = AppTab.Settings;
 
     /// <summary>
     /// Цель для действия, начатого сейчас: снимок активного профиля. Дальше операция работает только с ней —
@@ -260,7 +287,7 @@ public sealed partial class ModsViewModel : ObservableObject
     {
         if (_main.ActiveProfile is not { } profile) return null;
         if (ModTarget.For(profile.Model) is { } target) return target;
-        Error(Loc.T("remote.errDecrypt"));
+        Error(ModTarget.UnreadableText(profile.Model));
         return null;
     }
 
@@ -270,7 +297,7 @@ public sealed partial class ModsViewModel : ObservableObject
         : Loc.T("mods.noProfile");
 
     /// <summary>У своего профиля не нашлась игра: в «Моих модах» плашка с кнопкой «Указать папку».</summary>
-    public bool GameMissing => !IsRemote && _main.ActiveProfile is { } p && p.Resolved.GameVersion is null;
+    public bool GameMissing => IsLocalProfile && _main.ActiveProfile is { } p && p.Resolved.GameVersion is null;
 
     public string GameMissingText => Loc.T("mods.gameMissing", _main.ActiveProfile is { IsServer: true }
         ? Core.Game.ServerExecutable.FileName : Core.Game.GameLauncher.ClientExeName);
@@ -281,6 +308,7 @@ public sealed partial class ModsViewModel : ObservableObject
     /// <summary>Строка под кнопками: какие папки и какая игра.</summary>
     public string ProfileInfo => Profile is { } r
         ? Loc.T("mods.profileInfo", r.GameVersion?.ToString() ?? Loc.T("common.notFound"), string.Join("; ", r.ModDirs))
+        : IsHosted ? Loc.T("hosted.reading")
         : IsRemote ? Loc.T("mods.remoteWaiting")
         : Loc.T("mods.noProfile");
 
@@ -289,6 +317,7 @@ public sealed partial class ModsViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(ProfileInfo));
         OnPropertyChanged(nameof(HeaderSubtitle));
+        OnPropertyChanged(nameof(HostedVersionMissing));
     }
 
     /// <summary>Сменился профиль или его настройки — перечитываем моды с диска, ответ модбазы про другой набор сбрасываем.</summary>
@@ -297,8 +326,11 @@ public sealed partial class ModsViewModel : ObservableObject
         if (CheckCommand.IsRunning) CheckCancelCommand.Execute(null); // проверка прежнего профиля новому не нужна
         ModDbAnswers = new(StringComparer.OrdinalIgnoreCase);
         _agent.Reset();
+        _hosted.Reset();
         Locals = [];
         OnPropertyChanged(nameof(IsLocalProfile));
+        OnPropertyChanged(nameof(IsHosted));
+        OnPropertyChanged(nameof(HostedVersionMissing));
         OnPropertyChanged(nameof(ProfileInfo));
         OnPropertyChanged(nameof(HeaderSubtitle));
         OnPropertyChanged(nameof(GameMissing));
@@ -310,6 +342,14 @@ public sealed partial class ModsViewModel : ObservableObject
             // список придёт с первым ответом агента (OnRemoteStatus)
             Rebuild();
             StatusText = Loc.T("mods.remoteWaiting");
+            return;
+        }
+        if (IsHosted)
+        {
+            // по FTP читаем, только когда вкладка открыта: смена профиля или правка настроек не должна ходить на сервер зря
+            Rebuild();
+            StatusText = Loc.T("hosted.reading");
+            if (_main.SelectedTab == AppTab.Mods) _ = _hosted.ReloadAsync();
             return;
         }
         ReloadLocal();
@@ -335,6 +375,12 @@ public sealed partial class ModsViewModel : ObservableObject
     private void CountConfigs() => _configCounts = Source.ConfigCounts(Locals);
 
     public int ConfigCount(string modId) => _configCounts.GetValueOrDefault(modId);
+
+    /// <summary>
+    /// Перед записью настроек модов (вкладка «Настройки модов») — та же проверка, что перед изменением модов, и та же
+    /// память ответа: у хостера — «останови сервер в панели хостера» (текст вопроса — <paramref name="hostedQuestion"/>).
+    /// </summary>
+    internal bool ConfirmIfRunning(ModTarget target, string? hostedQuestion = null) => _installer.ConfirmIfRunning(target, hostedQuestion);
 
     /// <summary>Числа конфигов удалённого сервера пришли позже списка модов — ссылка в карточке обновляется.</summary>
     internal void ShowConfigCounts(Dictionary<string, int> counts)
@@ -397,7 +443,8 @@ public sealed partial class ModsViewModel : ObservableObject
 
         try
         {
-            await ReloadAsync();
+            // скан сервера у хостера — сеть и первое чтение долгое: моложе 10 с не перечитываем (автопроверка идёт сразу за чтением)
+            if (!(IsHosted && _hosted.IsFresh)) await ReloadAsync();
             if (_main.ActiveProfile != owner) return; // пока читали папки, профиль сменили — проверка уже не про него
             if (Profile?.GameVersion is not { } game)
             {
@@ -429,7 +476,17 @@ public sealed partial class ModsViewModel : ObservableObject
     {
         if (row?.Local.Info is null || CurrentTarget() is not { } target) return;
 
-        if (_installer.IsRunning(target))
+        if (target.IsHosted)
+        {
+            // у хостера запущен ли сервер, видно только по логу: не остановлен — спрашиваем «останови в панели хостера»;
+            // мод хостера и папку менять нельзя
+            if (RejectHostReadOnly(row) || !await _installer.ConfirmIfRunningAsync(target))
+            {
+                Rebuild(); // вернуть галочку как было (без сети)
+                return;
+            }
+        }
+        else if (_installer.IsRunning(target))
         {
             // клиент при выходе перезаписывает свои настройки, сервер применит только после перезапуска
             var server = target.Profile.Kind == ProfileKind.Server;
@@ -447,12 +504,13 @@ public sealed partial class ModsViewModel : ObservableObject
         try
         {
             await ModTargets.SetEnabledAsync(target, row.Local, enabled: !row.IsEnabled);
-            StatusText = _installer.WithWorldCopies(Loc.T(row.IsEnabled ? "mods.disabledOk" : "mods.enabledOk", row.Name));
+            StatusText = WithStartHint(_installer.WithWorldCopies(Loc.T(row.IsEnabled ? "mods.disabledOk" : "mods.enabledOk", row.Name)),
+                target.IsHosted);
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException
                                        or HttpRequestException or TaskCanceledException)
         {
-            Error(Loc.T("mods.toggleFailed", ex.Message));
+            Error(Loc.T("mods.toggleFailed", ErrorText(target, ex)));
         }
         await ReloadAsync();
     }
@@ -462,37 +520,30 @@ public sealed partial class ModsViewModel : ObservableObject
     [RelayCommand]
     private async Task DeleteAsync(ModRowViewModel? row)
     {
-        if (row is null || Profile is not { } profile || CurrentTarget() is not { } target) return;
+        if (row is null || Profile is null || CurrentTarget() is not { } target) return;
+        if (RejectHostReadOnly(row)) return;
 
-        var running = _installer.IsRunning(target)
-            ? "\n\n" + Loc.T("mods.deleteRunning") : "";
-        if (!Confirm(Loc.T("mods.deleteConfirm", row.Name, row.Installed) + running))
+        // у хостера корзины на сервере нет: свой вопрос (файл удалится сразу) и строка про копию на этой машине
+        var question = target.IsHosted
+            ? Loc.T("hosted.deleteConfirm", row.Name, row.Installed) + "\n\n" + Loc.T("hosted.deleteNote")
+            : Loc.T("mods.deleteConfirm", row.Name, row.Installed) + (_installer.IsRunning(target) ? "\n\n" + Loc.T("mods.deleteRunning") : "");
+        if (!Confirm(question))
             return;
+        if (target.IsHosted && !await _installer.ConfirmIfRunningAsync(target)) return;
         await _installer.CopyWorldsAsync(target, side: ModSides.Parse(row.Local.Info?.Side));
 
         using var history = ModHistory.Begin(ModHistorySource.Manual);
         try
         {
-            if (target.Remote is { } code)
-            {
-                using var agent = AgentClient.ForRemote(code);
-                await agent.DeleteModAsync(row.Local.Path); // на сервере — в его корзину (и в его историю)
-            }
-            else
-            {
-                Ui.Platform.MoveToTrash(row.Local.Path);
-                if (row.Local.Info is { } gone)
-                    ModHistory.Record(ModHistory.FileFor(target.ProfileId), gone.ModId, gone.Name, gone.Version, null);
-                // если других копий мода не осталось — чистим его и из списка выключенных
-                if (row.Local.Info is { } info && Locals.Count(l => l.Info?.ModId == info.ModId) == 1)
-                    ModConfigEditor.Forget(profile, info);
-            }
-            StatusText = _installer.WithWorldCopies(Loc.T("mods.deletedOk", row.Name));
+            // свой — в Корзину, удалённый сервер — в его корзину, у хостера — копия на этой машине и удаление по FTP
+            await ModTargets.DeleteAsync(target, row.Local, Ui.Platform.MoveToTrash);
+            var done = target.IsHosted ? Loc.T("hosted.deletedOk", row.Name) : Loc.T("mods.deletedOk", row.Name);
+            StatusText = WithStartHint(_installer.WithWorldCopies(done), target.IsHosted);
         }
         catch (Exception ex) when (ex is IOException or OperationCanceledException or UnauthorizedAccessException
                                        or HttpRequestException or InvalidOperationException)
         {
-            Error(Loc.T("mods.deleteFailed", row.Name, ex.Message));
+            Error(Loc.T("mods.deleteFailed", row.Name, ErrorText(target, ex)));
         }
         await ReloadAsync();
     }
@@ -524,12 +575,12 @@ public sealed partial class ModsViewModel : ObservableObject
         // зависимости — по итоговому состоянию, а не на момент установки каждого мода
         if (installed.Count > 0)
             problems.AddRange(DependencyIssues.Select(i => Loc.T("report.dependency", i.Describe())));
-        StatusText = _installer.WithWorldCopies(installed.Count switch
+        StatusText = WithStartHint(_installer.WithWorldCopies(installed.Count switch
         {
             0 => Loc.T("report.nothingChanged", title),
             <= 3 => $"{title}: " + string.Join("; ", installed),
             _ => Loc.T("report.changedCount", title, installed.Count), // длинный список — только число
-        });
+        }), IsHosted && installed.Count > 0);
         if (problems.Count == 0) return;
         var text = (installed.Count > 0 ? $"{title}:\n• " + string.Join("\n• ", installed) + "\n\n" : "")
                    + Loc.T("report.attention") + ":\n• " + string.Join("\n• ", problems);
@@ -559,7 +610,7 @@ public sealed partial class ModsViewModel : ObservableObject
     [RelayCommand]
     private void UpdateOne(ModRowViewModel? row)
     {
-        if (row is not { CanUpdate: true } || CurrentTarget() is not { } target) return;
+        if (row is not { CanUpdate: true } || CurrentTarget() is not { } target || RejectHostReadOnly(row)) return;
         Enqueue([QueueItemFor(target, row, row.Result.LatestCompatible!)], ModHistorySource.Update);
     }
 
@@ -567,7 +618,7 @@ public sealed partial class ModsViewModel : ObservableObject
     private void UpdateAll()
     {
         if (IsBusy && !IsQueueRunning) return;
-        var todo = Rows.Where(r => r.CanUpdate).ToList();
+        var todo = Rows.Where(r => r.CanUpdate && HostReadOnlyReason(r) is null).ToList();
         if (todo.Count == 0) return;
 
         var list = string.Join("\n", todo.Select(r => $"• {r.Name}: {r.Installed} → {r.Latest}"));
@@ -625,8 +676,54 @@ public sealed partial class ModsViewModel : ObservableObject
     /// Поставить в очередь; уже ждущий или ставящийся мод той же цели второй раз не добавляется.
     /// У каждого пункта своя цель: пункты разных профилей ставятся каждый в свой.
     /// </summary>
-    public void Enqueue(IEnumerable<UpdateQueueItem> items, string source, string? undoes = null, bool runningConfirmed = false) =>
-        _queue.Enqueue(items, source, undoes, runningConfirmed);
+    public void Enqueue(IEnumerable<UpdateQueueItem> items, string source, string? undoes = null, bool runningConfirmed = false)
+    {
+        var list = items.ToList();
+        List<ModTarget> hosted = runningConfirmed ? [] : [.. list.Select(i => i.Target).Where(t => t.IsHosted).DistinctBy(t => t.ProfileId)];
+        if (hosted.Count == 0)
+        {
+            _queue.Enqueue(list, source, undoes, runningConfirmed);
+            return;
+        }
+        // вкладка занята другим — сразу, как и без проверки (очередь не добавила бы и сама)
+        if (!_queue.CanEnqueue) return;
+        _ = EnqueueCheckedAsync(list, hosted, source, undoes);
+    }
+
+    /// <summary>
+    /// У хостера вопрос очереди — после быстрой проверки по логу: сервер остановлен — очередь не спросит. Вопрос
+    /// выключен или «Да» помнится — проверки нет, и пункты встают в очередь сразу, как раньше. Пока идёт проверка, в
+    /// строке статуса видно, чего ждём, а вкладка занята: перетащенный тем временем zip иначе начал бы свою установку,
+    /// и очередь после проверки молча не взяла бы пункты.
+    /// </summary>
+    private async Task EnqueueCheckedAsync(List<UpdateQueueItem> items, List<ModTarget> hosted, string source, string? undoes)
+    {
+        // прогон очереди уже держит флаг занятости — тогда его не трогаем.
+        // shortcut: прогон кончился посреди проверки и тут же началась другая операция — пункты не встанут, как и раньше
+        // при занятой вкладке. Переделать, если такое заметят
+        var claimed = !IsBusy;
+        if (claimed) IsBusy = true;
+        var before = StatusText;
+        var checking = Loc.T("hosted.stopChecking");
+        StatusText = checking;
+        try
+        {
+            foreach (var target in hosted) await _installer.CheckHostedAsync(target);
+        }
+        finally
+        {
+            if (StatusText == checking) StatusText = before;
+            if (claimed) IsBusy = false;
+        }
+        _queue.Enqueue(items, source, undoes);
+    }
+
+    /// <summary>
+    /// Можно ли менять моды цели: свой профиль и удалённый — вопрос, если игра или сервер запущены; у хостера — проверка
+    /// по логу и вопрос «останови сервер в панели хостера» с общей памятью ответа «Да» (окно вылета спрашивает так же).
+    /// </summary>
+    internal Task<bool> ConfirmIfRunningAsync(ModTarget target, string? hostedQuestion = null) =>
+        _installer.ConfirmIfRunningAsync(target, hostedQuestion);
 
     [RelayCommand]
     private void StopQueue() => _queue.Stop();
@@ -646,11 +743,14 @@ public sealed partial class ModsViewModel : ObservableObject
             set => owner.IsBusy = value;
         }
 
-        public void SetStatus(string text) => owner.StatusText = text;
+        // итог прогона: на сервере у хостера что-то поставилось — напомнить запустить его в панели
+        public void SetStatus(string text) => owner.StatusText =
+            WithStartHint(text, owner._queue.Items.Any(i => i.State == QueueState.Done && i.Target.IsHosted));
 
         public bool IsActive(ModTarget target) => owner._installer.IsActive(target);
 
-        public bool ConfirmIfRunning(ModTarget target) => owner._installer.ConfirmIfRunning(target);
+        // у хостера проверку по логу уже сделал Enqueue вкладки: остановлен — без вопроса
+        public bool ConfirmIfRunning(ModTarget target) => owner._installer.ConfirmChecked(target);
 
         public Task<bool> InstallZipAsync(ModTarget target, string zip, List<string> installed, List<string> problems) =>
             owner._installer.InstallZipAsync(target, zip, interactive: false, installed, problems);
@@ -821,14 +921,34 @@ public sealed partial class ModsViewModel : ObservableObject
     [RelayCommand]
     private void ShowFile(ModRowViewModel? row)
     {
-        if (!IsRemote && row is not null && Path.Exists(row.FilePath)) Ui.ShowInFolder(row.FilePath);
+        if (IsLocalProfile && row is not null && Path.Exists(row.FilePath)) Ui.ShowInFolder(row.FilePath);
     }
 
     [RelayCommand]
     private void OpenModsFolder()
     {
-        if (!IsRemote && Profile?.InstallDir is { } dir && Directory.Exists(dir)) Ui.OpenFolder(dir);
+        if (IsLocalProfile && Profile?.InstallDir is { } dir && Directory.Exists(dir)) Ui.OpenFolder(dir);
     }
+
+    // ---------- сервер у хостера ----------
+
+    /// <summary>К итогу операции на сервере у хостера: изменения вступят в силу, когда сервер запустят в панели хостера.</summary>
+    internal static string WithStartHint(string text, bool hostedChanged) =>
+        hostedChanged ? text + " · " + Loc.T("hosted.startHint") : text;
+
+    /// <summary>Почему этот мод на сервере у хостера нельзя менять (мод хостера, папка); null — можно или это не хостер.</summary>
+    private string? HostReadOnlyReason(ModRowViewModel row) => IsHosted ? HostedModSource.ReadOnlyReason(row.Local) : null;
+
+    /// <summary>Мод на сервере у хостера только для чтения — сказать об этом в статусе; true — действие не делаем.</summary>
+    private bool RejectHostReadOnly(ModRowViewModel row)
+    {
+        if (HostReadOnlyReason(row) is not { } reason) return false;
+        StatusText = reason;
+        return true;
+    }
+
+    /// <summary>Текст ошибки операции с целью: у хостера — словами (вход, права, место), у остальных — текст исключения.</summary>
+    private static string ErrorText(ModTarget target, Exception ex) => target.IsHosted ? ModTargets.Describe(target, ex) : ex.Message;
 
     private static bool Confirm(string text) =>
         Ui.Confirm(text);

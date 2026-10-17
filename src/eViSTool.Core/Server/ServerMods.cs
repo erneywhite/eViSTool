@@ -157,6 +157,7 @@ public sealed class ServerMods(string profileId, string gameDir, string dataDir)
     /// <summary>Отметка набора модов профиля: самое позднее время изменения его папок модов и файла настроек.</summary>
     public static DateTime? StampOf(ResolvedProfile resolved)
     {
+        if (resolved.OffMachine) return null; // папки не на этой машине — у них своя отметка (агент, ModTargets.StampAsync)
         DateTime? latest = null;
         foreach (var dir in resolved.ModDirs.Where(Directory.Exists))
         {

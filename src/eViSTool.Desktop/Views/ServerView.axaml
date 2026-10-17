@@ -9,52 +9,8 @@
              x:Class="eViSTool.Desktop.Views.ServerView"
              x:DataType="vm:ServerViewModel">
     <UserControl.Styles>
-        <!-- плитка-показатель над консолью -->
-        <Style Selector="Border.tile">
-            <Setter Property="Padding" Value="16,12" />
-            <Setter Property="Margin" Value="0,0,12,0" />
-        </Style>
-        <Style Selector="TextBlock.tileLabel">
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
-        </Style>
-        <Style Selector="TextBlock.tileValue">
-            <Setter Property="FontSize" Value="20" />
-            <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
-            <Setter Property="Margin" Value="0,4,0,0" />
-            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-        </Style>
-        <!-- точка состояния сервера: цвет — от тона (Ellipse.tone в теме), размер крупнее -->
-        <Style Selector="Ellipse.tone.stateDot">
-            <Setter Property="Width" Value="9" />
-            <Setter Property="Height" Value="9" />
-            <Setter Property="Margin" Value="0,0,9,0" />
-        </Style>
-        <!-- консоль: строки плотно, с переносом; выделение — лесное (кисти выделения списков — в теме) -->
-        <Style Selector="ListBox.console ListBoxItem">
-            <Setter Property="Padding" Value="6,1" />
-            <Setter Property="MinHeight" Value="0" />
-        </Style>
-        <!-- цвет строки по смыслу (ConsoleTint): ошибки — розоватые, предупреждения — янтарь, ввод — песок,
-             сообщения eViSTool — дымчато-голубые, чат — зелёный; без оттенка — светлый текст консоли -->
-        <Style Selector="TextBlock.line">
-            <Setter Property="Foreground" Value="#D8DCCF" />
-        </Style>
-        <Style Selector="TextBlock.line.error">
-            <Setter Property="Foreground" Value="{DynamicResource Forest.Danger}" />
-        </Style>
-        <Style Selector="TextBlock.line.warning">
-            <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
-        </Style>
-        <Style Selector="TextBlock.line.input">
-            <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
-        </Style>
-        <Style Selector="TextBlock.line.system">
-            <Setter Property="Foreground" Value="#9FB7C9" />
-        </Style>
-        <Style Selector="TextBlock.line.chat">
-            <Setter Property="Foreground" Value="{DynamicResource Forest.Good}" />
-        </Style>
+        <!-- плитки-показатели и строки консоли — общие с сервером у хостера -->
+        <StyleInclude Source="avares://eViSTool/Views/ServerStyles.axaml" />
 
         <!-- подсказки команд: пункты не берут фокус (он остаётся в поле ввода) -->
         <Style Selector="ListBox.suggestions ListBoxItem">
@@ -65,7 +21,7 @@
 
     <Panel Margin="10,4,10,0">
         <!-- ===== не серверный профиль ===== -->
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="520" IsVisible="{Binding !IsServerProfile}">
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="520" IsVisible="{Binding ShowNotServer}">
             <Border Width="64" Height="64" CornerRadius="14" Background="{DynamicResource Forest.Surface}" BorderBrush="{DynamicResource Forest.Line}"
                     BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,16">
                 <Path Classes="icon" Data="{StaticResource Icon.Server}" Stroke="{DynamicResource Forest.Accent}" Width="28" Height="28" />
@@ -75,7 +31,37 @@
             <Button Content="{local:Tr server.openSettings}" Command="{Binding OpenSettingsCommand}" HorizontalAlignment="Center" Margin="0,16,0,0" />
         </StackPanel>
 
-        <DockPanel IsVisible="{Binding IsServerProfile}">
+        <!-- ===== сервер у хостера: запускают его в панели хостера, здесь — лог, состояние и игроки по FTP и переход к модам ===== -->
+        <DockPanel IsVisible="{Binding IsHostedProfile}" AutomationProperties.AutomationId="ServerHostedPanel">
+            <!-- заголовок — как у своего сервера; вместо кнопок управления — моды и подключение -->
+            <DockPanel DockPanel.Dock="Top">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                    <Button Classes="primary" Command="{Binding OpenServerModsCommand}" Padding="18,8" AutomationProperties.AutomationId="ServerHostedMods">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Classes="icon" Data="{StaticResource Icon.Mods}" Width="14" Height="14" Margin="0,0,8,0" />
+                            <TextBlock Text="{local:Tr server.hostedOpenMods}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Content="{local:Tr server.hostedSettings}" Command="{Binding OpenSettingsCommand}" Margin="8,0,0,0" Padding="16,8"
+                            AutomationProperties.AutomationId="ServerHostedSettings" />
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock Classes="pageTitle" Text="{local:Tr nav.server}" />
+                    <TextBlock Text="{Binding HeaderSubtitle}" ToolTip.Tip="{Binding HeaderSubtitle}" Foreground="{DynamicResource Forest.Accent}" FontSize="12"
+                               Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </DockPanel>
+            <views:ServerHostedView DataContext="{Binding Hosted}" />
+        </DockPanel>
+
+        <DockPanel>
+            <DockPanel.IsVisible>
+                <!-- серверный профиль, но не у хостера: у сервера у хостера вместо всего этого — плашка выше -->
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="IsServerProfile" />
+                    <Binding Path="!IsHostedProfile" />
+                </MultiBinding>
+            </DockPanel.IsVisible>
             <!-- ===== заголовок и управление ===== -->
             <DockPanel DockPanel.Dock="Top">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
