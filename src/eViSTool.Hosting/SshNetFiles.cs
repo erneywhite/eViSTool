@@ -126,12 +126,25 @@ public sealed partial class SshNetFiles(HostedEndpoint endpoint) : IRemoteFiles
         {
             // зашифрованный ключ не открылся: без пароля ключа — он и нужен (не все форматы SSH.NET говорят об этом
             // своим исключением), с паролем — почти всегда пароль не тот. Внутреннее исключение не прикладываем: разбор
-            // ключа мог положить в текст что угодно из файла
+            // ключа мог положить в него что угодно из файла, — а из текста берём только то, что пишет сам SSH.NET
             if (KeyLooksEncrypted(bytes))
                 throw new RemoteFilesException(RemoteFailure.KeyPassphrase,
                     passphrase is null ? $"{keyFile}: the key is protected by a passphrase" : $"{keyFile}: wrong passphrase");
-            throw new RemoteFilesException(RemoteFailure.KeyFile, Scrub($"{keyFile}: {ex.Message}"));
+            throw new RemoteFilesException(RemoteFailure.KeyFile, Scrub($"{keyFile}: {KeyProblem(ex)}"));
         }
+    }
+
+    /// <summary>
+    /// Чем не подошёл файл ключа — для текста ошибки, а он идёт в окно и может попасть в журнал. Тексты SSH.NET о файле
+    /// ключа (<see cref="SshException"/>, NotSupportedException «Key '…' is not supported») — шаблоны, где из файла разве
+    /// что название формата, шифра или типа ключа: их показываем одной строкой не длиннее 160 знаков. Остальное (BouncyCastle,
+    /// разбор base64 и т. п.) — только тип исключения: что в таких текстах бывает, мы не проверяли.
+    /// </summary>
+    internal static string KeyProblem(Exception ex)
+    {
+        if (ex is not (SshException or NotSupportedException)) return $"not a private key ({ex.GetType().Name})";
+        var line = new string([.. ex.Message.Select(c => char.IsControl(c) ? ' ' : c)]).Trim();
+        return line.Length <= 160 ? line : line[..160] + "…";
     }
 
     /// <summary>
@@ -523,11 +536,23 @@ public sealed partial class SshNetFiles(HostedEndpoint endpoint) : IRemoteFiles
                 case ObjectDisposedException:
                     // SSH.NET закрыл сеанс сам (связь порвалась), пока шла операция
                     return new RemoteFilesException(RemoteFailure.Connect, $"{where}: the connection was closed", ex);
+                case SshException or InvalidOperationException when ClosedMidRequest(e.Message):
+                    return new RemoteFilesException(RemoteFailure.Connect, $"{where}: {e.Message}", ex);
             }
         }
         if (Chain(ex).Any(e => e is IOException)) return new RemoteFilesException(RemoteFailure.Connect, $"{where}: {ex.Message}", ex);
         return new RemoteFilesException(RemoteFailure.Protocol, $"{where}: {ex.Message}", ex);
     }
+
+    /// <summary>
+    /// Сеанс или канал SFTP закрылся посреди запроса. SSH.NET (SubsystemSession, проверено на 2026.0.0) бросает тогда
+    /// голый <see cref="SshException"/> без сетевой причины внутри, а запрос в уже закрытый канал — InvalidOperationException;
+    /// отличить их от прочих можно только по тексту. Это обрыв связи: следующая операция подключится заново.
+    /// </summary>
+    // shortcut: сверка по тексту SSH.NET 2026.0.0; при обновлении SSH.NET сверить тексты в SubsystemSession (или
+    // перейти на свой тип исключения, если библиотека его заведёт)
+    private static bool ClosedMidRequest(string message) =>
+        message is "Connection was closed by the server." or "Channel was closed." or "The session is not open.";
 
     /// <summary>Код ответа SFTP. У версии 3 (OpenSSH) кодов мало: «нет места» и «уже есть» приходят общим «Failure», а
     /// серверы новее шлют и коды версий 4–6 — их тоже понимаем.</summary>

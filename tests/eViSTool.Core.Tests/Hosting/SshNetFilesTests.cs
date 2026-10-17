@@ -83,6 +83,20 @@ public sealed class SshNetFilesTests : IDisposable
     }
 
     [Fact]
+    public void Translate_SessionOrChannelClosedMidRequest_IsConnect()
+    {
+        // так SSH.NET (SubsystemSession) отвечает на запрос, когда сеанс или канал SFTP закрылся: без сетевой причины внутри
+        Assert.Equal(RemoteFailure.Connect, Kind(new SshException("Connection was closed by the server.")));
+        Assert.Equal(RemoteFailure.Connect, Kind(new SshException("Channel was closed.")));
+        Assert.Equal(RemoteFailure.Connect, Kind(new InvalidOperationException("The session is not open.")));
+        Assert.Equal(RemoteFailure.Connect, Kind(new AggregateException(new SshException("Channel was closed."))));
+        Assert.Contains("rename /a", SshNetFiles.TranslateStatic(new SshException("Channel was closed."), "rename /a").Message);
+        // похожие, но другие тексты — по-прежнему «сервер ответил не то»
+        Assert.Equal(RemoteFailure.Protocol, Kind(new SshException("Subsystem 'sftp' could not be executed.")));
+        Assert.Equal(RemoteFailure.Protocol, Kind(new InvalidOperationException("Channel was closed by someone")));
+    }
+
+    [Fact]
     public void Translate_LooksInsideWrappers_AndKeepsOurOwn()
     {
         Assert.Equal(RemoteFailure.NotFound, Kind(new AggregateException(new SftpPathNotFoundException("No such file"))));
@@ -192,6 +206,32 @@ public sealed class SshNetFilesTests : IDisposable
     {
         var ex = await FailAsync(Endpoint(port: 1, keyFile: Write("notes.txt", "just some text")));
         Assert.Equal(RemoteFailure.KeyFile, ex.Kind);
+    }
+
+    [Fact]
+    public void KeyProblem_KeepsOnlySshNetTexts_OnOneShortLine()
+    {
+        Assert.Equal("Invalid private key file.", SshNetFiles.KeyProblem(new SshException("Invalid private key file.")));
+        Assert.Equal("Key 'ssh-x' is not supported.", SshNetFiles.KeyProblem(new NotSupportedException("Key 'ssh-x' is not supported.")));
+
+        // текст чужой библиотеки мог взять что угодно из файла — от него только тип
+        var foreign = SshNetFiles.KeyProblem(new FormatException("bytes-from-the-key-file"));
+        Assert.DoesNotContain("bytes-from-the-key-file", foreign);
+        Assert.Contains(nameof(FormatException), foreign);
+
+        var crafted = SshNetFiles.KeyProblem(new SshException("Key type " + new string('k', 5000) + "\nsecond line is not supported"));
+        Assert.DoesNotContain('\n', crafted);
+        Assert.True(crafted.Length <= 161, crafted.Length.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public async Task KeyFile_NotAKey_SaysWhatSshNetSaid()
+    {
+        var path = Write("notes.txt", "just some text");
+        var ex = await FailAsync(Endpoint(port: 1, keyFile: path));
+        Assert.Equal(RemoteFailure.KeyFile, ex.Kind);
+        Assert.Equal($"{path}: Invalid private key file.", ex.Message);
+        Assert.Null(ex.InnerException);
     }
 
     [Fact]

@@ -71,6 +71,70 @@ public sealed class HostedConnectSftpTests : IDisposable
         Assert.Equal("58021", vm.PortText);
     }
 
+    [Fact]
+    public void EditingTheAddress_KeepsTheSavedSftpPort()
+    {
+        var existing = new HostedConnection { Protocol = HostedProtocol.Sftp, Host = Host, Port = 2022, User = "gp_user" };
+        var vm = Model(existing: existing);
+
+        vm.Address = "sftp://203.0.113.41"; // поправили хост, схема осталась в поле
+        Assert.Equal("2022", vm.PortText);
+
+        // адрес набрали заново по буквам: по дороге он бывает и обычным хостом FTP («sftp», «sftp:»)
+        const string typed = "sftp://panel.example.net";
+        for (var i = 1; i <= typed.Length; i++) vm.Address = typed[..i];
+        Assert.True(vm.IsSftp);
+        Assert.Equal("2022", vm.PortText);
+        Assert.Equal(2022, vm.Accept()!.Port);
+    }
+
+    [Fact]
+    public void PortTypedForSftp_SurvivesAddressEdits()
+    {
+        var vm = Model();
+        vm.Address = "sftp://panel.example.net";
+        vm.CommitAddress();
+        vm.PortText = "2022"; // порт из панели хостера вписали руками
+
+        vm.Address = "sftp://panel.example.com";
+
+        Assert.Equal("2022", vm.PortText);
+    }
+
+    [Theory]
+    [InlineData("22")]
+    [InlineData("2022")]
+    [InlineData("8822")]
+    public void SftpLookingPortTypedForFtp_StaysWhenTheSchemeIsAdded(string port)
+    {
+        var vm = Model();
+        vm.Address = Host;
+        vm.PortText = port; // подсказка под портом советует дописать sftp:// — так и сделали
+        Assert.Equal(Loc.T("hosted.portSftp", int.Parse(port)), vm.PortHint);
+
+        vm.Address = "sftp://" + Host;
+
+        Assert.Equal(port, vm.PortText);
+    }
+
+    [Fact]
+    public void PortRemovedFromTheLink_FallsBackToTheSftpPortItHadBefore()
+    {
+        // новый профиль: до ссылки в поле 21 от FTP — без порта в ссылке у SFTP встаёт 22
+        var fresh = Model();
+        fresh.Address = "sftp://" + Host + ":2200";
+        Assert.Equal("2200", fresh.PortText);
+        fresh.Address = "sftp://" + Host;
+        Assert.Equal("22", fresh.PortText);
+
+        // профиль SFTP с портом 2022: убрали порт из ссылки — вернулся 2022, а не 22
+        var saved = Model(existing: new HostedConnection { Protocol = HostedProtocol.Sftp, Host = Host, Port = 2022, User = "gp_user" });
+        saved.Address = "sftp://" + Host + ":2200";
+        Assert.Equal("2200", saved.PortText);
+        saved.Address = "sftp://" + Host;
+        Assert.Equal("2022", saved.PortText);
+    }
+
     [Theory]
     [InlineData("21")]
     [InlineData("990")]
@@ -231,6 +295,45 @@ public sealed class HostedConnectSftpTests : IDisposable
         Assert.Equal(Loc.T("hosted.keyMissing", missing), vm.CheckText);
         Assert.Equal(RowTone.Danger, vm.CheckTone);
         Assert.False(vm.IsChecking);
+    }
+
+    [Fact]
+    public async Task KeyLogin_OnlyTheKeyFieldGoesToTheDisk()
+    {
+        // ключ может лежать на сетевой папке, которая отвечает долго: буквы в других полях её не ждут
+        var probes = new List<string>();
+        var onDisk = false;
+        var vm = new HostedConnectViewModel(null, "Подключить", (_, _, _) => Task.FromResult(Found()))
+        {
+            KeyFileProbe = path => { probes.Add(path); return onDisk; },
+        };
+        vm.Address = "sftp://" + Host;
+        vm.AuthIndex = 1;
+        const string share = @"\\nas\keys\id_ed25519";
+        vm.KeyFile = share;
+        Assert.Equal(new[] { share }, probes);
+        Assert.Equal(Loc.T("hosted.keyMissing", share), vm.KeyFileHint);
+
+        vm.User = "gp_user";
+        vm.Password = "made-up-password";
+        vm.PortText = "2022";
+        vm.Root = "/srv";
+        vm.KeyPassphrase = "made-up-passphrase";
+        vm.Address = "sftp://203.0.113.41";
+        Assert.Single(probes);
+        Assert.Equal(RowTone.Danger, vm.KeyFileTone); // подсказка та же — путь не менялся
+
+        // ключ положили на место; «Проверить» смотрит на диск заново — и подсказка тоже
+        onDisk = true;
+        await vm.CheckCommand.ExecuteAsync(null);
+        Assert.Equal(2, probes.Count);
+        Assert.Equal(Loc.T("hosted.keyHint"), vm.KeyFileHint);
+        Assert.Equal(RowTone.Good, vm.CheckTone);
+
+        // вход по паролю и снова по ключу — тоже свежий взгляд
+        vm.AuthIndex = 0;
+        vm.AuthIndex = 1;
+        Assert.Equal(3, probes.Count);
     }
 
     [Fact]
@@ -418,7 +521,7 @@ public sealed class HostedConnectSftpTests : IDisposable
         await vm.CheckCommand.ExecuteAsync(null);
 
         Assert.Equal(0, calls);
-        Assert.Equal(Loc.T("hosted.passwordUnreadable"), vm.CheckText);
+        Assert.Equal(Loc.T("hosted.keyPassphraseUnreadable"), vm.CheckText); // не прочитать именно пароль ключа
         vm.KeyPassphrase = "typed-again";
         await vm.CheckCommand.ExecuteAsync(null);
         Assert.Equal(1, calls);
