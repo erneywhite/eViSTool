@@ -190,12 +190,12 @@ public sealed class HostedLogsTests : IDisposable
     [Fact]
     public async Task StopBegunButLogFrozen_StopsCountingOnlyWhenBothClocksAgree()
     {
-        // сервер убили посреди остановки: «Stopped the server!» так и не появилась
-        PutLog(Main, HostedLogSamples.Stopping);
+        // сервер убили посреди остановки: «Stopped the server!» так и не появилась; файл менялся полминуты назад
+        PutLog(Main, HostedLogSamples.Stopping, _time.UtcNow - TimeSpan.FromSeconds(30));
         var logs = Logs();
 
         Assert.Equal(HostedServerState.Stopping, (await logs.PollAsync(default)).State);
-        // файл давно не менялся (MLSD), но мы смотрим на него только минуту — ещё не верим
+        // по MLSD файл уже не менялся 2,5 минуты, но мы смотрим на него только минуту — ещё не верим
         _time.UtcNow += TimeSpan.FromMinutes(1);
         Assert.Equal(HostedServerState.Stopping, (await logs.PollAsync(default)).State);
 
@@ -204,6 +204,17 @@ public sealed class HostedLogsTests : IDisposable
 
         Assert.Equal(HostedServerState.Stopped, update.State);
         Assert.True(HostedLogs.IsSurelyDown(update.State));
+    }
+
+    [Fact]
+    public async Task StopBegun_FileUnchangedForLong_IsStoppedAtOnce_EvenOnTheFirstLook()
+    {
+        // окно только открыли, а сервер убили посреди остановки полчаса назад: ждать своих 2 минут незачем
+        PutLog(Main, HostedLogSamples.Stopping, _time.UtcNow - TimeSpan.FromMinutes(30));
+
+        var update = await Logs().PollAsync(default);
+
+        Assert.Equal(HostedServerState.Stopped, update.State);
     }
 
     [Fact]

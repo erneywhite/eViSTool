@@ -66,6 +66,12 @@ public sealed class HostedLogs
     /// <summary>Остановка начата, а лог не растёт столько — сервер остановлен (убит посреди остановки).</summary>
     public static readonly TimeSpan StaleAfter = TimeSpan.FromMinutes(2);
 
+    /// <summary>
+    /// Лог не менялся так долго по времени файла, что остановка точно закончилась, даже если окно только открыли и само
+    /// роста не видело (иначе после запуска окна сервер, убитый посреди остановки, ещё 2 минуты «останавливался»).
+    /// </summary>
+    public static readonly TimeSpan LongStaleAfter = TimeSpan.FromMinutes(10);
+
     /// <summary>Сколько ждать быстрой проверки (<see cref="CheckNowAsync"/>).</summary>
     public static readonly TimeSpan QuickTimeout = TimeSpan.FromSeconds(5);
 
@@ -373,6 +379,7 @@ public sealed class HostedLogs
     private bool IsStale(RemoteEntry main, DateTime now)
     {
         var written = main.Modified is { Kind: DateTimeKind.Utc } utc ? utc : DateTime.MinValue;
+        if (written != DateTime.MinValue && now - written > LongStaleAfter) return true;
         return now - (written > _lastGrowth ? written : _lastGrowth) > StaleAfter;
     }
 
