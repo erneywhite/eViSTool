@@ -135,7 +135,7 @@ internal class TestUiPlatform : IUiPlatform
     public IReadOnlyList<string>? PickFiles(string title, IReadOnlyList<FileFilter> filters, bool multiple) => null;
     public string? PickSaveFile(string title, IReadOnlyList<FileFilter> filters, string suggestedName, string? folder = null, bool confirmOverwrite = true) => null;
     public string? PickFolder(string title, string? initialFolder) => null;
-    public void SetClipboard(string text) { }
+    public virtual void SetClipboard(string text) { }
     public void OpenUrl(string url) { }
     public void OpenFolder(string dir) { }
     public void ShowInFolder(string path) { }

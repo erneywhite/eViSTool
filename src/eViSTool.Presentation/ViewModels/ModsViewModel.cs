@@ -674,19 +674,49 @@ public sealed partial class ModsViewModel : ObservableObject
     {
         var list = items.ToList();
         List<ModTarget> hosted = runningConfirmed ? [] : [.. list.Select(i => i.Target).Where(t => t.IsHosted).DistinctBy(t => t.ProfileId)];
-        if (hosted.Count == 0) _queue.Enqueue(list, source, undoes, runningConfirmed);
-        else _ = EnqueueCheckedAsync(list, hosted, source, undoes);
+        if (hosted.Count == 0)
+        {
+            _queue.Enqueue(list, source, undoes, runningConfirmed);
+            return;
+        }
+        // вкладка занята другим — сразу, как и без проверки (очередь не добавила бы и сама)
+        if (!_queue.CanEnqueue) return;
+        _ = EnqueueCheckedAsync(list, hosted, source, undoes);
     }
 
     /// <summary>
     /// У хостера вопрос очереди — после быстрой проверки по логу: сервер остановлен — очередь не спросит. Вопрос
-    /// выключен или «Да» помнится — проверки нет, и пункты встают в очередь сразу, как раньше.
+    /// выключен или «Да» помнится — проверки нет, и пункты встают в очередь сразу, как раньше. Пока идёт проверка, в
+    /// строке статуса видно, чего ждём, а вкладка занята: перетащенный тем временем zip иначе начал бы свою установку,
+    /// и очередь после проверки молча не взяла бы пункты.
     /// </summary>
     private async Task EnqueueCheckedAsync(List<UpdateQueueItem> items, List<ModTarget> hosted, string source, string? undoes)
     {
-        foreach (var target in hosted) await _installer.CheckHostedAsync(target);
+        // прогон очереди уже держит флаг занятости — тогда его не трогаем.
+        // shortcut: прогон кончился посреди проверки и тут же началась другая операция — пункты не встанут, как и раньше
+        // при занятой вкладке. Переделать, если такое заметят
+        var claimed = !IsBusy;
+        if (claimed) IsBusy = true;
+        var before = StatusText;
+        var checking = Loc.T("hosted.stopChecking");
+        StatusText = checking;
+        try
+        {
+            foreach (var target in hosted) await _installer.CheckHostedAsync(target);
+        }
+        finally
+        {
+            if (StatusText == checking) StatusText = before;
+            if (claimed) IsBusy = false;
+        }
         _queue.Enqueue(items, source, undoes);
     }
+
+    /// <summary>
+    /// Можно ли менять моды цели: свой профиль и удалённый — вопрос, если игра или сервер запущены; у хостера — проверка
+    /// по логу и вопрос «останови сервер в панели хостера» с общей памятью ответа «Да» (окно вылета спрашивает так же).
+    /// </summary>
+    internal Task<bool> ConfirmIfRunningAsync(ModTarget target) => _installer.ConfirmIfRunningAsync(target);
 
     [RelayCommand]
     private void StopQueue() => _queue.Stop();

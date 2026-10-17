@@ -82,11 +82,21 @@ internal sealed class ModInstallActions(ModsViewModel owner, ModInstallService i
 
         var list = string.Join("\n", owner.DependencyIssues.Select(i => "• " + i.Describe()));
         if (!Confirm(Loc.T("mods.fixDepsConfirm", list))) return;
-        if (!await installer.ConfirmIfRunningAsync(target)) return;
+        // занято до первого await: пока идёт проверка сервера у хостера, вторая операция не начнётся
+        owner.IsBusy = true;
+        var go = false;
+        try
+        {
+            go = await installer.ConfirmIfRunningAsync(target);
+        }
+        finally
+        {
+            if (!go) owner.IsBusy = false;
+        }
+        if (!go) return;
 
         var installed = new List<string>();
         var problems = new List<string>();
-        owner.IsBusy = true;
         using var history = ModHistory.Begin(ModHistorySource.Dependencies);
         try
         {

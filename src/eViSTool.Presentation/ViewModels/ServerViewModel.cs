@@ -112,7 +112,10 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
 
     /// <summary>Подзаголовок: профиль и версия игры; путь к данным — в подсказке.</summary>
     public string HeaderSubtitle => _main.ActiveProfile is not { } p ? ""
-        : p.Model.IsHosted ? Loc.T("server.subtitleHosted", p.Name, p.Model.Hosted?.Describe() ?? "?", p.GameVersionText)
+        // версию игры у хостера узнаёт чтение модов: пока не узнали — без неё, а не «Vintage Story узнаю при чтении модов»
+        : p.Model.IsHosted ? (p.Model.Hosted?.GameVersion ?? p.HostedGameVersion) is { Length: > 0 } hostedVersion
+            ? Loc.T("server.subtitleHosted", p.Name, p.Model.Hosted?.Describe() ?? "?", hostedVersion)
+            : Loc.T("server.subtitleHostedNoVersion", p.Name, p.Model.Hosted?.Describe() ?? "?")
         : p.Model.IsRemote ? Loc.T("server.subtitleRemote", p.Name,
             (RemoteSecret.Unprotect(p.Model.RemoteCode) is { } c ? $"{c.Host}:{c.Port}" : "?") + (_remoteOs is { Length: > 0 } os ? " · " + os : ""),
             _remoteGameVersion ?? "?")

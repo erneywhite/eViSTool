@@ -2,6 +2,7 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Markup.Xaml.Styling;
+using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -86,6 +87,28 @@ public sealed class ServerHostedViewTests : IDisposable
         Assert.False(Named<TextBlock>(window, "HostedPlayersEmpty").IsEffectivelyVisible);
         Assert.True(Named<ComboBox>(window, "HostedRuns").IsEffectivelyVisible);
         Assert.False(Named<TextBlock>(window, "HostedStatus").IsEffectivelyVisible);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task Console_lines_get_the_colours_of_the_own_console()
+    {
+        // строки в конце лога: консоль показывает конец, а виртуальный список создаёт только видимые
+        string[] log = [.. HostedLogSamples.Running, "17.10.2026 13:31:19 [Error] Something broke", "17.10.2026 13:31:19 [Warning] Server overloaded",
+            "17.10.2026 13:31:19 [Event] Nothing special"];
+        PutLog(log);
+        var model = await PolledAsync();
+        var window = Show(model);
+
+        var lines = Named<ListBox>(window, "HostedConsole").GetVisualDescendants().OfType<TextBlock>().Where(t => t.Classes.Contains("line")).ToList();
+        Color Of(string text) => ((ISolidColorBrush)lines.Single(t => t.Text?.EndsWith(text, StringComparison.Ordinal) == true).Foreground!).Color;
+        Color Resource(string key) =>
+            window.TryFindResource(key, window.ActualThemeVariant, out var brush) ? ((ISolidColorBrush)brush!).Color : throw new KeyNotFoundException(key);
+
+        // стили ServerStyles.axaml дошли до строк: цвет по уровню, как у своей консоли
+        Assert.Equal(Resource("Forest.Danger"), Of("Something broke"));
+        Assert.Equal(Resource("Forest.Warn"), Of("Server overloaded"));
+        Assert.Equal(Color.Parse("#D8DCCF"), Of("Nothing special"));
         window.Close();
     }
 

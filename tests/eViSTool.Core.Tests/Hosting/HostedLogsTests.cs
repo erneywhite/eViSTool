@@ -524,6 +524,25 @@ public sealed class HostedLogsTests : IDisposable
     }
 
     [Fact]
+    public async Task CurrentCrashReported_AfterTheCrashIsGiven_UntilTheServerStartsAgain()
+    {
+        PutLog(Main, [.. HostedLogSamples.Running, .. FatalLines], CrashUtc);
+        var logs = Logs();
+        Assert.False(logs.CurrentCrashReported);   // лог ещё не читали
+
+        Assert.Equal(HostedServerState.Crashed, (await logs.PollAsync(default)).State);
+        Assert.False(logs.CurrentCrashReported);   // вылет виден, но ещё не отдан
+        Assert.NotNull(await logs.FindCrashAsync(default));
+        Assert.True(logs.CurrentCrashReported);    // окну незачем искать его на каждом опросе
+
+        // новый запуск: прошлый лог уехал в архив, новый короче
+        PutLog("/Logs/Archive/2026-10-17_13_27_08/server-main.log", [.. HostedLogSamples.Running, .. FatalLines], CrashUtc);
+        PutLog(Main, NextDay(HostedLogSamples.Starting));
+        Assert.True((await logs.PollAsync(default)).Restarted);
+        Assert.False(logs.CurrentCrashReported);
+    }
+
+    [Fact]
     public async Task FindCrash_TakesModsFromTheLastScan()
     {
         _host.PutMod("/Mods/badmod_1.0.0.zip", "badmod", "1.0.0");

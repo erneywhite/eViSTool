@@ -20,9 +20,11 @@ public sealed record HostedPlayerRow(string Name, string SinceText);
 /// Раздел «Сервер» у сервера у хостера: что сервер пишет в server-main.log (по FTP, только чтение), его состояние по
 /// логу, кто на нём и прошлые запуски из Logs/Archive. Запускают, останавливают и командуют сервером в панели хостера —
 /// здесь только смотрят. Лог опрашивается раз в <see cref="PollInterval"/> и только пока раздел открыт, а профиль
-/// активен и у хостера; ушли с раздела — опрос стоит, вернулись — продолжается с того же места лога. Новый вылет
-/// показывается тем же окном, что у своего сервера. Сам лог — <see cref="HostedLogs"/> (один на профиль,
-/// <see cref="HostedLogsPool"/>), строки консоли и их цвет — те же <see cref="ConsoleLineViewModel"/>, что у своей консоли.
+/// активен и у хостера; ушли с раздела — опрос стоит, вернулись — продолжается с того же места лога. Ошибку, которую
+/// повтор не вылечит (неверный пароль, недоверенный сертификат), опрос не повторяет, пока подключение не поправят или
+/// раздел не откроют заново. Новый вылет показывается тем же окном, что у своего сервера. Сам лог — <see cref="HostedLogs"/>
+/// (один на профиль, <see cref="HostedLogsPool"/>), строки консоли и их цвет — те же <see cref="ConsoleLineViewModel"/>,
+/// что у своей консоли.
 /// </summary>
 public sealed partial class HostedServerViewModel : ObservableObject
 {
@@ -35,8 +37,11 @@ public sealed partial class HostedServerViewModel : ObservableObject
     /// <summary>Сколько строк текущего запуска держит консоль — как у своей.</summary>
     public const int MaxLines = ServerConsoleViewModel.MaxLines;
 
-    /// <summary>Сколько строк прошлого запуска показывать: его лог читается до 8 МБ, это десятки тысяч строк.</summary>
-    public const int PastMaxLines = 20_000;
+    /// <summary>
+    /// Сколько строк прошлого запуска показывать — столько же, сколько у текущего и у своей консоли: строки добавляются
+    /// в список по одной, и десятки тысяч из лога в 8 МБ подвесили бы окно. Обычный запуск — несколько сотен строк.
+    /// </summary>
+    public const int PastMaxLines = MaxLines;
 
     private readonly MainViewModel _main;
     private IUiTimer? _timer;
@@ -47,6 +52,9 @@ public sealed partial class HostedServerViewModel : ObservableObject
     private bool _sectionOpen;
     private bool _polling;
     private bool _attached;            // первый опрос после подключения к логам профиля был: дальше — только новые строки
+    private bool _halted;              // ошибка, которую повтор не вылечит: опрос стоит до правки подключения или нового открытия раздела
+    private bool _runsAgain;           // список запусков не прочитался из-за сети: попробовать со следующим опросом
+    private bool _crashAgain;          // поиск вылета не удался из-за сети: попробовать со следующим опросом
     private DateTime? _updatedAt;      // последний удачный опрос, время этой машины
     private Exception? _error;         // последний опрос не удался — текст в статусе (пересобирается при смене языка)
     private int _runRequest;           // номер запроса прошлого запуска: ответ на устаревший выбор не показываем
@@ -140,13 +148,14 @@ public sealed partial class HostedServerViewModel : ObservableObject
     /// <summary>Раздел «Сервер» открыт или закрыт.</summary>
     public void SetActive(bool open)
     {
+        if (open && !_sectionOpen) _halted = false; // открыли заново — ещё одна попытка
         _sectionOpen = open;
         UpdatePolling();
     }
 
     private void UpdatePolling()
     {
-        if (!_sectionOpen || _logs is null)
+        if (!_sectionOpen || _logs is null || _halted)
         {
             _timer?.Stop();
             OnPropertyChanged(nameof(IsPolling));
@@ -170,8 +179,14 @@ public sealed partial class HostedServerViewModel : ObservableObject
         _cts.Dispose();
         _cts = new CancellationTokenSource();
         _generation++;
+        // таймер — заново: другой профиль читается сразу и с обычным интервалом, а не по тику прежнего (после его ошибки —
+        // через десять секунд)
+        _timer?.Stop();
         _polling = false;
         _attached = false;
+        _halted = false;
+        _runsAgain = false;
+        _crashAgain = false;
         _updatedAt = null;
         _error = null;
         _past = null;
@@ -230,7 +245,13 @@ public sealed partial class HostedServerViewModel : ObservableObject
                 if (generation != _generation || ct.IsCancellationRequested) return;
                 _error = ex;
                 StatusText = ErrorText(ex);
-                SetInterval(RetryInterval);
+                if (IsHopeless(ex))
+                {
+                    // неверный пароль каждые десять секунд — сотни неудачных входов в час, хостер может закрыть адрес
+                    _halted = true;
+                    UpdatePolling();
+                }
+                else SetInterval(RetryInterval);
                 return;
             }
             if (generation != _generation) return; // пока читали, профиль сменили
@@ -240,8 +261,15 @@ public sealed partial class HostedServerViewModel : ObservableObject
 
             var first = !_attached;
             Apply(logs, update);
-            if (first || update.Restarted) await LoadRunsAsync(logs, generation, ct);
-            if (update.State == HostedServerState.Crashed || update.Restarted) await CheckCrashAsync(logs, profile, ct);
+            if (first || update.Restarted || _runsAgain) await LoadRunsAsync(logs, generation, ct);
+            // вылет ищем после перезапуска, пока сервер лежит (если вылет этого запуска ещё не отдан: поиск — лишний листинг
+            // на каждом опросе) и при первом опросе профиля, если прошлый запуск мог кончиться уже при открытом окне: сервер
+            // мог упасть и снова запуститься, пока раздел не открывали. Текущий запуск начался раньше CrashesSince — вылет
+            // прошлого старый, и архив не читаем. Поиск сорвался из-за сети — со следующим опросом
+            var archiveDue = first && !(logs.RunStarted is { } started && logs.ToLocal(started) < CrashesSince);
+            var crashCheck = update.Restarted || _crashAgain
+                             || (update.State == HostedServerState.Crashed ? !logs.CurrentCrashReported : archiveDue);
+            if (crashCheck) await CheckCrashAsync(logs, profile, generation, ct);
         }
         finally
         {
@@ -343,8 +371,27 @@ public sealed partial class HostedServerViewModel : ObservableObject
         OnPropertyChanged(nameof(HasPlayers));
     }
 
-    private static string ErrorText(Exception ex) =>
-        Loc.T("server.hostedRetry", HostedSecret.Describe(ex), (int)RetryInterval.TotalSeconds);
+    private static string ErrorText(Exception ex) => IsHopeless(ex)
+        ? Loc.T("server.hostedNoRetry", Describe(ex))
+        : Loc.T("server.hostedRetry", Describe(ex), (int)RetryInterval.TotalSeconds);
+
+    /// <summary>
+    /// Ошибка, которую повтор не вылечит: неверный логин или пароль, недоверенный сертификат, протокол, который программа
+    /// не умеет. Это правят в «Настройках».
+    /// </summary>
+    private static bool IsHopeless(Exception ex) =>
+        ex is RemoteFilesException { Kind: RemoteFailure.Auth or RemoteFailure.CertificateUntrusted or RemoteFailure.Unsupported };
+
+    /// <summary>
+    /// Что случилось — законченным предложением: за ним в строке идёт «попробую снова…». Сертификату здесь доверить
+    /// нельзя (это делают в «Настройках»), поэтому совет «доверяй, только если…» не к месту — свой текст.
+    /// </summary>
+    private static string Describe(Exception ex)
+    {
+        if (ex is RemoteFilesException { Kind: RemoteFailure.CertificateUntrusted }) return Loc.T("server.hostedCertUntrusted");
+        var text = HostedSecret.Describe(ex).TrimEnd();
+        return text.Length == 0 || text[^1] is '.' or '!' or '?' or '…' ? text : text + ".";
+    }
 
     // ---------- прошлые запуски
 
@@ -357,9 +404,13 @@ public sealed partial class HostedServerViewModel : ObservableObject
         }
         catch (Exception ex) when (IsExpected(ex))
         {
-            return; // список запусков подождёт следующего перезапуска или смены профиля; консоль это не задевает
+            // сбой сети — попробуем со следующим опросом; другое (нет прав на папку и т. п.) повтор не вылечит, и список
+            // подождёт перезапуска сервера или смены профиля. Консоль это не задевает
+            if (generation == _generation) _runsAgain = !ct.IsCancellationRequested && IsNetwork(ex);
+            return;
         }
         if (generation != _generation) return;
+        _runsAgain = false;
         FillRuns(logs, runs, SelectedRun?.Run?.Name);
     }
 
@@ -412,7 +463,7 @@ public sealed partial class HostedServerViewModel : ObservableObject
         }
         catch (Exception ex) when (IsExpected(ex))
         {
-            if (request == _runRequest && !ct.IsCancellationRequested) RunNote = Loc.T("server.hostedRunFailed", HostedSecret.Describe(ex));
+            if (request == _runRequest && !ct.IsCancellationRequested) RunNote = Loc.T("server.hostedRunFailed", Describe(ex));
         }
     }
 
@@ -434,7 +485,7 @@ public sealed partial class HostedServerViewModel : ObservableObject
     /// Каждый вылет — один раз за окно; случившийся до открытия окна не показываем. Ищем только пока идёт опрос, то есть
     /// пока раздел открыт.
     /// </summary>
-    private async Task CheckCrashAsync(HostedLogs logs, GameProfile profile, CancellationToken ct)
+    private async Task CheckCrashAsync(HostedLogs logs, GameProfile profile, int generation, CancellationToken ct)
     {
         HostedCrash? crash;
         try
@@ -443,8 +494,10 @@ public sealed partial class HostedServerViewModel : ObservableObject
         }
         catch (Exception ex) when (IsExpected(ex))
         {
-            return; // найдётся при следующем опросе
+            if (generation == _generation) _crashAgain = !ct.IsCancellationRequested && IsNetwork(ex); // найдётся при следующем опросе
+            return;
         }
+        if (generation == _generation) _crashAgain = false;
         // профиль могли сменить, пока искали, — вылет всё равно настоящий: логи профиля второй раз его не отдадут
         if (crash is null || !_seenCrashes.Add(crash.Info.Id) || crash.Info.At < CrashesSince) return;
         AppWindows.Current.ShowServerCrash(_main, profile, crash.Info);
@@ -457,6 +510,11 @@ public sealed partial class HostedServerViewModel : ObservableObject
         if (ConsoleLineViewModel.SelectedText(Lines, selected) is { } text) Ui.Platform.SetClipboard(text);
     }
 
+    /// <summary>Сбой сети: пройдёт сам, повторить стоит.</summary>
+    private static bool IsNetwork(Exception ex) =>
+        ex is TimeoutException or RemoteFilesException { Kind: RemoteFailure.Timeout or RemoteFailure.Connect };
+
     private static bool IsExpected(Exception ex) =>
-        ex is IOException or InvalidOperationException or UnauthorizedAccessException or OperationCanceledException or TimeoutException;
+        ex is IOException or InvalidOperationException or InvalidDataException or UnauthorizedAccessException or OperationCanceledException
+            or TimeoutException;
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using eViSTool.Core.Hosting;
@@ -34,12 +35,15 @@ public sealed class HostedServerViewModelTests : IDisposable
 
     // ---------- стенд
 
-    /// <summary>Положить лог на «сервер» со временем файла, как у G-Portal: последняя строка только что записана, часы сервера — UTC+2.</summary>
-    private string PutLog(string remote, string[] lines)
+    /// <summary>
+    /// Положить лог на «сервер» (по умолчанию — стенда теста) со временем файла, как у G-Portal: последняя строка только
+    /// что записана, часы сервера — UTC+2.
+    /// </summary>
+    private string PutLog(string remote, string[] lines, HostedFixture? on = null)
     {
         var marks = new HostedRunMarks();
         foreach (var line in lines) marks.Add(line);
-        var local = _host.Server.Put(remote, HostedLogSamples.Bytes(lines));
+        var local = (on ?? _host).Server.Put(remote, HostedLogSamples.Bytes(lines));
         File.SetLastWriteTimeUtc(local, DateTime.SpecifyKind(marks.LastTime!.Value.AddHours(-2), DateTimeKind.Utc));
         return local;
     }
@@ -286,6 +290,176 @@ public sealed class HostedServerViewModelTests : IDisposable
         Assert.False(_host.Server.Calls.ContainsKey("connect"));
     });
 
+    [Fact]
+    public void SwitchingToAnotherHostedProfile_WithTheSectionOpen_ReadsItAtOnce_WithTheUsualInterval() => Sta.Run(() =>
+    {
+        PutLog(Main, HostedLogSamples.Running);
+        using var other = new HostedFixture();
+        other.GPortalLayout(log: false);
+        var otherLog = NextDay(HostedLogSamples.Stopped);
+        PutLog(Main, otherLog, other);
+        var vm = Vm();
+        _host.Server.FailOn = (op, _) => op == "list";  // у первого профиля нет связи: следующая попытка — через 10 с
+        _host.Server.FailKind = RemoteFailure.Timeout;
+        vm.SetActive(true);
+        Sta.WaitFor(() => vm.StatusText.Length > 0);
+        Assert.Equal(HostedServerViewModel.RetryInterval, Timer(vm).Interval);
+
+        var clock = Stopwatch.StartNew();
+        vm.OnProfileSwitched(other.Profile);
+        Assert.Equal(HostedServerViewModel.PollInterval, Timer(vm).Interval); // интервал — обычный, не от чужой ошибки
+        Sta.WaitFor(() => vm.Lines.Count > 0);
+
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(2), clock.Elapsed.ToString()); // сразу, не по тику прежнего таймера
+        Assert.Equal(otherLog, Texts(vm));
+        Assert.Equal("", vm.StatusText);
+        Assert.True(vm.IsPolling);
+        vm.SetActive(false);
+    });
+
+    [Fact]
+    public void PollStartedBeforeAProfileSwitch_IsThrownAway() => Sta.Run(() =>
+    {
+        PutLog(Main, HostedLogSamples.Running);
+        using var other = new HostedFixture();
+        other.GPortalLayout(log: false);
+        var otherLog = NextDay(HostedLogSamples.Stopped);
+        PutLog(Main, otherLog, other);
+        // первый сервер отвечает, только когда тест отпустит; отмену не слушает — ответ придёт уже после переключения
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var entered = false;
+        using var hook = RemoteFilesFactory.RegisterHost(_host.Host, _ => new HookFiles(_host.Server, async () =>
+        {
+            entered = true;
+            await release.Task;
+        }));
+        var vm = Vm();
+
+        var poll = vm.PollAsync();
+        Sta.WaitFor(() => entered);
+        vm.OnProfileSwitched(other.Profile); // пока первый читается — другой профиль
+        release.SetResult();
+        Sta.Wait(poll);
+
+        Assert.Empty(vm.Lines);              // строки первого в консоль второго не попали
+        Assert.Equal(HostedServerState.Unknown, vm.State);
+        Assert.Empty(vm.Runs);
+        Poll(vm);
+        Assert.Equal(otherLog, Texts(vm));
+        Assert.Equal(HostedServerState.Stopped, vm.State);
+    });
+
+    [Fact]
+    public void LeavingTheSectionDuringAPoll_TheTimerStaysStopped_EvenAfterAnError() => Sta.Run(() =>
+    {
+        PutLog(Main, HostedLogSamples.Running);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var entered = false;
+        using var hook = RemoteFilesFactory.RegisterHost(_host.Host, _ => new HookFiles(_host.Server, async () =>
+        {
+            entered = true;
+            await release.Task;
+        }));
+        var vm = Vm();
+
+        vm.SetActive(true);                  // открыли — опрос сразу
+        Sta.WaitFor(() => entered);
+        vm.SetActive(false);                 // ушли, пока сервер отвечает
+        Assert.False(vm.IsPolling);
+        _host.Server.FailOn = (op, _) => op == "list"; // и ответ — сбой сети
+        _host.Server.FailKind = RemoteFailure.Timeout;
+        release.SetResult();
+        Sta.WaitFor(() => vm.StatusText.Length > 0);
+
+        Assert.False(vm.IsPolling);
+        Assert.False(Timer(vm).IsEnabled);   // новый интервал таймер не запустил
+    });
+
+    [Theory]
+    [InlineData(RemoteFailure.Auth)]
+    [InlineData(RemoteFailure.CertificateUntrusted)]
+    [InlineData(RemoteFailure.Unsupported)]
+    public void ErrorsARetryWillNotFix_AreNotRetried_UntilTheSectionIsOpenedAgain(RemoteFailure kind) => Sta.Run(() =>
+    {
+        PutLog(Main, HostedLogSamples.Running);
+        var vm = Vm();
+        _host.Server.FailOn = (op, _) => op == "connect";
+        _host.Server.FailKind = kind;
+
+        vm.SetActive(true);
+        Sta.WaitFor(() => vm.StatusText.Length > 0);
+
+        var reason = kind switch
+        {
+            RemoteFailure.Auth => Loc.T("hosted.errAuth"),
+            RemoteFailure.CertificateUntrusted => Loc.T("server.hostedCertUntrusted"), // доверить здесь нельзя — без «доверяй, только если…»
+            _ => Loc.T("hosted.errNoTransport"),
+        };
+        Assert.Equal(Loc.T("server.hostedNoRetry", reason), vm.StatusText);
+        Assert.False(vm.IsPolling);          // неверный пароль каждые 10 с — сотни неудачных входов в час
+        Assert.False(Timer(vm).IsEnabled);
+
+        _host.Server.FailOn = null;          // поправили подключение
+        vm.SetActive(false);
+        vm.SetActive(true);                  // открыли раздел снова — пробуем ещё раз
+        Assert.True(vm.IsPolling);
+        Sta.WaitFor(() => vm.State == HostedServerState.Running);
+        Assert.Equal("", vm.StatusText);
+        vm.SetActive(false);
+    });
+
+    [Fact]
+    public void ErrorText_EndsItsSentence_BeforeTheRetryNote() => Sta.Run(() =>
+    {
+        PutLog(Main, HostedLogSamples.Running);
+        var vm = Vm();
+        _host.Server.FailOn = (op, _) => op == "list";
+        _host.Server.FailKind = RemoteFailure.Connect; // «Не удалось подключиться к серверу: {0}» — сообщение сервера без точки
+
+        Poll(vm);
+
+        var tail = Loc.T("server.hostedRetry", "", 10);
+        Assert.EndsWith("refused." + tail, vm.StatusText);
+        Assert.StartsWith(Loc.T("hosted.errConnect", "").TrimEnd(), vm.StatusText);
+    });
+
+    [Fact]
+    public void CopyLines_CopiesTheSelectedLinesInTheirOrder() => Sta.Run(() =>
+    {
+        PutLog(Main, HostedLogSamples.Running);
+        var vm = Vm();
+        Poll(vm);
+        var old = Ui.Platform;
+        var clipboard = new ClipboardPlatform();
+        Ui.Platform = clipboard;
+        try
+        {
+            vm.CopyLinesCommand.Execute(new List<ConsoleLineViewModel> { vm.Lines[3], vm.Lines[1] });
+            Assert.Equal(HostedLogSamples.Running[1] + Environment.NewLine + HostedLogSamples.Running[3], Assert.Single(clipboard.Copied));
+
+            vm.CopyLinesCommand.Execute(new List<ConsoleLineViewModel>()); // ничего не выбрано — буфер не трогаем
+            Assert.Single(clipboard.Copied);
+        }
+        finally
+        {
+            Ui.Platform = old;
+        }
+    });
+
+    [Fact]
+    public void Subtitle_LeavesTheGameVersionOut_UntilItIsKnown() => Sta.Run(() =>
+    {
+        var (main, hosted, _) = Open();
+        var where = _host.Settings.Describe();
+        Assert.Equal(Loc.T("server.subtitleHosted", hosted.Name, where, "1.22.7"), main.Server.HeaderSubtitle);
+
+        hosted.HostedGameVersion = null;     // чтение модов версию ещё не нашло
+        Assert.Equal(Loc.T("server.subtitleHostedNoVersion", hosted.Name, where), main.Server.HeaderSubtitle);
+
+        _host.Settings.GameVersion = "1.22.6"; // указана вручную
+        Assert.Equal(Loc.T("server.subtitleHosted", hosted.Name, where, "1.22.6"), main.Server.HeaderSubtitle);
+    });
+
     // ---------- прошлые запуски
 
     [Fact]
@@ -337,6 +511,42 @@ public sealed class HostedServerViewModelTests : IDisposable
         Assert.Equal(Loc.T("server.hostedRunCut"), vm.RunNote);
     });
 
+    [Fact]
+    public void PastRuns_MissedBecauseOfTheNetwork_AreReadWithTheNextPoll() => Sta.Run(() =>
+    {
+        _host.Server.Put("/Logs/Archive/2026-10-17_13_25_13/server-main.log", HostedLogSamples.Bytes(HostedLogSamples.Archived));
+        PutLog(Main, HostedLogSamples.Running);
+        _host.Server.FailKind = RemoteFailure.Timeout;
+        _host.Server.FailOn = (op, path) => op == "list" && path == "/Logs/Archive";
+        var vm = Vm();
+
+        Poll(vm);
+        Assert.Equal(HostedServerState.Running, vm.State); // консоль и плитки — как обычно
+        Assert.False(vm.HasRuns);
+
+        _host.Server.FailOn = null;
+        Poll(vm);
+        Assert.Equal([null, "2026-10-17_13_25_13"], vm.Runs.Select(r => r.Run?.Name));
+    });
+
+    [Fact]
+    public void PastRun_HugeLog_ShowsOnlyItsEnd_AsManyLinesAsTheConsoleKeeps() => Sta.Run(() =>
+    {
+        var lines = Enumerable.Range(0, HostedServerViewModel.MaxLines + 500)
+            .Select(i => $"17.10.2026 13:25:{i % 60:00} [Notification] line {i}").ToArray();
+        _host.Server.Put("/Logs/Archive/2026-10-17_13_25_13/server-main.log", HostedLogSamples.Bytes(lines));
+        PutLog(Main, HostedLogSamples.Running);
+        var vm = Vm();
+        Poll(vm);
+
+        vm.SelectedRun = vm.Runs[1];
+        Sta.WaitFor(() => vm.RunNote != Loc.T("server.hostedRunReading"));
+
+        Assert.Equal(HostedServerViewModel.MaxLines, vm.Lines.Count);
+        Assert.Equal(lines[^1], vm.Lines[^1].Text);
+        Assert.EndsWith(Loc.T("server.hostedRunTruncated"), vm.RunNote);
+    });
+
     // ---------- вылеты
 
     [Fact]
@@ -378,6 +588,72 @@ public sealed class HostedServerViewModelTests : IDisposable
         Assert.Equal(HostedServerState.Crashed, vm.State);
     });
 
+    [Fact]
+    public void Crash_OnceFound_IsNotSearchedForAgainOnEveryPoll() => Sta.Run(() =>
+    {
+        PutLog(Main, [.. HostedLogSamples.Running, .. FatalLines]);
+        AppWindows.Current = NewProfileViewModelTests.Fake<IAppWindows>.Of((nameof(IAppWindows.ShowServerCrash), _ => null));
+        var vm = Vm(crashesSince: DateTime.MinValue);
+        Poll(vm);
+        var lists = _host.Server.Calls["list"];
+
+        for (var i = 0; i < 5; i++) Poll(vm);
+
+        Assert.Equal(HostedServerState.Crashed, vm.State);
+        Assert.Equal(lists + 5, _host.Server.Calls["list"]); // один листинг на опрос, как у работающего сервера
+    });
+
+    /// <summary>Вылет прошлого запуска в 13:40 (по часам сервера) и текущий запуск на следующий день.</summary>
+    private void CrashedThenStartedAgain()
+    {
+        PutLog("/Logs/Archive/2026-10-17_13_27_08/server-main.log", [.. HostedLogSamples.Running, .. FatalLines]);
+        PutLog(Main, NextDay(HostedLogSamples.Running));
+    }
+
+    [Fact]
+    public void Crash_WhileTheSectionWasClosed_AndTheServerStartedAgain_IsShownOnTheFirstPoll() => Sta.Run(() =>
+    {
+        // окно открыли в 13:00, сервер упал в 13:40, панель хостера запустила его снова, раздел «Сервер» открыли позже
+        CrashedThenStartedAgain();
+        var shown = new List<ServerCrashInfo>();
+        AppWindows.Current = NewProfileViewModelTests.Fake<IAppWindows>.Of((nameof(IAppWindows.ShowServerCrash), a =>
+        {
+            shown.Add((ServerCrashInfo)a[2]!);
+            return null;
+        }));
+        var vm = Vm(crashesSince: Local(13, 0, 0));
+
+        Poll(vm);
+
+        Assert.Equal(HostedServerState.Running, vm.State);
+        Assert.Single(shown);
+        Poll(vm);
+        Assert.Single(shown);
+    });
+
+    [Fact]
+    public void Crash_OfAPastRun_BeforeTheWindowOpened_IsNotShownOnTheFirstPoll() => Sta.Run(() =>
+    {
+        CrashedThenStartedAgain();
+        AppWindows.Current = NewProfileViewModelTests.Fake<IAppWindows>.Of(); // окно вылета уронило бы тест
+
+        Poll(Vm(crashesSince: Local(13, 45, 0)));  // вылет раньше окна — старый
+    });
+
+    [Fact]
+    public void FirstPoll_DoesNotReadTheArchive_WhenTheCurrentRunStartedBeforeTheWindowOpened() => Sta.Run(() =>
+    {
+        CrashedThenStartedAgain();
+        var read = new List<string>();
+        _host.Server.OnBefore = (op, path) => { if (op is "read" or "download") read.Add(path); };
+        AppWindows.Current = NewProfileViewModelTests.Fake<IAppWindows>.Of();
+
+        Poll(Vm(crashesSince: new DateTime(2100, 1, 1)));
+
+        // прошлый запуск кончился до окна — его вылет всё равно старый
+        Assert.DoesNotContain(read, path => path.StartsWith("/Logs/Archive/", StringComparison.Ordinal));
+    });
+
     // ---------- вопрос «останови сервер в панели хостера»
 
     private JArray? Disabled() => JObject.Parse(_host.Server.Text("/serverconfig.json"))["WorldConfig"]?["DisabledMods"] as JArray;
@@ -387,6 +663,13 @@ public sealed class HostedServerViewModelTests : IDisposable
     {
         _host.PutMod("/Mods/alpha_1.0.0.zip", "alpha", "1.0.0");
         return Open().Main.Mods;
+    }
+
+    /// <summary>Главное окно с хостовым профилем и модом alpha на сервере; моды прочитаны.</summary>
+    private MainViewModel MainWithAlpha()
+    {
+        _host.PutMod("/Mods/alpha_1.0.0.zip", "alpha", "1.0.0");
+        return Open().Main;
     }
 
     private static ModRowViewModel Alpha(ModsViewModel mods) => mods.Rows.Single(r => r.ModId == "alpha");
@@ -536,6 +819,123 @@ public sealed class HostedServerViewModelTests : IDisposable
         Sta.Wait(reminder.CheckAsync(_host.Target));
         Assert.Equal(0, checks); // вопрос выключен в профиле
     });
+
+    [Fact]
+    public void CrashWindow_DisablingTheCulprit_AsksToStopTheServer_AndShares_TheAnswerWithMyMods() => Sta.Run(() =>
+    {
+        PutLog(Main, [.. HostedLogSamples.Running, .. FatalLines]); // вылетел — панель хостера могла уже запустить его снова
+        _host.PutMod("/Mods/beta_1.0.0.zip", "beta", "1.0.0");
+        var main = MainWithAlpha();
+        var mods = main.Mods;
+        var disable = new ModDisabler(main).For(_host.Profile, "/Mods/alpha_1.0.0.zip", "alpha")!;
+        var before = _host.Server.Text("/serverconfig.json");
+
+        using (var dialogs = new ScriptedDialogs(Answer.No))
+        {
+            var refused = disable();
+            Sta.Wait(refused);
+            Assert.Equal([Loc.T("hosted.stopAsk", _host.Profile.Name)], dialogs.Asked);
+            Assert.True(refused.Result.Failed); // кнопку можно нажать снова
+            Assert.Equal(Loc.T("crash.disableNotStopped"), refused.Result.Message);
+            Assert.Equal(before, _host.Server.Text("/serverconfig.json"));
+        }
+
+        using (var dialogs = new ScriptedDialogs(Answer.Yes))
+        {
+            var done = disable();
+            Sta.Wait(done);
+            Assert.False(done.Result.Failed);
+            Assert.Contains("alpha", Disabled()!.Select(t => (string?)t));
+        }
+
+        // «Да» из окна вылета помнится и для «Моих модов»: выключить ещё один мод — без вопроса
+        Sta.WaitFor(() => !mods.HostedSource.IsLoading && mods.Rows.Any(r => r.ModId == "beta"));
+        using (var dialogs = new ScriptedDialogs())
+        {
+            Sta.Wait(mods.ToggleEnabledCommand.ExecuteAsync(mods.Rows.Single(r => r.ModId == "beta")));
+            Assert.Empty(dialogs.Asked);
+            Assert.Contains("beta", Disabled()!.Select(t => (string?)t));
+        }
+    });
+
+    [Fact]
+    public void CrashWindow_ServerStoppedByTheLog_DisablesWithoutTheQuestion() => Sta.Run(() =>
+    {
+        PutLog(Main, HostedLogSamples.Stopped);
+        var main = MainWithAlpha();
+        using var dialogs = new ScriptedDialogs(); // любой вопрос уронил бы тест
+
+        var done = new ModDisabler(main).For(_host.Profile, "/Mods/alpha_1.0.0.zip", "alpha")!();
+        Sta.Wait(done);
+
+        Assert.False(done.Result.Failed);
+        Assert.Contains("alpha", Disabled()!.Select(t => (string?)t));
+    });
+
+    [Fact]
+    public void Queue_WhileTheLogIsChecked_TheTabIsBusy_AndSaysWhatItWaitsFor() => Sta.Run(() =>
+    {
+        PutLog(Main, HostedLogSamples.Stopped);
+        var mods = Mods();
+        // ответ сервера — через 300 мс, как по сети; соединение — новое, уже через подделку с задержкой
+        using var slow = RemoteFilesFactory.RegisterHost(_host.Host, _ => new SlowFiles(_host.Server, TimeSpan.FromMilliseconds(300)));
+        HostedSessions.Forget(_host.Profile.Id);
+        var zip = _host.Zip("alpha_1.1.0.zip", "alpha", "1.1.0");
+        var dropped = _host.Zip("gamma_1.0.0.zip", "gamma", "1.0.0");
+        using var dialogs = new ScriptedDialogs();
+
+        mods.Enqueue([new UpdateQueueItem(_host.Target, "alpha", "alpha", "1.0.0", "1.1.0", null, zip)], ModHistorySource.Update);
+
+        Assert.True(mods.IsBusy);            // щелчок не потерялся: вкладка занята и говорит, чего ждёт
+        Assert.False(mods.CanQueue);
+        Assert.Equal(Loc.T("hosted.stopChecking"), mods.StatusText);
+        Sta.Wait(mods.AddFilesAsync([dropped])); // zip, перетащенный тем временем, своей установки не начнёт
+        Sta.WaitFor(() => _host.Server.Has("/Mods/alpha_1.1.0.zip") && !mods.IsQueueRunning);
+
+        Assert.Empty(dialogs.Asked);         // по логу остановлен
+        Assert.False(_host.Server.Has("/Mods/gamma_1.0.0.zip"));
+        Assert.False(mods.IsBusy);
+    });
+
+    [Fact]
+    public void StopReminder_AnUnexpectedFailureOfTheCheck_MeansAsking_AndDoesNotEscape() => Sta.Run(() =>
+    {
+        var reminder = new HostedStopReminder(check: (_, _) => throw new ArgumentException("bug"));
+
+        Sta.Wait(reminder.CheckAsync(_host.Target));
+
+        Assert.False(reminder.IsKnownStopped(_host.Target));
+    });
+
+    /// <summary>Платформа окна, которая запоминает, что положили в буфер обмена.</summary>
+    private sealed class ClipboardPlatform : TestUiPlatform
+    {
+        public List<string> Copied { get; } = [];
+        public override void SetClipboard(string text) => Copied.Add(text);
+    }
+
+    /// <summary>Подделка FTP, перед каждым листингом которой тест решает, когда ей ответить.</summary>
+    private sealed class HookFiles(IRemoteFiles inner, Func<Task> beforeList) : IRemoteFiles
+    {
+        public RemoteFeatures Features => inner.Features;
+        public bool IsConnected => inner.IsConnected;
+        public Task ConnectAsync(CancellationToken ct) => inner.ConnectAsync(ct);
+
+        public async Task<IReadOnlyList<RemoteEntry>> ListAsync(string dir, CancellationToken ct)
+        {
+            await beforeList();
+            return await inner.ListAsync(dir, ct);
+        }
+
+        public Task<RemoteEntry?> StatAsync(string path, CancellationToken ct) => inner.StatAsync(path, ct);
+        public Task<byte[]> ReadRangeAsync(string path, long offset, int count, CancellationToken ct) => inner.ReadRangeAsync(path, offset, count, ct);
+        public Task DownloadAsync(string path, Stream destination, IProgress<long>? progress, CancellationToken ct) => inner.DownloadAsync(path, destination, progress, ct);
+        public Task UploadAsync(Stream source, string path, IProgress<long>? progress, CancellationToken ct) => inner.UploadAsync(source, path, progress, ct);
+        public Task RenameAsync(string from, string to, CancellationToken ct) => inner.RenameAsync(from, to, ct);
+        public Task DeleteFileAsync(string path, CancellationToken ct) => inner.DeleteFileAsync(path, ct);
+        public Task CreateDirectoryAsync(string path, CancellationToken ct) => inner.CreateDirectoryAsync(path, ct);
+        public ValueTask DisposeAsync() => inner.DisposeAsync();
+    }
 
     /// <summary>Подделка FTP, которая отвечает на листинг с задержкой, как настоящий сервер по сети.</summary>
     private sealed class SlowFiles(IRemoteFiles inner, TimeSpan delay) : IRemoteFiles

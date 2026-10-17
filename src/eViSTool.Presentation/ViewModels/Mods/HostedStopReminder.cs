@@ -56,12 +56,24 @@ internal sealed class HostedStopReminder(Func<DateTime>? now = null, Func<ModTar
         {
             state = await _check(target, ct);
         }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            state = HostedServerState.Unknown; // сеть или раскладка сервера — не узнали, спросим
+            // сеть, раскладка сервера, путь в настройках — не узнали, спросим. Проверка только избавляет от вопроса, так что
+            // любой её сбой — «спросить»; неожиданный — ещё и в журнал вылетов, а не молча (её ждут и без окна, из очереди)
+            if (ex is not (IOException or InvalidOperationException or InvalidDataException or UnauthorizedAccessException
+                or TimeoutException or OperationCanceledException))
+                Ui.Platform.WriteCrashLog(ex);
+            state = HostedServerState.Unknown;
         }
         if (state == HostedServerState.Stopped) _stoppedUntil[target.ProfileId] = _now() + StoppedMemory;
         else _stoppedUntil.Remove(target.ProfileId);
+    }
+
+    /// <summary>Проверка по логу (<see cref="CheckAsync"/>) и, если сервер не остановлен по логу, вопрос (<see cref="Confirm"/>).</summary>
+    public async Task<bool> ConfirmAsync(ModTarget target)
+    {
+        await CheckAsync(target);
+        return IsKnownStopped(target) || Confirm(target);
     }
 
     /// <summary>Только что проверили по логу: сервер остановлен — спрашивать не надо.</summary>

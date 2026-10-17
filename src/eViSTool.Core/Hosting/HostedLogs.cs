@@ -80,7 +80,7 @@ public sealed class HostedLogs
     private readonly List<string> _lines = [];
     private readonly List<string> _pending = [];       // новые строки, ещё не отданные PollAsync (их могли прочитать проверки)
     private bool _pendingRestart;
-    private readonly HashSet<string> _reported = new(StringComparer.Ordinal); // запуски, чей вылет уже отдан
+    private readonly HashSet<string> _reported = new(StringComparer.Ordinal); // запуски, чей вылет уже отдан (под _lock: его читает окно)
     private readonly HashSet<string> _checked = new(StringComparer.Ordinal);  // папки архива, уже проверенные на вылет
     private readonly HashSet<string> _waited = new(StringComparer.Ordinal);   // запуски, чей недописанный отчёт уже ждали
     private bool _unnamedReported;    // вылет текущего запуска отдан под ключом «current»: начала запуска не видно
@@ -138,6 +138,15 @@ public sealed class HostedLogs
     public TimeSpan? ServerUtcOffset
     {
         get { lock (_lock) return _serverOffset; }
+    }
+
+    /// <summary>
+    /// Вылет текущего запуска уже отдан <see cref="FindCrashAsync"/>: пока сервер не запущен заново, искать вылет снова
+    /// незачем — поиск начинается с ещё одного листинга.
+    /// </summary>
+    public bool CurrentCrashReported
+    {
+        get { lock (_lock) return _known && _reported.Contains(_marks.RunName ?? "current"); }
     }
 
     /// <summary>Папка логов на FTP; ещё не искали — null.</summary>
@@ -486,7 +495,7 @@ public sealed class HostedLogs
             last = _marks.LastTime;
             offset = _serverOffset;
         }
-        if (_reported.Contains(run)) return null;
+        if (Reported(run)) return null;
         var report = crash is null ? null
             : await HostedSessions.UseAsync<string?>(Id, Hosted.Endpoint, files => ReadReportAsync(files, crash, ct), readOnly: true, ct).ConfigureAwait(false);
         // вылет виден только по отчёту, а он пуст или пропал — сервер, видимо, ещё пишет его: ждём один вызов. Строки
@@ -494,8 +503,11 @@ public sealed class HostedLogs
         if (crash is not null && report is null && !byLines && _waited.Add(run)) return null;
         var finding = CrashAnalyzer.AnalyzeServer(GameLog.Parse(lines), report, crashedExit: true, prints)!;
         var at = At(crash?.Modified ?? last, offset);
-        _reported.Add(run);
-        if (unnamed) _unnamedReported = true;
+        lock (_lock)
+        {
+            _reported.Add(run);
+            if (unnamed) _unnamedReported = true;
+        }
         return Crash(finding, at, run, crash, report, current: true);
     }
 
@@ -509,7 +521,7 @@ public sealed class HostedLogs
         {
             var newest = (await RunsCoreAsync(files, ct).ConfigureAwait(false)).FirstOrDefault();
             if (newest is null) return null;
-            if (_checked.Contains(newest.Name) || _reported.Contains(newest.Name) || newest.Started <= unnamedEnded)
+            if (_checked.Contains(newest.Name) || Reported(newest.Name) || newest.Started <= unnamedEnded)
                 return new ArchivedRead(newest, null, null);
             var read = await ReadRunCoreAsync(files, newest, ct).ConfigureAwait(false);
             var report = read.Crash is { } crash ? await ReadReportAsync(files, crash, ct).ConfigureAwait(false) : null;
@@ -521,7 +533,7 @@ public sealed class HostedLogs
             // запуск, чей вылет отдан под «current», начался не позже своей последней строки: это самый свежий в архиве.
             // Если самый свежий начался позже, тот уже старше его — и сюда больше не попадёт
             _unnamedEnded = null;
-            if (found.Run.Started <= ended) _reported.Add(found.Run.Name);
+            if (found.Run.Started <= ended) MarkReported(found.Run.Name);
         }
         if (found.Read is not { } read) return null;
 
@@ -530,8 +542,18 @@ public sealed class HostedLogs
         if (read.Log.Outcome != HostedServerState.Crashed) return null;
         var finding = CrashAnalyzer.AnalyzeServer(GameLog.Parse(read.Log.Lines), found.Report, crashedExit: true, prints)!;
         var at = At(read.Crash?.Modified ?? read.Marks.LastTime ?? found.Run.Started, read.Offset);
-        _reported.Add(found.Run.Name);
+        MarkReported(found.Run.Name);
         return Crash(finding, at, found.Run.Name, read.Crash, found.Report, current: false);
+    }
+
+    private bool Reported(string run)
+    {
+        lock (_lock) return _reported.Contains(run);
+    }
+
+    private void MarkReported(string run)
+    {
+        lock (_lock) _reported.Add(run);
     }
 
     /// <summary>
