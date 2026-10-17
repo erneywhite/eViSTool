@@ -34,8 +34,9 @@ public enum HostedServerState
 /// Признаки одного запуска сервера по строкам его server-main.log: когда начат, готов ли, начата и закончена ли
 /// остановка, был ли вылет. Строки приходят по порядку и по частям, сами они здесь не хранятся. Признаки — те же, что
 /// у своего сервера: готовность и остановка — как у <see cref="ServerHost"/>, вылет — как у <see cref="CrashAnalyzer"/>
-/// (плюс запись уровня Fatal). Время в строках — местное время сервера (у G-Portal UTC+2): не время этой машины и не
-/// UTC файлов из листинга.
+/// (плюс запись уровня Fatal), но остановка и вылет узнаются строже (см. <see cref="Add"/>): по ним не задаётся вопрос
+/// «останови сервер». Время в строках — местное время сервера (у G-Portal UTC+2): не время этой машины и не UTC файлов
+/// из листинга.
 /// </summary>
 /// <param name="fromMiddle">Чтение начато с середины файла (лог огромный): начала запуска не видно.</param>
 public sealed class HostedRunMarks(bool fromMiddle = false)
@@ -61,6 +62,9 @@ public sealed class HostedRunMarks(bool fromMiddle = false)
     /// <summary>Время первой строки — начало запуска (время сервера); чтение с середины — null.</summary>
     public DateTime? Started { get; private set; }
 
+    /// <summary>Время первой прочитанной строки с отметкой (время сервера) — и при чтении с середины: запуск начался не позже.</summary>
+    public DateTime? FirstTime { get; private set; }
+
     /// <summary>Время последней строки с отметкой времени (время сервера).</summary>
     public DateTime? LastTime { get; private set; }
 
@@ -79,7 +83,9 @@ public sealed class HostedRunMarks(bool fromMiddle = false)
 
     /// <summary>
     /// Учесть строку. Возвращает её время, а у строки без отметки (стек, продолжение записи) — время предыдущей.
-    /// Строки чата не в счёт: их пишут игроки, и «Stopped the server!» в чате — не остановка.
+    /// Строки чата не в счёт: их пишут игроки, и «Stopped the server!» в чате — не остановка. Мост чата (Discord и т. п.)
+    /// пишет те же слова обычной записью мода, поэтому остановку и вылет узнаём по тексту записи целиком и её уровню:
+    /// «[Event] Stopped the server!» ровно, остановка начата — запись с этих слов, вылет — запись уровня Error или Fatal.
     /// </summary>
     public DateTime? Add(string line)
     {
@@ -91,16 +97,17 @@ public sealed class HostedRunMarks(bool fromMiddle = false)
         }
         if (ParseTime(entry.Time) is { } time)
         {
+            FirstTime ??= time;
             if (!FromMiddle) Started ??= time;
             LastTime = time;
         }
         if (entry.Level == "Chat") return LastTime;
         var text = entry.Message;
-        if (entry.Level == "Fatal" || CrashAnalyzer.IsServerCrashLine(text)) Crashed = true;
+        if (entry.Level == "Fatal" || entry.Level == "Error" && CrashAnalyzer.IsServerCrashLine(text)) Crashed = true;
         if (text.Contains(ServerHost.ReadyMarker, StringComparison.Ordinal)) Ready = true;
-        if (text.Contains(ServerHost.StoppingMarker, StringComparison.Ordinal) || text.Contains(TerminationMarker, StringComparison.Ordinal))
+        if (text.StartsWith(ServerHost.StoppingMarker, StringComparison.Ordinal) || text.StartsWith(TerminationMarker, StringComparison.Ordinal))
             StopBegun = true;
-        if (text.Contains(StoppedMarker, StringComparison.Ordinal)) Stopped = true;
+        if (entry.Level == "Event" && text.TrimEnd() == StoppedMarker) Stopped = true;
         return LastTime;
     }
 

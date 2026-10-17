@@ -1,3 +1,4 @@
+using eViSTool.Core.Diagnostics;
 using eViSTool.Core.Hosting;
 
 namespace eViSTool.Core.Tests.Hosting;
@@ -81,6 +82,25 @@ public sealed class HostedRunMarksTests
     }
 
     [Fact]
+    public void ModRelayingChatIntoTheLog_ChangesNothing()
+    {
+        // мост чата (Discord и т. п.) пишет сообщения игроков обычной записью мода, не [Chat]
+        var marks = Read([.. HostedLogSamples.Running,
+            "17.10.2026 13:40:01 [Notification] [DiscordBridge] Erney: Stopped the server!",
+            "17.10.2026 13:40:02 [Event] Erney: Stopped the server!",
+            "17.10.2026 13:40:03 [Notification] [DiscordBridge] Erney: Server stop requested",
+            "17.10.2026 13:40:04 [Notification] <Erney> Server termination event SIGTERM received",
+            "17.10.2026 13:40:05 [Notification] [DiscordBridge] Erney: Critical error occurred in the following mod: badmod@1.0.0",
+            "17.10.2026 13:40:06 [Notification] [DiscordBridge] Erney: More then 100000 errors detected. Shutting down now",
+            "17.10.2026 13:40:07 [Warning] [DiscordBridge] Crash written to file at \"/tmp/x.log\""]);
+
+        Assert.False(marks.StopBegun);
+        Assert.False(marks.Stopped);
+        Assert.False(marks.Crashed);
+        Assert.Equal(HostedServerState.Running, marks.State(stale: true));
+    }
+
+    [Fact]
     public void FromTheMiddle_StartIsUnknown_ButTheServerCountsAsRunning()
     {
         var marks = Read(HostedLogSamples.Running.Skip(200), fromMiddle: true);
@@ -89,6 +109,17 @@ public sealed class HostedRunMarksTests
         Assert.Null(marks.RunName);
         Assert.Equal(HostedServerState.Running, marks.State(stale: false));
         Assert.Equal(new DateTime(2026, 10, 17, 13, 31, 18), marks.LastTime);
+    }
+
+    [Fact]
+    public void FirstTime_IsKnownEvenFromTheMiddle()
+    {
+        var lines = HostedLogSamples.Running.Skip(200).ToArray();
+        var first = HostedRunMarks.ParseTime(GameLog.Parse(lines)[0].Time);
+
+        Assert.NotNull(first);
+        Assert.Equal(first, Read(lines, fromMiddle: true).FirstTime);
+        Assert.Equal(new DateTime(2026, 10, 17, 13, 27, 8), Read(HostedLogSamples.Running).FirstTime);
     }
 
     [Fact]

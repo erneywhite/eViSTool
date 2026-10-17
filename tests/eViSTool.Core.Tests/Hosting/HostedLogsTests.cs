@@ -59,6 +59,14 @@ public sealed class HostedLogsTests : IDisposable
     private static string[] Between(string[] lines, int from, string until) =>
         lines[from..(Array.FindIndex(lines, from, l => l.Contains(until, StringComparison.Ordinal)) + 1)];
 
+    /// <summary>Поток предупреждений в 13:35 — с ним лог вырастает больше <see cref="HostedLogs.FirstReadLimit"/>.</summary>
+    private static IEnumerable<string> Overloaded(int count = 9000) =>
+        Enumerable.Range(0, count).Select(i => $"17.10.2026 13:35:{i % 60:00} [Warning] Server overloaded. A tick took {500 + i % 100}ms to complete.");
+
+    /// <summary>UTC для времени этой машины: подделка с ListLocalTime отдаёт его в листинге, как LIST.</summary>
+    private static DateTime LocalClock(int hour, int minute, int second) =>
+        new DateTime(2026, 10, 17, hour, minute, second, DateTimeKind.Local).ToUniversalTime();
+
     // ---------- текущий запуск
 
     [Fact]
@@ -360,6 +368,35 @@ public sealed class HostedLogsTests : IDisposable
         Assert.True((await logs.PollAsync(default)).Restarted);
     }
 
+    [Fact]
+    public async Task Restart_ArchiveFolderComesBeforeTheLogMoves_RestartOnlyOnceWithTheNewLog()
+    {
+        var local = PutLog(Main, HostedLogSamples.Stopped);
+        PutLog("/Logs/Archive/2026-10-17_13_25_13/server-main.log", HostedLogSamples.Archived);
+        var archive = Path.Combine(_host.Server.Root, "Logs", "Archive");
+        Directory.SetLastWriteTimeUtc(archive, new DateTime(2026, 10, 17, 11, 27, 8, DateTimeKind.Utc));
+        var logs = Logs();
+        await logs.PollAsync(default);
+
+        // сервер запускается: папку в архиве уже завёл, а прошлый лог ещё не унёс
+        _host.Server.MakeDir("/Logs/Archive/2026-10-17_13_27_08");
+        Directory.SetLastWriteTimeUtc(archive, new DateTime(2026, 10, 18, 11, 27, 8, DateTimeKind.Utc));
+        var moving = await logs.PollAsync(default);
+
+        Assert.False(moving.Restarted); // прежний лог не читается заново как новый запуск
+        Assert.Empty(moving.NewLines);
+
+        // унёс, новый лог того же размера: перезапуск виден только по папке архива
+        _host.Server.Put("/Logs/Archive/2026-10-17_13_27_08/server-main.log", File.ReadAllBytes(local));
+        var fresh = NextDay(HostedLogSamples.Stopped);
+        PutLog(Main, fresh);
+        var update = await logs.PollAsync(default);
+
+        Assert.True(update.Restarted);
+        Assert.Equal(fresh, update.NewLines);
+        Assert.False((await logs.PollAsync(default)).Restarted);
+    }
+
     // ---------- вылет текущего запуска
 
     private static readonly string[] FatalLines =
@@ -410,6 +447,55 @@ public sealed class HostedLogsTests : IDisposable
         Assert.Equal(HostedServerState.Crashed, (await Logs().PollAsync(default)).State);
     }
 
+    // время из LIST — до минуты: вылет прошлого запуска и автоперезапуск за секунды попадают в одну минуту
+    private static readonly string[] StartedAt134030 =
+    [
+        "17.10.2026 13:40:30 [Notification] Server logger started.",
+        "17.10.2026 13:40:40 [Event] Dedicated Server now running on Port 29600 and ip 198.51.100.10!",
+    ];
+
+    [Fact]
+    public async Task ListTime_CrashLogOfThePreviousRun_InTheMinuteOfTheStart_IsNotThisRunsCrash()
+    {
+        _host.Server.ListLocalTime = true;
+        PutLog(Main, StartedAt134030, LocalClock(13, 40, 40));
+        File.SetLastWriteTimeUtc(_host.Server.Put("/Logs/server-crash.log", Report), LocalClock(13, 40, 5));
+
+        var update = await Logs().PollAsync(default);
+
+        Assert.Equal(HostedServerState.Running, update.State);
+        Assert.False(HostedLogs.IsSurelyDown(update.State));
+    }
+
+    [Fact]
+    public async Task ListTime_CrashLogInTheNextMinute_IsThisRunsCrash()
+    {
+        _host.Server.ListLocalTime = true;
+        PutLog(Main, StartedAt134030, LocalClock(13, 40, 40));
+        File.SetLastWriteTimeUtc(_host.Server.Put("/Logs/server-crash.log", Report), LocalClock(13, 41, 10));
+
+        Assert.Equal(HostedServerState.Crashed, (await Logs().PollAsync(default)).State);
+    }
+
+    [Fact]
+    public async Task HugeLog_CrashLogWrittenAfterTheFirstLineRead_IsThisRunsCrash()
+    {
+        // начала запуска не видно, строк вылета нет (процесс убит), отчёт записан, когда лог уже шёл
+        PutLog(Main, [.. HostedLogSamples.Running, .. Overloaded()]);
+        PutLog("/Logs/Archive/2026-10-17_13_25_13/server-main.log", HostedLogSamples.Archived);
+        File.SetLastWriteTimeUtc(_host.Server.Put("/Logs/server-crash.log", Report), new DateTime(2026, 10, 17, 11, 36, 30, DateTimeKind.Utc));
+        var logs = Logs();
+
+        var crash = await logs.FindCrashAsync(default, [BadMod]);
+
+        Assert.Equal(HostedServerState.Crashed, logs.State);
+        Assert.NotNull(crash);
+        Assert.True(crash.Current); // не прошлого запуска из архива
+        Assert.Equal("badmod", crash.Info.ModId);
+        var runs = await logs.RunsAsync(default);
+        Assert.Null((await logs.ReadRunAsync(runs[0], default)).CrashLog);
+    }
+
     [Fact]
     public async Task FindCrash_CurrentRun_WithReportAndCulprit_OnlyOnce()
     {
@@ -448,6 +534,96 @@ public sealed class HostedLogsTests : IDisposable
 
         Assert.Equal("/Mods/badmod_1.0.0.zip", crash?.Info.ModPath);
         Assert.Null(crash?.Report); // отчёта нет — разбор по строкам лога
+    }
+
+    [Fact]
+    public async Task FindCrash_EmptyCrashLog_CulpritFromTheLogLines()
+    {
+        PutLog(Main, [.. HostedLogSamples.Running, .. FatalLines], CrashUtc);
+        File.SetLastWriteTimeUtc(_host.Server.Put("/Logs/server-crash.log", ""), CrashUtc);
+
+        var crash = await Logs().FindCrashAsync(default, [BadMod]);
+
+        Assert.Equal("badmod", crash?.Info.ModId);
+        Assert.Null(crash?.Report);
+    }
+
+    [Fact]
+    public async Task FindCrash_CrashLogStillEmpty_WaitsForTheReportOnce()
+    {
+        // вылет виден только по свежему отчёту, а сервер его ещё пишет
+        PutLog(Main, HostedLogSamples.Running);
+        var report = _host.Server.Put("/Logs/server-crash.log", "");
+        File.SetLastWriteTimeUtc(report, CrashUtc);
+        var logs = Logs();
+
+        Assert.Null(await logs.FindCrashAsync(default, [BadMod]));
+
+        File.WriteAllText(report, Report);
+        File.SetLastWriteTimeUtc(report, CrashUtc);
+        var crash = await logs.FindCrashAsync(default, [BadMod]);
+
+        Assert.Equal("badmod", crash?.Info.ModId);
+        Assert.Equal(Report, crash?.Report);
+    }
+
+    [Fact]
+    public async Task FindCrash_CrashLogStaysEmpty_TheCrashStillComes()
+    {
+        PutLog(Main, HostedLogSamples.Running);
+        File.SetLastWriteTimeUtc(_host.Server.Put("/Logs/server-crash.log", ""), CrashUtc);
+        var logs = Logs();
+
+        Assert.Null(await logs.FindCrashAsync(default));
+
+        Assert.NotNull(await logs.FindCrashAsync(default));
+    }
+
+    [Fact]
+    public async Task FindCrash_SeveralReportsInTheCrashLog_TheCulpritOfTheLastOne()
+    {
+        const string old = "Game Version: v1.22.7 (Stable)\n16.10.2026 10:00:00: Critical error occurred in the following mod: oldmod@2.0.0\n"
+                           + "System.Exception: old\n   at OldMod.Thing.Do()\n";
+        PutLog(Main, [.. HostedLogSamples.Running, .. FatalLines], CrashUtc);
+        File.SetLastWriteTimeUtc(_host.Server.Put("/Logs/server-crash.log", old + Report), CrashUtc);
+
+        var crash = await Logs().FindCrashAsync(default, [BadMod]);
+
+        Assert.Equal("badmod", crash?.Info.ModId);
+        Assert.Equal(Report, crash?.Report);
+    }
+
+    [Fact]
+    public async Task FindCrash_HugeLogWithoutStart_IsNotRepeatedAfterItGoesToTheArchive()
+    {
+        var local = PutLog(Main, [.. HostedLogSamples.Running, .. Overloaded(), .. FatalLines], CrashUtc);
+        var logs = Logs();
+        var crash = await logs.FindCrashAsync(default, [BadMod]);
+        Assert.NotNull(crash);
+        Assert.Null(logs.RunName); // начала не видно
+
+        // хостер поднял сервер заново: упавший запуск уехал в архив под именем своего начала
+        _host.Server.Put("/Logs/Archive/2026-10-17_13_27_08/server-main.log", File.ReadAllBytes(local));
+        PutLog(Main, NextDay(HostedLogSamples.Starting));
+
+        Assert.True((await logs.PollAsync(default)).Restarted);
+        Assert.Null(await logs.FindCrashAsync(default, [BadMod]));
+    }
+
+    [Fact]
+    public async Task FindCrash_HugeLogWithoutStart_NotRepeatedWhileTheLogIsGone()
+    {
+        var local = PutLog(Main, [.. HostedLogSamples.Running, .. Overloaded(), .. FatalLines], CrashUtc);
+        var logs = Logs();
+        Assert.NotNull(await logs.FindCrashAsync(default));
+
+        // лог уже в архиве, новый ещё не начат
+        _host.Server.Put("/Logs/Archive/2026-10-17_13_27_08/server-main.log", File.ReadAllBytes(local));
+        File.Delete(local);
+
+        Assert.Null(await logs.FindCrashAsync(default));
+        PutLog(Main, NextDay(HostedLogSamples.Starting));
+        Assert.Null(await logs.FindCrashAsync(default));
     }
 
     [Fact]

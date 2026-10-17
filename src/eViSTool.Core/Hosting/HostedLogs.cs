@@ -82,6 +82,9 @@ public sealed class HostedLogs
     private bool _pendingRestart;
     private readonly HashSet<string> _reported = new(StringComparer.Ordinal); // запуски, чей вылет уже отдан
     private readonly HashSet<string> _checked = new(StringComparer.Ordinal);  // папки архива, уже проверенные на вылет
+    private readonly HashSet<string> _waited = new(StringComparer.Ordinal);   // запуски, чей недописанный отчёт уже ждали
+    private bool _unnamedReported;    // вылет текущего запуска отдан под ключом «current»: начала запуска не видно
+    private DateTime? _unnamedEnded;  // такой запуск кончился: время его последней строки — по нему узнаем его папку в архиве
 
     private string? _logsDir;
     private bool _known;            // лог текущего запуска уже читали: _offset что-то значит
@@ -141,6 +144,15 @@ public sealed class HostedLogs
     public string? LogsDir
     {
         get { lock (_lock) return _logsDir; }
+    }
+
+    /// <summary>
+    /// Текущий запуск начался не позже этого (время сервера): его начало, а если лог читали с середины, — первая
+    /// прочитанная строка. Лога сейчас нет (уехал в архив) или его ещё не читали — null.
+    /// </summary>
+    private DateTime? CurrentSince
+    {
+        get { lock (_lock) return _known && !_missing ? _marks.Started ?? _marks.FirstTime : null; }
     }
 
     private HostedTarget Hosted => Target.Hosted!;
@@ -220,8 +232,9 @@ public sealed class HostedLogs
     }
 
     /// <summary>Что принёс опрос: листинг папки логов и новые байты лога с позиции <paramref name="From"/>.</summary>
+    /// <param name="KeepArchive">Перемену в Logs/Archive пока не запоминать: перезапуск ещё не виден целиком.</param>
     private sealed record Fetch(string LogsDir, RemoteEntry? Main, RemoteEntry? Archive, RemoteEntry? Crash, bool Restart, long From,
-        byte[] Bytes, bool FromMiddle);
+        byte[] Bytes, bool FromMiddle, bool KeepArchive = false);
 
     private async Task<Fetch> FetchAsync(IRemoteFiles files, CancellationToken ct)
     {
@@ -233,7 +246,12 @@ public sealed class HostedLogs
         if (main is null) return new Fetch(logsDir, null, archive, crash, false, 0, [], false);
 
         // запуск заново: при старте сервер уносит прошлые логи в Archive/<время> и начинает лог с нуля
-        var restart = _known && (main.Size < _offset || _missing || ArchiveChanged(archive));
+        var archived = _known && ArchiveChanged(archive);
+        // папка в архиве уже есть, а лог в листинге старше её: сервер запускается и ещё не унёс прошлый лог. Это прежний
+        // лог — перезапуск узнаем по новому, а перемену в архиве до тех пор не запоминаем. Время из LIST — до минуты:
+        // в одну минуту с папкой прежний лог сочтётся новым, как и раньше
+        var moving = archived && main.Modified is { } written && archive?.Modified is { } created && written < created;
+        var restart = _known && (main.Size < _offset || _missing || archived && !moving);
         long from;
         var fromMiddle = false;
         if (!_known || restart)
@@ -259,7 +277,7 @@ public sealed class HostedLogs
             // лог пропал между листингом и чтением — сервер как раз запускается заново: как будто лога нет
             return new Fetch(logsDir, null, archive, crash, false, 0, [], false);
         }
-        return new Fetch(logsDir, main, archive, crash, restart, from, bytes, fromMiddle);
+        return new Fetch(logsDir, main, archive, crash, restart, from, bytes, fromMiddle, KeepArchive: moving && !restart);
     }
 
     /// <summary>В Logs/Archive появилась папка (или сама Archive) — значит, сервер запускался.</summary>
@@ -275,9 +293,18 @@ public sealed class HostedLogs
         lock (_lock)
         {
             _logsDir = fetch.LogsDir;
-            _archiveSeen = fetch.Archive is not null;
-            _archiveStamp = fetch.Archive?.Modified;
+            if (!fetch.KeepArchive)
+            {
+                _archiveSeen = fetch.Archive is not null;
+                _archiveStamp = fetch.Archive?.Modified;
+            }
             _crash = fetch.Crash;
+            if (_unnamedReported && (fetch.Main is null ? _known : fetch.Restart))
+            {
+                // запуск, чей вылет отдан под «current», кончился (лог унесён в архив): его папку узнаем по времени
+                _unnamedEnded = _marks.LastTime ?? DateTime.MaxValue;
+                _unnamedReported = false;
+            }
             if (fetch.Main is not { } main)
             {
                 // лога нет: сервер ещё не запускали — или он прямо сейчас запускается заново (прошлый лог уезжает в архив)
@@ -317,7 +344,8 @@ public sealed class HostedLogs
                 _known = true;
                 _missing = false;
                 _serverOffset = EstimateOffset(main.Modified, _marks.LastTime) ?? _serverOffset;
-                _crashOfRun = fetch.Crash is { } crash && IsOfRun(crash.Modified, _marks.Started, null, _serverOffset);
+                // начала не видно (лог читали с середины) — запуск начался не позже первой прочитанной строки
+                _crashOfRun = fetch.Crash is { } crash && IsOfRun(crash.Modified, _marks.Started ?? _marks.FirstTime, null, _serverOffset);
                 _state = state = _crashOfRun ? HostedServerState.Crashed : _marks.State(IsStale(main, now));
             }
         }
@@ -393,12 +421,15 @@ public sealed class HostedLogs
         }
         var offset = EstimateOffset(main?.Modified, marks.LastTime) ?? ServerUtcOffset;
 
-        // отчёт о вылете — в папке запуска (уехал в архив вместе с логами) или ещё в Logs, если записан во время этого запуска
+        // отчёт о вылете — в папке запуска (уехал в архив вместе с логами) или ещё в Logs, если записан во время этого запуска.
+        // Конец самого свежего запуска не знаем, когда текущий читали с середины: тогда он не позже первой прочитанной
+        // строки текущего, иначе отчёт текущего запуска приписался бы этому
+        var until = run.Until ?? (CurrentSince is { } since && since > run.Started ? since : null);
         var crash = entries.FirstOrDefault(e => !e.IsDirectory && e.Name == CrashLog);
         if (crash is null
             && (await ls.ListAsync(await LogsDirAsync(files, ct).ConfigureAwait(false), ct).ConfigureAwait(false))?
                 .FirstOrDefault(e => !e.IsDirectory && e.Name == CrashLog) is { } loose
-            && IsOfRun(loose.Modified, run.Started, run.Until, offset))
+            && IsOfRun(loose.Modified, run.Started, until, offset))
             crash = loose;
 
         var outcome = marks.Crashed || crash is not null ? HostedServerState.Crashed
@@ -415,7 +446,8 @@ public sealed class HostedLogs
     /// <paramref name="mods"/> или последнего скана профиля (<see cref="HostedMods.LastScanMods"/>), по modid и меткам,
     /// без кода (файлов модов на этой машине нет). Один вылет отдаётся один раз; старый вылет при первом вызове окно
     /// отсекает само (по <see cref="ServerCrashInfo.At"/>, как у своего сервера). Звать, когда опрос показал Crashed
-    /// или Restarted. Сбой сети — <see cref="RemoteFilesException"/>, вылет тогда найдётся в следующий раз.
+    /// или Restarted, — на каждом таком опросе: вылет, видный пока только по пустому отчёту, придёт со следующим вызовом,
+    /// когда сервер допишет отчёт. Сбой сети — <see cref="RemoteFilesException"/>, вылет тогда найдётся в следующий раз.
     /// </summary>
     public async Task<HostedCrash?> FindCrashAsync(CancellationToken ct, IReadOnlyList<LocalMod>? mods = null)
     {
@@ -437,15 +469,18 @@ public sealed class HostedLogs
     private async Task<HostedCrash?> CurrentCrashAsync(ModFingerprints prints, CancellationToken ct)
     {
         string run;
+        bool unnamed, byLines;
         RemoteEntry? crash;
         List<string> lines;
         DateTime? last;
         TimeSpan? offset;
         lock (_lock)
         {
-            // shortcut: начала запуска не видно (огромный лог читали с конца) — один общий ключ «current»; два таких
-            // вылета подряд второй раз не покажутся. Переделать, если встретятся
+            // shortcut: начала запуска не видно (огромный лог читали с конца) — один общий ключ «current». Два таких
+            // вылета подряд: второй покажется только после перезапуска, из архива. Переделать, если встретятся
+            unnamed = _marks.RunName is null;
             run = _marks.RunName ?? "current";
+            byLines = _marks.Crashed;
             crash = _crashOfRun ? _crash : null;
             lines = [.. _lines];
             last = _marks.LastTime;
@@ -454,47 +489,70 @@ public sealed class HostedLogs
         if (_reported.Contains(run)) return null;
         var report = crash is null ? null
             : await HostedSessions.UseAsync<string?>(Id, Hosted.Endpoint, files => ReadReportAsync(files, crash, ct), readOnly: true, ct).ConfigureAwait(false);
+        // вылет виден только по отчёту, а он пуст или пропал — сервер, видимо, ещё пишет его: ждём один вызов. Строки
+        // вылета в логе сервер пишет уже после отчёта, с ними ждать нечего
+        if (crash is not null && report is null && !byLines && _waited.Add(run)) return null;
         var finding = CrashAnalyzer.AnalyzeServer(GameLog.Parse(lines), report, crashedExit: true, prints)!;
         var at = At(crash?.Modified ?? last, offset);
         _reported.Add(run);
+        if (unnamed) _unnamedReported = true;
         return Crash(finding, at, run, crash, report, current: true);
     }
 
-    private sealed record ArchivedRead(HostedRun Run, RunRead Read, string? Report);
+    /// <param name="Read">null — этот запуск не читали: его вылет уже отдан или он уже проверен.</param>
+    private sealed record ArchivedRead(HostedRun Run, RunRead? Read, string? Report);
 
     private async Task<HostedCrash?> ArchivedCrashAsync(ModFingerprints prints, CancellationToken ct)
     {
+        var unnamedEnded = _unnamedEnded;
         var found = await HostedSessions.UseAsync<ArchivedRead?>(Id, Hosted.Endpoint, async files =>
         {
             var newest = (await RunsCoreAsync(files, ct).ConfigureAwait(false)).FirstOrDefault();
-            if (newest is null || _checked.Contains(newest.Name) || _reported.Contains(newest.Name)) return null;
+            if (newest is null) return null;
+            if (_checked.Contains(newest.Name) || _reported.Contains(newest.Name) || newest.Started <= unnamedEnded)
+                return new ArchivedRead(newest, null, null);
             var read = await ReadRunCoreAsync(files, newest, ct).ConfigureAwait(false);
             var report = read.Crash is { } crash ? await ReadReportAsync(files, crash, ct).ConfigureAwait(false) : null;
             return new ArchivedRead(newest, read, report);
         }, readOnly: true, ct).ConfigureAwait(false);
         if (found is null) return null;
+        if (unnamedEnded is { } ended)
+        {
+            // запуск, чей вылет отдан под «current», начался не позже своей последней строки: это самый свежий в архиве.
+            // Если самый свежий начался позже, тот уже старше его — и сюда больше не попадёт
+            _unnamedEnded = null;
+            if (found.Run.Started <= ended) _reported.Add(found.Run.Name);
+        }
+        if (found.Read is not { } read) return null;
 
         // папка без лога — архив ещё переезжает (сервер как раз запускается): проверим в следующий раз
-        if (found.Read.Main is not null) _checked.Add(found.Run.Name);
-        if (found.Read.Log.Outcome != HostedServerState.Crashed) return null;
-        var finding = CrashAnalyzer.AnalyzeServer(GameLog.Parse(found.Read.Log.Lines), found.Report, crashedExit: true, prints)!;
-        var at = At(found.Read.Crash?.Modified ?? found.Read.Marks.LastTime ?? found.Run.Started, found.Read.Offset);
+        if (read.Main is not null) _checked.Add(found.Run.Name);
+        if (read.Log.Outcome != HostedServerState.Crashed) return null;
+        var finding = CrashAnalyzer.AnalyzeServer(GameLog.Parse(read.Log.Lines), found.Report, crashedExit: true, prints)!;
+        var at = At(read.Crash?.Modified ?? read.Marks.LastTime ?? found.Run.Started, read.Offset);
         _reported.Add(found.Run.Name);
-        return Crash(finding, at, found.Run.Name, found.Read.Crash, found.Report, current: false);
+        return Crash(finding, at, found.Run.Name, read.Crash, found.Report, current: false);
     }
 
-    /// <summary>Текст server-crash.log (не больше <see cref="ReportLimit"/> с конца); пропал — null.</summary>
+    /// <summary>
+    /// Последний отчёт из server-crash.log (читается не больше <see cref="ReportLimit"/> с конца); пропал или пуст — null.
+    /// Каждый отчёт начинается строкой «Game Version: …»; если сервер дописывает вылеты в конец файла, нужен последний.
+    /// </summary>
     private static async Task<string?> ReadReportAsync(IRemoteFiles files, RemoteEntry crash, CancellationToken ct)
     {
+        string text;
         try
         {
             ReadOnlySpan<byte> bytes = await ReadFromAsync(files, crash, Math.Max(0, crash.Size - ReportLimit), ct).ConfigureAwait(false);
-            return Encoding.UTF8.GetString(bytes.StartsWith(Utf8Bom) ? bytes[3..] : bytes);
+            text = Encoding.UTF8.GetString(bytes.StartsWith(Utf8Bom) ? bytes[3..] : bytes);
         }
         catch (RemoteFilesException ex) when (ex.Kind is RemoteFailure.NotFound or RemoteFailure.Denied)
         {
             return null;
         }
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var last = text.LastIndexOf("\nGame Version:", StringComparison.Ordinal);
+        return last < 0 ? text : text[(last + 1)..];
     }
 
     private HostedCrash Crash(CrashFinding finding, DateTime at, string run, RemoteEntry? crash, string? report, bool current) =>
@@ -540,18 +598,16 @@ public sealed class HostedLogs
     private static bool IsOfRun(DateTime? modified, DateTime? started, DateTime? until, TimeSpan? offset)
     {
         if (modified is not { } m || started is not { } from) return false;
-        DateTime at;
         if (m.Kind == DateTimeKind.Utc)
         {
             if (offset is not { } shift) return false;
-            at = DateTime.SpecifyKind(m + shift, DateTimeKind.Unspecified);
+            var at = DateTime.SpecifyKind(m + shift, DateTimeKind.Unspecified);
+            return at >= from && (until is not { } end || at < end);
         }
-        else
-        {
-            at = m;
-            from = new DateTime(from.Ticks - from.Ticks % TimeSpan.TicksPerMinute);
-        }
-        return at >= from && (until is not { } end || at < end);
+        // LIST: файл записан где-то в этой минуте — запуска, только если в нём вся минута. Отчёт прошлого запуска в минуту
+        // старта (вылет и автоперезапуск за секунды) иначе сделал бы упавшим работающий сервер; ошибка в эту сторону —
+        // лишь заданный вопрос «останови сервер»
+        return m >= from && (until is not { } stop || m.AddMinutes(1) <= stop);
     }
 
     // ---------- чтение
