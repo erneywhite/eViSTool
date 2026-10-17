@@ -60,8 +60,23 @@ public sealed class ModFingerprints
             foreach (var ns in mod.Namespaces)
                 if (ns.Length > bestLength && frame.StartsWith(ns + ".", StringComparison.Ordinal))
                     (best, bestLength) = (mod, ns.Length);
-        return best;
+        return best ?? ByNamespaceName(frame);
     }
+
+    /// <summary>
+    /// Код мода не прочитан (у хостера файлы на FTP, DLL не качаем): угадать по первому слову пространства имён — моды
+    /// обычно называют его как modid или имя («EvistoolCrashTest.Boom» → evistoolcrashtest). Только для модов без
+    /// прочитанного кода и при полном совпадении, чтобы не приписать вылет чужому.
+    /// </summary>
+    private ModPrint? ByNamespaceName(string frame)
+    {
+        var first = frame.Split('.', 2)[0];
+        var key = Squash(first);
+        if (key.Length < 4 || first.Length == frame.Length) return null;
+        return _mods.FirstOrDefault(m => m.Namespaces.Count == 0 && (Squash(m.ModId) == key || Squash(m.Name) == key));
+    }
+
+    private static string Squash(string s) => new([.. s.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant)]);
 
     /// <summary>
     /// Мод по метке в сообщении: «[carryon]», «[Carry On]», «[BlockBehaviorAutoStashable]», «for mod Unforgettable.Core» —
@@ -71,7 +86,6 @@ public sealed class ModFingerprints
     {
         var t = tag.Trim();
         if (t.Length == 0) return null;
-        static string Squash(string s) => new([.. s.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant)]);
         return _mods.FirstOrDefault(m => string.Equals(m.ModId, t, StringComparison.OrdinalIgnoreCase))
                ?? _mods.FirstOrDefault(m => Squash(m.Name) == Squash(t) && Squash(t).Length > 2)
                // пространство имён или имя сборки («Unforgettable.Core» при пространстве «Unforgettable»)

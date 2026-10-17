@@ -174,6 +174,40 @@ public sealed class CrashAnalyzerTests : IDisposable
     }
 
     [Fact]
+    public void HostedServer_TooManyErrors_TheCulpritIsGuessedFromTheStack_WithoutTheModsCode()
+    {
+        // настоящий лог G-Portal: мод-пустышка бросал исключение на каждом тике, игра остановила сервер по
+        // DieAboveErrorCount; отчёта server-crash.log нет, код мода на FTP не читается
+        var mods = ModFingerprints.WithoutCode([
+            ModScanner.FromModInfo("/Mods/evistoolcrashtest_1.0.0.zip",
+                """{ "modid": "evistoolcrashtest", "name": "eViSTool crash test", "version": "1.0.0" }"""),
+            ModScanner.FromModInfo("/Mods/BetterSticks_v1.2.1.zip", """{ "modid": "bettersticks", "name": "Better Sticks", "version": "1.2.1" }"""),
+        ]);
+
+        var finding = CrashAnalyzer.AnalyzeServer(Log("hosted-too-many-errors.log"), null, crashedExit: true, mods);
+
+        Assert.NotNull(finding);
+        Assert.Equal("Too many errors", finding.Reason);
+        Assert.Equal("evistoolcrashtest", finding.Culprit?.ModId);
+        Assert.Equal(CulpritSource.Stack, finding.Culprit?.Source);
+    }
+
+    [Fact]
+    public void ModsWithoutReadCode_AreGuessedByTheNamespaceName_OnlyOnAFullMatch()
+    {
+        // у хостера код модов не читается: стек «EvistoolCrashTest.…» узнаётся по modid, а похожие имена — нет
+        static LocalMod Mod(string id, string name) =>
+            ModScanner.FromModInfo("/Mods/" + id + ".zip", $$"""{ "modid": "{{id}}", "name": "{{name}}", "version": "1.0.0" }""");
+        var mods = ModFingerprints.WithoutCode([Mod("evistoolcrashtest", "eViSTool crash test"), Mod("carryon", "Carry On"), Mod("ui", "UI")]);
+
+        Assert.Equal("evistoolcrashtest", mods.ByStack(["EvistoolCrashTest.CrashTestSystem.Boom", "Vintagestory.Server.ServerMain.Process"])?.ModId);
+        Assert.Equal("carryon", mods.ByFrame("CarryOn.Behaviors.Carry.Tick")?.ModId);       // по имени мода
+        Assert.Null(mods.ByFrame("CarryOnExtras.Patch.Run"));                                   // похоже, но не то
+        Assert.Null(mods.ByFrame("Ui.Panel.Draw"));                                             // слишком короткое
+        Assert.Null(mods.ByFrame("Vintagestory.GameContent.Boom"));                             // код игры
+    }
+
+    [Fact]
     public void GameMessages_WithoutAModTag_AreNotBlamedOnAMod()
     {
         var error = new CrashAnalyzer.ErrorEntry(new LogEntry("7.10.2026 00:00:00", "Error",
