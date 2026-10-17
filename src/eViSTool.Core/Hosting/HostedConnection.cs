@@ -75,6 +75,25 @@ public sealed class HostedConnection
         return copy;
     }
 
+    /// <summary>
+    /// Тот же сервер и та же учётная запись: протокол, адрес (без учёта регистра), порт, логин и корень. Пароль,
+    /// шифрование и папки внутри корня не в счёт: после их правки кэш и журнал установки профиля остаются годными.
+    /// Корень, который не разобрать, считается другим сервером: лучше лишний раз забыть, чем довести чужую установку.
+    /// </summary>
+    public bool IsSameServer(HostedConnection? other)
+    {
+        if (other is null || other.Protocol != Protocol || other.Port != Port || other.User != User
+            || !string.Equals((other.Host ?? "").Trim(), (Host ?? "").Trim(), StringComparison.OrdinalIgnoreCase)) return false;
+        try
+        {
+            return RemotePath.Normalize(other.Root ?? "/") == RemotePath.Normalize(Root ?? "/");
+        }
+        catch (InvalidDataException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>Куда ведёт подключение — «ftp://логин@host:21» (с папкой, если корень не «/»). Пароля здесь нет.</summary>
     public string Describe()
     {

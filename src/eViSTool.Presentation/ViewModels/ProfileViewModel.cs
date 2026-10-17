@@ -60,6 +60,10 @@ public sealed partial class ProfileViewModel : ObservableObject
     private void EditConnection()
     {
         if (AppWindows.Current.AskHostedConnection(Model.Hosted, Loc.T("settings.hostedEditOk")) is not { } connection) return;
+        // живое соединение со старыми данными (пароль, шифрование) не должно пережить правку; другой сервер или
+        // учётная запись — ещё и кэш с журналом установки: прерванную установку старого сервера на новом не доводим
+        if (connection.IsSameServer(Model.Hosted)) Core.Hosting.HostedSessions.Forget(Model.Id);
+        else ProfileActions.ForgetHosted(Model.Id);
         Model.Hosted = connection;
         Model.RemoteCode = GameProfile.HostedMarker;
         OnPropertyChanged(nameof(HostedTarget));

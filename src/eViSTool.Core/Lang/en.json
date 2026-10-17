@@ -1874,6 +1874,7 @@
   "settings.hostedGameVersion": "Server game version",
   "settings.hostedGameVersionHint": "Leave it empty to find it automatically: {0}",
   "settings.hostedRemindStop": "Remind me to stop the server before changing mods",
+  "settings.removeAskHosted": "Remove the profile «{0}»?\n\nThe server and its files at the host are not touched. Only the saved connection and the cache on this computer are removed.",
   "settings.removeAsk": "Remove the profile «{0}»?\n\nIts data folder stays on disk:\n{1}",
   "settings.removeAskData": "Removing the profile “{0}”.\n\nMove its data folder to the Recycle Bin as well? It holds the worlds, settings, player data and backups of this profile ({2}):\n{1}\n\nYes — remove the profile and move the folder to the Recycle Bin.\nNo — remove only the profile, the folder stays.\nCancel — do nothing.",
   "settings.removeAskShared": "Remove the profile \"{0}\"?\n\nIts data folder is used by other profiles, so it stays on disk:\n{1}\n\n{2}\n\nYes — remove only the profile. No — do nothing.",

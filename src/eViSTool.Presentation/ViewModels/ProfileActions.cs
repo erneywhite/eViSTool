@@ -1,4 +1,5 @@
 using System.IO;
+using eViSTool.Core;
 using eViSTool.Core.Game;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;
@@ -33,7 +34,15 @@ public sealed class ProfileActions(IReadOnlyList<ProfileViewModel> profiles, Fun
     /// </summary>
     public GameProfile? NewServer()
     {
-        if (AskNewProfile(ProfileKind.Server, Loc.T("profile.newServer", profiles.Count + 1)) is not { DataDir: { } dataDir } dlg) return null;
+        if (AskNewProfile(ProfileKind.Server, Loc.T("profile.newServer", profiles.Count + 1)) is not { } dlg) return null;
+
+        // сервер у хостера: профиль без папок на этом компьютере, подключение уже с зашифрованным паролем.
+        // Kind остаётся Server (новый вид профиля старые окна не прочитали бы), метка — для них же
+        if (dlg.Existing == ExistingProfileMode.Hosted)
+            return dlg.Hosted is { } hosted
+                ? new GameProfile { Name = dlg.ProfileName, Kind = ProfileKind.Server, RemoteCode = GameProfile.HostedMarker, Hosted = hosted }
+                : null;
+        if (dlg.DataDir is not { } dataDir) return null;
 
         // сервер на другом компьютере: профиль без папок, код подключения — зашифрованным
         if (dlg.Existing == ExistingProfileMode.Remote && dlg.RemoteCode is { } code)
@@ -82,11 +91,18 @@ public sealed class ProfileActions(IReadOnlyList<ProfileViewModel> profiles, Fun
     /// <summary>
     /// Перед удалением профиля из списка: работающий сервер не удаляем; папку данных, заведённую самой программой и не
     /// нужную другим, — по вопросу в Корзину; файлы агента и расписания профиля — удаляем. true — профиль можно убирать
-    /// из списка, false — отменили или не вышло (профиль остаётся, чтобы можно было повторить).
+    /// из списка, false — отменили или не вышло (профиль остаётся, чтобы можно было повторить). У профиля у хостера —
+    /// только вопрос; его следы на этом компьютере убирает <see cref="AfterRemoved"/>.
     /// </summary>
     public async Task<bool> PrepareRemoveAsync(ProfileViewModel profile)
     {
         var model = profile.Model;
+        if (model.IsHosted)
+        {
+            // у профиля у хостера нет ни папок, ни агента: только спросить; соединение и кэш — в AfterRemoved,
+            // когда окно уже ушло с этого профиля и источник модов не откроет соединение заново
+            return Ui.Confirm(Loc.T("settings.removeAskHosted", model.Name), byDefault: Answer.No);
+        }
         if (model.Kind == ProfileKind.Server && await IsServerRunningAsync(model))
         {
             Ui.Warn(Loc.T("settings.removeRunning", model.Name));
@@ -142,6 +158,41 @@ public sealed class ProfileActions(IReadOnlyList<ProfileViewModel> profiles, Fun
         return true;
     }
 
+    /// <summary>
+    /// После удаления профиля из списка (окно уже переключилось на другой): у профиля у хостера — закрыть соединение,
+    /// убрать кэш и журнал установки. Для остальных профилей всё сделал <see cref="PrepareRemoveAsync"/>.
+    /// </summary>
+    public static void AfterRemoved(GameProfile model)
+    {
+        if (model.IsHosted) ForgetHosted(model.Id);
+    }
+
+    /// <summary>
+    /// Убрать следы профиля у хостера на этом компьютере: соединение, кэш (<c>cache/hosted/id</c>) и журнал установки
+    /// (<c>hosted/id</c>). Моды на сервере и копии прежних версий в хранилище версий не трогаем.
+    /// </summary>
+    internal static void ForgetHosted(string profileId)
+    {
+        Core.Hosting.HostedSessions.Forget(profileId);
+        foreach (var dir in new[] { Core.Hosting.ModInfoCache.DirFor(profileId), HostedStateDir(profileId) })
+        {
+            try
+            {
+                if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // shortcut: не вышло — папка останется насовсем («Уборка диска» хостовые профили и папку hosted/ не
+                // трогает); переделать, если такие остатки начнут попадаться — убирать при запуске папки без профиля
+            }
+        }
+    }
+
+    /// <summary>Папка журнала профиля у хостера: <c>hosted/id</c> в данных программы (не в cache: «Уборка диска» её не трогает).</summary>
+    private static string HostedStateDir(string profileId) =>
+        PathRules.FileIn(Path.Combine(AppPaths.Root, "hosted"), profileId)
+        ?? throw new ArgumentException("bad profile id", nameof(profileId));
+
     /// <summary>Спросить название нового профиля (у серверного от него зависит имя папки данных). null — отменили.</summary>
     private static NewProfileChoice? AskNewProfile(ProfileKind kind, string suggestedName) =>
         AppWindows.Current.NewProfile(kind, suggestedName);
@@ -166,6 +217,7 @@ public sealed class ProfileActions(IReadOnlyList<ProfileViewModel> profiles, Fun
     /// <summary>Работает ли сервер профиля под нашим агентом (копировать мир работающего сервера нельзя).</summary>
     private static async Task<bool> IsServerRunningAsync(GameProfile profile)
     {
+        if (profile.IsHosted) return false; // сервером управляет хостер, под нашим агентом его нет
         using var client = AgentClient.TryConnect(profile.Id);
         if (client is null) return false;
         try

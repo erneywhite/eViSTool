@@ -286,4 +286,29 @@ public sealed class HostedContractsTests : IDisposable
         public Task CreateDirectoryAsync(string path, CancellationToken ct) => Task.CompletedTask;
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
+
+    // ---------- тот же сервер после правки подключения
+
+    [Fact]
+    public void IsSameServer_IgnoresPasswordTlsAndFolders_ButNotPlaceOrAccount()
+    {
+        HostedConnection Gp() => new() { Host = "198.51.100.7", Port = 58021, User = "gp_user", Root = "/", Tls = FtpTls.None };
+        HostedConnection With(Action<HostedConnection> change) { var c = Gp(); change(c); return c; }
+
+        Assert.True(Gp().IsSameServer(Gp()));
+        Assert.True(Gp().IsSameServer(With(c => c.Password = HostedSecret.Protect("new"))));
+        Assert.True(Gp().IsSameServer(With(c => c.Tls = FtpTls.Explicit)));
+        Assert.True(Gp().IsSameServer(With(c => { c.ModDirs = ["Mods"]; c.ConfigPath = "serverconfig.json"; c.ActiveMode = true; })));
+        Assert.True(Gp().IsSameServer(With(c => { c.Host = " 198.51.100.7 "; c.Root = ""; })));
+        Assert.True(With(c => c.Host = "Ftp.Example.org").IsSameServer(With(c => c.Host = "ftp.example.org")));
+        Assert.True(With(c => c.Root = "/g123/").IsSameServer(With(c => c.Root = "g123")));
+
+        Assert.False(Gp().IsSameServer(null));
+        Assert.False(Gp().IsSameServer(With(c => c.Host = "203.0.113.9")));
+        Assert.False(Gp().IsSameServer(With(c => c.Port = 21)));
+        Assert.False(Gp().IsSameServer(With(c => c.User = "GP_USER"))); // логин — как набран: регистр не угадываем
+        Assert.False(Gp().IsSameServer(With(c => c.Root = "/g123")));
+        Assert.False(Gp().IsSameServer(With(c => c.Protocol = HostedProtocol.Sftp)));
+        Assert.False(Gp().IsSameServer(With(c => c.Root = "/../x"))); // не разобрать — считаем другим
+    }
 }

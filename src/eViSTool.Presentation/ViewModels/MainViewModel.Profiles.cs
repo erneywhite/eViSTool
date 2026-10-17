@@ -68,7 +68,7 @@ public sealed partial class MainViewModel
         WorldCopies = value?.Model.Kind == ProfileKind.Client ? new WorldCopiesViewModel(value.Model) : null;
     }
 
-    /// <summary>«Уборка диска» профиля (файлы на этой машине; у удалённого сервера — пока нет).</summary>
+    /// <summary>«Уборка диска» профиля (файлы на этой машине; у удалённого сервера и сервера у хостера — нет).</summary>
     [RelayCommand(CanExecute = nameof(CanCleanupDisk))]
     private void CleanupDisk(ProfileViewModel? profile)
     {
@@ -77,7 +77,7 @@ public sealed partial class MainViewModel
         WorldCopies?.Refresh();
     }
 
-    private static bool CanCleanupDisk(ProfileViewModel? profile) => profile is { Model.IsRemote: false };
+    private static bool CanCleanupDisk(ProfileViewModel? profile) => profile is { Model.IsLocal: true };
 
     /// <summary>Сделаны новые копии миров — обновить список в настройках, если открыт этот профиль.</summary>
     public void RefreshWorldCopies(GameProfile profile)
@@ -157,6 +157,7 @@ public sealed partial class MainViewModel
         Profiles.Remove(profile);
         if (ActiveProfile == profile) ActiveProfile = Profiles[0];
         if (EditedProfile == profile) EditedProfile = ActiveProfile;
+        ProfileActions.AfterRemoved(model); // соединение и кэш хостового профиля — когда окно уже ушло с него
         foreach (var p in _settings.Profiles) p.LinkedProfiles.RemoveAll(id => id == model.Id); // связи с удалённым — не нужны
         RefreshLinks();
         Save();

@@ -62,7 +62,7 @@ public static class PlayMenu
         string? defaultKey, string? clientVersion)
     {
         items.Clear();
-        foreach (var server in profiles.Where(p => p.Kind == ProfileKind.Server))
+        foreach (var server in profiles.Where(p => p.Kind == ProfileKind.Server && !p.Model.IsHosted))
         {
             if (PlayTargets.Own(server.Model) is not { } target) continue;
             var item = new PlayMenuItemViewModel(target, server.Name,
@@ -100,7 +100,7 @@ public static class PlayMenu
     /// <summary>Варианты поля «Сервер по умолчанию»: без сервера, свои серверы, избранное игры клиентского профиля.</summary>
     public static IReadOnlyList<MainViewModel.DefaultServerOption> DefaultServerOptions(GameProfile client, IEnumerable<ProfileViewModel> profiles)
     {
-        var own = profiles.Where(p => p.Kind == ProfileKind.Server).Select(p => PlayTargets.Own(p.Model)).OfType<PlayTarget>();
+        var own = profiles.Where(p => p.Kind == ProfileKind.Server && !p.Model.IsHosted).Select(p => PlayTargets.Own(p.Model)).OfType<PlayTarget>();
         return [new MainViewModel.DefaultServerOption("", Loc.T("play.noServer")),
             .. own.Concat(PlayTargets.Favorites(client.DataDir)).Select(t => new MainViewModel.DefaultServerOption(t.Key, $"{t.Name}  ·  {t.Address}"))];
     }
