@@ -19,10 +19,34 @@ public sealed record HostedCheckResult(HostedLayout Layout, ModVersion? GameVers
 /// <summary>Проверка подключения из окна «Подключение по FTP» и закрепление найденных путей в профиле.</summary>
 public static class HostedProbe
 {
-    /// <summary>Вход → возможности сервера → раскладка → конфиг → версия → число модов.</summary>
-    public static Task<HostedCheckResult> CheckAsync(HostedEndpoint endpoint, HostedConnection settings, CancellationToken ct) =>
-        // shortcut: заглушка до пакета P3; ошибка ловится фильтрами окна, в отличие от NotImplementedException
-        Task.FromException<HostedCheckResult>(new RemoteFilesException(RemoteFailure.Unsupported, "HostedProbe.CheckAsync is not implemented yet"));
+    /// <summary>
+    /// Вход → возможности сервера → раскладка → конфиг → версия → число модов (только по листингу, архивы не читаются).
+    /// Своё соединение, не из пула профиля: профиля ещё может не быть, а настройки в окне — ещё не сохранены.
+    /// </summary>
+    public static async Task<HostedCheckResult> CheckAsync(HostedEndpoint endpoint, HostedConnection settings, CancellationToken ct)
+    {
+        var files = RemoteFilesFactory.Create(endpoint);
+        await using (files.ConfigureAwait(false))
+        {
+            await files.ConnectAsync(ct).ConfigureAwait(false);
+            var snapshot = await HostedLayoutProbe.ReadAsync(files, settings, ct).ConfigureAwait(false);
+            var (version, source) = await HostedGameVersion.DetectAsync(files, settings, snapshot, null, ct).ConfigureAwait(false);
+            var count = 0;
+            foreach (var dir in snapshot.Layout.ModDirs)
+                count += (await snapshot.Listings.ListAsync(dir, ct).ConfigureAwait(false) ?? []).Count(LooksLikeMod);
+            return new HostedCheckResult(snapshot.Layout, version, source, count, files.Features);
+        }
+    }
+
+    /// <summary>Похоже на мод по листингу: архив, код (кроме базовых dll игры) или папка.</summary>
+    private static bool LooksLikeMod(RemoteEntry e)
+    {
+        if (e.IsDirectory) return true;
+        var ext = Path.GetExtension(e.Name);
+        return ext.Equals(".zip", StringComparison.OrdinalIgnoreCase)
+               || (ext.Equals(".dll", StringComparison.OrdinalIgnoreCase) || ext.Equals(".cs", StringComparison.OrdinalIgnoreCase))
+               && !HostedLayoutProbe.IsBaseGameFile(e.Name);
+    }
 
     /// <summary>
     /// Копия настроек с закреплёнными путями из раскладки (относительно <see cref="HostedConnection.Root"/>): следующие

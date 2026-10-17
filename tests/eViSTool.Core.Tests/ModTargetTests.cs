@@ -100,4 +100,48 @@ public sealed class ModTargetTests : IDisposable
         Assert.Contains("alpha", ProfileResolver.Resolve(a).DisabledMods);
         Assert.Single(ModBackupStore.ForProfile(a).List("alpha"));
     }
+
+    [Fact]
+    public async Task Delete_Local_GoesToTrash_WritesHistory_AndForgetsTheLastCopy()
+    {
+        var a = Server("A", "alpha", "other");
+        await ModTargets.InstallAsync(ModTarget.For(a)!, Zip("alpha_1.0.0.zip", "alpha", "1.0.0"));
+        var (_, mods) = await ModTargets.ScanAsync(ModTarget.For(a)!);
+        var trashed = new List<string>();
+        try
+        {
+            await ModTargets.DeleteAsync(ModTarget.For(a)!, mods.Single(), path => { trashed.Add(path); File.Delete(path); });
+
+            Assert.Equal([Path.Combine(a.DataDir!, "Mods", "alpha_1.0.0.zip")], trashed);
+            Assert.Empty(ModsOf(a));
+            Assert.Equal(["other"], ProfileResolver.Resolve(a).DisabledMods);
+            var last = ModHistory.ReadEntries(ModHistory.FileFor(a.Id))[^1];
+            Assert.Equal(("alpha", "1.0.0", (string?)null), (last.ModId, last.From, last.To));
+        }
+        finally
+        {
+            File.Delete(ModHistory.FileFor(a.Id));
+        }
+    }
+
+    [Fact]
+    public async Task Delete_Local_AnotherCopyLeft_KeepsTheDisabledEntry()
+    {
+        var a = Server("A", "alpha");
+        var mods = Path.Combine(a.DataDir!, "Mods");
+        File.Copy(Zip("alpha_1.0.0.zip", "alpha", "1.0.0"), Path.Combine(mods, "alpha_1.0.0.zip"));
+        File.Copy(Zip("alpha_copy.zip", "alpha", "1.0.0"), Path.Combine(mods, "alpha_copy.zip"));
+        var (_, list) = await ModTargets.ScanAsync(ModTarget.For(a)!);
+        try
+        {
+            await ModTargets.DeleteAsync(ModTarget.For(a)!, list.First(), File.Delete);
+
+            Assert.Single(ModsOf(a));
+            Assert.Equal(["alpha"], ProfileResolver.Resolve(a).DisabledMods);
+        }
+        finally
+        {
+            File.Delete(ModHistory.FileFor(a.Id));
+        }
+    }
 }

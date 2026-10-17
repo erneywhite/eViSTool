@@ -176,11 +176,26 @@ public static class ModTargets
     /// у хостера — копия на этой машине, потом удаление на сервере. Запись в историю; последняя копия мода — и из
     /// списка выключенных.
     /// </summary>
-    public static Task DeleteAsync(ModTarget target, LocalMod mod, Action<string> moveToTrash, CancellationToken ct = default)
+    public static async Task DeleteAsync(ModTarget target, LocalMod mod, Action<string> moveToTrash, CancellationToken ct = default)
     {
-        if (target.IsHosted) return new HostedMods(target).DeleteAsync(mod.Path, ct);
-        // shortcut: ветки своего профиля и агента пока живут в ModsViewModel и ModHistoryActions; перенести сюда в пакете P3
-        throw new NotImplementedException("ModTargets.DeleteAsync — пакет P3");
+        if (target.IsHosted)
+        {
+            await new HostedMods(target).DeleteAsync(mod.Path, ct).ConfigureAwait(false);
+            return;
+        }
+        if (target.Remote is { } code)
+        {
+            using var agent = AgentClient.ForRemote(code);
+            await agent.DeleteModAsync(mod.Path, ct).ConfigureAwait(false); // на сервере — в его корзину (и в его историю)
+            return;
+        }
+        moveToTrash(mod.Path);
+        if (mod.Info is not { } gone) return;
+        ModHistory.Record(ModHistory.FileFor(target.ProfileId), gone.ModId, gone.Name, gone.Version, null);
+        // других копий мода не осталось — убираем его и из списка выключенных
+        var resolved = ProfileResolver.Resolve(target.Profile);
+        var left = await Task.Run(() => ModUpdateService.ScanLocal(resolved), ct).ConfigureAwait(false);
+        if (left.All(l => l.Info?.ModId != gone.ModId)) ModConfigEditor.Forget(resolved, gone);
     }
 
     /// <summary>

@@ -80,7 +80,7 @@ public static class AlsoInstall
         catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidOperationException or UnauthorizedAccessException
                                        or TaskCanceledException or Newtonsoft.Json.JsonException)
         {
-            return new AlsoInstallFiles(target, null, [], 0, target.IsRemote ? Server.Remote.RemoteSecret.Describe(ex) : ex.Message);
+            return new AlsoInstallFiles(target, null, [], 0, ModTargets.Describe(target, ex));
         }
     }
 
@@ -96,8 +96,7 @@ public static class AlsoInstall
         catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidOperationException or UnauthorizedAccessException
                                        or TaskCanceledException or Newtonsoft.Json.JsonException)
         {
-            return new AlsoInstallOption(target, AlsoInstallState.Unavailable, null, null, null,
-                target.IsRemote ? Server.Remote.RemoteSecret.Describe(ex) : ex.Message);
+            return new AlsoInstallOption(target, AlsoInstallState.Unavailable, null, null, null, ModTargets.Describe(target, ex));
         }
 
         var game = resolved.GameVersion;

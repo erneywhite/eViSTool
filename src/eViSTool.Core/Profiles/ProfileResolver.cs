@@ -105,8 +105,14 @@ public static class ProfileResolver
         return (Strings(lists?["modPaths"]), Strings(lists?["disabledMods"]));
     }
 
-    private static (List<string> ModPaths, List<string> Disabled) ReadServer(JObject root) =>
-        (Strings(root["ModPaths"]), Strings(root["WorldConfig"]?["DisabledMods"]));
+    private static (List<string> ModPaths, List<string> Disabled) ReadServer(JObject root) => ReadServerConfig(root);
+
+    /// <summary>
+    /// Папки модов (ModPaths, как записаны) и выключенные моды (WorldConfig.DisabledMods) из дерева serverconfig.json —
+    /// для конфига, прочитанного не с диска (сервер у хостера). Нет списка, null или не тот тип — пустой список.
+    /// </summary>
+    public static (List<string> ModPaths, List<string> Disabled) ReadServerConfig(JObject root) =>
+        (Strings(root["ModPaths"]), Strings((root["WorldConfig"] as JObject)?["DisabledMods"]));
 
     private static List<string> Strings(JToken? token) =>
         token is JArray arr ? arr.Where(t => t.Type == JTokenType.String).Select(t => t.ToString()).ToList() : [];
