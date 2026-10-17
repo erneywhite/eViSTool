@@ -136,9 +136,9 @@
                       AutomationProperties.Name="{Binding Label}" AutomationProperties.AutomationId="{Binding Path}">
                 <ComboBox.ItemTemplate>
                     <DataTemplate x:DataType="vm:ConfigChoiceOption">
-                        <TextBlock TextTrimming="CharacterEllipsis">
+                        <ctl:RunTextBlock TextTrimming="CharacterEllipsis">
                             <Run Text="{Binding Label, Mode=OneWay}" /><Run Text="   " /><Run Text="{Binding Code, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" />
-                        </TextBlock>
+                        </ctl:RunTextBlock>
                     </DataTemplate>
                 </ComboBox.ItemTemplate>
             </ComboBox>
@@ -219,9 +219,9 @@
                                                Margin="12,10,12,4" />
                                 </DataTemplate>
                                 <DataTemplate DataType="vm:WorldSettingKeyOption">
-                                    <TextBlock>
+                                    <ctl:RunTextBlock>
                                         <Run Text="{Binding Label, Mode=OneWay}" /><Run Text="   " /><Run Text="{Binding KeyNote, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" />
-                                    </TextBlock>
+                                    </ctl:RunTextBlock>
                                 </DataTemplate>
                             </ComboBox.DataTemplates>
                         </ComboBox>
@@ -240,9 +240,9 @@
                                       AutomationProperties.Name="{local:Tr srvcfg.wsValue}" AutomationProperties.AutomationId="{Binding ValueAutomationId}">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate x:DataType="vm:WorldSettingValueOption">
-                                        <TextBlock>
+                                        <ctl:RunTextBlock>
                                             <Run Text="{Binding Label, Mode=OneWay}" /><Run Text="   " /><Run Text="{Binding ValueNote, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" />
-                                        </TextBlock>
+                                        </ctl:RunTextBlock>
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
                             </ComboBox>

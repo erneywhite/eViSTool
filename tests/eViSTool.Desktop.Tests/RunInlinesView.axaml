@@ -1,0 +1,50 @@
+<!--
+  Подписи из нескольких Run так, как они были в «Моих модах» до обхода двумя TextBlock (1881d1e, ae4ce48): счётчик
+  над таблицей и строка modid в ячейке DataGrid; куски — {Binding} и {local:Tr}, цвета — DynamicResource и класс.
+  Каждая подпись — дважды: обычным TextBlock (на нём видна ошибка Avalonia) и ctl:RunTextBlock (обход).
+  RunInlinesTests меняет язык и данные, в том числе пока страница скрыта, и проверяет, что подписи нарисованы.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:eViSTool.Desktop"
+             xmlns:ctl="using:eViSTool.Desktop.Controls"
+             xmlns:t="using:eViSTool.Desktop.Tests"
+             x:Class="eViSTool.Desktop.Tests.RunInlinesView"
+             x:DataType="t:RunPageModel">
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="Probe.Text" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="Probe.Muted" Color="#B0B0B0" />
+        <SolidColorBrush x:Key="Probe.Warn" Color="#FFB000" />
+    </UserControl.Resources>
+    <UserControl.Styles>
+        <Style Selector="Run.warn">
+            <Setter Property="Foreground" Value="{DynamicResource Probe.Warn}" />
+        </Style>
+    </UserControl.Styles>
+    <DockPanel Background="Black">
+        <StackPanel DockPanel.Dock="Top">
+            <!-- счётчик-вкладка: число и подпись, подпись переводит модель -->
+            <TextBlock x:Name="PlainCounter" Foreground="{DynamicResource Probe.Text}"><Run Text="{Binding ModCount, Mode=OneWay}" FontSize="24" /><Run Text="  " /><Run Text="{Binding InstalledLabel, Mode=OneWay}" Foreground="{DynamicResource Probe.Muted}" FontSize="13" /></TextBlock>
+            <ctl:RunTextBlock x:Name="Counter" Foreground="{DynamicResource Probe.Text}"><Run Text="{Binding ModCount, Mode=OneWay}" FontSize="24" /><Run Text="  " /><Run Text="{Binding InstalledLabel, Mode=OneWay}" Foreground="{DynamicResource Probe.Muted}" FontSize="13" /></ctl:RunTextBlock>
+            <!-- перевод в разметке рядом с привязкой -->
+            <ctl:RunTextBlock x:Name="Translated" Foreground="{DynamicResource Probe.Text}"><Run Text="{local:Tr about.version}" /><Run Text=" " /><Run Text="{Binding Version, Mode=OneWay}" FontWeight="SemiBold" /></ctl:RunTextBlock>
+            <!-- размер задан: измерение и раскладка получают одно и то же место -->
+            <ctl:RunTextBlock x:Name="Sized" Width="300" Height="20" HorizontalAlignment="Left" Foreground="{DynamicResource Probe.Text}"><Run Text="{local:Tr about.version}" /><Run Text=" " /><Run Text="{Binding Version, Mode=OneWay}" /></ctl:RunTextBlock>
+        </StackPanel>
+        <DataGrid x:Name="Grid" ItemsSource="{Binding Rows}" AutoGenerateColumns="False" HeadersVisibility="None" CanUserSortColumns="False">
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Width="360">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate x:DataType="t:RunRowModel">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{DynamicResource Probe.Text}" />
+                                <TextBlock Classes="plain" FontSize="11" Foreground="{DynamicResource Probe.Muted}" TextTrimming="CharacterEllipsis"><Run Text="{Binding ModId, Mode=OneWay}" /><Run Text="{Binding SideNote, Mode=OneWay}" Classes.warn="{Binding IsUnneeded}" /><Run Text="{local:Tr mods.sortName}" /></TextBlock>
+                                <ctl:RunTextBlock Classes="row" FontSize="11" Foreground="{DynamicResource Probe.Muted}" TextTrimming="CharacterEllipsis"><Run Text="{Binding ModId, Mode=OneWay}" /><Run Text="{Binding SideNote, Mode=OneWay}" Classes.warn="{Binding IsUnneeded}" /><Run Text="{local:Tr mods.sortName}" /></ctl:RunTextBlock>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</UserControl>

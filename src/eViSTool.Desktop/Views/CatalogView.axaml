@@ -113,14 +113,14 @@
                                     <TextBlock Classes="stateBadgeText" Classes.installed="{Binding IsInstalled}" Text="{Binding InstalledText}" />
                                 </Border>
                                 <StackPanel>
-                                    <TextBlock TextTrimming="CharacterEllipsis">
+                                    <ctl:RunTextBlock TextTrimming="CharacterEllipsis">
                                         <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" FontSize="14" Foreground="{DynamicResource Forest.Text}" /><Run Text=" " /><Run Text="{Binding Author, Mode=OneWay}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" />
-                                    </TextBlock>
+                                    </ctl:RunTextBlock>
                                     <TextBlock Text="{Binding Summary}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap"
                                                MaxLines="2" TextTrimming="CharacterEllipsis" Margin="0,3,0,0" />
-                                    <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,6,0,0" TextTrimming="CharacterEllipsis">
+                                    <ctl:RunTextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,6,0,0" TextTrimming="CharacterEllipsis">
                                         <Run Text="{Binding Tag, Mode=OneWay}" Foreground="{DynamicResource Forest.Accent}" /><Run Text="     " /><Run Text="{Binding Stats, Mode=OneWay}" /><Run Text="     " /><Run Text="{Binding NoVersionText, Mode=OneWay}" Foreground="{DynamicResource Forest.Warn}" />
-                                    </TextBlock>
+                                    </ctl:RunTextBlock>
                                 </StackPanel>
                             </DockPanel>
                         </DataTemplate>
@@ -245,9 +245,9 @@
                                                                         <TextBlock Text="{local:Tr mcard.installedBadge}" FontSize="11" Foreground="{DynamicResource Forest.Good}" />
                                                                     </Border>
                                                                     <StackPanel VerticalAlignment="Center">
-                                                                        <TextBlock>
+                                                                        <ctl:RunTextBlock>
                                                                             <Run Text="{Binding Version, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" FontSize="13" Foreground="{DynamicResource Forest.Text}" /><Run Text=" " /><Run Text="{Binding PreText, Mode=OneWay}" FontSize="11" Foreground="{DynamicResource Forest.Warn}" />
-                                                                        </TextBlock>
+                                                                        </ctl:RunTextBlock>
                                                                         <TextBlock Text="{Binding Meta}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2,8,0" />
                                                                     </StackPanel>
                                                                 </DockPanel>

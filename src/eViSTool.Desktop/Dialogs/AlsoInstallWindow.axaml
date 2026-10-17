@@ -21,9 +21,9 @@
                         <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding IsEnabled}" VerticalContentAlignment="Center"
                                   AutomationProperties.Name="{Binding Name}">
                             <StackPanel Margin="4,0,0,0">
-                                <TextBlock FontSize="13" Foreground="{DynamicResource Forest.Text}">
+                                <ctl:RunTextBlock FontSize="13" Foreground="{DynamicResource Forest.Text}">
                                     <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding KindText, Mode=OneWay}" Foreground="{DynamicResource Forest.Muted}" />
-                                </TextBlock>
+                                </ctl:RunTextBlock>
                                 <TextBlock Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2,0,0" />
                             </StackPanel>
                         </CheckBox>

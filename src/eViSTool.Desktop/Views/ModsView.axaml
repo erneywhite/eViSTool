@@ -272,9 +272,9 @@
                                                 </DockPanel>
                                                 <TextBlock Text="{Binding Summary}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap"
                                                            MaxLines="2" TextTrimming="CharacterEllipsis" Margin="0,3,0,0" />
-                                                <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Accent}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis">
+                                                <ctl:RunTextBlock FontSize="11" Foreground="{DynamicResource Forest.Accent}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis">
                                                     <Run Text="{Binding Sources, Mode=OneWay}" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding Closed, Mode=OneWay}" Foreground="{DynamicResource Forest.Muted}" />
-                                                </TextBlock>
+                                                </ctl:RunTextBlock>
                                             </StackPanel>
                                         </Border>
                                     </DataTemplate>
@@ -425,9 +425,9 @@
                                                             <StackPanel>
                                                                 <TextBlock Text="{Binding Title}" FontSize="13" Foreground="{DynamicResource Forest.Text}"
                                                                            TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ModId}" />
-                                                                <TextBlock FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap">
+                                                                <ctl:RunTextBlock FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap">
                                                                     <Run Text="{Binding Versions, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" Foreground="{DynamicResource Forest.Muted}" /><Run Text=" " /><Run Text="{Binding Later, Mode=OneWay}" Foreground="{DynamicResource Forest.Warn}" />
-                                                                </TextBlock>
+                                                                </ctl:RunTextBlock>
                                                             </StackPanel>
                                                         </DockPanel>
                                                     </Border>
@@ -658,9 +658,9 @@
                                                                         <TextBlock Text="{local:Tr mcard.installedBadge}" FontSize="11" Foreground="{DynamicResource Forest.Good}" />
                                                                     </Border>
                                                                     <StackPanel VerticalAlignment="Center">
-                                                                        <TextBlock>
+                                                                        <ctl:RunTextBlock>
                                                                             <Run Text="{Binding Version, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" FontSize="13" Foreground="{DynamicResource Forest.Text}" /><Run Text=" " /><Run Text="{Binding PreText, Mode=OneWay}" FontSize="11" Foreground="{DynamicResource Forest.Warn}" />
-                                                                        </TextBlock>
+                                                                        </ctl:RunTextBlock>
                                                                         <TextBlock Text="{Binding Meta}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2,8,0" />
                                                                     </StackPanel>
                                                                 </DockPanel>
