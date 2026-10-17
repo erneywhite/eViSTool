@@ -9,7 +9,7 @@ namespace eViSTool.Presentation.ViewModels;
 /// <summary>
 /// Окно «Новый профиль»: название. У серверного профиля сразу видно, какая папка данных будет создана: она получает имя
 /// профиля (…\VintagestoryData\ServerProfiles\имя). Ещё у серверного: уже существующие данные сервера (скопировать
-/// в профиль или работать прямо в той папке) и сервер на другом компьютере по коду подключения.
+/// в профиль или работать прямо в той папке) и сервер на другом компьютере по коду подключения и сервер у хостера по FTP.
 /// Выбор сделан — <see cref="Finished"/> с ответом, окно закрывается с ним.
 /// </summary>
 public sealed partial class NewProfileViewModel : ObservableObject
@@ -104,7 +104,7 @@ public sealed partial class NewProfileViewModel : ObservableObject
     /// <summary>Выбор сделан — окно закрывается с этим ответом.</summary>
     public event Action<NewProfileChoice>? Finished;
 
-    /// <summary>«Подключить по коду» с пустым названием — вернуть фокус в поле названия.</summary>
+    /// <summary>«Подключить по коду» или «Подключить по FTP» с пустым названием — вернуть фокус в поле названия.</summary>
     public event Action? FocusNameRequested;
 
     private static string Clean(string? text) => text?.Trim() ?? "";
@@ -167,6 +167,23 @@ public sealed partial class NewProfileViewModel : ObservableObject
         }
         if (AppWindows.Current.AskConnectionCode(Loc.T("newprofile.connectOk")) is not { } code) return;
         Finish(new NewProfileChoice(name, "", ExistingProfileMode.Remote, code, null));
+    }
+
+    /// <summary>
+    /// «Подключить по FTP»: сервер у хостера (G-Portal и другие), моды по FTP. Папки данных у профиля нет (DataDir —
+    /// пустая строка), подключение приходит из окна с уже зашифрованным паролем.
+    /// </summary>
+    [RelayCommand]
+    private void ConnectHosted()
+    {
+        var name = Clean(Name);
+        if (name.Length == 0)
+        {
+            FocusNameRequested?.Invoke();
+            return;
+        }
+        if (AppWindows.Current.AskHostedConnection(null, Loc.T("newprofile.connectOk")) is not { } hosted) return;
+        Finish(new NewProfileChoice(name, "", ExistingProfileMode.Hosted, null, null, hosted));
     }
 
     /// <summary>«Обзор…» у папки существующих данных.</summary>

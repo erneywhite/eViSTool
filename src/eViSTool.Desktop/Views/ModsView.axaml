@@ -109,6 +109,19 @@
             </DockPanel>
         </Border>
 
+        <!-- ===== сервер у хостера: версия игры не определилась — без неё не подобрать совместимые версии модов ===== -->
+        <Border DockPanel.Dock="Top" Classes="warning" Margin="0,14,0,0" IsVisible="{Binding HostedVersionMissing}"
+                AutomationProperties.AutomationId="HostedVersionMissing">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Classes="small" Padding="12,5" Margin="12,0,0,0" VerticalAlignment="Center"
+                        Content="{local:Tr nav.settings}" Command="{Binding OpenHostedSettingsCommand}" />
+                <Path Classes="icon" DockPanel.Dock="Left" Data="{StaticResource Icon.Warning}" Stroke="{DynamicResource Forest.Warn}"
+                      VerticalAlignment="Center" Margin="0,0,12,0" />
+                <TextBlock Text="{Binding HostedVersionMissingText}" Foreground="{DynamicResource Forest.Warn}" FontSize="13" TextWrapping="Wrap"
+                           VerticalAlignment="Center" />
+            </DockPanel>
+        </Border>
+
         <!-- ===== зависимости ===== -->
         <Border DockPanel.Dock="Top" Classes="warning" Margin="0,14,0,0" IsVisible="{Binding HasDependencyIssues}">
             <DockPanel>

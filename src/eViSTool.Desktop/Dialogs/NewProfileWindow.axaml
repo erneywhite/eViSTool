@@ -55,6 +55,18 @@
             </DockPanel>
         </Border>
 
+        <!-- серверный профиль: сервер у хостера (G-Portal и другие) — моды по FTP -->
+        <Border Classes="card" Padding="16,14" Margin="0,12,0,0" IsVisible="{Binding IsServer}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="{local:Tr newprofile.hostedConnect}" Command="{Binding ConnectHostedCommand}" VerticalAlignment="Center"
+                        Margin="12,0,0,0" AutomationProperties.AutomationId="NewProfileConnectHosted" />
+                <StackPanel>
+                    <TextBlock Text="{local:Tr newprofile.hosted}" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Classes="hint" Text="{local:Tr newprofile.hostedHint}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
         <StackPanel Classes="dialogButtons" Margin="0,20,0,0">
             <Button Classes="primary" Content="{local:Tr newprofile.create}" IsDefault="True" Command="{Binding OkCommand}" Padding="18,8"
                     AutomationProperties.AutomationId="NewProfileCreate" />

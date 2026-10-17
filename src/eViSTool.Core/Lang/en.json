@@ -1475,6 +1475,7 @@
   "hosted.user": "Login",
   "hosted.password": "Password",
   "hosted.passwordKeep": "Leave it empty to keep the saved password",
+  "hosted.advanced": "Advanced",
   "hosted.activeMode": "Active mode (only if the connection hangs on the file list)",
   "hosted.root": "Server folder on FTP",
   "hosted.rootHint": "Usually /. Some hosts keep the server in a subfolder, like /g123456.",

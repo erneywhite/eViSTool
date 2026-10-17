@@ -195,6 +195,8 @@
     <StreamGeometry x:Key="Icon.Pin">M12 17 v5 M9 10.76 a2 2 0 0 1 -1.11 1.79 l-1.78 .9 A2 2 0 0 0 5 15.24 V16 a1 1 0 0 0 1 1 h12 a1 1 0 0 0 1 -1 v-.76 a2 2 0 0 0 -1.11 -1.79 l-1.78 -.9 A2 2 0 0 1 15 10.76 V7 a1 1 0 0 1 1 -1 a2 2 0 0 0 0 -4 H8 a2 2 0 0 0 0 4 a1 1 0 0 1 1 1 z</StreamGeometry>
     <StreamGeometry x:Key="Icon.Globe">M2 12 A10 10 0 1 0 22 12 A10 10 0 1 0 2 12 Z M12 2 a14.5 14.5 0 0 0 0 20 a14.5 14.5 0 0 0 0 -20 M2 12 h20</StreamGeometry>
     <StreamGeometry x:Key="Icon.Server">M4 2 H20 A2 2 0 0 1 22 4 V8 A2 2 0 0 1 20 10 H4 A2 2 0 0 1 2 8 V4 A2 2 0 0 1 4 2 Z M4 14 H20 A2 2 0 0 1 22 16 V20 A2 2 0 0 1 20 22 H4 A2 2 0 0 1 2 20 V16 A2 2 0 0 1 4 14 Z M6 6 h.01 M6 18 h.01</StreamGeometry>
+    <!-- сервер у хостера: облако -->
+    <StreamGeometry x:Key="Icon.Cloud">M17.5 19 H9 a7 7 0 1 1 6.71 -9 h1.79 a4.5 4.5 0 1 1 0 9 Z</StreamGeometry>
     <StreamGeometry x:Key="Icon.Settings">M14 17 H5 M19 7 h-9 M14 17 A3 3 0 1 0 20 17 A3 3 0 1 0 14 17 Z M4 7 A3 3 0 1 0 10 7 A3 3 0 1 0 4 7 Z</StreamGeometry>
     <!-- файл настроек мода: лист с загнутым углом и строками -->
     <StreamGeometry x:Key="Icon.ModConfig">M6 22 a2 2 0 0 1 -2 -2 V4 a2 2 0 0 1 2 -2 h8 a2.4 2.4 0 0 1 1.704 .706 l3.588 3.588 A2.4 2.4 0 0 1 20 8 v12 a2 2 0 0 1 -2 2 z M14 2 v5 a1 1 0 0 0 1 1 h5 M10 9 H8 m8 4 H8 m8 4 H8</StreamGeometry>

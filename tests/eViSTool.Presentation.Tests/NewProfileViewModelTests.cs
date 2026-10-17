@@ -1,4 +1,5 @@
 using System.Reflection;
+using eViSTool.Core.Hosting;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Server.Remote;
@@ -321,6 +322,57 @@ public sealed class NewProfileViewModelTests : IDisposable
 
         Assert.Equal(1, focused);
         Assert.Null(vm.Result);
+    }
+
+    [Fact]
+    public void ConnectHosted_WithConnection_AnswersHosted_WithEmptyDataDir()
+    {
+        var hosted = new HostedConnection { Host = "203.0.113.40", Port = 58021, User = "gp_user", Password = HostedSecret.Protect("made-up") };
+        var asked = new List<object?[]>();
+        AppWindows.Current = Fake<IAppWindows>.Of(("AskHostedConnection", args => { asked.Add(args); return hosted; }));
+        var vm = Server(" G-Portal ");
+
+        vm.ConnectHostedCommand.Execute(null);
+
+        var args = Assert.Single(asked);
+        Assert.Null(args[0]); // новое подключение, не правка
+        Assert.Equal(Loc.T("newprofile.connectOk"), args[1]);
+        // DataDir — пустая строка, как у профиля по коду: папки данных на этой машине нет
+        Assert.Equal(new NewProfileChoice("G-Portal", "", ExistingProfileMode.Hosted, null, null, hosted), vm.Result);
+        Assert.Same(hosted, vm.Result!.Hosted);
+    }
+
+    [Fact]
+    public void ConnectHosted_Cancelled_DoesNothing()
+    {
+        AppWindows.Current = Fake<IAppWindows>.Of(("AskHostedConnection", _ => null));
+        var vm = Server();
+
+        vm.ConnectHostedCommand.Execute(null);
+
+        Assert.Null(vm.Result);
+    }
+
+    [Fact]
+    public void ConnectHosted_EmptyName_FocusesTheName_WithoutAsking()
+    {
+        // спросить подключение — ошибка теста: без названия окно подключения не открывается
+        AppWindows.Current = Fake<IAppWindows>.Of();
+        var vm = Server(" ");
+        var focused = 0;
+        vm.FocusNameRequested += () => focused++;
+
+        vm.ConnectHostedCommand.Execute(null);
+
+        Assert.Equal(1, focused);
+        Assert.Null(vm.Result);
+    }
+
+    [Fact]
+    public void ConnectHosted_IsOnlyForServerProfiles()
+    {
+        Assert.True(Server().IsServer); // третья карточка в окне видна по IsServer: у клиента её нет
+        Assert.False(new NewProfileViewModel(ProfileKind.Client, "Клиент", Path.Combine(Path.GetTempPath(), "evis-np-none")).IsServer);
     }
 
     /// <summary>
