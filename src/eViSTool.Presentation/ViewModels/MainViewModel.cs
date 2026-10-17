@@ -171,7 +171,7 @@ public sealed partial class MainViewModel : ObservableObject
             Save();
         }, () => IsGameRunning || IsLaunching || _game.IsWatching);
         Loc.Instance.SetLanguage(_settings.Language); // до того, как VM начнут собирать тексты
-        foreach (var p in _settings.Profiles) Profiles.Add(new ProfileViewModel(p, OnProfileChanged));
+        foreach (var p in _settings.Profiles) Profiles.Add(new ProfileViewModel(p, OnProfileChanged, _ => Save()));
 
         _allowUnstable = _settings.AllowUnstable;
         _alsoInstallWithoutAsking = _settings.AlsoInstallWithoutAsking;

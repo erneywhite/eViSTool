@@ -60,6 +60,13 @@ public sealed class HostedConnection
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     public string? GameVersion { get; set; }
 
+    /// <summary>
+    /// Версия игры, найденная последней проверкой подключения или чтением модов. Её видно сразу после запуска окна,
+    /// пока моды ещё не читали; сама по себе ничего не решает — решает свежая с сервера.
+    /// </summary>
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public string? FoundGameVersion { get; set; }
+
     /// <summary>SHA-256 сертификата FTPS, которому человек доверился (у хостеров сертификат часто свой).</summary>
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     public string? CertificateSha256 { get; set; }

@@ -64,6 +64,27 @@ public sealed class HostedModsViewModelTests : IDisposable
     // ---- чтение
 
     [Fact]
+    public void FoundGameVersion_IsRememberedInTheProfile_AndShownBeforeTheModsAreRead() => Sta.Run(() =>
+    {
+        var saved = 0;
+        // первое чтение модов находит версию и запоминает её в профиле (с сохранением)
+        var edited = 0;
+        var first = new ProfileViewModel(_host.Profile, _ => edited++, _ => saved++);
+        Assert.Equal(Loc.T("profile.hostedVersion"), first.GameVersionText);
+        first.HostedGameVersion = "1.22.7";
+        Assert.Equal("1.22.7", _host.Profile.Hosted!.FoundGameVersion);
+        Assert.Equal(1, saved);
+        first.HostedGameVersion = "1.22.7";
+        Assert.Equal(1, saved); // та же версия — профиль не пересохраняется
+        Assert.Equal(0, edited); // и это не правка профиля: она перечитала бы моды, а их чтение версию и нашло
+
+        // следующий запуск окна: моды ещё не читали, а версия уже видна
+        var next = new ProfileViewModel(_host.Profile, _ => { });
+        Assert.Equal("1.22.7", next.GameVersionText);
+        Assert.Equal("1.22.7", next.HostedGameVersion);
+    });
+
+    [Fact]
     public void Open_ReadsModsFromTheServer_AndShowsTheHostersModWithoutActions() => Sta.Run(() =>
     {
         _host.PutMod("/Mods/alpha_1.0.0.zip", "alpha", "1.0.0");

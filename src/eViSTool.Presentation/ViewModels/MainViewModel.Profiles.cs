@@ -125,7 +125,7 @@ public sealed partial class MainViewModel
     private void AddProfile(GameProfile model)
     {
         _settings.Profiles.Add(model);
-        var vm = new ProfileViewModel(model, OnProfileChanged);
+        var vm = new ProfileViewModel(model, OnProfileChanged, _ => Save());
         Profiles.Add(vm);
         EditedProfile = vm;
         RefreshLinks();

@@ -263,6 +263,7 @@ public sealed class HostedConnectViewModelTests
         Assert.Equal("serverconfig.json", result.ConfigPath);
         Assert.Equal(["Mods"], result.ModDirs);
         Assert.Equal("Mods", result.InstallDir);
+        Assert.Equal("1.22.7", result.FoundGameVersion); // её видно сразу, ещё до чтения модов
     }
 
     [Fact]
@@ -272,7 +273,9 @@ public sealed class HostedConnectViewModelTests
         await vm.CheckCommand.ExecuteAsync(null);
         vm.User = "someone_else";
 
-        Assert.Null(vm.Accept()!.ConfigPath); // раскладка найдена для других полей
+        var result = vm.Accept()!;
+        Assert.Null(result.ConfigPath); // раскладка найдена для других полей
+        Assert.Null(result.FoundGameVersion); // и версия игры — тоже
         Assert.Equal("", vm.CheckText);
     }
 

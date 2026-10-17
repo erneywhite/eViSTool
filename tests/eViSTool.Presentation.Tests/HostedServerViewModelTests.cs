@@ -456,6 +456,7 @@ public sealed class HostedServerViewModelTests : IDisposable
         Assert.DoesNotContain(_host.Settings.User + "@", main.Server.HeaderSubtitle);
 
         hosted.HostedGameVersion = null;     // чтение модов версию ещё не нашло
+        _host.Settings.FoundGameVersion = null; // и с прошлых раз она не запомнена
         Assert.Equal(Loc.T("server.subtitleHostedNoVersion", hosted.Name, where), main.Server.HeaderSubtitle);
 
         _host.Settings.GameVersion = "1.22.6"; // указана вручную

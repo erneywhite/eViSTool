@@ -11,6 +11,7 @@ namespace eViSTool.Presentation.ViewModels;
 public sealed partial class ProfileViewModel : ObservableObject
 {
     private readonly Action<ProfileViewModel> _changed;
+    private readonly Action<ProfileViewModel>? _remembered; // только сохранить настройки: не правка профиля, моды не перечитываются
 
     public GameProfile Model { get; }
 
@@ -20,10 +21,13 @@ public sealed partial class ProfileViewModel : ObservableObject
     [ObservableProperty] private string? _dataDir;
     [ObservableProperty] private ResolvedProfile _resolved;
 
-    public ProfileViewModel(GameProfile model, Action<ProfileViewModel> changed)
+    /// <param name="remembered">Сохранить настройки, когда профиль сам запомнил найденное (версию игры у хостера);
+    /// в отличие от <paramref name="changed"/> это не правка профиля и ничего не перечитывает.</param>
+    public ProfileViewModel(GameProfile model, Action<ProfileViewModel> changed, Action<ProfileViewModel>? remembered = null)
     {
         Model = model;
         _changed = changed;
+        _remembered = remembered;
         _name = model.Name;
         _kind = model.Kind;
         _gameDir = model.GameDir;
@@ -102,11 +106,25 @@ public sealed partial class ProfileViewModel : ObservableObject
         }
     }
 
-    /// <summary>Версия игры сервера у хостера, которую нашло чтение модов (null — ещё не читали или не нашлась).</summary>
+    /// <summary>
+    /// Версия игры сервера у хостера: найденная чтением модов, а до него — запомненная в профиле с прошлого раза
+    /// (null — ещё ни разу не находили). Новая найденная запоминается в профиле.
+    /// </summary>
     public string? HostedGameVersion
     {
-        get;
-        set { if (field == value) return; field = value; OnPropertyChanged(); OnPropertyChanged(nameof(GameVersionText)); }
+        get => field ?? Model.Hosted?.FoundGameVersion;
+        set
+        {
+            if (field == value) return;
+            field = value;
+            if (value is not null && Model.Hosted is { } hosted && hosted.FoundGameVersion != value)
+            {
+                hosted.FoundGameVersion = value;
+                _remembered?.Invoke(this); // не _changed: та перечитала бы моды, а их чтение и нашло версию
+            }
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(GameVersionText));
+        }
     }
 
     /// <summary>Откуда взялась <see cref="HostedGameVersion"/> — «из serverconfig.json» и т. п.; пусто — неизвестно.</summary>

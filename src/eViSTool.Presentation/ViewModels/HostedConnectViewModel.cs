@@ -33,6 +33,7 @@ public sealed partial class HostedConnectViewModel : ObservableObject
     private CancellationTokenSource? _checkCts;
     // раскладка из последней удачной проверки; любая правка полей её сбрасывает, закрепляется только свежая
     private HostedLayout? _checkedLayout;
+    private string? _checkedVersion; // версия игры из той же проверки, что и _checkedLayout
     // сертификат, которому человек доверился (или был в подключении); null — не доверяем никакому
     private string? _trustedCertificate;
     private string? _pendingCertificate;
@@ -341,6 +342,7 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         if (ok && done is not null)
         {
             _checkedLayout = done.Layout;
+            _checkedVersion = done.GameVersion?.ToString();
             // без тихого понижения: сервер умеет TLS — «если сервер умеет» становится «только с шифрованием»
             if (Tls == FtpTls.Auto && done.Features.Encrypted)
             {
@@ -422,6 +424,7 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         CancelCheck();
         var connection = BuildConnection();
         Result = _checkedLayout is { } layout ? HostedProbe.Pin(connection, layout) : connection;
+        if (_checkedLayout is not null && _checkedVersion is not null) Result.FoundGameVersion = _checkedVersion;
         return Result;
     }
 
