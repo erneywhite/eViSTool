@@ -30,7 +30,7 @@ internal sealed class LocalModSource : IModSource
         _main = main;
         _diskWatch.Tick += (_, _) =>
         {
-            if (_owner.IsRemote || _owner.IsBusy || Resolved is not { } profile) return;
+            if (!_owner.IsLocalProfile || _owner.IsBusy || Resolved is not { } profile) return;
             if (ServerMods.StampOf(profile) == _diskStamp) return;
             _ = ReloadAsync();
             _owner.StatusText = Loc.T("mods.changedOutside");
@@ -44,7 +44,7 @@ internal sealed class LocalModSource : IModSource
     {
         if (active && !_diskWatch.IsEnabled)
         {
-            if (!_owner.IsRemote && Resolved is { } profile && ServerMods.StampOf(profile) != _diskStamp) _ = ReloadAsync();
+            if (_owner.IsLocalProfile && Resolved is { } profile && ServerMods.StampOf(profile) != _diskStamp) _ = ReloadAsync();
             _diskWatch.Start();
         }
         else if (!active) _diskWatch.Stop();

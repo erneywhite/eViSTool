@@ -166,6 +166,21 @@ public sealed class HostedModsViewModelTests : IDisposable
     });
 
     [Fact]
+    public void Delete_SaysTheServerHasNoRecycleBin_InTheQuestionAndTheResult() => Sta.Run(() =>
+    {
+        _host.PutMod("/Mods/alpha_1.0.0.zip", "alpha", "1.0.0");
+        var (_, mods, _) = Open();
+        using var dialogs = new ScriptedDialogs(Answer.Yes, Answer.Yes);
+
+        Sta.Wait(mods.DeleteCommand.ExecuteAsync(Row(mods, "alpha")));
+
+        Assert.Equal(Loc.T("hosted.deleteConfirm", "alpha", "1.0.0") + "\n\n" + Loc.T("hosted.deleteNote"), dialogs.Asked[0]);
+        Assert.DoesNotContain(Loc.T("mods.deleteConfirm", "alpha", "1.0.0"), dialogs.Asked[0]); // про Корзину — неправда
+        Assert.StartsWith(Loc.T("hosted.deletedOk", "alpha"), mods.StatusText);
+        Assert.DoesNotContain(Loc.T("mods.deletedOk", "alpha"), mods.StatusText);
+    });
+
+    [Fact]
     public void Delete_StopQuestionAnsweredNo_ChangesNothingOnTheServer() => Sta.Run(() =>
     {
         _host.PutMod("/Mods/alpha_1.0.0.zip", "alpha", "1.0.0");
@@ -301,6 +316,64 @@ public sealed class HostedModsViewModelTests : IDisposable
     });
 
     [Fact]
+    public void Poll_RereadFailed_KeepsTheReadErrorInTheStatus() => Sta.Run(() =>
+    {
+        _host.PutMod("/Mods/alpha_1.0.0.zip", "alpha", "1.0.0");
+        var (_, mods, _) = Open();
+
+        _host.PutMod("/Mods/gamma_3.0.0.zip", "gamma", "3.0.0"); // отпечаток сменился
+        _host.Server.FailOn = (op, _) => op is "read" or "download"; // а прочитать моды уже не выходит
+        Sta.Wait(mods.PollHostedAsync());
+
+        Assert.StartsWith(Loc.T("mods.readFailed", "").TrimEnd(), mods.StatusText);
+        Assert.NotEqual(Loc.T("mods.changedOutside"), mods.StatusText);
+    });
+
+    [Fact]
+    public void Poll_FirstReadFailed_TriesAgainAndShowsTheMods() => Sta.Run(() =>
+    {
+        _host.PutMod("/Mods/alpha_1.0.0.zip", "alpha", "1.0.0");
+        _host.Server.FailOn = (op, _) => op == "connect";
+        var (_, mods, _) = Open(wait: false);
+        Sta.WaitFor(() => mods.StatusText.StartsWith(Loc.T("mods.readFailed", "").TrimEnd()) && !mods.HostedSource.IsLoading);
+
+        _host.Server.FailOn = null;                 // связь вернулась
+        Sta.Wait(mods.PollHostedAsync());
+        WaitRead(mods);
+
+        Assert.Single(mods.Rows, r => r.ModId == "alpha");
+        Assert.Equal(Loc.T("mods.readFromServer"), mods.StatusText);
+    });
+
+    [Fact]
+    public void SwitchFromOwnProfile_TheDiskWatchDoesNotWipeTheHostedList() => Sta.Run(() =>
+    {
+        _host.PutMod("/Mods/alpha_1.0.0.zip", "alpha", "1.0.0");
+        var data = Directory.CreateDirectory(Path.Combine(_host.Dir, "local-data")).FullName;
+        Directory.CreateDirectory(Path.Combine(data, "Mods"));
+        File.WriteAllText(Path.Combine(data, ProfileResolver.ServerConfigName), """{ "ModPaths": [ "Mods" ] }""");
+        var language = Loc.Instance.Language;
+        var main = new MainViewModel { AutoCheckUpdates = false };
+        Loc.Instance.SetLanguage(language);
+        main.Profiles.Clear();
+        var local = new ProfileViewModel(new GameProfile { Id = "own-" + Guid.NewGuid().ToString("N")[..6], Name = "Own", Kind = ProfileKind.Server, DataDir = data }, _ => { });
+        var hosted = new ProfileViewModel(_host.Profile, _ => { });
+        main.Profiles.Add(local);
+        main.Profiles.Add(hosted);
+        main.ActiveProfile = local;
+        main.Mods.SetActive(true);                  // таймер диска запущен, отметка своего профиля запомнена
+        Sta.WaitFor(() => main.Mods.Profile is not null);
+
+        main.ActiveProfile = hosted;
+        WaitRead(main.Mods);
+        var until = DateTime.UtcNow.AddSeconds(3);  // таймер диска тикает раз в 2 с
+        Sta.WaitFor(() => DateTime.UtcNow > until);
+
+        Assert.Contains(main.Mods.Rows, r => r.ModId == "alpha");
+        Assert.NotEqual(Loc.T("mods.changedOutside"), main.Mods.StatusText);
+    });
+
+    [Fact]
     public void Check_DoesNotReadTheServerAgainWhileTheScanIsYoungerThanTenSeconds() => Sta.Run(() =>
     {
         // без версии игры проверка кончается сразу после чтения — до модбазы, в сеть тест не выходит
@@ -319,6 +392,49 @@ public sealed class HostedModsViewModelTests : IDisposable
         now += TimeSpan.FromSeconds(11);
         Sta.Wait(mods.CheckCommand.ExecuteAsync(null));
         Assert.True(_host.Server.Calls["list"] > lists);
+    });
+
+    // ---- откат из истории
+
+    [Fact]
+    public void RollbackSession_ThreeUpdatesFromLocalCopiesAndOneRemoval_AsksToStopTheServerOnce() => Sta.Run(() =>
+    {
+        foreach (var id in new[] { "alpha", "beta", "gamma" })
+        {
+            _host.PutMod($"/Mods/{id}_1.1.0.zip", id, "1.1.0");
+            // прежняя версия — в копиях на этой машине: модбаза откату не нужна
+            var dir = Directory.CreateDirectory(ModBackupStore.ForProfile(_host.Profile).DirFor(id)).FullName;
+            File.Copy(_host.Zip($"{id}_1.0.0.zip", id, "1.0.0"), Path.Combine(dir, $"{id}_1.0.0.zip"));
+        }
+        _host.PutMod("/Mods/delta_1.0.0.zip", "delta", "1.0.0");
+        var file = ModHistory.FileFor(_host.Profile.Id);
+        using (ModHistory.Begin(ModHistorySource.UpdateAll))
+        {
+            foreach (var id in new[] { "alpha", "beta", "gamma" }) ModHistory.Record(file, id, id, "1.0.0", "1.1.0");
+            ModHistory.Record(file, "delta", "delta", null, "1.0.0");
+        }
+        var (_, mods, _) = Open();
+        var now = mods.Rows.Where(r => r.ModId.Length > 0).ToDictionary(r => r.ModId, r => (string?)r.Installed);
+        var session = new HistorySessionRow(ModHistory.Read(file).Single(), now, server: true);
+        var lists = _host.Server.Calls["list"];
+        using var dialogs = new ScriptedDialogs(Answer.Yes, Answer.Yes);
+
+        Sta.Wait(mods.RollbackSessionCommand.ExecuteAsync(session));
+        Sta.WaitFor(() => !mods.IsQueueRunning && _host.Server.Has("/Mods/gamma_1.0.0.zip"));
+        Sta.WaitFor(() => !mods.IsQueueRunning && !mods.IsBusy);
+
+        Assert.Equal(2, dialogs.Asked.Count);                       // сам откат и один вопрос про остановку на всё
+        Assert.Equal(Loc.T("hosted.stopAsk", _host.Profile.Name), dialogs.Asked[1]);
+        foreach (var id in new[] { "alpha", "beta", "gamma" })
+        {
+            Assert.True(_host.Server.Has($"/Mods/{id}_1.0.0.zip"), id);
+            Assert.False(_host.Server.Has($"/Mods/{id}_1.1.0.zip"), id);
+        }
+        Assert.False(_host.Server.Has("/Mods/delta_1.0.0.zip"));   // поставленный в сеансе убран
+        Assert.Single(ModBackupStore.ForProfile(_host.Profile).List("delta")); // с копией на этой машине
+        Assert.True(_host.Server.Calls["list"] > lists);
+        Sta.WaitFor(() => mods.Rows.Any(r => r.ModId == "alpha" && r.Installed == "1.0.0"));
+        Assert.DoesNotContain(mods.Rows, r => r.ModId == "delta");
     });
 
     // ---- установка и модпак

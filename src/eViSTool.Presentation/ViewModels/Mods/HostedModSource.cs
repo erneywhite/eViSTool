@@ -80,13 +80,16 @@ internal sealed class HostedModSource : IModSource
         else _ = PollAsync(); // вкладку открыли после перерыва — сервер мог измениться
     }
 
-    public async Task ReloadAsync()
+    public Task ReloadAsync() => ReadAsync();
+
+    /// <summary>Прочитать моды с сервера. Ответ — прочитали ли (нет связи, профиль сменили, отменили — false).</summary>
+    private async Task<bool> ReadAsync()
     {
-        if (_main.ActiveProfile is not { } profile || !profile.Model.IsHosted) return;
+        if (_main.ActiveProfile is not { } profile || !profile.Model.IsHosted) return false;
         if (ModTarget.For(profile.Model) is not { IsHosted: true } target)
         {
             _owner.StatusText = ModTarget.UnreadableText(profile.Model);
-            return;
+            return false;
         }
 
         _cts?.Cancel();
@@ -117,7 +120,7 @@ internal sealed class HostedModSource : IModSource
                 _owner.StatusText = s;
             });
             var (resolved, mods) = await hosted.ScanAsync(progress, cts.Token);
-            if (generation != _generation || _main.ActiveProfile != profile) return; // пока читали, профиль сменили или перечитали
+            if (generation != _generation || _main.ActiveProfile != profile) return false; // пока читали, профиль сменили или перечитали
 
             _resolved = resolved;
             _stamp = stamp;
@@ -132,14 +135,17 @@ internal sealed class HostedModSource : IModSource
             ShowWarnings(profile.Model.Id, resolved.Warnings);
             if (first && _main.AutoCheckUpdates && resolved.GameVersion is not null && _owner.CheckCommand.CanExecute(null))
                 _owner.CheckCommand.Execute(null);
+            return true;
         }
         catch (OperationCanceledException)
         {
             // перечитывают заново или сменили профиль — итог придёт от нового чтения
+            return false;
         }
         catch (Exception ex) when (IsExpected(ex))
         {
             if (generation == _generation) _owner.StatusText = Loc.T("mods.readFailed", ModTargets.Describe(target, ex));
+            return false;
         }
         finally
         {
@@ -149,7 +155,10 @@ internal sealed class HostedModSource : IModSource
         }
     }
 
-    /// <summary>Опрос: отпечаток папок модов и конфига поменялся — моды изменили со стороны, перечитываем.</summary>
+    /// <summary>
+    /// Опрос: отпечаток папок модов и конфига поменялся — моды изменили со стороны, перечитываем. Первое чтение не
+    /// удалось (не было связи) — пробуем прочитать снова, без сверки отпечатка.
+    /// </summary>
     internal async Task PollAsync()
     {
         if (_polling || !IsQuiet() || _main.ActiveProfile is not { } profile || ModTarget.For(profile.Model) is not { IsHosted: true } target) return;
@@ -157,11 +166,16 @@ internal sealed class HostedModSource : IModSource
         var generation = _generation;
         try
         {
+            if (_resolved is null)
+            {
+                await ReadAsync(); // не вышло — ошибка снова в статусе, следующий опрос попробует ещё
+                return;
+            }
             var stamp = await ModTargets.StampAsync(target);
             // пока ждали сервер, началась своя операция или чтение, или профиль сменили — это уже не «со стороны»
             if (generation != _generation || !IsQuiet() || _main.ActiveProfile != profile || stamp == _stamp) return;
-            await ReloadAsync();
-            if (_main.ActiveProfile == profile && _resolved is not null) _owner.StatusText = Loc.T("mods.changedOutside");
+            // перечитать не удалось — в статусе остаётся ошибка чтения: список устарел, и это надо видеть
+            if (await ReadAsync() && _main.ActiveProfile == profile) _owner.StatusText = Loc.T("mods.changedOutside");
         }
         catch (Exception ex) when (IsExpected(ex))
         {
@@ -173,10 +187,11 @@ internal sealed class HostedModSource : IModSource
         }
     }
 
-    /// <summary>Своих операций нет — можно смотреть, не изменили ли моды со стороны.</summary>
+    /// <summary>Своих операций нет (откат с его удалениями — тоже своя) — можно смотреть, не изменили ли моды со стороны.</summary>
     private bool IsQuiet() =>
-        _owner.IsHosted && _resolved is not null && !_loading && !_owner.IsBusy
-        && !_owner.ToggleEnabledCommand.IsRunning && !_owner.DeleteCommand.IsRunning;
+        _owner.IsHosted && !_stale && !_loading && !_owner.IsBusy
+        && !_owner.ToggleEnabledCommand.IsRunning && !_owner.DeleteCommand.IsRunning
+        && !_owner.RollbackSessionCommand.IsRunning && !_owner.RevertChangeCommand.IsRunning;
 
     // у сервера у хостера нет папки ModConfig, доступной окну: ссылки «Настройки мода» в карточке нет
     public Dictionary<string, int> ConfigCounts(IReadOnlyList<LocalMod> mods) => new(StringComparer.OrdinalIgnoreCase);

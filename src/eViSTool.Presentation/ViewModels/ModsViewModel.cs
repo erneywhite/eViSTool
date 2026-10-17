@@ -513,10 +513,11 @@ public sealed partial class ModsViewModel : ObservableObject
         if (row is null || Profile is null || CurrentTarget() is not { } target) return;
         if (RejectHostReadOnly(row)) return;
 
-        // у хостера корзины на сервере нет: вместо «сервер запущен» — строка про копию на этой машине
-        var running = target.IsHosted ? "\n\n" + Loc.T("hosted.deleteNote")
-            : _installer.IsRunning(target) ? "\n\n" + Loc.T("mods.deleteRunning") : "";
-        if (!Confirm(Loc.T("mods.deleteConfirm", row.Name, row.Installed) + running))
+        // у хостера корзины на сервере нет: свой вопрос (файл удалится сразу) и строка про копию на этой машине
+        var question = target.IsHosted
+            ? Loc.T("hosted.deleteConfirm", row.Name, row.Installed) + "\n\n" + Loc.T("hosted.deleteNote")
+            : Loc.T("mods.deleteConfirm", row.Name, row.Installed) + (_installer.IsRunning(target) ? "\n\n" + Loc.T("mods.deleteRunning") : "");
+        if (!Confirm(question))
             return;
         if (target.IsHosted && !_installer.ConfirmIfRunning(target)) return;
         await _installer.CopyWorldsAsync(target, side: ModSides.Parse(row.Local.Info?.Side));
@@ -526,7 +527,8 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             // свой — в Корзину, удалённый сервер — в его корзину, у хостера — копия на этой машине и удаление по FTP
             await ModTargets.DeleteAsync(target, row.Local, Ui.Platform.MoveToTrash);
-            StatusText = WithStartHint(_installer.WithWorldCopies(Loc.T("mods.deletedOk", row.Name)), target.IsHosted);
+            var done = target.IsHosted ? Loc.T("hosted.deletedOk", row.Name) : Loc.T("mods.deletedOk", row.Name);
+            StatusText = WithStartHint(_installer.WithWorldCopies(done), target.IsHosted);
         }
         catch (Exception ex) when (ex is IOException or OperationCanceledException or UnauthorizedAccessException
                                        or HttpRequestException or InvalidOperationException)
