@@ -1,0 +1,25 @@
+eViSTool 0.12.1: statistics show how much memory and how many cores the server has.
+
+New
+- Server → Statistics: under the memory and CPU tiles, how much the server's machine has ("of 64 GB", "of 8 cores"). In a container or a systemd unit with a memory limit, the limit is shown. If the memory peak reaches 90% of it, the line turns yellow: the server is short of memory.
+- On the memory chart a dashed line shows the limit, but only when the peak gets close to it (75%); otherwise the chart looks as before.
+
+Fixes
+- Hosted server: the game version is remembered in the profile, so it shows right after the window starts, without opening My mods first.
+- Statistics: the memory value fits into its tile ("21.9 / 28.5 GB"), and the lines under the tiles wrap instead of being cut off.
+
+Update from About; then update the agent on the server computer with Update on the server, so it starts sending the machine's memory and cores.
+
+---
+
+eViSTool 0.12.1: статистика показывает, сколько у сервера памяти и ядер.
+
+Новое
+- «Сервер» → «Статистика»: под плитками памяти и процессора видно, сколько есть у машины с сервером («из 64 ГБ», «из 8 ядер»). Если сервер в контейнере или в юните systemd с пределом памяти, показывается предел. Когда пик памяти доходит до 90 % от него, строка становится жёлтой: серверу тесно.
+- На графике памяти пунктиром показан предел, но только когда пик к нему подобрался (75 %), иначе график как раньше.
+
+Исправления
+- Сервер у хостера: версия игры запоминается в профиле и видна сразу после запуска окна, без захода в «Мои моды».
+- Статистика: значение памяти влезает в плитку («21,9 / 28,5 ГБ»), а строки под плитками переносятся, а не обрезаются.
+
+Обнови из «О программе», потом обнови агента на компьютере с сервером кнопкой «Обновить на сервере», чтобы он начал присылать память и ядра машины.

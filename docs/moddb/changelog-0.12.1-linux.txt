@@ -1,0 +1,17 @@
+eViSTool 0.12.1 for Linux: statistics show how much memory and how many cores the server has.
+
+- Server → Statistics: "of 64 GB" and "of 8 cores" under the memory and CPU tiles. For a server in a container or a systemd unit with MemoryMax, the limit is read from cgroup and shown instead; a memory peak at 90% of it turns the line yellow. The memory chart shows the limit as a dashed line when the peak gets close.
+- Hosted server: the game version is remembered in the profile and shows right after the window starts.
+- The memory value fits into its tile, and the lines under the tiles wrap instead of being cut off.
+
+Update the agent with Update on the server in the window, so it starts sending the machine's memory and cores.
+
+---
+
+eViSTool 0.12.1 для Linux: статистика показывает, сколько у сервера памяти и ядер.
+
+- «Сервер» → «Статистика»: «из 64 ГБ» и «из 8 ядер» под плитками памяти и процессора. Если сервер в контейнере или в юните systemd с MemoryMax, предел читается из cgroup и показывается он; пик памяти на 90 % от него подсвечивается жёлтым. На графике памяти предел виден пунктиром, когда пик к нему подобрался.
+- Сервер у хостера: версия игры запоминается в профиле и видна сразу после запуска окна.
+- Значение памяти влезает в плитку, строки под плитками переносятся, а не обрезаются.
+
+Обнови агента кнопкой «Обновить на сервере» в окне, чтобы он начал присылать память и ядра машины.
