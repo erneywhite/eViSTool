@@ -59,10 +59,24 @@ public sealed class StatsChartLayout
         PlotWidth = width - Left - Right;
         PlotHeight = height - Top - Bottom;
         var points = report?.Points ?? [];
+        var peakGb = points.Count == 0 ? 0 : Math.Max(points.Max(p => p.MemoryMb ?? 0), report!.PeakMemoryMb ?? 0) / 1024.0;
+        // предел памяти машины — только когда пик к нему подобрался: иначе сервер на 4 ГБ из 64 сплющился бы в полоску
+        if (kind == StatsChartKind.Resources && report?.MachineMemoryMb is { } limitMb && limitMb > 0
+            && peakGb * 1024 >= limitMb * LimitShowShare)
+            LimitGb = limitMb / 1024.0;
         Max = points.Count == 0 ? 0
             : kind == StatsChartKind.Players ? Math.Max(2, points.Max(p => p.Players ?? 0))
-            : NiceGb(points.Max(p => p.MemoryMb ?? 0) / 1024);
+            : NiceGb(Math.Max(points.Max(p => p.MemoryMb ?? 0) / 1024, LimitGb ?? 0));
     }
+
+    /// <summary>С какой доли памяти машины пик показывает на графике её предел.</summary>
+    public const double LimitShowShare = 0.75;
+
+    /// <summary>Предел памяти машины, ГБ, — пунктиром на графике ресурсов; null — пик далеко от него (или агент старый).</summary>
+    public double? LimitGb { get; }
+
+    /// <summary>Высота пунктира предела (на середине пикселя); null — пунктира нет.</summary>
+    public double? LimitY => LimitGb is { } gb && Max > 0 ? Snap(Y(gb, Max)) : null;
 
     public StatsReport? Report { get; }
     public StatsChartKind Kind { get; }

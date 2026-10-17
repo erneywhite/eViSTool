@@ -39,6 +39,15 @@
             <Setter Property="Margin" Value="0,2,0,0" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
+        <!-- «из 64 ГБ · пик — …» длиннее остальных подписей: переносится, а не обрезается (плитки ряда — одной высоты) -->
+        <Style Selector="TextBlock.tileNote.wrap">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="TextTrimming" Value="None" />
+        </Style>
+        <!-- пик памяти дошёл до 90 % машины: «из 4 ГБ» жёлтым — серверу тесно -->
+        <Style Selector="Run.tight">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
+        </Style>
         <!-- таблица игроков: заголовки колонок и ячейки; «сейчас в игре» — зелёным -->
         <Style Selector="TextBlock.colHead">
             <Setter Property="FontSize" Value="12" />
@@ -129,18 +138,23 @@
                         </StackPanel>
                     </Border>
                     <!-- расход сервера: в среднем / в пике (пока он работал) -->
-                    <Border Grid.Column="8" Classes="card tile" ToolTip.Tip="{local:Tr stats.loadTip}">
+                    <!-- под значением: сколько есть у машины («из 64 ГБ»; пик у предела — жёлтым) и когда был пик -->
+                    <Border Grid.Column="8" Classes="card tile" ToolTip.Tip="{Binding LoadTip}">
                         <StackPanel>
                             <TextBlock Classes="tileLabel" Text="{local:Tr stats.memoryTile}" />
                             <TextBlock Classes="tileValue" Text="{Binding MemoryText}" />
-                            <TextBlock Classes="tileNote" Text="{Binding MemoryPeakText}" />
+                            <TextBlock Classes="tileNote wrap">
+                                <Run Classes.tight="{Binding MemoryTight}" Text="{Binding MemoryLimitText}" /><Run Text="{Binding MemoryPeakText}" />
+                            </TextBlock>
                         </StackPanel>
                     </Border>
-                    <Border Grid.Column="10" Classes="card tile" ToolTip.Tip="{local:Tr stats.loadTip}">
+                    <Border Grid.Column="10" Classes="card tile" ToolTip.Tip="{Binding LoadTip}">
                         <StackPanel>
                             <TextBlock Classes="tileLabel" Text="{local:Tr stats.cpuTile}" />
                             <TextBlock Classes="tileValue" Text="{Binding CpuText}" />
-                            <TextBlock Classes="tileNote" Text="{Binding CpuPeakText}" />
+                            <TextBlock Classes="tileNote wrap">
+                                <Run Text="{Binding CpuLimitText}" /><Run Text="{Binding CpuPeakText}" />
+                            </TextBlock>
                         </StackPanel>
                     </Border>
                 </Grid>

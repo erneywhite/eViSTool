@@ -40,6 +40,16 @@ public sealed class ServerStatsTests : IDisposable
     }
 
     [Fact]
+    public void Report_TellsHowMuchTheMachineHas_SoTheWindowCanShowTheLimit()
+    {
+        var report = new StatsStore(_dir).Report(StatsPeriod.Day, Now);
+
+        // вся память машины (или предел контейнера) и ядра: 100 % процессора в замерах — это все они
+        Assert.True(report.MachineMemoryMb > 0);
+        Assert.Equal(Environment.ProcessorCount, report.MachineCores);
+    }
+
+    [Fact]
     public void Enabled_IsAMarkFile()
     {
         var store = new StatsStore(_dir);

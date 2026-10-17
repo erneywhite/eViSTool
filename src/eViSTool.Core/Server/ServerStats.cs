@@ -140,7 +140,23 @@ public sealed class StatsStore(string dir)
     {
         var from = now - StatsReport.SpanOf(period);
         // на день раньше: кто был в игре к началу срока, зашёл до него
-        return StatsReport.Build(Read(from.AddDays(-1), now), period, now, IsEnabled);
+        return StatsReport.Build(Read(from.AddDays(-1), now), period, now, IsEnabled)
+            with { MachineMemoryMb = MachineMemoryMb(), MachineCores = Environment.ProcessorCount };
+    }
+
+    /// <summary>
+    /// Сколько памяти есть у сервера на этой машине, МБ: вся память, а в контейнере или юните systemd с пределом —
+    /// предел (.NET сам читает cgroup). null — узнать не вышло.
+    /// </summary>
+    private static long? MachineMemoryMb()
+    {
+        var bytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+        if (bytes <= 0)
+        {
+            GC.Collect(0); // сведения берутся из последней сборки мусора; её могло ещё не быть
+            bytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+        }
+        return bytes > 0 ? bytes / (1024 * 1024) : null;
     }
 }
 
@@ -178,6 +194,13 @@ public sealed record StatsReport
     public double? AvgCpu { get; init; }
     public double? PeakCpu { get; init; }
     public DateTime? PeakCpuAt { get; init; }
+
+    /// <summary>
+    /// Сколько есть у машины с сервером (с учётом предела контейнера): память, МБ, и ядра — 100 % процессора это все они.
+    /// null — агент старее этих полей.
+    /// </summary>
+    public long? MachineMemoryMb { get; init; }
+    public int? MachineCores { get; init; }
 
     public bool HasData => Points.Any(p => p.Players is not null) || Players.Count > 0;
 

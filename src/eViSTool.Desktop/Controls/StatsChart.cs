@@ -117,6 +117,15 @@ public sealed class StatsChart : Control
             var cpu = new Pen(Tone(StatsChartTone.Warn), 1.4, lineJoin: PenLineJoin.Round);
             foreach (var l in g.MemoryLines()) dc.DrawGeometry(null, memory, Figure(l, closed: false));
             foreach (var l in g.CpuLines()) dc.DrawGeometry(null, cpu, Figure(l, closed: false));
+
+            // предел памяти машины, когда пик к нему подобрался: пунктир цветом памяти и подпись над ним слева
+            if (g is { LimitY: { } limitY, LimitGb: { } limitGb })
+            {
+                var good = Tone(StatsChartTone.Good);
+                dc.DrawLine(Dashed(good, 1, 4, 3), new Point(StatsChartLayout.Left, limitY), new Point(g.PlotRight, limitY));
+                var label = Format(Loc.T("stats.limit", ServerStatsViewModel.LimitGb(limitGb * 1024)), good, 11);
+                dc.DrawText(label, new Point(StatsChartLayout.Left + 6, Math.Max(StatsChartLayout.Top, limitY - label.Height - 1)));
+            }
         }
 
         // ---- вылеты: черта на обоих графиках, подпись — на верхнем, справа от черты (у края — слева)

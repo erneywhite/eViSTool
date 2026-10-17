@@ -250,4 +250,57 @@ public class StatsChartLayoutTests
         Assert.Equal(736, label.X);
         Assert.Equal(Dates.Clock(new DateTime(2026, 10, 9, 18, 0, 0)), label.Text);
     }
+
+    // ---------- предел памяти машины
+
+    private static StatsReport Memory(long machineMb, params double[] memoryMb) =>
+        Report(memoryMb.Select(m => ((int?)1, (double?)m, (double?)10))) with { MachineMemoryMb = machineMb, PeakMemoryMb = (long)memoryMb.Max() };
+
+    [Fact]
+    public void Limit_IsDrawnOnlyWhenThePeakIsClose_AndTheScaleNeverStretchesToAFarLimit()
+    {
+        // 4 ГБ из 64: предела не видно, шкала — по пику
+        var far = new StatsChartLayout(Memory(64 * 1024, 3000, 4096), Kind.Resources, Width, Height);
+        Assert.Null(far.LimitGb);
+        Assert.Null(far.LimitY);
+        Assert.Equal(6, far.Max);
+
+        // 3,2 ГБ из 4 (80 %): пунктир на 4 ГБ, шкала расширена до 6, чтобы он влез
+        var close = new StatsChartLayout(Memory(4096, 2000, 3277), Kind.Resources, Width, Height);
+        Assert.Equal(4, close.LimitGb);
+        Assert.Equal(6, close.Max);
+        Assert.Equal(StatsChartLayout.Snap(close.Y(4, 6)), close.LimitY);
+
+        // у игроков и от старого агента предела нет
+        Assert.Null(new StatsChartLayout(Memory(4096, 3277), Kind.Players, Width, Height).LimitGb);
+        Assert.Null(new StatsChartLayout(Memory(4096, 3277) with { MachineMemoryMb = null }, Kind.Resources, Width, Height).LimitGb);
+    }
+
+    [Fact]
+    public void Tiles_SayHowMuchTheMachineHas_AndATightPeakTurnsYellow() => Sta.Run(() =>
+    {
+        var language = Loc.Instance.Language; // главная модель выставляет язык из настроек — другим тестам его не менять
+        var stats = new MainViewModel().Server.Stats;
+        Loc.Instance.SetLanguage(language);
+        var r = Memory(4096, 2000, 3800) with { AvgMemoryMb = 2900, PeakMemoryAt = Start, AvgCpu = 5, PeakCpu = 30, PeakCpuAt = Start, MachineCores = 8 };
+
+        stats.Show(r);
+
+        Assert.Equal(Loc.T("stats.ofMemory", ServerStatsViewModel.LimitGb(4096)), stats.MemoryLimitText);
+        Assert.True(stats.MemoryTight);                                 // 3,7 ГБ из 4 — больше 90 %
+        Assert.StartsWith(" · ", stats.MemoryPeakText);
+        Assert.Equal(ServerStatsViewModel.AvgPeakGb(2900, 3800), stats.MemoryText);
+        Assert.Equal((2.8).ToString("0.0", Loc.Culture) + " / " + (3.7).ToString("0.0", Loc.Culture) + " " + Loc.T("stats.gb"),
+            ServerStatsViewModel.AvgPeakGb(2900, 3800)); // единица одна: так влезает в плитку
+        Assert.Equal("850 " + Loc.T("stats.mb") + " / " + (1.2).ToString("0.0", Loc.Culture) + " " + Loc.T("stats.gb"),
+            ServerStatsViewModel.AvgPeakGb(850, 1228));
+        Assert.Equal(Loc.Plural("stats.ofCores", 8), stats.CpuLimitText);
+        Assert.Contains(Loc.Plural("stats.cores", 8), stats.LoadTip);
+
+        stats.Show(r with { MachineMemoryMb = 64 * 1024, MachineCores = null }); // старый агент не знает ядер
+        Assert.False(stats.MemoryTight);
+        Assert.Equal("", stats.CpuLimitText);
+        Assert.DoesNotContain(" · ", stats.CpuPeakText);
+        Assert.Equal(Loc.T("stats.loadTip"), stats.LoadTip);
+    });
 }
