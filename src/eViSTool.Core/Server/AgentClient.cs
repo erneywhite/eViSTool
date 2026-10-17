@@ -344,7 +344,7 @@ public static class AgentLauncher
     /// </summary>
     public static async Task StopIdleAgentsAsync(IEnumerable<GameProfile> profiles, CancellationToken ct = default)
     {
-        foreach (var profile in profiles.Where(p => p.Kind == ProfileKind.Server && !p.IsRemote))
+        foreach (var profile in profiles.Where(p => p.Kind == ProfileKind.Server && p.IsLocal))
         {
             if (AgentClient.TryConnect(profile.Id) is not { } client) continue;
             try

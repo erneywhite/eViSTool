@@ -1,3 +1,5 @@
+using eViSTool.Core.Hosting;
+using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Server;
 using eViSTool.Core.Server.Remote;
@@ -7,17 +9,21 @@ namespace eViSTool.Core.Mods;
 /// <summary>
 /// Куда ставится мод — запоминается в момент, когда пользователь нажал «Обновить» / «Установить», и дальше не меняется.
 /// Операция работает только с этой целью и не смотрит на активный профиль: его могут переключить, пока идёт загрузка.
-/// Свой профиль — по папкам на этой машине, удалённый сервер — по коду подключения (своё соединение на операцию).
+/// Свой профиль — по папкам на этой машине, удалённый сервер — по коду подключения (своё соединение на операцию),
+/// сервер у хостера — по FTP (<see cref="Hosted"/>).
 /// </summary>
-public sealed record ModTarget(GameProfile Profile, ConnectionCode? Remote)
+public sealed record ModTarget(GameProfile Profile, ConnectionCode? Remote, HostedTarget? Hosted = null)
 {
     public string ProfileId => Profile.Id;
     public string Name => Profile.Name;
     public bool IsRemote => Remote is not null;
+    public bool IsHosted => Hosted is not null;
+    public bool IsLocal => Remote is null && Hosted is null;
 
     /// <summary>
     /// Цель для профиля — снимок на этот момент: правка профиля в настройках посреди загрузки её уже не сдвинет.
-    /// Удалённый — с расшифрованным кодом (null — код не прочитать на этой машине).
+    /// Удалённый — с расшифрованным кодом (null — код не прочитать на этой машине). У хостера — с расшифрованным паролем
+    /// (null — подключение не задано или пароль не прочитать). Почему null — <see cref="UnreadableText"/>.
     /// </summary>
     public static ModTarget? For(GameProfile profile)
     {
@@ -25,12 +31,36 @@ public sealed record ModTarget(GameProfile Profile, ConnectionCode? Remote)
         {
             Id = profile.Id, Name = profile.Name, Kind = profile.Kind,
             GameDir = profile.GameDir, DataDir = profile.DataDir, RemoteCode = profile.RemoteCode,
+            Hosted = profile.Hosted?.Clone(),
             PinnedMods = new(profile.PinnedMods, StringComparer.OrdinalIgnoreCase),
             BlockedVersions = profile.BlockedVersions.ToDictionary(kv => kv.Key, kv => kv.Value.ToList(), StringComparer.OrdinalIgnoreCase),
         };
-        if (!snapshot.IsRemote) return new ModTarget(snapshot, null);
+        if (snapshot.IsHosted)
+            return snapshot.Hosted is { } settings && HostedEndpoint.From(settings) is { } endpoint
+                ? new ModTarget(snapshot, null, new HostedTarget(endpoint, settings))
+                : null;
+        if (snapshot.IsLocal) return new ModTarget(snapshot, null);
         return RemoteSecret.Unprotect(snapshot.RemoteCode) is { } code ? new ModTarget(snapshot, code) : null;
     }
+
+    /// <summary>Почему <see cref="For"/> вернул null — словами для окна.</summary>
+    public static string UnreadableText(GameProfile profile) =>
+        !profile.IsHosted ? Loc.T("remote.errDecrypt")
+        : profile.Hosted is null ? Loc.T("hosted.errNoConnection")
+        : Loc.T("hosted.errDecrypt");
+
+    /// <summary>Без секретов: ни ключа агента из кода подключения, ни пароля FTP.</summary>
+    public override string ToString() =>
+        Hosted is { } hosted ? $"{Name} [hosted {hosted}]"
+        : Remote is { } code ? $"{Name} [agent {code.Host}:{code.Port}]"
+        : $"{Name} [local]";
+}
+
+/// <summary>Сервер у хостера для операции: куда подключаться (с паролем, только в памяти) и снимок настроек профиля.</summary>
+public sealed record HostedTarget(HostedEndpoint Endpoint, HostedConnection Settings)
+{
+    /// <summary>Без пароля.</summary>
+    public override string ToString() => Endpoint.ToString();
 }
 
 /// <summary>Итог установки одного архива.</summary>
@@ -42,13 +72,19 @@ public sealed record ModInstallOutcome(string Name, string? Version, string? Old
 
 /// <summary>
 /// Операции с модами цели: что стоит, установка архива, включение и выключение. Логика одна для своего профиля
-/// и удалённого сервера (там то же самое делает его агент — см. <see cref="ServerMods"/>).
+/// и удалённого сервера (там то же самое делает его агент — см. <see cref="ServerMods"/>); у сервера у хостера —
+/// <see cref="HostedMods"/>. Ветка хостера — первой строкой: иначе FTP-цель ушла бы в ветку своего профиля.
 /// </summary>
 public static class ModTargets
 {
-    /// <summary>Профиль цели и её моды — с диска или у агента. Удалённый профиль получает папки и версию игры от сервера.</summary>
-    public static async Task<(ResolvedProfile Profile, IReadOnlyList<LocalMod> Mods)> ScanAsync(ModTarget target, CancellationToken ct = default)
+    /// <summary>
+    /// Профиль цели и её моды — с диска, у агента или по FTP. Удалённый профиль получает папки и версию игры от сервера.
+    /// <paramref name="progress"/> — строки «читаю моды с сервера» (пока только у хостера: первое чтение там долгое).
+    /// </summary>
+    public static async Task<(ResolvedProfile Profile, IReadOnlyList<LocalMod> Mods)> ScanAsync(ModTarget target, CancellationToken ct = default,
+        IProgress<string>? progress = null)
     {
+        if (target.IsHosted) return await new HostedMods(target).ScanAsync(progress, ct).ConfigureAwait(false);
         if (target.Remote is not { } code)
         {
             var resolved = ProfileResolver.Resolve(target.Profile);
@@ -69,6 +105,7 @@ public static class ModTargets
             ModDirs = list.ModDirs,
             InstallDir = list.InstallDir,
             DisabledMods = list.DisabledMods,
+            OffMachine = true, // пути — на машине агента
         };
         var disabled = new HashSet<string>(list.DisabledMods);
         var mods = list.Mods.Select(m => new LocalMod(m.Path, m.Info, m.Error))
@@ -84,6 +121,7 @@ public static class ModTargets
     public static async Task<ModInstallOutcome?> InstallAsync(ModTarget target, string zip, Func<InstallPlan, bool>? confirm = null,
         CancellationToken ct = default)
     {
+        if (target.IsHosted) return await new HostedMods(target).InstallAsync(zip, confirm, ct).ConfigureAwait(false);
         var (resolved, mods) = await ScanAsync(target, ct).ConfigureAwait(false);
         var plan = ModInstaller.Plan(zip, resolved, mods);
         if (confirm is not null && !confirm(plan)) return null;
@@ -104,7 +142,10 @@ public static class ModTargets
         return new ModInstallOutcome(info.Name, info.Version, plan.Replaces.FirstOrDefault()?.Info?.Version);
     }
 
-    /// <summary>История изменений модов цели (записи и отметки запусков): своя — из файла, удалённого сервера — у агента.</summary>
+    /// <summary>
+    /// История изменений модов цели (записи и отметки запусков): своя и у хостера — из файла на этой машине,
+    /// удалённого сервера — у агента.
+    /// </summary>
     public static async Task<IReadOnlyList<ModHistoryEntry>> HistoryAsync(ModTarget target, CancellationToken ct = default)
     {
         if (target.Remote is not { } code)
@@ -116,6 +157,11 @@ public static class ModTargets
     /// <summary>Включить или выключить мод цели — так же, как это делает менеджер модов игры.</summary>
     public static async Task SetEnabledAsync(ModTarget target, LocalMod mod, bool enabled, CancellationToken ct = default)
     {
+        if (target.IsHosted)
+        {
+            await new HostedMods(target).SetEnabledAsync(mod.Path, enabled, ct).ConfigureAwait(false);
+            return;
+        }
         if (target.Remote is { } code)
         {
             using var agent = AgentClient.ForRemote(code);
@@ -124,4 +170,37 @@ public static class ModTargets
         }
         ModConfigEditor.SetEnabled(ProfileResolver.Resolve(target.Profile), mod.Info ?? throw new InvalidOperationException(mod.Error ?? mod.Path), enabled);
     }
+
+    /// <summary>
+    /// Удалить мод цели: свой — в корзину (<paramref name="moveToTrash"/>), удалённого сервера — в корзину на его машине,
+    /// у хостера — копия на этой машине, потом удаление на сервере. Запись в историю; последняя копия мода — и из
+    /// списка выключенных.
+    /// </summary>
+    public static Task DeleteAsync(ModTarget target, LocalMod mod, Action<string> moveToTrash, CancellationToken ct = default)
+    {
+        if (target.IsHosted) return new HostedMods(target).DeleteAsync(mod.Path, ct);
+        // shortcut: ветки своего профиля и агента пока живут в ModsViewModel и ModHistoryActions; перенести сюда в пакете P3
+        throw new NotImplementedException("ModTargets.DeleteAsync — пакет P3");
+    }
+
+    /// <summary>
+    /// Отпечаток набора модов — для опроса «поменяли со стороны». Свой — по времени папок модов и конфига, у хостера —
+    /// по листингу; у агента — null (он сам сообщает об изменениях в статусе).
+    /// </summary>
+    public static async Task<string?> StampAsync(ModTarget target, CancellationToken ct = default)
+    {
+        if (target.IsHosted) return await new HostedMods(target).StampAsync(ct).ConfigureAwait(false);
+        if (target.IsRemote) return null;
+        var stamp = await Task.Run(() => ServerMods.StampOf(ProfileResolver.Resolve(target.Profile)), ct).ConfigureAwait(false);
+        return stamp?.Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Ошибка операции с целью — словами: у агента и хостера свои тексты, у своего профиля — текст исключения.</summary>
+    public static string Describe(ModTarget target, Exception ex) =>
+        target.IsHosted ? HostedSecret.Describe(ex)
+        : target.IsRemote ? RemoteSecret.Describe(ex)
+        : ex.Message;
+
+    /// <summary>Сколько ждать скан цели в фоновых проверках («Установить также в»): у хостера первое чтение долгое.</summary>
+    public static TimeSpan ScanTimeout(ModTarget target) => target.IsHosted ? TimeSpan.FromSeconds(45) : TimeSpan.FromSeconds(10);
 }

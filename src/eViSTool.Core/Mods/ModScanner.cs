@@ -81,6 +81,14 @@ public static class ModScanner
         }
     }
 
+    /// <summary>Мод по тексту modinfo.json (архив прочитан не с диска — например, с сервера у хостера): те же проверки
+    /// modid, что у сканера папки.</summary>
+    public static LocalMod FromModInfo(string path, string json) => Read(path, () => json);
+
+    /// <summary>Мод по записи кэша (<see cref="Hosting.ModInfoCache"/>): текст modinfo.json или ключ ошибки.</summary>
+    public static LocalMod FromCached(string path, Hosting.CachedModInfo cached) =>
+        cached.ModInfoJson is { } json ? FromModInfo(path, json) : new LocalMod(path, null, Loc.T(cached.ErrorKey ?? "scan.corrupt"));
+
     private static LocalMod Read(string path, Func<string> readJson)
     {
         try

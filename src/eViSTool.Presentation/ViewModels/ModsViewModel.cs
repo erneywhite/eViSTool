@@ -250,7 +250,20 @@ public sealed partial class ModsViewModel : ObservableObject
     internal bool IsRemote => _main.ActiveProfile?.Model.IsRemote == true;
 
     /// <summary>Профиль на этой машине: папку модов можно открыть, модпаки — собрать и поставить.</summary>
-    public bool IsLocalProfile => !IsRemote;
+    public bool IsLocalProfile => _main.ActiveProfile?.Model.IsLocal ?? true;
+
+    /// <summary>Открыт сервер у хостера: моды — по FTP.</summary>
+    public bool IsHosted => _main.ActiveProfile?.Model.IsHosted == true;
+
+    /// <summary>У сервера у хостера не определилась версия игры: плашка «укажи её в настройках профиля».</summary>
+    // shortcut: всегда false, пока нет чтения модов по FTP; наполнить в пакете P4b (источник HostedModSource)
+    public bool HostedVersionMissing => false;
+
+    public string HostedVersionMissingText => Loc.T("hosted.versionMissing");
+
+    /// <summary>Перейти к настройкам профиля (подключение, версия игры сервера у хостера).</summary>
+    [RelayCommand]
+    private void OpenHostedSettings() => _main.SelectedTab = AppTab.Settings;
 
     /// <summary>
     /// Цель для действия, начатого сейчас: снимок активного профиля. Дальше операция работает только с ней —

@@ -74,10 +74,20 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     // состояние сервера профиля выяснено (первый проход слежения после смены профиля завершён)
     private bool _stateKnown;
 
-    [ObservableProperty] private bool _isServerProfile;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowNotServer))]
+    private bool _isServerProfile;
 
     /// <summary>Сервер на другом компьютере: всё через агента по сети, своих папок у профиля нет.</summary>
     [ObservableProperty] private bool _isRemoteProfile;
+
+    /// <summary>Сервер у хостера: управляет им панель хостера, здесь — только плашка и переход к модам.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowNotServer))]
+    private bool _isHostedProfile;
+
+    /// <summary>Плашка «это не серверный профиль»: у сервера у хостера своя плашка.</summary>
+    public bool ShowNotServer => !IsServerProfile && !IsHostedProfile;
     private string? _remoteGameVersion;
     private string? _remoteOs; // система машины с сервером — в подзаголовке
     [ObservableProperty] private ServerState _state = ServerState.Stopped;
@@ -249,6 +259,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
 
         IsServerProfile = _main.ActiveProfile?.Kind == ProfileKind.Server;
         IsRemoteProfile = _main.ActiveProfile?.Model.IsRemote == true;
+        IsHostedProfile = _main.ActiveProfile?.Model.IsHosted == true;
         _remoteGameVersion = null;
         _remoteOs = null;
         // удалённый доступ настраивают на компьютере с сервером — у удалённого профиля этой вкладки нет

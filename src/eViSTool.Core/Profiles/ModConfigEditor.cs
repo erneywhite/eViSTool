@@ -16,6 +16,8 @@ public static class ModConfigEditor
     /// <summary>Выключает (enabled=false) или включает мод. Возвращает false, если менять нечего.</summary>
     public static bool SetEnabled(ResolvedProfile profile, ModInfo mod, bool enabled)
     {
+        // страховка: конфиг такого профиля не на этом диске — правит его агент или ModTargets по FTP
+        if (profile.OffMachine) throw new InvalidOperationException("the profile is not on this computer");
         var path = profile.ConfigPath ?? throw new InvalidOperationException(
             profile.Profile.Kind == ProfileKind.Server
                 ? Loc.T("cfg.noServerConfigRun")

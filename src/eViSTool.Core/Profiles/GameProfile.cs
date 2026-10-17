@@ -12,6 +12,9 @@ public enum ProfileKind
     Server,
 }
 
+/// <summary>Где живёт профиль: на этой машине, на другом компьютере (через агента) или у хостера (по FTP).</summary>
+public enum ProfileHost { Local, Agent, Hosted }
+
 /// <summary>Профиль — одна установка игры/сервера с её папкой данных.</summary>
 public sealed class GameProfile
 {
@@ -32,8 +35,33 @@ public sealed class GameProfile
     /// </summary>
     public string? RemoteCode { get; set; }
 
+    /// <summary>
+    /// Метка в <see cref="RemoteCode"/> у сервера у хостера. Окно до 0.12 примет её за код агента, не расшифрует
+    /// и покажет «код не читается»: сервер не запустит и в локальные папки не полезет.
+    /// </summary>
+    public const string HostedMarker = "hosted";
+
+    /// <summary>Сервер у хостера (G-Portal и другие): моды по FTP. null — профиль не у хостера или подключение
+    /// потеряно (профиль сохранило старое окно — тогда остаётся только <see cref="HostedMarker"/>).</summary>
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public Hosting.HostedConnection? Hosted { get; set; }
+
+    /// <summary>Где живёт профиль. <see cref="Kind"/> у сервера у хостера — Server: новое значение Kind старое окно не
+    /// прочитало бы и сбросило бы все настройки.</summary>
     [JsonIgnore]
-    public bool IsRemote => !string.IsNullOrEmpty(RemoteCode);
+    public ProfileHost Host => Hosted is not null || RemoteCode == HostedMarker ? ProfileHost.Hosted
+        : string.IsNullOrEmpty(RemoteCode) ? ProfileHost.Local : ProfileHost.Agent;
+
+    /// <summary>Сервер на другом компьютере, через его агента (не у хостера).</summary>
+    [JsonIgnore]
+    public bool IsRemote => Host == ProfileHost.Agent;
+
+    [JsonIgnore]
+    public bool IsHosted => Host == ProfileHost.Hosted;
+
+    /// <summary>Профиль на этой машине: свои папки игры и данных.</summary>
+    [JsonIgnore]
+    public bool IsLocal => Host == ProfileHost.Local;
 
     /// <summary>Закреплённые моды: modid → версия, на которой закреплён. Такие не обновляются.</summary>
     public Dictionary<string, string> PinnedMods { get; set; } = new(StringComparer.OrdinalIgnoreCase);
@@ -88,4 +116,10 @@ public sealed record ResolvedProfile
     public IReadOnlyList<string> DisabledMods { get; init; } = [];
 
     public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    /// <summary>
+    /// Папки и файлы профиля не на этой машине (агент, хостер): пути в нём — чужие. Страховка: по такому профилю
+    /// ничего не читается и не пишется на локальном диске (скан — пусто, отметка — null, правка конфига — исключение).
+    /// </summary>
+    public bool OffMachine { get; init; }
 }

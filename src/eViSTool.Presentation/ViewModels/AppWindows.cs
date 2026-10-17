@@ -1,5 +1,6 @@
 using eViSTool.Core.Diagnostics;
 using eViSTool.Core.Game;
+using eViSTool.Core.Hosting;
 using eViSTool.Core.Notifications;
 using eViSTool.Core.Packs;
 using eViSTool.Core.Profiles;
@@ -8,14 +9,16 @@ using eViSTool.Core.Server.Remote;
 
 namespace eViSTool.Presentation.ViewModels;
 
-/// <summary>Что делать с уже существующими данными сервера в окне «Новый профиль».</summary>
-public enum ExistingProfileMode { None, Import, UseInPlace, Remote }
+/// <summary>Что делать с уже существующими данными сервера в окне «Новый профиль». Hosted — сервер у хостера (FTP).</summary>
+public enum ExistingProfileMode { None, Import, UseInPlace, Remote, Hosted }
 
 /// <summary>Ответ окна «Новый профиль»: название и откуда брать данные.</summary>
 /// <param name="DataDir">Папка данных нового серверного профиля (для клиентского — null).</param>
 /// <param name="RemoteCode">Для Remote: код подключения к серверу на другом компьютере.</param>
 /// <param name="ExistingDir">Папка существующих данных сервера (для Import и UseInPlace).</param>
-public sealed record NewProfileChoice(string ProfileName, string? DataDir, ExistingProfileMode Existing, ConnectionCode? RemoteCode, string? ExistingDir);
+/// <param name="Hosted">Для Hosted: подключение к серверу у хостера (пароль уже зашифрован).</param>
+public sealed record NewProfileChoice(string ProfileName, string? DataDir, ExistingProfileMode Existing, ConnectionCode? RemoteCode,
+    string? ExistingDir, HostedConnection? Hosted = null);
 
 /// <summary>Ответ окна бана: срок в единицах команды /ban (minute, hour, day, week, year) и причина.</summary>
 public sealed record BanChoice(int Amount, string Unit, string Reason);
@@ -46,6 +49,11 @@ public interface IAppWindows
     NewProfileChoice? NewProfile(ProfileKind kind, string suggestedName);
     /// <summary>Вставить и проверить код подключения к серверу на другом компьютере.</summary>
     ConnectionCode? AskConnectionCode(string okText);
+    /// <summary>
+    /// Подключение к серверу у хостера по FTP: новое (existing = null) или правка. Ответ — с уже зашифрованным паролем
+    /// и закреплёнными путями; null — закрыли без «ОК».
+    /// </summary>
+    HostedConnection? AskHostedConnection(HostedConnection? existing, string okText);
     void ShowCleanup(GameProfile profile);
     void ShowFindServer(FindServerViewModel model);
     /// <summary>

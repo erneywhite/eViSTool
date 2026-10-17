@@ -14,9 +14,9 @@ public static class ProfileResolver
 
     public static ResolvedProfile Resolve(GameProfile profile)
     {
-        // удалённый сервер: своих папок нет, моды и версия — у агента на той машине
-        if (profile.IsRemote)
-            return new ResolvedProfile { Profile = profile }; // моды удалённого сервера окно берёт у его агента
+        // удалённый сервер и сервер у хостера: своих папок нет, моды и версия — у агента на той машине или по FTP
+        if (!profile.IsLocal)
+            return new ResolvedProfile { Profile = profile, OffMachine = true };
 
         var warnings = new List<string>();
         var version = string.IsNullOrWhiteSpace(profile.GameDir) ? null : GameInstall.DetectVersion(profile.GameDir);
