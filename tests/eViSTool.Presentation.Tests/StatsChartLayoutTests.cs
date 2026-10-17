@@ -288,7 +288,7 @@ public class StatsChartLayoutTests
 
         Assert.Equal(Loc.T("stats.ofMemory", ServerStatsViewModel.LimitGb(4096)), stats.MemoryLimitText);
         Assert.True(stats.MemoryTight);                                 // 3,7 ГБ из 4 — больше 90 %
-        Assert.StartsWith(" · ", stats.MemoryPeakText);
+        Assert.Equal(Loc.T("stats.peakAt", ServerStatsViewModel.When(Start)), stats.MemoryPeakText); // своей строкой, без « · »
         Assert.Equal(ServerStatsViewModel.AvgPeakGb(2900, 3800), stats.MemoryText);
         Assert.Equal((2.8).ToString("0.0", Loc.Culture) + " / " + (3.7).ToString("0.0", Loc.Culture) + " " + Loc.T("stats.gb"),
             ServerStatsViewModel.AvgPeakGb(2900, 3800)); // единица одна: так влезает в плитку
@@ -300,7 +300,6 @@ public class StatsChartLayoutTests
         stats.Show(r with { MachineMemoryMb = 64 * 1024, MachineCores = null }); // старый агент не знает ядер
         Assert.False(stats.MemoryTight);
         Assert.Equal("", stats.CpuLimitText);
-        Assert.DoesNotContain(" · ", stats.CpuPeakText);
         Assert.Equal(Loc.T("stats.loadTip"), stats.LoadTip);
     });
 }

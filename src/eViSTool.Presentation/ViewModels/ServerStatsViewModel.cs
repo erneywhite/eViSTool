@@ -59,9 +59,6 @@ public sealed partial class ServerStatsViewModel : ObservableObject
     /// <summary>Доля памяти машины, с которой пик подсвечивается: серверу тесно, пора поднимать предел.</summary>
     public const double TightShare = 0.9;
 
-    /// <summary>Вторая часть строки под плиткой («пик — …») — после «из 64 ГБ», если он есть, через точку.</summary>
-    private static string Note(string limit, string peak) => limit.Length > 0 && peak.Length > 0 ? " · " + peak : peak;
-
     /// <summary>Сколько памяти у машины: «64 ГБ», «7,5 ГБ», «512 МБ».</summary>
     public static string LimitGb(double mb) => mb >= 1024
         ? (mb / 1024).ToString(mb >= 10 * 1024 ? "0" : "0.#", Loc.Culture) + " " + Loc.T("stats.gb")
@@ -202,10 +199,10 @@ public sealed partial class ServerStatsViewModel : ObservableObject
         MemoryText = r is { AvgMemoryMb: { } avgMem, PeakMemoryMb: { } peakMem } ? AvgPeakGb(avgMem, peakMem) : "—";
         MemoryLimitText = r?.MachineMemoryMb is { } total ? Loc.T("stats.ofMemory", LimitGb(total)) : "";
         MemoryTight = r is { MachineMemoryMb: { } all, PeakMemoryMb: { } peak } && peak >= all * TightShare;
-        MemoryPeakText = Note(MemoryLimitText, r?.PeakMemoryAt is { } memAt ? Loc.T("stats.peakAt", When(memAt)) : "");
+        MemoryPeakText = r?.PeakMemoryAt is { } memAt ? Loc.T("stats.peakAt", When(memAt)) : "";
         CpuText = r is { AvgCpu: { } avgCpu, PeakCpu: { } peakCpu } ? $"{avgCpu.ToString("0", c)} / {peakCpu.ToString("0", c)} %" : "—";
         CpuLimitText = r?.MachineCores is { } cores ? Loc.Plural("stats.ofCores", cores) : "";
-        CpuPeakText = Note(CpuLimitText, r?.PeakCpuAt is { } cpuAt ? Loc.T("stats.peakAt", When(cpuAt)) : "");
+        CpuPeakText = r?.PeakCpuAt is { } cpuAt ? Loc.T("stats.peakAt", When(cpuAt)) : "";
         LoadTip = r is { MachineMemoryMb: { } mem, MachineCores: { } n }
             ? Loc.T("stats.loadTip") + "\n\n" + Loc.T("stats.machineTip", LimitGb(mem), Loc.Plural("stats.cores", n))
             : Loc.T("stats.loadTip");

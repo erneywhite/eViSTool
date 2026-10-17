@@ -45,7 +45,7 @@
             <Setter Property="TextTrimming" Value="None" />
         </Style>
         <!-- пик памяти дошёл до 90 % машины: «из 4 ГБ» жёлтым — серверу тесно -->
-        <Style Selector="Run.tight">
+        <Style Selector="TextBlock.tileNote.tight">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
         </Style>
         <!-- таблица игроков: заголовки колонок и ячейки; «сейчас в игре» — зелёным -->
@@ -143,18 +143,24 @@
                         <StackPanel>
                             <TextBlock Classes="tileLabel" Text="{local:Tr stats.memoryTile}" />
                             <TextBlock Classes="tileValue" Text="{Binding MemoryText}" />
-                            <TextBlock Classes="tileNote wrap">
-                                <Run Classes.tight="{Binding MemoryTight}" Text="{Binding MemoryLimitText}" /><Run Text="{Binding MemoryPeakText}" />
-                            </TextBlock>
+                            <!-- две строки: «из 31 ГБ» и «пик — …». Двумя TextBlock, не Run в одном: на Linux TextBlock из Run,
+                                 меняющихся на месте, переставал рисоваться (смена срока меняет оба куска) -->
+                            <StackPanel>
+                                <TextBlock Classes="tileNote wrap" Classes.tight="{Binding MemoryTight}" Text="{Binding MemoryLimitText}"
+                                           IsVisible="{Binding MemoryLimitText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                <TextBlock Classes="tileNote wrap" Text="{Binding MemoryPeakText}" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
                     <Border Grid.Column="10" Classes="card tile" ToolTip.Tip="{Binding LoadTip}">
                         <StackPanel>
                             <TextBlock Classes="tileLabel" Text="{local:Tr stats.cpuTile}" />
                             <TextBlock Classes="tileValue" Text="{Binding CpuText}" />
-                            <TextBlock Classes="tileNote wrap">
-                                <Run Text="{Binding CpuLimitText}" /><Run Text="{Binding CpuPeakText}" />
-                            </TextBlock>
+                            <StackPanel>
+                                <TextBlock Classes="tileNote wrap" Text="{Binding CpuLimitText}"
+                                           IsVisible="{Binding CpuLimitText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                <TextBlock Classes="tileNote wrap" Text="{Binding CpuPeakText}" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
                 </Grid>
