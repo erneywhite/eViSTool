@@ -13,17 +13,23 @@ public sealed class HostedMods(ModTarget target)
     public ModTarget Target { get; } = target.IsHosted ? target : throw new ArgumentException("not a hosted target", nameof(target));
 
     public Task<(ResolvedProfile Profile, IReadOnlyList<LocalMod> Mods)> ScanAsync(IProgress<string>? progress, CancellationToken ct) =>
-        throw new NotImplementedException("HostedMods.ScanAsync — пакет P3");
+        NotReady<(ResolvedProfile, IReadOnlyList<LocalMod>)>("HostedMods.ScanAsync");
 
     public Task<ModInstallOutcome?> InstallAsync(string zip, Func<InstallPlan, bool>? confirm, CancellationToken ct) =>
-        throw new NotImplementedException("HostedMods.InstallAsync — пакет P3");
+        NotReady<ModInstallOutcome?>("HostedMods.InstallAsync");
 
     public Task SetEnabledAsync(string path, bool enabled, CancellationToken ct) =>
-        throw new NotImplementedException("HostedMods.SetEnabledAsync — пакет P3");
+        NotReady<bool>("HostedMods.SetEnabledAsync");
 
     public Task DeleteAsync(string path, CancellationToken ct) =>
-        throw new NotImplementedException("HostedMods.DeleteAsync — пакет P3");
+        NotReady<bool>("HostedMods.DeleteAsync");
 
     public Task<string> StampAsync(CancellationToken ct) =>
-        throw new NotImplementedException("HostedMods.StampAsync — пакет P3");
+        NotReady<string>("HostedMods.StampAsync");
+
+    // shortcut: заглушки до пакета P3, там и заменить настоящими операциями. Ошибка — RemoteFilesException (наследник
+    // IOException), а не NotImplementedException: её ловят фильтры окна, и промежуточная сборка не падает,
+    // если профиль у хостера попал, например, в «Поставить заодно»
+    private static Task<T> NotReady<T>(string what) =>
+        Task.FromException<T>(new RemoteFilesException(RemoteFailure.Unsupported, what + " is not implemented yet"));
 }

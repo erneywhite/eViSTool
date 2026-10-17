@@ -34,6 +34,8 @@ public sealed class ModConfigService(string dataDir, ModConfigBackups backups, F
 {
     public static ModConfigService ForProfile(GameProfile profile)
     {
+        // у сервера у хостера папки на этом диске нет: пустой DataDir привёл бы к данным игры этого компьютера
+        if (profile.IsHosted) throw new InvalidOperationException(Loc.T("mcfg.hostedUnavailable"));
         var data = string.IsNullOrWhiteSpace(profile.DataDir) ? Game.GameInstall.DefaultDataDir : profile.DataDir;
         return new ModConfigService(data, ModConfigBackups.ForProfile(profile),
             () => ModUpdateService.ScanLocal(ProfileResolver.Resolve(profile)));

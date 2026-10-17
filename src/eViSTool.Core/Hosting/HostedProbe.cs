@@ -21,7 +21,8 @@ public static class HostedProbe
 {
     /// <summary>Вход → возможности сервера → раскладка → конфиг → версия → число модов.</summary>
     public static Task<HostedCheckResult> CheckAsync(HostedEndpoint endpoint, HostedConnection settings, CancellationToken ct) =>
-        throw new NotImplementedException("HostedProbe.CheckAsync — пакет P3");
+        // shortcut: заглушка до пакета P3; ошибка ловится фильтрами окна, в отличие от NotImplementedException
+        Task.FromException<HostedCheckResult>(new RemoteFilesException(RemoteFailure.Unsupported, "HostedProbe.CheckAsync is not implemented yet"));
 
     /// <summary>
     /// Копия настроек с закреплёнными путями из раскладки (относительно <see cref="HostedConnection.Root"/>): следующие

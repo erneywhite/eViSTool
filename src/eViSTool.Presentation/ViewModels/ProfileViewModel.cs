@@ -45,9 +45,15 @@ public sealed partial class ProfileViewModel : ObservableObject
     /// <summary>Профиль на этой машине: папки игры и данных показываются и выбираются.</summary>
     public bool IsLocal => Model.IsLocal;
 
-    /// <summary>Куда ведёт подключение к хостеру: «ftp://логин@host:21 · без шифрования» (пароль не показываем).</summary>
+    /// <summary>Куда ведёт подключение к хостеру: «ftp://логин@host:21 · без шифрования» (пароль не показываем).
+    /// Auto не обещает шифрования: сервер без TLS (G-Portal) оставляет профиль на Auto, и пароль идёт открытым текстом.</summary>
     public string HostedTarget => Model.Hosted is not { } h ? Loc.T("hosted.errNoConnection")
-        : h.Describe() + " · " + (h.Tls == Core.Hosting.FtpTls.None ? Loc.T("hosted.noEncryption") : Loc.T("hosted.encrypted"));
+        : h.Describe() + " · " + h.Tls switch
+        {
+            Core.Hosting.FtpTls.Explicit or Core.Hosting.FtpTls.Implicit => Loc.T("hosted.encrypted"),
+            Core.Hosting.FtpTls.Auto => Loc.T("hosted.encryptionIfSupported"),
+            _ => Loc.T("hosted.noEncryption"),
+        };
 
     /// <summary>Изменить подключение к хостеру (адрес, логин, пароль, папки).</summary>
     [RelayCommand]

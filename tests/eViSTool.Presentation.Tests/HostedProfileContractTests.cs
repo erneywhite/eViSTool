@@ -75,6 +75,24 @@ public sealed class HostedProfileContractTests : IDisposable
     }
 
     [Fact]
+    public void HostedTarget_PromisesEncryptionOnlyForTlsModes()
+    {
+        string Target(FtpTls tls)
+        {
+            var profile = Hosted();
+            profile.Hosted!.Tls = tls;
+            return new ProfileViewModel(profile, _ => { }).HostedTarget;
+        }
+
+        // Auto — «если сервер умеет»: сервер без TLS (G-Portal) оставляет профиль на Auto, пароль идёт открытым текстом
+        Assert.EndsWith(" · " + Loc.T("hosted.encryptionIfSupported"), Target(FtpTls.Auto));
+        Assert.EndsWith(" · " + Loc.T("hosted.noEncryption"), Target(FtpTls.None));
+        Assert.EndsWith(" · " + Loc.T("hosted.encrypted"), Target(FtpTls.Explicit));
+        Assert.EndsWith(" · " + Loc.T("hosted.encrypted"), Target(FtpTls.Implicit));
+        Assert.NotEqual(Loc.T("hosted.encrypted"), Loc.T("hosted.encryptionIfSupported"));
+    }
+
+    [Fact]
     public void ExistingProfiles_KeepTheirFlags()
     {
         var local = new ProfileViewModel(new GameProfile { Name = "Клиент", Kind = ProfileKind.Client }, _ => { });

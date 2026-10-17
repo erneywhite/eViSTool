@@ -254,6 +254,14 @@ public sealed partial class ModConfigViewModel : ObservableObject
         OnPropertyChanged(nameof(Subtitle));
         if (_profile is null) return;
         var profile = _profile;
+        if (profile.IsHosted)
+        {
+            // shortcut: конфиги модов сервера у хостера пока не правятся; источник по FTP — в следующих пакетах
+            _source = null;
+            OnPropertyChanged(nameof(CanShowFile));
+            Clear(Loc.T("mcfg.hostedUnavailable"));
+            return;
+        }
         _source = ModTarget.For(profile) is { Remote: { } code }
             ? new RemoteModConfigSource(code)
             : new LocalModConfigSource(ModConfigService.ForProfile(profile));

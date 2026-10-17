@@ -85,20 +85,41 @@ public sealed class ModInfoCache
         }
     }
 
-    /// <summary>Записать на диск, если что-то поменялось: через временный файл.</summary>
-    public void Save()
+    /// <summary>
+    /// Записать на диск, если что-то поменялось: через временный файл со своим именем (два окна с одним профилем не
+    /// пишут в один и тот же временный файл). Сбой записи не выходит наружу — кэш не должен ронять скан: записи
+    /// остаются в памяти и попадут на диск при следующем Save. true — на диске то, что в памяти.
+    /// </summary>
+    public bool Save()
     {
         string text;
         lock (_gate)
         {
-            if (!_dirty) return;
+            if (!_dirty) return true;
             text = JsonConvert.SerializeObject(_entries, Formatting.None);
             _dirty = false;
         }
-        Directory.CreateDirectory(Path.GetDirectoryName(_file)!);
-        var tmp = _file + ".tmp";
-        File.WriteAllText(tmp, text);
-        SafeFile.Replace(tmp, _file);
+        var tmp = _file + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_file)!);
+            File.WriteAllText(tmp, text);
+            SafeFile.Replace(tmp, _file);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            lock (_gate) _dirty = true;
+            try
+            {
+                File.Delete(tmp);
+            }
+            catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
+            {
+                // временный файл остался: вреда нет, следующий Save пишет свой
+            }
+            return false;
+        }
     }
 
     private static Dictionary<string, Entry> Load(string file)

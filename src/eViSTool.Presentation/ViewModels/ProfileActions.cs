@@ -70,7 +70,8 @@ public sealed class ProfileActions(IReadOnlyList<ProfileViewModel> profiles, Fun
     /// </summary>
     public async Task<GameProfile?> CloneAsync(ProfileViewModel? profile)
     {
-        if (profile is null || profile.Model.IsRemote) return null; // удалённый сервер клонируется на своём компьютере
+        // удалённый сервер клонируется на своём компьютере; у сервера у хостера нет папок на этом диске
+        if (profile is null || !profile.Model.IsLocal) return null;
         if (profile.Kind == ProfileKind.Client)
             return AppWindows.Current.ClientProfile(profile.Model, clone: true, Loc.T("clone.copySuffix", profile.Name));
 

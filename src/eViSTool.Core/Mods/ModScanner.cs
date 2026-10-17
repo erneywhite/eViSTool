@@ -85,9 +85,16 @@ public static class ModScanner
     /// modid, что у сканера папки.</summary>
     public static LocalMod FromModInfo(string path, string json) => Read(path, () => json);
 
-    /// <summary>Мод по записи кэша (<see cref="Hosting.ModInfoCache"/>): текст modinfo.json или ключ ошибки.</summary>
+    /// <summary>Мод по записи кэша (<see cref="Hosting.ModInfoCache"/>): текст modinfo.json или ключ ошибки.
+    /// Ключ пришёл из файла на диске, поэтому в Loc.T идут только известные ключи-литералы; незнакомый (кэш битый или
+    /// записан более новой версией) — «архив повреждён», а не сырой ключ в окне.</summary>
     public static LocalMod FromCached(string path, Hosting.CachedModInfo cached) =>
-        cached.ModInfoJson is { } json ? FromModInfo(path, json) : new LocalMod(path, null, Loc.T(cached.ErrorKey ?? "scan.corrupt"));
+        cached.ModInfoJson is { } json ? FromModInfo(path, json) : new LocalMod(path, null, cached.ErrorKey switch
+        {
+            "scan.noModInfo" => Loc.T("scan.noModInfo"),
+            "scan.nestedModInfo" => Loc.T("scan.nestedModInfo"),
+            _ => Loc.T("scan.corrupt"),
+        });
 
     private static LocalMod Read(string path, Func<string> readJson)
     {

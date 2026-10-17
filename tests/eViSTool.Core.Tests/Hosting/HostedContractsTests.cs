@@ -57,6 +57,24 @@ public sealed class HostedContractsTests : IDisposable
     }
 
     [Fact]
+    public void Cache_SaveFailure_DoesNotThrow_AndKeepsChangesForNextSave()
+    {
+        var cache = ModInfoCache.ForProfile(_profileId);
+        cache.Put(File("/Mods/a.zip"), new CachedModInfo("{}", null));
+        var dir = ModInfoCache.DirFor(_profileId);
+        var blocker = Path.Combine(dir, ModInfoCache.FileName);
+        Directory.CreateDirectory(blocker); // на месте файла кэша — папка: записать не выйдет
+
+        Assert.False(cache.Save());
+        Assert.Empty(Directory.GetFiles(dir, "*.tmp"));
+
+        Directory.Delete(blocker);
+        Assert.True(cache.Save()); // изменения не потерялись, хотя новых Put не было
+        Assert.True(ModInfoCache.ForProfile(_profileId).TryGet(File("/Mods/a.zip"), out _));
+        Assert.Empty(Directory.GetFiles(dir, "*.tmp"));
+    }
+
+    [Fact]
     public void Cache_RetainDropsGoneFiles_BrokenFileIsEmpty_DeleteRemoves()
     {
         var cache = ModInfoCache.ForProfile(_profileId);
@@ -167,6 +185,19 @@ public sealed class HostedContractsTests : IDisposable
         Assert.NotNull(bad.Error);
         var noModInfo = ModScanner.FromCached("/Mods/y.zip", new CachedModInfo(null, "scan.noModInfo"));
         HostedTestText.AssertIs("scan.noModInfo", noModInfo.Error!);
+        HostedTestText.AssertIs("scan.nestedModInfo", ModScanner.FromCached("/Mods/n.zip", new CachedModInfo(null, "scan.nestedModInfo")).Error!);
+        // незнакомый ключ из кэша (битый файл или более новая версия) — «повреждён», не сырой ключ
+        HostedTestText.AssertIs("scan.corrupt", ModScanner.FromCached("/Mods/z.zip", new CachedModInfo(null, "scan.fromTheFuture")).Error!);
+        HostedTestText.AssertIs("scan.corrupt", ModScanner.FromCached("/Mods/z.zip", new CachedModInfo(null, null)).Error!);
+    }
+
+    [Fact]
+    public void ModConfigService_RefusesHostedProfile_InsteadOfFallingBackToLocalData()
+    {
+        // пустой DataDir у своего профиля — папка данных игры этого компьютера; у хостового туда идти нельзя
+        var hosted = new Profiles.GameProfile { Name = "G-Portal", Kind = Profiles.ProfileKind.Server, RemoteCode = Profiles.GameProfile.HostedMarker };
+        var ex = Assert.Throws<InvalidOperationException>(() => Profiles.ModConfigService.ForProfile(hosted));
+        HostedTestText.AssertIs("mcfg.hostedUnavailable", ex.Message);
     }
 
     // ---------- фабрика и закрепление путей
@@ -174,7 +205,9 @@ public sealed class HostedContractsTests : IDisposable
     [Fact]
     public void Factory_PrefersHostOverride_AndReportsMissingTransport()
     {
-        var endpoint = new HostedEndpoint(HostedProtocol.Sftp, "fake-" + Guid.NewGuid().ToString("N") + ".test", 22, FtpTls.None, "u", "p", false, null);
+        // протокол, которого нет в перечислении: его транспорт не зарегистрирует ни один соседний тест
+        // (тесты Core идут параллельно, а регистрация по протоколу общая на весь процесс)
+        var endpoint = new HostedEndpoint((HostedProtocol)int.MaxValue, "fake-" + Guid.NewGuid().ToString("N") + ".test", 22, FtpTls.None, "u", "p", false, null);
         var ex = Assert.Throws<RemoteFilesException>(() => RemoteFilesFactory.Create(endpoint));
         Assert.Equal(RemoteFailure.Unsupported, ex.Kind);
         Assert.DoesNotContain("\"p\"", ex.Message);
