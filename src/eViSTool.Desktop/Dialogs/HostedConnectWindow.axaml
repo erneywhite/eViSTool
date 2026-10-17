@@ -1,0 +1,102 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:local="using:eViSTool.Desktop"
+                      xmlns:ctl="using:eViSTool.Desktop.Controls"
+                      x:Class="eViSTool.Desktop.Dialogs.HostedConnectWindow"
+                      x:DataType="vm:HostedConnectViewModel"
+                      Width="544" SizeToContent="Height" CanResize="False"
+                      Title="{local:Tr hosted.title}">
+    <dialogs:DialogWindow.Styles>
+        <!-- шеврон «Дополнительно» переворачивается, когда блок раскрыт -->
+        <Style Selector="Path.chevron.open">
+            <Setter Property="RenderTransform" Value="rotate(180deg)" />
+        </Style>
+    </dialogs:DialogWindow.Styles>
+
+    <!-- ширина — содержимого окна, без рамки -->
+    <StackPanel Margin="24,20,24,22">
+        <TextBlock Classes="dialogTitle" Text="{local:Tr hosted.title}" />
+
+        <TextBlock Classes="label" Text="{local:Tr hosted.host}" Margin="0,14,0,0" />
+        <!-- адрес целиком (ftp://логин@host:порт/папка) раскладывается по полям; из поля ушли — остаётся один хост -->
+        <TextBox Classes="clearButton" Text="{Binding Address}" Margin="0,6,0,0" VerticalContentAlignment="Center"
+                 ctl:Focus.OnOpen="True" LostFocus="Address_LostFocus" AutomationProperties.AutomationId="HostedAddress" />
+        <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding AddressTone}" Text="{Binding AddressHint}"
+                   FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" />
+
+        <Grid ColumnDefinitions="110,12,*">
+            <StackPanel>
+                <TextBlock Classes="label" Text="{local:Tr hosted.port}" />
+                <TextBox Text="{Binding PortText}" Margin="0,6,0,0" MaxLength="5" VerticalContentAlignment="Center"
+                         AutomationProperties.AutomationId="HostedPort" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Classes="label" Text="{local:Tr hosted.tls}" />
+                <ComboBox ItemsSource="{Binding TlsOptions}" SelectedIndex="{Binding TlsIndex}" HorizontalAlignment="Stretch" Margin="0,6,0,0"
+                          ctl:WheelToParent.IsEnabled="True" AutomationProperties.AutomationId="HostedTls"
+                          AutomationProperties.Name="{local:Tr hosted.tls}" />
+            </StackPanel>
+        </Grid>
+        <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding PortTone}" Text="{Binding PortHint}" FontSize="11" TextWrapping="Wrap"
+                   Margin="0,6,0,0" IsVisible="{Binding PortHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+        <Grid ColumnDefinitions="*,12,*">
+            <StackPanel>
+                <TextBlock Classes="label" Text="{local:Tr hosted.user}" />
+                <TextBox Text="{Binding User}" Margin="0,6,0,0" VerticalContentAlignment="Center" AutomationProperties.AutomationId="HostedUser" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Classes="label" Text="{local:Tr hosted.password}" />
+                <!-- пароль — секрет: поле скрытое. Точки — из Cascadia Mono (mono), как в окне кода подключения -->
+                <ctl:SecretTextBox Classes="mono" Text="{Binding Password}" PasswordChar="●" Margin="0,6,0,0" VerticalContentAlignment="Center"
+                                   AutomationProperties.AutomationId="HostedPassword" />
+            </StackPanel>
+        </Grid>
+        <!-- правка готового подключения: пароль сохранён, пустое поле его не меняет -->
+        <TextBlock Classes="hint" Text="{local:Tr hosted.passwordKeep}" Margin="0,6,0,0" IsVisible="{Binding HasSavedPassword}" />
+
+        <!-- «Дополнительно»: папка сервера на FTP и активный режим -->
+        <Button Classes="small" HorizontalAlignment="Left" Padding="0,4" Margin="0,16,0,0" Background="Transparent" BorderThickness="0"
+                Click="Advanced_Click" AutomationProperties.AutomationId="HostedAdvanced">
+            <StackPanel Orientation="Horizontal">
+                <Path Classes="icon chevron" Classes.open="{Binding IsAdvancedOpen}" Data="{StaticResource Icon.ChevronDown}" Width="12" Height="12" Margin="0,0,6,0" />
+                <TextBlock Text="{local:Tr hosted.advanced}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" />
+            </StackPanel>
+        </Button>
+        <StackPanel IsVisible="{Binding IsAdvancedOpen}">
+            <TextBlock Classes="label" Text="{local:Tr hosted.root}" Margin="0,8,0,0" />
+            <TextBox Classes="mono" Text="{Binding Root}" Margin="0,6,0,0" VerticalContentAlignment="Center" AutomationProperties.AutomationId="HostedRoot" />
+            <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding RootTone}" Text="{Binding RootHint}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" />
+            <CheckBox IsChecked="{Binding ActiveMode}" Margin="0,10,0,0" AutomationProperties.AutomationId="HostedActive">
+                <TextBlock Text="{local:Tr hosted.activeMode}" FontSize="12" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap" />
+            </CheckBox>
+        </StackPanel>
+
+        <DockPanel Margin="0,18,0,0">
+            <Button DockPanel.Dock="Left" VerticalAlignment="Top" Content="{local:Tr hosted.check}" Command="{Binding CheckCommand}"
+                    AutomationProperties.AutomationId="HostedCheck" />
+            <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding CheckTone}" Text="{Binding CheckText}" VerticalAlignment="Top"
+                       TextWrapping="Wrap" Margin="12,8,0,0" AutomationProperties.AutomationId="HostedResult" />
+        </DockPanel>
+
+        <!-- сертификат сервера не подтверждён известным центром: показать отпечаток и дать довериться -->
+        <Border Classes="warning" Margin="0,12,0,0" IsVisible="{Binding HasPendingCertificate}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Classes="small" Padding="12,5" Margin="12,0,0,0" VerticalAlignment="Center"
+                        Content="{local:Tr hosted.trust}" Command="{Binding TrustCertificateCommand}" AutomationProperties.AutomationId="HostedTrust" />
+                <Path Classes="icon" DockPanel.Dock="Left" Data="{StaticResource Icon.Warning}" Stroke="{DynamicResource Forest.Warn}"
+                      VerticalAlignment="Center" Margin="0,0,12,0" />
+                <TextBlock Text="{Binding CertificateText}" Foreground="{DynamicResource Forest.Muted}" FontSize="12" TextWrapping="Wrap"
+                           VerticalAlignment="Center" />
+            </DockPanel>
+        </Border>
+
+        <StackPanel Classes="dialogButtons" Margin="0,20,0,0">
+            <Button Classes="primary" Content="{Binding OkText}" IsDefault="True" IsEnabled="{Binding CanAccept}"
+                    Click="Ok_Click" Padding="18,8" AutomationProperties.AutomationId="HostedOk" />
+            <Button Content="{local:Tr common.cancel}" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8" />
+        </StackPanel>
+    </StackPanel>
+</dialogs:DialogWindow>

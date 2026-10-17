@@ -306,9 +306,14 @@
                                   AutomationProperties.AutomationId="ProfileCombo" WindowDecorationProperties.ElementRole="User">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ProfileViewModel">
-                                    <TextBlock>
-                                        <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding KindText, Mode=OneWay}" Foreground="{DynamicResource Forest.Muted}" />
-                                    </TextBlock>
+                                    <StackPanel Orientation="Horizontal">
+                                        <!-- сервер у хостера — облако перед именем -->
+                                        <Path Classes="icon" Data="{StaticResource Icon.Cloud}" Width="13" Height="13" Margin="0,0,7,0" VerticalAlignment="Center"
+                                              Stroke="{DynamicResource Forest.Accent}" IsVisible="{Binding IsHosted}" />
+                                        <TextBlock>
+                                            <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding KindText, Mode=OneWay}" Foreground="{DynamicResource Forest.Muted}" />
+                                        </TextBlock>
+                                    </StackPanel>
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>

@@ -65,7 +65,7 @@
 
     <Panel Margin="10,4,10,0">
         <!-- ===== не серверный профиль ===== -->
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="520" IsVisible="{Binding !IsServerProfile}">
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="520" IsVisible="{Binding ShowNotServer}">
             <Border Width="64" Height="64" CornerRadius="14" Background="{DynamicResource Forest.Surface}" BorderBrush="{DynamicResource Forest.Line}"
                     BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,16">
                 <Path Classes="icon" Data="{StaticResource Icon.Server}" Stroke="{DynamicResource Forest.Accent}" Width="28" Height="28" />
@@ -75,7 +75,31 @@
             <Button Content="{local:Tr server.openSettings}" Command="{Binding OpenSettingsCommand}" HorizontalAlignment="Center" Margin="0,16,0,0" />
         </StackPanel>
 
-        <DockPanel IsVisible="{Binding IsServerProfile}">
+        <!-- ===== сервер у хостера: им управляет панель хостера, здесь — только моды по FTP ===== -->
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="520" IsVisible="{Binding IsHostedProfile}"
+                    AutomationProperties.AutomationId="ServerHostedPanel">
+            <Border Width="64" Height="64" CornerRadius="14" Background="{DynamicResource Forest.Surface}" BorderBrush="{DynamicResource Forest.Line}"
+                    BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,16">
+                <Path Classes="icon" Data="{StaticResource Icon.Cloud}" Stroke="{DynamicResource Forest.Accent}" Width="28" Height="28" />
+            </Border>
+            <TextBlock Text="{local:Tr server.hostedTitle}" FontSize="18" FontWeight="SemiBold" TextAlignment="Center" Foreground="{DynamicResource Forest.Text}" />
+            <TextBlock Text="{local:Tr server.hostedHint}" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,0" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
+                <Button Classes="primary" Content="{local:Tr server.hostedOpenMods}" Command="{Binding OpenServerModsCommand}" Padding="18,8"
+                        AutomationProperties.AutomationId="ServerHostedMods" />
+                <Button Content="{local:Tr server.hostedSettings}" Command="{Binding OpenSettingsCommand}" Margin="8,0,0,0" Padding="16,8"
+                        AutomationProperties.AutomationId="ServerHostedSettings" />
+            </StackPanel>
+        </StackPanel>
+
+        <DockPanel>
+            <DockPanel.IsVisible>
+                <!-- серверный профиль, но не у хостера: у сервера у хостера вместо всего этого — плашка выше -->
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="IsServerProfile" />
+                    <Binding Path="!IsHostedProfile" />
+                </MultiBinding>
+            </DockPanel.IsVisible>
             <!-- ===== заголовок и управление ===== -->
             <DockPanel DockPanel.Dock="Top">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">

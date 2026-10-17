@@ -30,6 +30,7 @@ public static class HostedSecret
         RemoteFilesException { Kind: RemoteFailure.Quota } => Loc.T("hosted.errQuota"),
         RemoteFilesException { Kind: RemoteFailure.Unsupported } => Loc.T("hosted.errNoTransport"),
         RemoteFilesException => Loc.T("hosted.errProtocol", ex.Message),
+        TimeoutException => Loc.T("hosted.errTimeout"),
         _ => ex.Message,
     };
 }
