@@ -110,6 +110,9 @@ public sealed class ModRowViewModel
     /// <summary>Мод можно выключать, закреплять, откатывать и удалять (не мод хостера).</summary>
     public bool CanChange => !IsHosterMod;
 
+    /// <summary>Мод можно искать в каталоге: есть номер на модбазе, modid или имя из modinfo (у мода хостера ничего).</summary>
+    public bool CanFindInCatalog => !IsHosterMod && (Result.Remote?.AssetId is > 0 || ModId.Length > 0 || Local.Info?.Name is { Length: > 0 });
+
     public string Name { get; }
     public string ModId { get; }
     public string FileName { get; }

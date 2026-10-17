@@ -177,6 +177,9 @@ public sealed partial class CatalogViewModel : ObservableObject
         await EnsureLoadedAsync();
         if (!_loaded) return false;
 
+        // пустой modid или имя (мод без modinfo) совпал бы с любым модом каталога, у которого в списке modid есть ""
+        if (string.IsNullOrWhiteSpace(modId)) modId = null;
+        if (string.IsNullOrWhiteSpace(name)) name = null;
         var item = (assetId is > 0 ? _catalog.Items.FirstOrDefault(i => i.AssetId == assetId) : null)
                    ?? (modId is null ? null : _catalog.Items.FirstOrDefault(i =>
                        i.ModIdStrs.Any(s => string.Equals(s, modId, StringComparison.OrdinalIgnoreCase))))

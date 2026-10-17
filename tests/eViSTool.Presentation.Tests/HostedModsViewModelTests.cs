@@ -88,6 +88,7 @@ public sealed class HostedModsViewModelTests : IDisposable
         Assert.Equal(Loc.T("status.hosterMod"), hoster.StatusText);
         Assert.False(hoster.IsProblem);
         Assert.False(hoster.CanChange);
+        Assert.False(hoster.CanFindInCatalog);
         mods.Selected = hoster;
         Assert.False(mods.CanChangeSelected);
         Assert.Equal(0, mods.ProblemCount);

@@ -303,7 +303,7 @@
                                     <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.skip}" Command="{Binding SkipVersionCommand}" CommandParameter="{Binding Selected}" />
                                     <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.unskip}" Command="{Binding ClearSkippedCommand}" CommandParameter="{Binding Selected}" />
                                     <Separator />
-                                    <MenuItem Header="{local:Tr menu.showInCatalog}" Command="{Binding ShowInCatalogCommand}" CommandParameter="{Binding Selected}" />
+                                    <MenuItem IsEnabled="{Binding Selected.CanFindInCatalog, FallbackValue=False}" Header="{local:Tr menu.showInCatalog}" Command="{Binding ShowInCatalogCommand}" CommandParameter="{Binding Selected}" />
                                     <MenuItem Header="{local:Tr menu.openPage}" Command="{Binding OpenPageCommand}" CommandParameter="{Binding Selected}" />
                                     <MenuItem Header="{local:Tr menu.showFile}" Command="{Binding ShowFileCommand}" CommandParameter="{Binding Selected}"
                                               IsVisible="{Binding IsLocalProfile}" />
@@ -575,6 +575,7 @@
                                                             Command="{Binding Owner.OpenPageCommand}" CommandParameter="{Binding Row}"
                                                             IsVisible="{Binding Row.PageUrl, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                                                     <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr mcard.inCatalog}" Margin="0,0,14,4"
+                                                            IsVisible="{Binding Row.CanFindInCatalog}"
                                                             Command="{Binding Owner.ShowInCatalogCommand}" CommandParameter="{Binding Row}" />
                                                     <Button Theme="{StaticResource Forest.LinkButton}" Content="{Binding ConfigText}" Margin="0,0,14,4"
                                                             IsVisible="{Binding HasConfigs}"
