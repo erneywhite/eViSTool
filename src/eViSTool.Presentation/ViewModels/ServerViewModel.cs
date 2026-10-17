@@ -241,8 +241,9 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     {
         // правки конфига старого профиля — сохранить, пока связь с его агентом ещё открыта
         var next = _main.ActiveProfile?.Model;
-        var nextServer = next?.Kind == ProfileKind.Server;
-        Config.BeforeSwitch(nextServer && next is { IsRemote: false } ? next.DataDir : null, nextServer && next!.IsRemote ? next : null);
+        // у профиля у хостера нет ни папок на этой машине, ни агента: серверных вкладок для него нет
+        var nextServer = next?.Kind == ProfileKind.Server && next.IsHosted == false;
+        Config.BeforeSwitch(nextServer && next is { IsLocal: true } ? next.DataDir : null, nextServer && next!.IsRemote ? next : null);
 
         _stateKnown = false;
         _monitor.Stop();
@@ -257,9 +258,10 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         OnPropertyChanged(nameof(DataDir));
         _console.Reset();
 
-        IsServerProfile = _main.ActiveProfile?.Kind == ProfileKind.Server;
-        IsRemoteProfile = _main.ActiveProfile?.Model.IsRemote == true;
         IsHostedProfile = _main.ActiveProfile?.Model.IsHosted == true;
+        // хостовый профиль — Kind = Server, но серверным разделом это не считается: монитора и вкладок нет
+        IsServerProfile = _main.ActiveProfile?.Kind == ProfileKind.Server && !IsHostedProfile;
+        IsRemoteProfile = _main.ActiveProfile?.Model.IsRemote == true;
         _remoteGameVersion = null;
         _remoteOs = null;
         // удалённый доступ настраивают на компьютере с сервером — у удалённого профиля этой вкладки нет
