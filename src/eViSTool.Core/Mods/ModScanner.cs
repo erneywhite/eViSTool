@@ -12,6 +12,9 @@ public sealed record LocalMod(string Path, ModInfo? Info, string? Error)
 
     /// <summary>Выключен в настройках игры (disabledMods / WorldConfig.DisabledMods).</summary>
     public bool IsDisabled { get; init; }
+
+    /// <summary>Мод самого хостера (у G-Portal — папка gportal_mods): показываем, но не обновляем, не удаляем, не выключаем.</summary>
+    public bool IsHosterMod { get; init; }
 }
 
 /// <summary>Сканирует папку модов: zip-архивы и распакованные папки с modinfo.json.</summary>

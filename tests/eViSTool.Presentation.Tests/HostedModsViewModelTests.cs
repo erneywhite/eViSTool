@@ -84,6 +84,15 @@ public sealed class HostedModsViewModelTests : IDisposable
         var hoster = mods.Rows.Single(r => r.FileName == "GPortalPlayerCount.cs");
         Assert.Equal("", hoster.ModId);
         Assert.False(hoster.CanUpdate);
+        // у мода хостера свой статус: не «не читается» и не проблема; переключатель и действия скрыты
+        Assert.Equal(Loc.T("status.hosterMod"), hoster.StatusText);
+        Assert.False(hoster.IsProblem);
+        Assert.False(hoster.CanChange);
+        mods.Selected = hoster;
+        Assert.False(mods.CanChangeSelected);
+        Assert.Equal(0, mods.ProblemCount);
+        mods.Selected = Row(mods, "beta");
+        Assert.True(mods.CanChangeSelected);
         Assert.Equal(0, mods.ConfigCount("alpha")); // ссылки «Настройки мода» у хостера нет
         Assert.Equal(AppTab.Mods, main.SelectedTab);
     });

@@ -37,7 +37,9 @@ public sealed class HostedModsTests : IDisposable
         Assert.Equal(["/Mods/alpha_1.0.0.zip", "/Mods/beta_2.0.0.zip", "/gportal_mods/GPortalPlayerCount.cs"], mods.Select(m => m.Path).Order(StringComparer.Ordinal));
         var hoster = mods.Single(m => m.Path.EndsWith(".cs"));
         Assert.Null(hoster.Info);
-        HostedTestText.AssertIs("hosted.hosterMod", hoster.Error!);
+        Assert.Null(hoster.Error); // мод хостера — не ошибка чтения
+        Assert.True(hoster.IsHosterMod);
+        Assert.All(mods.Where(m => m != hoster), m => Assert.False(m.IsHosterMod));
         Assert.Equal("1.0.0", mods.Single(m => m.Info?.ModId == "alpha").Info!.Version);
     }
 

@@ -122,6 +122,7 @@ public sealed partial class ModCardViewModel : ObservableObject
 
     private static string CompatibilityText(ModRowViewModel row, ModVersion? game)
     {
+        if (row.IsHosterMod) return Loc.T("mcard.compatHoster");
         if (game is null) return Loc.T("common.notFound");
         var branch = $"{game.Major}.{game.Minor}.x";
         return row.Kind switch

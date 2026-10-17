@@ -60,7 +60,10 @@ public sealed partial class ModsViewModel : ObservableObject
     [ObservableProperty] private int _sortIndex;
 
     /// <summary>Выбранный в таблице мод и его карточка справа.</summary>
-    [ObservableProperty] private ModRowViewModel? _selected;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanChangeSelected))] private ModRowViewModel? _selected;
+
+    /// <summary>Пункты контекстного меню, которые меняют мод: у мода хостера недоступны.</summary>
+    public bool CanChangeSelected => Selected is not { CanChange: false };
     [ObservableProperty] private ModCardViewModel? _card;
     private CancellationTokenSource? _cardLoad;
 
