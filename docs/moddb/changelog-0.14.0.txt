@@ -3,7 +3,7 @@ eViSTool 0.14.0: copies of a hosted server's world on your own computer.
 If you stop paying the host or lose access to it, the server and its world go with it. Now eViSTool can keep copies of the world on your computer and put one back on the server.
 
 New
-- Hosted server → Server → Backups: "Back up now". When the server is stopped (by its log), the world itself is downloaded; when it is running, the freshest complete copy the game made (/genbackup) is taken. Next to the world eViSTool keeps serverconfig.json, mod settings, player data, mod data and the list of mods with their versions.
+- Hosted server → Server → Backups: "Download a backup now". When the server is stopped (by its log), the world itself is downloaded; when it is running, the freshest complete copy the game made (/genbackup) is taken. Next to the world eViSTool keeps serverconfig.json, mod settings, player data, mod data and the list of mods with their versions.
 - The download resumes after a dropped connection, and a copy is thrown away if the world changed while it was being downloaded: a broken copy is worse than none.
 - On a schedule: once a day or once a week, while eViSTool is running. Keep the last N copies (7 by default) in the program folder or a folder of your choice. If a scheduled copy fails, you get a "Backup failed" notification.
 - "Restore to the server": only when the server is stopped by its log. The current world stays on the server next to the restored one (….evistool.bak), and if anything fails halfway, the old world is put back. Optionally the mod settings, player data and mod data are restored too.
