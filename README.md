@@ -520,6 +520,9 @@ It works for game and server profiles on this computer.
 
 **Updates.** On start eViSTool checks GitHub for a new release. **About → Update to …** downloads it, verifies the checksum
 and the release signature, and replaces the program. A running server is not interrupted.
+The previous version stays next to it until the new one has started twice and a day has passed since its first start.
+Until then **About → Go back to the previous version** puts it back and restarts the program, and the version you left
+is not offered again until a newer one comes out.
 
 **Your data** — settings, saved versions of mods, downloads and logs — lives in the `data` folder next to `eViSTool.exe`.
 Move the program folder, and everything moves with it. (If eViSTool cannot write there, for example in `Program Files`,
