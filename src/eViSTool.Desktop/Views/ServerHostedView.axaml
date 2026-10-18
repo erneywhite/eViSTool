@@ -127,7 +127,7 @@
                                Margin="16,0,16,8" IsVisible="{Binding RunNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                AutomationProperties.AutomationId="HostedRunNote" />
 
-                    <Border Background="#151C17" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="6,4">
+                    <Border Background="{DynamicResource Forest.Side}" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="6,4">
                         <Panel>
                             <!-- строки — виртуализированный список с переносом, как у своей консоли -->
                             <ListBox x:Name="ConsoleList" Classes="console" ItemsSource="{Binding Lines}" Background="Transparent" BorderThickness="0"

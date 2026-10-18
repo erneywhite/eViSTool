@@ -328,7 +328,7 @@
                             </DockPanel>
                         </Border>
 
-                        <Border Background="#151C17" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="6,4">
+                        <Border Background="{DynamicResource Forest.Side}" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="6,4">
                             <!-- строки — виртуализированный список с переносом; выделение — несколько строк (Ctrl, Shift) -->
                             <ListBox x:Name="ConsoleList" Classes="console" ItemsSource="{Binding Lines}" Background="Transparent" BorderThickness="0"
                                      FontFamily="{DynamicResource Forest.Mono}" FontSize="12.5" SelectionMode="Multiple"

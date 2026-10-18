@@ -34,7 +34,7 @@
     <!-- цвет строки по смыслу (ConsoleTint): ошибки — розоватые, предупреждения — янтарь, ввод — песок,
          сообщения eViSTool — дымчато-голубые, чат — зелёный; без оттенка — светлый текст консоли -->
     <Style Selector="TextBlock.line">
-        <Setter Property="Foreground" Value="#D8DCCF" />
+        <Setter Property="Foreground" Value="{DynamicResource Forest.ConsoleText}" />
     </Style>
     <Style Selector="TextBlock.line.error">
         <Setter Property="Foreground" Value="{DynamicResource Forest.Danger}" />
@@ -46,7 +46,7 @@
         <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
     </Style>
     <Style Selector="TextBlock.line.system">
-        <Setter Property="Foreground" Value="#9FB7C9" />
+        <Setter Property="Foreground" Value="{DynamicResource Forest.ConsoleSystem}" />
     </Style>
     <Style Selector="TextBlock.line.chat">
         <Setter Property="Foreground" Value="{DynamicResource Forest.Good}" />

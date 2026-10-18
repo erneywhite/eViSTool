@@ -24,7 +24,7 @@
         <Style Selector="TextBlock.jsonName">
             <Setter Property="FontFamily" Value="{DynamicResource Forest.Mono}" />
             <Setter Property="FontSize" Value="10.5" />
-            <Setter Property="Foreground" Value="#8A9786" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
         <!-- точка «изменено, но не сохранено»: стоит в левом поле карточки (отступ −14 + ширина 7 + 7 = 0), подпись не сдвигает -->

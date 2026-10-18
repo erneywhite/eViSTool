@@ -477,7 +477,7 @@
                                 <DataTemplate x:DataType="vm:ModCardViewModel">
                                     <StackPanel>
                                         <!-- шапка: логотип с модбазы или буквы -->
-                                        <Border Background="{DynamicResource Forest.Raised}" CornerRadius="8,8,0,0" Height="150" ClipToBounds="True">
+                                        <Border Background="{DynamicResource Forest.Raised}" CornerRadius="9,9,0,0" Height="150" ClipToBounds="True">
                                             <Panel>
                                                 <!-- буквы под картинкой: логотипа нет, он грузится или не загрузился — видно их -->
                                                 <TextBlock IsVisible="{Binding #Logo1.Source, Converter={x:Static ObjectConverters.IsNull}}" Text="{Binding Row.Initials}"
@@ -496,7 +496,7 @@
                                                 <Image x:Name="Logo1" ctl:RemoteImage.Source="{Binding Logo}" Stretch="Uniform"
                                                        RenderOptions.BitmapInterpolationMode="HighQuality" />
                                                 <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,12,0" Padding="8,2" CornerRadius="4"
-                                                        Background="#CC19231D" IsVisible="{Binding Tag, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                        Background="{DynamicResource Forest.SideVeil}" IsVisible="{Binding Tag, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                                                     <TextBlock Text="{Binding Tag}" FontSize="11" Foreground="{DynamicResource Forest.Accent}" />
                                                 </Border>
                                             </Panel>

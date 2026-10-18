@@ -18,17 +18,21 @@
         <FluentTheme>
             <FluentTheme.Palettes>
                 <!-- базовые цвета Fluent → лесные: от них Fluent строит фон, текст, рамки, наведение и акцент всех
-                     стандартных элементов. Полупрозрачные оттенки — от цвета текста и боковой колонки, как у Fluent от
-                     белого и чёрного. -->
+                     стандартных элементов. Непрозрачные — токены из ForestResources; полупрозрачные оттенки — от цвета
+                     текста и боковой колонки (#E7E9DE и #111913 с прозрачностью), как у Fluent от белого и чёрного:
+                     поменялся токен — поменять и их. -->
                 <ColorPaletteResources x:Key="Dark"
-                                       Accent="#D4BD83" RegionColor="#202822" ErrorText="#E89B96"
-                                       AltHigh="#19231D" AltMediumHigh="#CC19231D" AltMedium="#9919231D" AltMediumLow="#6619231D" AltLow="#3319231D"
-                                       BaseHigh="#E7E9DD" BaseMediumHigh="#CCE7E9DD" BaseMedium="#99E7E9DD" BaseMediumLow="#66E7E9DD" BaseLow="#33E7E9DD"
-                                       ChromeAltLow="#E7E9DD" ChromeWhite="#E7E9DD" ChromeGray="#8A9786" ChromeHigh="#46523F"
-                                       ChromeMedium="#202822" ChromeMediumLow="#273129" ChromeLow="#19231D"
-                                       ChromeDisabledHigh="#303D32" ChromeDisabledLow="#6E7A6A"
+                                       Accent="{StaticResource Forest.AccentColor}" RegionColor="{StaticResource Forest.BaseColor}"
+                                       ErrorText="{StaticResource Forest.DangerColor}"
+                                       AltHigh="{StaticResource Forest.SideColor}" AltMediumHigh="#CC111913" AltMedium="#99111913" AltMediumLow="#66111913" AltLow="#33111913"
+                                       BaseHigh="{StaticResource Forest.TextColor}" BaseMediumHigh="#CCE7E9DE" BaseMedium="#99E7E9DE" BaseMediumLow="#66E7E9DE" BaseLow="#33E7E9DE"
+                                       ChromeAltLow="{StaticResource Forest.TextColor}" ChromeWhite="{StaticResource Forest.TextColor}"
+                                       ChromeGray="#8A9786" ChromeHigh="{StaticResource Forest.LineStrongColor}"
+                                       ChromeMedium="{StaticResource Forest.BaseColor}" ChromeMediumLow="{StaticResource Forest.SurfaceColor}"
+                                       ChromeLow="{StaticResource Forest.SideColor}"
+                                       ChromeDisabledHigh="{StaticResource Forest.RaisedColor}" ChromeDisabledLow="{StaticResource Forest.FaintColor}"
                                        ChromeBlackHigh="#0E1410" ChromeBlackMedium="#CC0E1410" ChromeBlackMediumLow="#660E1410" ChromeBlackLow="#330E1410"
-                                       ListLow="#19E7E9DD" ListMedium="#33E7E9DD" />
+                                       ListLow="#19E7E9DE" ListMedium="#33E7E9DE" />
             </FluentTheme.Palettes>
         </FluentTheme>
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />

@@ -15,8 +15,8 @@
             <TextBlock Text="{Binding PackName}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
             <TextBlock Text="{Binding Info}" Opacity="0.7" TextWrapping="Wrap" Margin="0,2,0,0" />
             <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Margin="0,8,0,0" IsVisible="{Binding HasDescription}" />
-            <!-- пак собран для другой версии игры: полупрозрачный жёлтый -->
-            <Border Margin="0,10,0,0" Padding="10,6" CornerRadius="6" Background="#40F0A020" IsVisible="{Binding HasWarning}">
+            <!-- пак собран для другой версии игры: плашка-предупреждение темы -->
+            <Border Classes="warning" Margin="0,10,0,0" IsVisible="{Binding HasWarning}">
                 <TextBlock Text="{Binding Warning}" TextWrapping="Wrap" />
             </Border>
         </StackPanel>

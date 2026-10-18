@@ -10,50 +10,107 @@
         просто остаётся стандартного цвета, поэтому новые ключи — только после проверки на снимке.
     -->
 
-    <!-- ===== токены ===== -->
-    <Color x:Key="Forest.BaseColor">#202822</Color>
-    <Color x:Key="Forest.SurfaceColor">#273129</Color>
-    <Color x:Key="Forest.RaisedColor">#303D32</Color>
-    <Color x:Key="Forest.SideColor">#19231D</Color>
-    <Color x:Key="Forest.TextColor">#E7E9DD</Color>
-    <Color x:Key="Forest.MutedColor">#A4B1A0</Color>
-    <Color x:Key="Forest.LineColor">#3B483B</Color>
-    <Color x:Key="Forest.AccentColor">#D4BD83</Color>
-    <Color x:Key="Forest.AccentInkColor">#2C2B1C</Color>
-    <Color x:Key="Forest.SelectedColor">#394432</Color>
-    <Color x:Key="Forest.GoodColor">#B0C898</Color>
-    <Color x:Key="Forest.WarnColor">#EDBF82</Color>
-    <Color x:Key="Forest.WarningBgColor">#3A3425</Color>
-    <Color x:Key="Forest.DangerColor">#E89B96</Color>
+    <!-- ===== токены (docs/design.md, раздел 1) ===== -->
+    <!-- слои: шаг около 5 % светлоты, чем светлее — тем «выше» лежит -->
+    <Color x:Key="Forest.SideColor">#111913</Color>
+    <Color x:Key="Forest.BaseColor">#1A211B</Color>
+    <Color x:Key="Forest.SurfaceColor">#252E26</Color>
+    <Color x:Key="Forest.CardHoverColor">#2A332B</Color>
+    <Color x:Key="Forest.RaisedColor">#323C33</Color>
+    <Color x:Key="Forest.TextColor">#E7E9DE</Color>
+    <Color x:Key="Forest.MutedColor">#A3AFA0</Color>
+    <Color x:Key="Forest.FaintColor">#747D72</Color>
+    <Color x:Key="Forest.LineColor">#3C473C</Color>
+    <Color x:Key="Forest.LineStrongColor">#4B5649</Color>
+    <Color x:Key="Forest.AccentColor">#D2BC86</Color>
+    <Color x:Key="Forest.AccentHoverColor">#E0CC98</Color>
+    <Color x:Key="Forest.AccentTopColor">#E9D6A3</Color>
+    <Color x:Key="Forest.AccentPressedColor">#C0A873</Color>
+    <Color x:Key="Forest.AccentInkColor">#2A2715</Color>
+    <Color x:Key="Forest.SelectedColor">#35402D</Color>
+    <Color x:Key="Forest.SelectedHoverColor">#3E4936</Color>
+    <Color x:Key="Forest.NavHoverColor">#99283128</Color>
+    <Color x:Key="Forest.GoodColor">#AFC798</Color>
+    <Color x:Key="Forest.WarnColor">#EDBD86</Color>
+    <Color x:Key="Forest.WarningBgColor">#372F1F</Color>
+    <Color x:Key="Forest.WarnLineColor">#5A4A30</Color>
+    <Color x:Key="Forest.DangerColor">#E59B94</Color>
+    <!-- светлая кромка сверху у карточек и кнопок; тень — чёрный 38 % -->
+    <Color x:Key="Forest.EdgeColor">#12FFFFFF</Color>
+    <Color x:Key="Forest.ShadeColor">#61000000</Color>
+    <!-- консоль сервера: светлый текст чуть тише основного и дымчато-голубые сообщения самой программы -->
+    <Color x:Key="Forest.ConsoleTextColor">#D8DCCF</Color>
+    <Color x:Key="Forest.ConsoleSystemColor">#9FB7C9</Color>
+    <!-- фон из игры (раздел 5): вуали над картинкой под боковой панелью -->
+    <Color x:Key="Forest.SideVeilColor">#BF111913</Color>
+    <Color x:Key="Forest.NavSelectedVeilColor">#E035402D</Color>
+    <Color x:Key="Forest.NavHoverVeilColor">#99283128</Color>
+    <Color x:Key="Forest.SideCardVeilColor">#D1252E26</Color>
 
+    <SolidColorBrush x:Key="Forest.Side" Color="{StaticResource Forest.SideColor}" />
     <SolidColorBrush x:Key="Forest.Base" Color="{StaticResource Forest.BaseColor}" />
     <SolidColorBrush x:Key="Forest.Surface" Color="{StaticResource Forest.SurfaceColor}" />
+    <SolidColorBrush x:Key="Forest.CardHover" Color="{StaticResource Forest.CardHoverColor}" />
     <SolidColorBrush x:Key="Forest.Raised" Color="{StaticResource Forest.RaisedColor}" />
-    <SolidColorBrush x:Key="Forest.Side" Color="{StaticResource Forest.SideColor}" />
     <SolidColorBrush x:Key="Forest.Text" Color="{StaticResource Forest.TextColor}" />
     <SolidColorBrush x:Key="Forest.Muted" Color="{StaticResource Forest.MutedColor}" />
+    <SolidColorBrush x:Key="Forest.Faint" Color="{StaticResource Forest.FaintColor}" />
     <SolidColorBrush x:Key="Forest.Line" Color="{StaticResource Forest.LineColor}" />
+    <SolidColorBrush x:Key="Forest.LineStrong" Color="{StaticResource Forest.LineStrongColor}" />
     <SolidColorBrush x:Key="Forest.Accent" Color="{StaticResource Forest.AccentColor}" />
+    <SolidColorBrush x:Key="Forest.AccentHover" Color="{StaticResource Forest.AccentHoverColor}" />
+    <SolidColorBrush x:Key="Forest.AccentTop" Color="{StaticResource Forest.AccentTopColor}" />
+    <SolidColorBrush x:Key="Forest.AccentPressed" Color="{StaticResource Forest.AccentPressedColor}" />
     <SolidColorBrush x:Key="Forest.AccentInk" Color="{StaticResource Forest.AccentInkColor}" />
     <SolidColorBrush x:Key="Forest.Selected" Color="{StaticResource Forest.SelectedColor}" />
+    <SolidColorBrush x:Key="Forest.SelectedHover" Color="{StaticResource Forest.SelectedHoverColor}" />
+    <SolidColorBrush x:Key="Forest.NavHover" Color="{StaticResource Forest.NavHoverColor}" />
     <SolidColorBrush x:Key="Forest.Good" Color="{StaticResource Forest.GoodColor}" />
     <SolidColorBrush x:Key="Forest.Warn" Color="{StaticResource Forest.WarnColor}" />
     <SolidColorBrush x:Key="Forest.WarningBg" Color="{StaticResource Forest.WarningBgColor}" />
+    <SolidColorBrush x:Key="Forest.WarnLine" Color="{StaticResource Forest.WarnLineColor}" />
     <SolidColorBrush x:Key="Forest.Danger" Color="{StaticResource Forest.DangerColor}" />
+    <SolidColorBrush x:Key="Forest.Edge" Color="{StaticResource Forest.EdgeColor}" />
+    <SolidColorBrush x:Key="Forest.Shade" Color="{StaticResource Forest.ShadeColor}" />
+    <SolidColorBrush x:Key="Forest.ConsoleText" Color="{StaticResource Forest.ConsoleTextColor}" />
+    <SolidColorBrush x:Key="Forest.ConsoleSystem" Color="{StaticResource Forest.ConsoleSystemColor}" />
+    <SolidColorBrush x:Key="Forest.SideVeil" Color="{StaticResource Forest.SideVeilColor}" />
+    <SolidColorBrush x:Key="Forest.NavSelectedVeil" Color="{StaticResource Forest.NavSelectedVeilColor}" />
+    <SolidColorBrush x:Key="Forest.NavHoverVeil" Color="{StaticResource Forest.NavHoverVeilColor}" />
+    <SolidColorBrush x:Key="Forest.SideCardVeil" Color="{StaticResource Forest.SideCardVeilColor}" />
+    <SolidColorBrush x:Key="Forest.Selection" Color="#666B6044" /> <!-- выделение текста: тёмный песок, 40 % -->
 
-    <!-- оттенки для шаблонов элементов -->
-    <SolidColorBrush x:Key="Forest.LineStrong" Color="#46523F" />
-    <SolidColorBrush x:Key="Forest.SelectedHover" Color="#414D39" />
-    <SolidColorBrush x:Key="Forest.Disabled" Color="#242C25" />
-    <SolidColorBrush x:Key="Forest.DisabledText" Color="#6E7A6A" />
-    <SolidColorBrush x:Key="Forest.Selection" Color="#666B6044" /> <!-- песок с прозрачностью 0.4 -->
+    <!-- главная кнопка — выпуклая: сверху светлее -->
+    <LinearGradientBrush x:Key="Forest.AccentGradient" StartPoint="0%,0%" EndPoint="0%,100%">
+        <GradientStop Offset="0" Color="{StaticResource Forest.AccentTopColor}" />
+        <GradientStop Offset="1" Color="{StaticResource Forest.AccentColor}" />
+    </LinearGradientBrush>
+
+    <!-- ===== глубина (раздел 2): тени — строкой, цвет внутри строки токеном не задать, поэтому числа здесь,
+         рядом с токенами: #12FFFFFF — Forest.Edge, #61000000 — Forest.Shade.
+         Сдвиг 1.5 вместо 1 из документа: у элемента с рамкой 1 px Avalonia рисует фон и тени от середины рамки (на
+         0.5 px внутри края), и тень со сдвигом 1 закрывает только полпикселя под рамкой — кромка выходит вдвое
+         бледнее. 1.5 даёт ровно 1 px под рамкой, как inset 0 1px в эскизе (в CSS тень идёт от внутреннего края
+         рамки). У элементов без рамки — сдвиг 1 (EdgeShadowFlat) ===== -->
+    <!-- кромка: светлая линия сверху (кнопки, плашки, пункты-карточки, выбранный чип) -->
+    <BoxShadows x:Key="Forest.EdgeShadow">inset 0 1.5 0 0 #12FFFFFF</BoxShadows>
+    <!-- та же кромка у элемента без рамки (выбранный пункт меню) -->
+    <BoxShadows x:Key="Forest.EdgeShadowFlat">inset 0 1 0 0 #12FFFFFF</BoxShadows>
+    <!-- подъём карточки: кромка и короткая тёмная тень -->
+    <BoxShadows x:Key="Forest.CardShadow">inset 0 1.5 0 0 #12FFFFFF, 0 1.5 0 0 #61000000, 0 10 24 -14 #61000000</BoxShadows>
+    <!-- главная кнопка: яркая кромка и тень в 1 px -->
+    <BoxShadows x:Key="Forest.PrimaryShadow">inset 0 1.5 0 0 #59FFFFFF, 0 1.5 0 0 #61000000</BoxShadows>
+    <!-- рамка окна на Linux (рисует сама Avalonia): мягкая тень вокруг -->
+    <BoxShadows x:Key="Forest.WindowShadow">0 2 10 2 #80000000</BoxShadows>
 
     <!-- ===== шрифты ===== -->
     <!-- основной (Noto Sans) задан шрифтом по умолчанию в Program.cs; здесь — моноширинный для версий, кода, консоли -->
     <FontFamily x:Key="Forest.Mono">avares://eViSTool/Assets/Fonts#Cascadia Mono</FontFamily>
+    <!-- основной текст 13 (раздел 4): размер текста полей, списков и меню Fluent; окна — стилем Window в Forest.axaml -->
+    <x:Double x:Key="ControlContentThemeFontSize">13</x:Double>
 
-    <!-- ===== формы: скругления Fluent ===== -->
-    <CornerRadius x:Key="ControlCornerRadius">4</CornerRadius>
+    <!-- ===== формы: скругления Fluent (поля 7, как кнопки; галочкам — свои 4, см. Forest.axaml) ===== -->
+    <CornerRadius x:Key="ControlCornerRadius">7</CornerRadius>
     <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
 
     <!-- ===== поля ввода: рамка-линия, в фокусе — песок ===== -->
@@ -61,8 +118,9 @@
          до полей не доходила). На карточке поле так чуть светлее её; непрозрачная «поверхность» с карточкой сливалась. -->
     <SolidColorBrush x:Key="TextControlBackground" Color="#0FFFFFFF" />
     <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#15FFFFFF" />
-    <!-- в фокусе — тёмная полупрозрачная заливка (Fluent ControlFillColorInputActive) и песочная рамка: 1 px, снизу 2 px -->
-    <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#B31E1E1E" />
+    <!-- в фокусе — тёмная полупрозрачная заливка цвета боковой колонки (поле «проваливается» глубже карточки и
+         страницы) и песочная рамка: 1 px, снизу 2 px -->
+    <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#B3111913" />
     <Thickness x:Key="TextControlBorderThemeThicknessFocused">1,1,1,2</Thickness>
     <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#0BFFFFFF" />
     <StaticResource x:Key="TextControlBorderBrush" ResourceKey="Forest.Line" />
@@ -75,7 +133,7 @@
     <StaticResource x:Key="TextControlForeground" ResourceKey="Forest.Text" />
     <StaticResource x:Key="TextControlForegroundPointerOver" ResourceKey="Forest.Text" />
     <StaticResource x:Key="TextControlForegroundFocused" ResourceKey="Forest.Text" />
-    <StaticResource x:Key="TextControlForegroundDisabled" ResourceKey="Forest.DisabledText" />
+    <StaticResource x:Key="TextControlForegroundDisabled" ResourceKey="Forest.Faint" />
     <StaticResource x:Key="TextControlPlaceholderForeground" ResourceKey="Forest.Muted" />
     <StaticResource x:Key="TextControlPlaceholderForegroundPointerOver" ResourceKey="Forest.Muted" />
     <StaticResource x:Key="TextControlPlaceholderForegroundFocused" ResourceKey="Forest.Muted" />
@@ -135,7 +193,7 @@
     <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedDisabled" Color="Transparent" />
     <StaticResource x:Key="CheckBoxCheckBackgroundStrokeCheckedDisabled" ResourceKey="Forest.LineStrong" />
     <StaticResource x:Key="CheckBoxCheckBackgroundStrokeUncheckedDisabled" ResourceKey="Forest.LineStrong" />
-    <StaticResource x:Key="CheckBoxCheckGlyphForegroundCheckedDisabled" ResourceKey="Forest.DisabledText" />
+    <StaticResource x:Key="CheckBoxCheckGlyphForegroundCheckedDisabled" ResourceKey="Forest.Faint" />
     <StaticResource x:Key="RadioButtonOuterEllipseCheckedFill" ResourceKey="Forest.Accent" />
     <StaticResource x:Key="RadioButtonOuterEllipseCheckedFillPointerOver" ResourceKey="Forest.Accent" />
     <StaticResource x:Key="RadioButtonOuterEllipseCheckedFillPressed" ResourceKey="Forest.Accent" />
@@ -148,7 +206,7 @@
 
     <!-- ===== подсказки, меню, всплывающие панели ===== -->
     <StaticResource x:Key="ToolTipBackground" ResourceKey="Forest.Surface" />
-    <StaticResource x:Key="ToolTipBorderBrush" ResourceKey="Forest.Line" />
+    <StaticResource x:Key="ToolTipBorderBrush" ResourceKey="Forest.LineStrong" />
     <StaticResource x:Key="ToolTipForeground" ResourceKey="Forest.Text" />
     <StaticResource x:Key="MenuFlyoutPresenterBackground" ResourceKey="Forest.Surface" />
     <StaticResource x:Key="MenuFlyoutPresenterBorderBrush" ResourceKey="Forest.LineStrong" />
@@ -168,7 +226,7 @@
     <x:Double x:Key="DataGridRowSelectedHoveredBackgroundOpacity">1</x:Double>
     <x:Double x:Key="DataGridRowSelectedUnfocusedBackgroundOpacity">1</x:Double>
     <x:Double x:Key="DataGridRowSelectedHoveredUnfocusedBackgroundOpacity">1</x:Double>
-    <Color x:Key="DataGridRowHoveredBackgroundColor">#14E7E9DD</Color>
+    <Color x:Key="DataGridRowHoveredBackgroundColor">#14E7E9DE</Color> <!-- текст, 8 % -->
     <StaticResource x:Key="DataGridGridLinesBrush" ResourceKey="Forest.Line" />
     <SolidColorBrush x:Key="DataGridColumnHeaderBackgroundBrush" Color="Transparent" />
     <StaticResource x:Key="DataGridColumnHeaderForegroundBrush" ResourceKey="Forest.Muted" />
