@@ -264,7 +264,7 @@
 
                 <Panel Margin="0,12,0,0">
                     <!-- история: сеансы изменений модов -->
-                    <Border Classes="card" ClipToBounds="True" IsVisible="{Binding IsHistory}">
+                    <Border Classes="card" IsVisible="{Binding IsHistory}"><Border Classes="cardClip">
                         <Panel>
                             <TextBlock Text="{Binding History.Status}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" TextWrapping="Wrap"
                                        TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24" MaxWidth="420"
@@ -293,10 +293,10 @@
                                 </ListBox.ItemTemplate>
                             </ListBox>
                         </Panel>
-                    </Border>
+                    </Border></Border>
 
                     <!-- таблица -->
-                    <Border Classes="card" ClipToBounds="True" IsVisible="{Binding !IsHistory}">
+                    <Border Classes="card" IsVisible="{Binding !IsHistory}"><Border Classes="cardClip">
                         <DataGrid x:Name="Grid" ItemsSource="{Binding View.Items}" SelectedItem="{Binding Selected}" AutoGenerateColumns="False" IsReadOnly="True"
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{DynamicResource Forest.Line}"
                                   SelectionMode="Single" RowHeight="54" Background="Transparent" RowBackground="Transparent" BorderThickness="0"
@@ -395,7 +395,7 @@
                                 </DataGridTemplateColumn>
                             </DataGrid.Columns>
                         </DataGrid>
-                    </Border>
+                    </Border></Border>
                 </Panel>
             </DockPanel>
 

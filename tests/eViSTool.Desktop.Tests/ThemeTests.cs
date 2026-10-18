@@ -90,23 +90,88 @@ public sealed class ThemeTests
     }
 
     /// <summary>
-    /// Правило раздела 1: в стилях и разметке цвета — только токенами. Исключения — сами токены, производные цвета
-    /// палитры Fluent, системный красный кнопки «закрыть» и нейтрально-чёрный просмотр скриншотов.
+    /// Правило раздела 1: в стилях и разметке цвета — только токенами. Целиком исключены файлы, где числа — их место:
+    /// сами токены, производные цвета палитры Fluent и нейтрально-чёрный просмотр скриншотов. В остальных разрешены
+    /// только перечисленные значения — системный красный кнопки «закрыть», — чтобы новый цвет числом там не прошёл молча.
     /// </summary>
     [Fact]
     public void Markup_HasNoNumericColors()
     {
         var src = System.IO.Path.Combine(RepoRoot(), "src", "eViSTool.Desktop");
-        string[] allowed = ["App.axaml", "Themes/ForestResources.axaml", "Themes/ForestWindowChrome.axaml", "Dialogs/ScreenshotWindow.axaml"];
+        string[] allowedFiles = ["App.axaml", "Themes/ForestResources.axaml", "Dialogs/ScreenshotWindow.axaml"];
+        (string File, string Color)[] allowedColors = [("Themes/ForestWindowChrome.axaml", "#C42B1C"), ("Themes/ForestWindowChrome.axaml", "#B0291C")];
         var found = new List<string>();
         foreach (var file in Directory.EnumerateFiles(src, "*.axaml", SearchOption.AllDirectories))
         {
             var relative = System.IO.Path.GetRelativePath(src, file).Replace('\\', '/');
-            if (allowed.Contains(relative) || relative.StartsWith("bin/") || relative.StartsWith("obj/")) continue;
+            if (allowedFiles.Contains(relative) || relative.StartsWith("bin/") || relative.StartsWith("obj/")) continue;
             var text = Regex.Replace(File.ReadAllText(file), "<!--.*?-->", "", RegexOptions.Singleline); // в комментариях — можно
-            found.AddRange(Regex.Matches(text, @"""#[0-9A-Fa-f]{3,8}""|#[0-9A-Fa-f]{6,8}\b").Select(m => $"{relative}: {m.Value}"));
+            found.AddRange(Regex.Matches(text, @"""#[0-9A-Fa-f]{3,8}""|#[0-9A-Fa-f]{6,8}\b")
+                .Select(m => m.Value.Trim('"'))
+                .Where(color => !allowedColors.Contains((relative, color.ToUpperInvariant())))
+                .Select(color => $"{relative}: {color}"));
         }
         Assert.Empty(found);
+    }
+
+    /// <summary>
+    /// Обрезка карточки (ClipToBounds) срезает и её собственную тень: карточка с таблицей или консолью выходила плоской
+    /// рядом с приподнятыми. Обрезают внутренней рамкой Border.cardClip.
+    /// </summary>
+    [Fact]
+    public void Markup_CardsAreNotClipped()
+    {
+        var src = System.IO.Path.Combine(RepoRoot(), "src", "eViSTool.Desktop");
+        var found = new List<string>();
+        foreach (var file in Directory.EnumerateFiles(src, "*.axaml", SearchOption.AllDirectories))
+        {
+            var relative = System.IO.Path.GetRelativePath(src, file).Replace('\\', '/');
+            if (relative.StartsWith("bin/") || relative.StartsWith("obj/")) continue;
+            var text = Regex.Replace(File.ReadAllText(file), "<!--.*?-->", "", RegexOptions.Singleline);
+            found.AddRange(Regex.Matches(text, @"<Border\b[^>]*>")
+                .Where(m => Regex.IsMatch(m.Value, @"Classes=""[^""]*\bcard\b") && m.Value.Contains("ClipToBounds=\"True\""))
+                .Select(m => $"{relative}: {m.Value}"));
+        }
+        Assert.Empty(found);
+    }
+
+    /// <summary>Карточка с содержимым во всю площадь (как таблица): тень под ней есть, углы содержимого обрезаны по скруглению.</summary>
+    [AvaloniaFact]
+    public void Card_KeepsShadow_AndClipsContentByInnerBorder()
+    {
+        var card = new Border { Width = 200, Height = 100, Classes = { "card" } };
+        var window = Show(card);
+        var accent = new SolidColorBrush(Token(window, "Forest.Accent"));
+        card.Child = new Border { Classes = { "cardClip" }, Child = new Border { Background = accent } };
+        window.Background = new SolidColorBrush(Token(window, "Forest.Base"));
+        Dispatcher.UIThread.RunJobs();
+        var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("кадр не отрисовался");
+        var at = card.TranslatePoint(default, window)!.Value;
+        var (left, top, bottom) = ((int)at.X, (int)at.Y, (int)(at.Y + card.Bounds.Height));
+
+        // под карточкой — тень: темнее фона страницы
+        var basePixel = Pixel(frame, left + 100, bottom + 60);
+        var under = Pixel(frame, left + 100, bottom);
+        Assert.True(Lightness(under) < Lightness(basePixel) - 10, $"под карточкой {under}, фон {basePixel}");
+
+        // посередине содержимое, а в углу (сразу за рамкой) — уже нет: обрезано по скруглению 9
+        Assert.Equal(accent.Color, Pixel(frame, left + 100, top + 50));
+        var corner = Pixel(frame, left + 1, top + 1);
+        Assert.True(Math.Abs(corner.R - accent.Color.R) > 60, $"угол карточки {corner}");
+        window.Close();
+    }
+
+    private static int Lightness(Color c) => c.R + c.G + c.B;
+
+    private static Color Pixel(Avalonia.Media.Imaging.WriteableBitmap frame, int x, int y)
+    {
+        var bytes = new byte[4];
+        var handle = System.Runtime.InteropServices.GCHandle.Alloc(bytes, System.Runtime.InteropServices.GCHandleType.Pinned);
+        try { frame.CopyPixels(new PixelRect(x, y, 1, 1), handle.AddrOfPinnedObject(), 4, 4); }
+        finally { handle.Free(); }
+        return frame.Format == Avalonia.Platform.PixelFormat.Rgba8888
+            ? Color.FromArgb(bytes[3], bytes[0], bytes[1], bytes[2])
+            : Color.FromArgb(bytes[3], bytes[2], bytes[1], bytes[0]);
     }
 
     [AvaloniaFact]

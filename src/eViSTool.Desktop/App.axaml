@@ -20,14 +20,17 @@
                 <!-- базовые цвета Fluent → лесные: от них Fluent строит фон, текст, рамки, наведение и акцент всех
                      стандартных элементов. Непрозрачные — токены из ForestResources; полупрозрачные оттенки — от цвета
                      текста и боковой колонки (#E7E9DE и #111913 с прозрачностью), как у Fluent от белого и чёрного:
-                     поменялся токен — поменять и их. -->
+                     поменялся токен — поменять и их. Серый Fluent (ChromeGray) — Faint: та же светлота, что у его
+                     #767676. Из непрозрачных числом нарочно оставлен только «чёрный» ChromeBlackHigh (#0E1410, темнее
+                     Side — у Fluent на этом месте чёрный, остальные ChromeBlack* — он же с прозрачностью): своего токена
+                     у него нет. -->
                 <ColorPaletteResources x:Key="Dark"
                                        Accent="{StaticResource Forest.AccentColor}" RegionColor="{StaticResource Forest.BaseColor}"
                                        ErrorText="{StaticResource Forest.DangerColor}"
                                        AltHigh="{StaticResource Forest.SideColor}" AltMediumHigh="#CC111913" AltMedium="#99111913" AltMediumLow="#66111913" AltLow="#33111913"
                                        BaseHigh="{StaticResource Forest.TextColor}" BaseMediumHigh="#CCE7E9DE" BaseMedium="#99E7E9DE" BaseMediumLow="#66E7E9DE" BaseLow="#33E7E9DE"
                                        ChromeAltLow="{StaticResource Forest.TextColor}" ChromeWhite="{StaticResource Forest.TextColor}"
-                                       ChromeGray="#8A9786" ChromeHigh="{StaticResource Forest.LineStrongColor}"
+                                       ChromeGray="{StaticResource Forest.FaintColor}" ChromeHigh="{StaticResource Forest.LineStrongColor}"
                                        ChromeMedium="{StaticResource Forest.BaseColor}" ChromeMediumLow="{StaticResource Forest.SurfaceColor}"
                                        ChromeLow="{StaticResource Forest.SideColor}"
                                        ChromeDisabledHigh="{StaticResource Forest.RaisedColor}" ChromeDisabledLow="{StaticResource Forest.FaintColor}"

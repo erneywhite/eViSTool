@@ -103,7 +103,7 @@
 
         <!-- ===== консоль (только чтение) и игроки онлайн ===== -->
         <Grid Margin="0,14,0,12" ColumnDefinitions="*,280">
-            <Border Classes="card" ClipToBounds="True">
+            <Border Classes="card"><Border Classes="cardClip">
                 <DockPanel>
                     <DockPanel DockPanel.Dock="Top" Margin="16,10,10,8">
                         <!-- какой запуск показан: текущий или прошлый из Logs/Archive -->
@@ -152,7 +152,7 @@
                         </Panel>
                     </Border>
                 </DockPanel>
-            </Border>
+            </Border></Border>
 
             <!-- кто на сервере: только просмотр -->
             <Border Grid.Column="1" Classes="card" Margin="12,0,0,0" Padding="16,12" AutomationProperties.AutomationId="HostedPlayers">

@@ -263,7 +263,7 @@
                 </Panel>
 
                 <!-- ===== консоль ===== -->
-                <Border Classes="card" Margin="0,14,0,12" ClipToBounds="True" IsVisible="{Binding IsConsoleTab}">
+                <Border Classes="card" Margin="0,14,0,12" IsVisible="{Binding IsConsoleTab}"><Border Classes="cardClip">
                     <DockPanel>
                         <DockPanel DockPanel.Dock="Top" Margin="16,10,10,8">
                             <Button DockPanel.Dock="Right" Classes="small" Content="{local:Tr server.clear}" Command="{Binding ClearConsoleCommand}" />
@@ -348,7 +348,7 @@
                             </ListBox>
                         </Border>
                     </DockPanel>
-                </Border>
+                </Border></Border>
             </Panel>
         </DockPanel>
     </Panel>

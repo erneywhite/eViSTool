@@ -110,6 +110,12 @@
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="BoxShadow" Value="{DynamicResource Forest.CardShadow}" />
     </Style>
+    <!-- обрезка содержимого карточки по скруглению (таблица, консоль): внутренняя рамка с радиусом 10 − 1 (толщина
+         рамки карточки). ClipToBounds на самой карточке нельзя: обрезка срезает и её тень -->
+    <Style Selector="Border.cardClip">
+        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="ClipToBounds" Value="True" />
+    </Style>
     <!-- плашка-предупреждение: тёплый фон, рамка и кромка -->
     <Style Selector="Border.warning">
         <Setter Property="Background" Value="{DynamicResource Forest.WarningBg}" />
