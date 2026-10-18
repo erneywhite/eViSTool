@@ -11,8 +11,8 @@ namespace eViSTool.Desktop.Tests;
 /// <summary>
 /// Боковая панель главного окна и фон из игры (docs/design.md, раздел 5) — настоящая разметка окна и лесная тема:
 /// без картинки — цвет Side и «горизонтали», с картинкой (класс backdrop у Root) — вуаль над ней, вуалевые выбранный
-/// и наведённый пункт меню и карточка профиля. Вуаль пункта меню задаётся через часть его шаблона (Border#Bd): поменяется
-/// шаблон в теме — тест упадёт, а не вуаль тихо пропадёт. Окно не показывается и живёт без модели: только разметка и стили.
+/// и наведённый пункт меню (их задаёт тема, Forest.NavItem) и карточка профиля. Окно не показывается и живёт без
+/// модели: только разметка и стили.
 /// </summary>
 public sealed class MainWindowBackdropTests : IDisposable
 {
@@ -64,7 +64,7 @@ public sealed class MainWindowBackdropTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void With_a_picture_veil_and_veil_brushes_in_the_menu()
+    public async Task With_a_picture_veil_and_veil_brushes_in_the_menu()
     {
         var window = Window();
         var nav = window.FindControl<ListBox>("Nav")!;
@@ -75,13 +75,14 @@ public sealed class MainWindowBackdropTests : IDisposable
         Assert.False(window.FindControl<GlyphPath>("Contours")!.IsVisible);
         Assert.Same(window.FindResource("Forest.SideCardVeil"), window.FindControl<Border>("ProfileCard")!.Background);
 
-        // невидимое окно разворачивает в меню только первый пункт (остальные — без темы пункта меню), на нём и проверяем
+        // невидимое окно разворачивает в меню только первый пункт (остальные — без темы пункта меню), на нём и проверяем.
+        // Подложка пункта меняется переходом (180 мс) — проверяем, к чему он пришёл
         var item = Assert.IsType<ListBoxItem>(nav.ContainerFromIndex(0));
-        Assert.Same(window.FindResource("Forest.NavSelectedVeil"), Bd(item).Background);
+        await Wait.Until(() => ReferenceEquals(Bd(item).Background, window.FindResource("Forest.NavSelectedVeil")));
 
         // наведение — псевдоклассом напрямую: мышь окну без показа не нужна
         nav.SelectedIndex = -1;
         ((IPseudoClasses)item.Classes).Set(":pointerover", true);
-        Assert.Same(window.FindResource("Forest.NavHoverVeil"), Bd(item).Background);
+        await Wait.Until(() => ReferenceEquals(Bd(item).Background, window.FindResource("Forest.NavHoverVeil")));
     }
 }
