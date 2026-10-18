@@ -1,0 +1,13 @@
+eViSTool 0.14.2 for Linux: readable backup folder names and a lighter update.
+
+- Hosted server backups go to a folder named after the profile; the same name twice gives "Name (2)". Renaming the profile does not move the folder; folders from 0.14.0 and 0.14.1 are renamed on first start.
+- "Go back to the previous version" and "eViSTool.Agent rollback" from 0.14.1 are removed: an older release is easier to download from GitHub or ModDB. The update works as in 0.14.0 again.
+- Avalonia 12.1.4 and other library updates; eViSTool's own workaround for an Avalonia text-rendering bug is removed, the bug is fixed upstream.
+
+---
+
+eViSTool 0.14.2 для Linux: понятные имена папок с копиями и более простое обновление.
+
+- Копии мира сервера у хостера лежат в папке с именем профиля, при совпадении имён — «Имя (2)». Если переименовать профиль, папка останется прежней. Папки от 0.14.0 и 0.14.1 переименуются при первом запуске.
+- Убраны «Вернуться на прежнюю версию» и «eViSTool.Agent rollback» из 0.14.1: прежний выпуск проще скачать с GitHub или ModDB. Обновление снова работает как в 0.14.0.
+- Avalonia 12.1.4 и обновления других библиотек. В Avalonia исправили ошибку отрисовки текста, поэтому свой обход для неё в eViSTool убран.

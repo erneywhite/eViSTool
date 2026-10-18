@@ -1,0 +1,19 @@
+eViSTool 0.14.2: readable backup folder names and a lighter update.
+
+Changes
+- Hosted server backups now go to a folder named after the profile (HostedBackups\My server instead of a string of letters and digits). If two profiles have the same name, the second one gets "My server (2)". The name is picked once: renaming the profile does not move the folder. Folders made by 0.14.0 and 0.14.1 are renamed automatically on first start.
+- "Go back to the previous version", added in 0.14.1, is removed. If a new version fails to start, the button cannot be reached anyway, and an older release is easier to download from GitHub or ModDB. The update works as in 0.14.0 again, and leftovers of the previous version are removed right after the update.
+- Avalonia 12.1.4 and other library updates. A text-rendering bug in Avalonia is fixed upstream, so eViSTool's own workaround for it is removed.
+
+Update from About.
+
+---
+
+eViSTool 0.14.2: понятные имена папок с копиями и более простое обновление.
+
+Изменения
+- Копии мира сервера у хостера теперь лежат в папке с именем профиля (HostedBackups\Мой сервер вместо набора букв и цифр). Если у двух профилей одно имя, второй получит «Мой сервер (2)». Имя выбирается один раз: если переименовать профиль, папка останется прежней. Папки от 0.14.0 и 0.14.1 переименуются сами при первом запуске.
+- Убран «Возврат на прежнюю версию» из 0.14.1. Если новая версия не запускается, до этой кнопки всё равно не добраться, а прежний выпуск проще скачать с GitHub или ModDB. Обновление снова работает как в 0.14.0, хвосты прежней версии убираются сразу после него.
+- Avalonia 12.1.4 и обновления других библиотек. В Avalonia исправили ошибку отрисовки текста, поэтому свой обход для неё в eViSTool убран.
+
+Обнови из «О программе».
