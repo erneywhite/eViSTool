@@ -114,6 +114,8 @@ internal static partial class HostedWorldLocator
             && await MatchAsync(ls, fromConfig, layout, dataDir, ct).ConfigureAwait(false) is { } byConfig)
             return byConfig with { FoundBy = HostedWorldFoundBy.Config };
 
+        // shortcut: из лога — только текущий server-main.log (его начало уже прочитано раскладкой); лога нет (сервер как раз
+        // запускается) — Logs/Archive не смотрим. Переделать, если путь из конфига и Saves перестанут выручать
         if (LogPath(snapshot.LogHead) is { } fromLog
             && await MatchAsync(ls, fromLog, layout, dataDir, ct).ConfigureAwait(false) is { } byLog)
             return byLog with { FoundBy = HostedWorldFoundBy.Log };

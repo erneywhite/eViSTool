@@ -234,6 +234,8 @@ public sealed partial class HostedWorldBackups
 
         try
         {
+            // shortcut: список модов — из последнего скана в этом окне; скана не было — mods.json в архиве нет. Переделать на
+            // свой скан без записи (HostedMods.PeekAsync), если копии начнут делать без открытых «Моих модов»
             await HostedSessions.UseAsync(Id, Hosted.Endpoint, async files =>
                     await HostedWorldExtra.PackAsync(files, Root, layout, HostedMods.LastScan(Target)?.Mods, ExtraFor(target), progress, ct)
                         .ConfigureAwait(false),
