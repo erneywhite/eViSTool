@@ -12,16 +12,8 @@
          Окно — поверх всех и в панели задач, без владельца: вылет приходит, пока игрок в игре, а программа может быть
          свёрнута (на Wayland «поверх всех» композитор может не выполнить) -->
 
-    <!-- «Подробности» — как Expander Fluent (лесная тема его не перекрашивала): шапка и содержимое —
-         полупрозрачный белый, рамка — тёмная полупрозрачная (CardBackgroundFillColorDefault/Secondary, CardStrokeColorDefault) -->
-    <dialogs:DialogWindow.Resources>
-        <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#0DFFFFFF" />
-        <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="#19000000" />
-        <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="#19000000" />
-        <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPressed" Color="#19000000" />
-        <SolidColorBrush x:Key="ExpanderContentBackground" Color="#08FFFFFF" />
-        <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="#19000000" />
-    </dialogs:DialogWindow.Resources>
+    <!-- «Подробности» — Expander в цветах темы (кисти Expander* — в ForestResources): шапка — поверхность, содержимое —
+         фон окна, рамки — линия -->
     <dialogs:DialogWindow.Styles>
         <!-- шапка ниже, чем у Fluent в Avalonia (48); текст и содержимое ближе к краю (11, у
              Fluent в Avalonia 16) -->

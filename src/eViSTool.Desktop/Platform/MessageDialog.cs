@@ -47,8 +47,8 @@ internal sealed class MessageDialog : Window
                         new Border
                         {
                             [DockPanel.DockProperty] = Dock.Left, Width = 30, Height = 30, CornerRadius = new CornerRadius(15),
-                            Background = new SolidColorBrush(GlyphColor(glyph)), Margin = new Thickness(0, 0, 14, 0), VerticalAlignment = VerticalAlignment.Top,
-                            Child = new TextBlock { Text = GlyphText(glyph), FontWeight = FontWeight.Bold, FontSize = 16, Foreground = Brush.Parse("#2C2B1C"),
+                            Background = Token(GlyphToken(glyph)), Margin = new Thickness(0, 0, 14, 0), VerticalAlignment = VerticalAlignment.Top,
+                            Child = new TextBlock { Text = GlyphText(glyph), FontWeight = FontWeight.Bold, FontSize = 16, Foreground = Token("Forest.AccentInk"),
                                 HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
                         },
                         new SelectableTextBlock { Text = text, TextWrapping = TextWrapping.Wrap, FontSize = 13 },
@@ -67,13 +67,17 @@ internal sealed class MessageDialog : Window
 
     private enum Glyph { Question, Info, Warning, Error }
 
-    private static Color GlyphColor(Glyph g) => g switch
+    /// <summary>Цвет кружка со значком — токен темы по смыслу.</summary>
+    private static string GlyphToken(Glyph g) => g switch
     {
-        Glyph.Warning => Color.Parse("#EDBF82"),
-        Glyph.Error => Color.Parse("#E89B96"),
-        Glyph.Info => Color.Parse("#B0C898"),
-        _ => Color.Parse("#D4BD83"),
+        Glyph.Warning => "Forest.Warn",
+        Glyph.Error => "Forest.Danger",
+        Glyph.Info => "Forest.Good",
+        _ => "Forest.Accent",
     };
+
+    /// <summary>Кисть темы по ключу (окно ещё не показано — ищется в ресурсах приложения).</summary>
+    private IBrush? Token(string key) => this.TryFindResource(key, ActualThemeVariant, out var value) ? value as IBrush : null;
 
     private static string GlyphText(Glyph g) => g switch { Glyph.Question => "?", Glyph.Info => "i", _ => "!" };
 

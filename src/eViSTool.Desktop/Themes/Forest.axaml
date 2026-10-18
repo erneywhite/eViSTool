@@ -7,11 +7,15 @@
         ErrorText), тоже здесь. Отличие конкретного экрана — локальным значением или локальным стилем.
         Важно: значение, которое меняет класс или состояние, задавать стилем, а не атрибутом — атрибут (локальное
         значение) в Avalonia сильнее любого стиля.
+        Типографика (docs/design.md, раздел 4): заголовок страницы 28, окна-диалога 20, карточки 16, основной текст 13,
+        подписи 12, мелкие пометки 11; заголовки прямые.
     -->
 
+    <!-- основной текст — 13 (у Fluent по умолчанию 14) -->
     <Style Selector="Window">
         <Setter Property="Background" Value="{DynamicResource Forest.Base}" />
         <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+        <Setter Property="FontSize" Value="13" />
     </Style>
 
     <!-- контурная иконка: Data = геометрия Icon.*, цвет линии — наследуемый цвет текста родителя -->
@@ -30,7 +34,7 @@
         <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
     </Style>
     <Style Selector="TextBlock.pageTitle">
-        <Setter Property="FontSize" Value="26" />
+        <Setter Property="FontSize" Value="28" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
     </Style>
@@ -67,7 +71,7 @@
     <!-- заголовок карточки (CardTitle) -->
     <Style Selector="TextBlock.cardTitle">
         <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
-        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontSize" Value="16" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <!-- ошибка под полем (ErrorText) -->
@@ -96,19 +100,30 @@
         <Setter Property="SelectionBrush" Value="{DynamicResource Forest.Selection}" />
     </Style>
 
-    <!-- ===== панели ===== -->
+    <!-- ===== панели (раздел 2: глубина) ===== -->
+    <!-- карточка «приподнята»: светлая кромка сверху и короткая тёмная тень снизу. Карточку в карточку не кладём:
+         внутренний блок — фон на ступень светлее, без своей рамки -->
     <Style Selector="Border.card">
         <Setter Property="Background" Value="{DynamicResource Forest.Surface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Forest.Line}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="BoxShadow" Value="{DynamicResource Forest.CardShadow}" />
     </Style>
+    <!-- обрезка содержимого карточки по скруглению (таблица, консоль): внутренняя рамка с радиусом 10 − 1 (толщина
+         рамки карточки). ClipToBounds на самой карточке нельзя: обрезка срезает и её тень -->
+    <Style Selector="Border.cardClip">
+        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="ClipToBounds" Value="True" />
+    </Style>
+    <!-- плашка-предупреждение: тёплый фон, рамка и кромка -->
     <Style Selector="Border.warning">
         <Setter Property="Background" Value="{DynamicResource Forest.WarningBg}" />
-        <Setter Property="BorderBrush" Value="#5A4C33" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Forest.WarnLine}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="10" />
         <Setter Property="Padding" Value="14,10" />
+        <Setter Property="BoxShadow" Value="{DynamicResource Forest.EdgeShadow}" />
     </Style>
     <!-- строка настройки с линией сверху (Row) -->
     <Style Selector="Border.row">
@@ -169,20 +184,28 @@
         <Setter Property="IsHitTestVisible" Value="False" />
     </Style>
 
-    <!-- ===== разделитель колонок: прозрачная полоса, посередине — короткая ручка ===== -->
+    <!-- ===== разделитель колонок: прозрачная полоса, посередине — короткая ручка; при наведении ручка светлеет ===== -->
     <Style Selector="GridSplitter">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Template">
             <ControlTemplate>
                 <Border Background="{TemplateBinding Background}">
-                    <Border x:Name="Grip" Width="4" Height="24" CornerRadius="2" Background="{DynamicResource Forest.Muted}" Opacity="0.6"
+                    <Border x:Name="Grip" Width="4" Height="24" CornerRadius="2"
                             HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
             </ControlTemplate>
         </Setter>
     </Style>
+    <Style Selector="GridSplitter /template/ Border#Grip">
+        <Setter Property="Background" Value="{DynamicResource Forest.Faint}" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+            </Transitions>
+        </Setter>
+    </Style>
     <Style Selector="GridSplitter:pointerover /template/ Border#Grip">
-        <Setter Property="Opacity" Value="1" />
+        <Setter Property="Background" Value="{DynamicResource Forest.Muted}" />
     </Style>
 
     <!-- кнопка поменьше: в предупреждениях, очереди, шапках, списках версий -->
@@ -211,6 +234,11 @@
     <Style Selector="ScrollViewer /template/ ScrollContentPresenter#PART_ContentPresenter">
         <Setter Property="Grid.ColumnSpan" Value="1" />
         <Setter Property="Grid.RowSpan" Value="1" />
+    </Style>
+
+    <!-- галочка: скругление поля (ControlCornerRadius) у неё слишком круглое — свои 4, как было -->
+    <Style Selector="CheckBox">
+        <Setter Property="CornerRadius" Value="4" />
     </Style>
 
     <!-- стрелка выпадающего списка — мельче (у Fluent в Avalonia 12×12). Масштабом, а не

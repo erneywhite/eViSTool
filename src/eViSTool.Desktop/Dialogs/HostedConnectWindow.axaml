@@ -96,7 +96,7 @@
         </StackPanel>
 
         <!-- «Дополнительно»: папка сервера и активный режим FTP -->
-        <Button Classes="small" HorizontalAlignment="Left" Padding="0,4" Margin="0,16,0,0" Background="Transparent" BorderThickness="0"
+        <Button Classes="small flat" HorizontalAlignment="Left" Padding="0,4" Margin="0,16,0,0"
                 Click="Advanced_Click" AutomationProperties.AutomationId="HostedAdvanced">
             <StackPanel Orientation="Horizontal">
                 <Path Classes="icon chevron" Classes.open="{Binding IsAdvancedOpen}" Data="{StaticResource Icon.ChevronDown}" Width="12" Height="12" Margin="0,0,6,0" />

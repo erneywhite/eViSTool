@@ -103,7 +103,7 @@
 
         <!-- ===== консоль (только чтение) и игроки онлайн ===== -->
         <Grid Margin="0,14,0,12" ColumnDefinitions="*,280">
-            <Border Classes="card" ClipToBounds="True">
+            <Border Classes="card"><Border Classes="cardClip">
                 <DockPanel>
                     <DockPanel DockPanel.Dock="Top" Margin="16,10,10,8">
                         <!-- какой запуск показан: текущий или прошлый из Logs/Archive -->
@@ -127,7 +127,7 @@
                                Margin="16,0,16,8" IsVisible="{Binding RunNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                AutomationProperties.AutomationId="HostedRunNote" />
 
-                    <Border Background="#151C17" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="6,4">
+                    <Border Background="{DynamicResource Forest.Side}" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="6,4">
                         <Panel>
                             <!-- строки — виртуализированный список с переносом, как у своей консоли -->
                             <ListBox x:Name="ConsoleList" Classes="console" ItemsSource="{Binding Lines}" Background="Transparent" BorderThickness="0"
@@ -152,7 +152,7 @@
                         </Panel>
                     </Border>
                 </DockPanel>
-            </Border>
+            </Border></Border>
 
             <!-- кто на сервере: только просмотр -->
             <Border Grid.Column="1" Classes="card" Margin="12,0,0,0" Padding="16,12" AutomationProperties.AutomationId="HostedPlayers">

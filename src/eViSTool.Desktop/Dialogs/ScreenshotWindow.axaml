@@ -8,6 +8,8 @@
                       x:DataType="vm:ScreenshotViewerViewModel"
                       Title="{Binding Title}" Background="#111111"
                       Width="1100" Height="700">
+    <!-- просмотр скриншотов нарочно нейтрально-чёрный, а не лесной: зелёный вокруг картинки менял бы на глаз её цвета.
+         Поэтому цвета здесь числом, без токенов темы -->
     <Window.KeyBindings>
         <KeyBinding Gesture="Left" Command="{Binding PreviousCommand}" />
         <KeyBinding Gesture="Right" Command="{Binding NextCommand}" />
