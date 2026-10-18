@@ -1470,6 +1470,7 @@
   "remote.title": "Remote access",
   "remote.warning": "Keep the code to yourself. Within a home network or a VPN this is enough. Do not expose the port to the internet unless you need to: the connection is encrypted and the key cannot be guessed, but a VPN is still safer.",
   "hosted.title": "Server at a hosting provider",
+  "hosted.protocol": "Protocol",
   "hosted.host": "Address",
   "hosted.hostHint": "From the host’s panel: host, host:port, ftp://login@host:port/folder or sftp://…",
   "hosted.port": "Port",
