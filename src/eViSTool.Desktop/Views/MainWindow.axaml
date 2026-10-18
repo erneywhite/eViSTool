@@ -12,7 +12,9 @@
 
     <Window.Resources>
         <!-- фон из игры под боковой панелью (docs/design.md, раздел 5): над картинкой — вуаль цвета Side (75 %),
-             выбранный и наведённый пункт меню и карточка профиля — полупрозрачные, чтобы картинка просвечивала -->
+             выбранный и наведённый пункт меню и карточка профиля — полупрозрачные, чтобы картинка просвечивала.
+             shortcut: вуалевые токены здесь, а не в Themes/ForestResources.axaml, пока тема переделывается отдельно;
+             при слиянии с новой темой перенести их к остальным токенам Forest.* и убрать отсюда -->
         <SolidColorBrush x:Key="Forest.SideVeil" Color="#BF111913" />
         <SolidColorBrush x:Key="Forest.NavSelectedVeil" Color="#E035402D" />
         <SolidColorBrush x:Key="Forest.NavHoverVeil" Color="#99283128" />
@@ -147,6 +149,8 @@
         <Style Selector="Grid#Root.backdrop Path#Contours">
             <Setter Property="IsVisible" Value="False" />
         </Style>
+        <!-- пункт меню: фон рисует часть Bd шаблона Forest.NavItem (ForestControls.axaml). Переименуют часть или фон
+             уйдёт в TemplateBinding — эти два стиля перестанут действовать; ловит MainWindowBackdropTests -->
         <Style Selector="Grid#Root.backdrop ListBox#Nav ListBoxItem:pointerover /template/ Border#Bd">
             <Setter Property="Background" Value="{DynamicResource Forest.NavHoverVeil}" />
         </Style>

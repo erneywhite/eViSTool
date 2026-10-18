@@ -139,8 +139,10 @@ public partial class MainWindow : Window
             string? path = null;
             if (vm.GameBackground)
             {
-                var dirs = vm.IconSearchDirs;
-                path = await Task.Run(() => GameBackdrop.Find(dirs, TimeProvider.System));
+                // папки — в порядке IconSearchDirs, но без его FindGameDir на этом потоке: поиск установленной игры
+                // ходит по диску (на Linux ещё и разбирает exe), поэтому в фоне вместе с выбором файла
+                string?[] profiles = [vm.ActiveProfile?.GameDir, .. vm.Profiles.Select(p => p.GameDir)];
+                path = await Task.Run(() => GameBackdrop.Find([.. profiles, GameInstall.FindGameDir()], TimeProvider.System));
                 if (run != _backdropRun) return;
             }
             if (path == _backdropPath) return;
