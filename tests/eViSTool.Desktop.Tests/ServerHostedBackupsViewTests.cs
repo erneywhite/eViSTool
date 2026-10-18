@@ -1,6 +1,8 @@
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Styling;
 using Avalonia.Threading;
@@ -17,8 +19,9 @@ namespace eViSTool.Desktop.Tests;
 
 /// <summary>
 /// Вкладка «Копии» раздела «Сервер» у хостера: список копий с метками и действиями, пустой список, строка хода с
-/// полосой и отменой, пока идёт скачивание, итог, переключатели расписания и поле «Хранить последних». Сервер —
-/// поддельный FTP; копии в папке — файлы с именами, как их делает eViSTool.
+/// полосой и отменой, пока идёт скачивание, итог, переключатели расписания и поле «Хранить последних», поле папки
+/// (применяется по Enter и когда его отпустили). Сервер — поддельный FTP; копии в папке — файлы с именами, как их
+/// делает eViSTool.
 /// </summary>
 public sealed class ServerHostedBackupsViewTests : IDisposable
 {
@@ -164,6 +167,49 @@ public sealed class ServerHostedBackupsViewTests : IDisposable
         Assert.True(error.IsEffectivelyVisible);
         Assert.Equal(Loc.T("sched.keepError"), error.Text);
         Assert.Equal(7, _host.Settings.BackupKeep);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task The_folder_field_applies_on_Enter_and_keeps_the_focus()
+    {
+        var model = await OpenAsync();
+        var window = Show(model);
+        var dir = Path.Combine(_host.Dir, "elsewhere");
+        var box = Named<TextBox>(window, "HostedBackupDir");
+        box.Focus();
+        Dispatcher.UIThread.RunJobs();
+        box.SelectAll();
+
+        window.KeyTextInput(dir);
+        Assert.Equal(_copies, model.BackupDirText); // привязка LostFocus: пока поле держит фокус, модель текста не знает
+
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+        Assert.Equal(dir, model.BackupDirText);
+        Assert.True(box.IsFocused); // Enter поле не отпускает
+        await Wait.Until(() => model.BackupDirOk.Length > 0);
+        Assert.Equal(dir, _host.Settings.BackupDir);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task Leaving_the_folder_field_applies_the_text()
+    {
+        var model = await OpenAsync();
+        var window = Show(model);
+        var dir = Path.Combine(_host.Dir, "elsewhere");
+        var box = Named<TextBox>(window, "HostedBackupDir");
+        box.Focus();
+        Dispatcher.UIThread.RunJobs();
+        box.SelectAll();
+        window.KeyTextInput(dir);
+
+        Named<TextBox>(window, "HostedBackupKeep").Focus();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(dir, model.BackupDirText);
+        await Wait.Until(() => model.BackupDirOk.Length > 0);
+        Assert.Equal(dir, _host.Settings.BackupDir);
         window.Close();
     }
 }

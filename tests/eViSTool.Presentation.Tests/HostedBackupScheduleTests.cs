@@ -12,7 +12,9 @@ namespace eViSTool.Presentation.Tests;
 /// Копии мира у хостера по расписанию — сторожем оповещений (<see cref="HostedWatch"/>) с подменёнными часами,
 /// поддельным FTP «как G-Portal» и настоящими логами: пора и не пора (по копиям в папке, в том числе после
 /// перезапуска окна), копии игры нет — молча через час, а целый срок — одно оповещение; неудача — «Копия мира не
-/// получилась» ровно один раз до удачной копии; кнопка и расписание не качают две копии сразу.
+/// получилась» ровно один раз до удачной копии; кнопка и расписание не качают две копии сразу. Гонки прохода: повтор
+/// после неудачи не обгоняется проходом, который уже шёл; молчащая папка копий не держит проход; профиль удалили или
+/// расписание выключили, пока читали папку или качали, — ничего не начинается и не приходит.
 /// </summary>
 public sealed class HostedBackupScheduleTests : IDisposable
 {
@@ -75,12 +77,13 @@ public sealed class HostedBackupScheduleTests : IDisposable
         File.SetLastWriteTimeUtc(local, DateTime.SpecifyKind(marks.LastTime!.Value.AddHours(-2), DateTimeKind.Utc));
     }
 
-    private (HostedWatch Watch, HostedWorldJobs Jobs) Watch(HostedWorldJobs? jobs = null)
+    private (HostedWatch Watch, HostedWorldJobs Jobs) Watch(HostedWorldJobs? jobs = null, IEnumerable<ProfileViewModel>? profiles = null,
+        HostedModUpdates? updates = null)
     {
         jobs ??= new HostedWorldJobs(_clock);
         jobs.Started += _started.Add;
-        var watch = new HostedWatch([new ProfileViewModel(_host.Profile, _ => { })], new HostedModUpdates((_, _) => Task.FromResult<IReadOnlyList<ModCheckResult>>([])),
-            _clock, _agents, jobs)
+        var watch = new HostedWatch(profiles ?? [new ProfileViewModel(_host.Profile, _ => { })],
+            updates ?? new HostedModUpdates((_, _) => Task.FromResult<IReadOnlyList<ModCheckResult>>([])), _clock, _agents, jobs)
         {
             Send = (_, message) =>
             {
@@ -327,5 +330,196 @@ public sealed class HostedBackupScheduleTests : IDisposable
         _host.Server.OnBefore = null;
         release.Set();
         Sta.WaitFor(() => jobs.Running(_host.Profile.Id) is null);
+    });
+
+    [Fact]
+    public void WhileACopyHoldsTheConnection_ModUpdatesAreNotChecked_AndAreRightAfterIt() => Sta.Run(() =>
+    {
+        PutLog(HostedLogSamples.Stopped);
+        PutWorld(World, "one");
+        new ServerNotifySettings
+        {
+            ServerName = _host.Profile.Name,
+            Channels = [new NotifyChannel { Id = "tg", Name = "Telegram", Kind = NotifyKind.Telegram }],
+            Routes = new() { [NotifyEvent.ModUpdates] = ["tg"] },
+        }.Save(_host.Profile.Id, _agents);
+        var checks = 0;
+        var updates = new HostedModUpdates((_, _) =>
+        {
+            checks++; // настоящая проверка начала бы со скана модов по FTP — того же соединения
+            return Task.FromResult<IReadOnlyList<ModCheckResult>>([]);
+        }, _clock);
+        using var reached = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var (watch, jobs) = Watch(updates: updates);
+        _host.Server.OnBefore = (op, path) =>
+        {
+            if (op != "download" || path != World) return;
+            reached.Set();
+            release.Wait(TimeSpan.FromSeconds(20));
+        };
+        Assert.NotNull(jobs.StartBackup(_host.Target, scheduled: false));
+        Sta.WaitFor(() => reached.IsSet);
+
+        _clock.UtcNow += TimeSpan.FromHours(7); // обновления модов пора проверять
+        Sta.Wait(watch.TickAsync());
+        Assert.Equal(0, checks);
+
+        _host.Server.OnBefore = null;
+        release.Set();
+        Sta.WaitFor(() => jobs.Running(_host.Profile.Id) is null);
+        Sta.Wait(watch.TickAsync());
+        Assert.Equal(1, checks);
+    });
+
+    [Fact]
+    public void AHeldProfile_IsNotCopiedOnSchedule_UntilItIsLetGo() => Sta.Run(() =>
+    {
+        PutLog(HostedLogSamples.Stopped);
+        PutWorld(World, "one");
+        var (watch, jobs) = Watch();
+        _clock.UtcNow += HostedWatch.BackupFirstDelay;
+
+        using (jobs.Hold(_host.Profile.Id)) // вкладка спрашивает о восстановлении
+        {
+            Tick(watch, jobs);
+            Assert.Empty(_started);
+            Assert.Null(jobs.StartBackup(_host.Target, scheduled: true));
+        }
+
+        Assert.False(jobs.IsHeld(_host.Profile.Id));
+        Tick(watch, jobs);
+        Assert.Single(_started);
+    });
+
+    [Fact]
+    public void AFaultyFinishedHandler_DoesNotTurnASuccessIntoAFailure_NorAnnounceItTwice() => Sta.Run(() =>
+    {
+        PutLog(HostedLogSamples.Stopped);
+        PutWorld(World, "one");
+        var jobs = new HostedWorldJobs(_clock);
+        var calls = 0;
+        jobs.Finished += _ =>
+        {
+            calls++;
+            throw new InvalidOperationException("handler bug");
+        };
+
+        var job = jobs.StartBackup(_host.Target, scheduled: false);
+        Assert.NotNull(job);
+        Sta.WaitFor(() => job.IsFinished);
+        Sta.Wait(Task.Delay(100));
+
+        Assert.Equal(1, calls);
+        Assert.True(job.Completion.Result.Ok);
+        Assert.True(jobs.Last(_host.Profile.Id)!.Ok);
+        Assert.Single(Copies());
+    });
+
+    // ---------- гонки прохода
+
+    [Fact]
+    public void AFailedCopy_SetsItsRetry_BeforeAPassAlreadyUnderwayCouldStartAnother() => Sta.Run(() =>
+    {
+        PutLog(HostedLogSamples.Stopped);
+        PutWorld(World, "one");
+        _host.Server.FailOn = (op, path) => op == "download" && path == World;
+        var (watch, jobs) = Watch();
+        _clock.UtcNow += HostedWatch.BackupFirstDelay;
+        Task? midway = null;
+        // проход, начатый в тот миг, когда копия кончилась, а её итог ещё не разобран (повтор ещё не назначен)
+        jobs.Finished += _ => midway ??= watch.TickAsync();
+
+        Tick(watch, jobs);
+        Assert.NotNull(midway);
+        Sta.Wait(midway);
+        Sta.WaitFor(() => jobs.Running(_host.Profile.Id) is null);
+
+        Assert.Single(_started); // повтор — через час, а не второй попыткой сразу
+        Assert.Equal([Loc.T("notify.ev.backupFailed")], Titles());
+    });
+
+    [Fact]
+    public void AFolderThatDoesNotAnswer_DoesNotHoldThePass_AndItsAnswerIsTakenLater() => Sta.Run(() =>
+    {
+        PutLog(HostedLogSamples.Stopped);
+        PutWorld(World, "one");
+        var (watch, jobs) = Watch();
+        using var gate = new ManualResetEventSlim();
+        var reads = 0;
+        var answered = false;
+        watch.BackupReadWait = TimeSpan.FromMilliseconds(100);
+        watch.ReadLastOwn = _ =>
+        {
+            Interlocked.Increment(ref reads);
+            gate.Wait(TimeSpan.FromSeconds(30)); // сетевая папка молчит
+            Volatile.Write(ref answered, true);
+            return null;
+        };
+        _clock.UtcNow += HostedWatch.BackupFirstDelay;
+
+        Sta.Wait(watch.TickAsync()); // ждёт папку недолго (а чтение висит 30 с)
+        Assert.False(Volatile.Read(ref answered));
+        Assert.True(watch.TickAsync().IsCompleted); // следующий проход её уже не ждёт и нового чтения не начинает
+        Assert.Equal(1, Volatile.Read(ref reads));
+        Assert.Empty(_started);
+
+        gate.Set();
+        Sta.WaitFor(() => Volatile.Read(ref answered));
+        Tick(watch, jobs); // ответ папки забирает следующий проход
+        Assert.Single(_started);
+        Assert.Equal(1, Volatile.Read(ref reads));
+    });
+
+    [Fact]
+    public void ScheduleTurnedOffOrProfileRemoved_WhileTheFolderIsRead_StartsNothing() => Sta.Run(() =>
+    {
+        PutLog(HostedLogSamples.Stopped);
+        PutWorld(World, "one");
+        var profiles = new List<ProfileViewModel> { new(_host.Profile, _ => { }) };
+        var (watch, jobs) = Watch(profiles: profiles);
+        _clock.UtcNow += HostedWatch.BackupFirstDelay;
+
+        // расписание выключили, пока проход читал папку
+        watch.ReadLastOwn = _ =>
+        {
+            UiThread.Owner!.Send(_ => _host.Settings.BackupSchedule = HostedBackupSchedule.Off, null);
+            return null;
+        };
+        Tick(watch, jobs);
+        Assert.Empty(_started);
+
+        // включили снова, а пока проход читал папку, профиль удалили
+        _host.Settings.BackupSchedule = HostedBackupSchedule.Daily;
+        watch.ReadLastOwn = _ =>
+        {
+            UiThread.Owner!.Send(_ => profiles.Clear(), null);
+            return null;
+        };
+        Tick(watch, jobs);
+        Assert.Empty(_started);
+        Assert.Empty(Copies());
+    });
+
+    [Fact]
+    public void ScheduleTurnedOffMidCopy_ItsFailureSendsNothing() => Sta.Run(() =>
+    {
+        PutLog(HostedLogSamples.Stopped);
+        PutWorld(World, "one");
+        var state = new TaskCompletionSource<HostedServerState>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var (watch, jobs) = Watch(new HostedWorldJobs(_clock, (_, _) => state.Task)); // копия ждёт проверки лога
+        _host.Server.FailOn = (op, path) => op == "download" && path == World;
+        _clock.UtcNow += HostedWatch.BackupFirstDelay;
+        Sta.Wait(watch.TickAsync());
+        Assert.Single(_started);
+
+        _host.Settings.BackupSchedule = HostedBackupSchedule.Off; // выключили, пока копия шла
+        state.SetResult(HostedServerState.Stopped);
+        Sta.WaitFor(() => jobs.Running(_host.Profile.Id) is null);
+        Sta.Wait(watch.BackupFollowedAsync(_host.Profile.Id));
+        Sta.Wait(watch.SentAsync(_host.Profile.Id));
+
+        Assert.False(jobs.Last(_host.Profile.Id)!.Ok);
+        Assert.Empty(Titles()); // итог ничей: расписания уже нет
     });
 }

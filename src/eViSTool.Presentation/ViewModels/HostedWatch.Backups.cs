@@ -21,6 +21,16 @@ public sealed partial class HostedWatch
     public static TimeSpan PeriodOf(HostedBackupSchedule schedule) =>
         schedule == HostedBackupSchedule.Weekly ? TimeSpan.FromDays(7) : TimeSpan.FromDays(1);
 
+    /// <summary>
+    /// Сколько проход ждёт чтения папки копий. Сетевая папка, которая не отвечает (SMB — десятки секунд, NFS с hard —
+    /// бесконечно), не должна держать проход: с ним стоят оповещения всех серверов. Не дождались — чтение идёт дальше
+    /// само, а его итог заберёт один из следующих проходов. Тесты укорачивают.
+    /// </summary>
+    internal TimeSpan BackupReadWait { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>Чтение последней своей копии в папке; null — настоящее (<see cref="LastOwn"/>). Тесты придерживают его.</summary>
+    internal Func<HostedWorldBackups, DateTime?>? ReadLastOwn { get; set; }
+
     private readonly Dictionary<string, BackupPlan> _plans = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Task> _following = new(StringComparer.Ordinal);
     private DateTime? _backupsSince; // первый проход после запуска окна (UTC)
@@ -37,40 +47,42 @@ public sealed partial class HostedWatch
         public DateTime RetryAt;      // раньше не пробовать (UTC)
         public DateTime? DueSince;    // с какого прохода копию пора сделать (UTC)
         public bool Notified;         // о неудаче этой полосы уже сказали
+        public Task<DateTime?>? Reading; // чтение папки, не успевшее за свой проход
+        public string? ReadingDir;    // какой папки
     }
 
     /// <summary>
     /// Профилям с включённым расписанием, которым пора (последняя своя копия в папке старше суток или недели), — скачать
     /// копию тем же путём, что кнопка (<see cref="HostedWorldJobs.StartBackup"/>). Одна копия по расписанию за раз; у
-    /// профиля уже идёт операция (кнопка, восстановление) — не трогаем. Время последней копии — по папке копий: так оно
-    /// переживает перезапуск окна; папку читаем в пуле потоков и только когда по памяти уже пора (папка бывает сетевой).
+    /// профиля уже идёт операция (кнопка, восстановление) или вкладка его придержала (<see cref="HostedWorldJobs.Hold"/>) —
+    /// не трогаем. Время последней копии — по папке копий: так оно переживает перезапуск окна; папку читаем в пуле
+    /// потоков, только когда по памяти уже пора, и ждём не дольше <see cref="BackupReadWait"/> (папка бывает сетевой).
     /// </summary>
     private async Task CheckBackupsAsync()
     {
         if (_jobs is not { } jobs) return;
         var now = UtcNow;
         _backupsSince ??= now;
+        var ids = Profiles.Select(p => p.Model).Where(p => p.IsHosted).Select(p => p.Id).ToList();
+        foreach (var gone in _plans.Keys.Except(ids, StringComparer.Ordinal).ToList()) _plans.Remove(gone); // профиль удалили
         if (now - _backupsSince < BackupFirstDelay || jobs.AnyScheduled) return;
-        foreach (var profile in Profiles.Select(p => p.Model).Where(p => p.IsHosted).ToList())
+        foreach (var id in ids)
         {
-            if (profile.Hosted?.BackupSchedule is not (HostedBackupSchedule.Daily or HostedBackupSchedule.Weekly) || ModTarget.For(profile) is not
-                { IsHosted: true } target)
-            {
-                _plans.Remove(profile.Id); // выключили — включат снова с чистого листа
-                continue;
-            }
-            if (jobs.Running(profile.Id) is not null) continue;
-            if (!_plans.TryGetValue(profile.Id, out var plan)) _plans[profile.Id] = plan = new BackupPlan();
-            if (now < plan.RetryAt) continue;
-            var period = PeriodOf(profile.Hosted.BackupSchedule);
+            if (Plan(id) is not { } planned) continue;
+            var (target, period, plan) = planned;
+            if (jobs.Running(id) is not null || jobs.IsHeld(id) || now < plan.RetryAt) continue;
             var backups = new HostedWorldBackups(target) { Time = _time };
             if (!plan.Read || plan.Dir != backups.Dir || plan.Last is not { } known || now - known >= period)
             {
                 // по памяти пора (или не знаем) — свериться с папкой: копию могли сделать кнопкой или в другом окне
-                plan.Last = await Task.Run(() => LastOwn(backups));
-                plan.Dir = backups.Dir;
-                plan.Read = true;
+                if (!await ReadLastAsync(plan, backups)) continue; // папка молчит
                 now = UtcNow;
+                // пока читали, могли удалить профиль, выключить расписание или сменить папку, начать копию кнопкой, придержать
+                // профиль восстановлением, а неудачная копия по расписанию — назначить повтор: берём то, что сейчас
+                if (Plan(id) is not { } fresh || !ReferenceEquals(fresh.Plan, plan)) continue;
+                (target, period) = (fresh.Target, fresh.Period);
+                if (new HostedWorldBackups(target).Dir != plan.Dir) continue; // папку сменили — прочитаем новую следующим проходом
+                if (jobs.Running(id) is not null || jobs.IsHeld(id) || now < plan.RetryAt) continue;
             }
             if (plan.Last is { } last && now - last < period)
             {
@@ -78,13 +90,61 @@ public sealed partial class HostedWatch
                 continue;
             }
             plan.DueSince ??= now;
-            if (jobs.Running(profile.Id) is not null || jobs.AnyScheduled) return; // пока читали папку, начали копию
+            if (jobs.AnyScheduled) return; // пока читали папку, началась другая копия по расписанию
             if (jobs.StartBackup(target, scheduled: true) is { } job)
             {
-                _following[profile.Id] = FollowAsync(job, profile.Id, period);
+                _following[id] = FollowAsync(job, id, period);
                 return;
             }
         }
+    }
+
+    /// <summary>
+    /// Расписание профиля сейчас: профиль есть, он у хостера, копии по расписанию включены и пароль читается — цель,
+    /// срок и что о нём помнится (нет — заводится). Иначе — null, и память о нём забыта: включат снова — с чистого листа.
+    /// </summary>
+    private (ModTarget Target, TimeSpan Period, BackupPlan Plan)? Plan(string profileId)
+    {
+        if (ScheduleOf(profileId) is not { } schedule)
+        {
+            _plans.Remove(profileId);
+            return null;
+        }
+        if (!_plans.TryGetValue(profileId, out var plan)) _plans[profileId] = plan = new BackupPlan();
+        return (schedule.Target, schedule.Period, plan);
+    }
+
+    private (ModTarget Target, TimeSpan Period)? ScheduleOf(string profileId)
+    {
+        var profile = Profiles.Select(p => p.Model).FirstOrDefault(p => p.Id == profileId && p.IsHosted);
+        if (profile?.Hosted is not { BackupSchedule: HostedBackupSchedule.Daily or HostedBackupSchedule.Weekly } hosted) return null;
+        return ModTarget.For(profile) is { IsHosted: true } target ? (target, PeriodOf(hosted.BackupSchedule)) : null;
+    }
+
+    /// <summary>
+    /// Прочитать папку копий в пуле потоков и запомнить последнюю свою копию. Ждём не дольше <see cref="BackupReadWait"/>:
+    /// не дождались — false, чтение продолжается. Следующие проходы нового не начинают и его не ждут, а только смотрят,
+    /// кончилось ли оно, и забирают итог.
+    /// </summary>
+    private async Task<bool> ReadLastAsync(BackupPlan plan, HostedWorldBackups backups)
+    {
+        // shortcut: чтение, повисшее навсегда (NFS с hard), держит поток пула, и копий этого профиля по расписанию больше
+        // не будет до перезапуска окна (оповещения и остальные профили идут). Переделать, если такое встретится
+        var fresh = plan.Reading is null || plan.ReadingDir != backups.Dir;
+        if (fresh)
+        {
+            var read = ReadLastOwn ?? LastOwn;
+            plan.Reading = Task.Run(() => read(backups));
+            plan.ReadingDir = backups.Dir;
+        }
+        var reading = plan.Reading!;
+        if (fresh && !reading.IsCompleted) await Task.WhenAny(reading, Task.Delay(BackupReadWait));
+        if (!reading.IsCompleted) return false;
+        plan.Reading = null;
+        plan.Last = await reading;
+        plan.Dir = plan.ReadingDir;
+        plan.Read = true;
+        return true;
     }
 
     /// <summary>Последняя своя копия в папке (UTC, по отметке в имени); папки нет или своих копий нет — null.</summary>
@@ -97,13 +157,18 @@ public sealed partial class HostedWatch
     /// Итог копии по расписанию. Удалась — без оповещения, следующая через срок. Отменили — попробовать через час, это
     /// не сбой. Скачать нечего (сервер работает, а свежей копии игры нет) — тоже через час и молча, пока это длится
     /// меньше срока расписания; дольше — это уже неудача. Неудача — оповещение «Копия мира не получилась» один раз, пока
-    /// не случится удачная копия, и следующая попытка через час.
+    /// не случится удачная копия, и следующая попытка через час. Пока качали, профиль удалили или расписание выключили —
+    /// итог ничей: ни оповещения, ни повтора.
     /// </summary>
     private async Task FollowAsync(HostedWorldJob job, string profileId, TimeSpan period)
     {
         var outcome = await job.Completion;
         var now = UtcNow;
-        if (!_plans.TryGetValue(profileId, out var plan)) return; // расписание выключили, пока качали
+        if (ScheduleOf(profileId) is null || !_plans.TryGetValue(profileId, out var plan))
+        {
+            _plans.Remove(profileId);
+            return;
+        }
         if (outcome.Backup is { } done)
         {
             plan.Last = Utc(done.Backup.Time);

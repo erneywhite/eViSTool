@@ -119,6 +119,7 @@ public sealed class HostedWorldJobs(TimeProvider? time = null, Func<ModTarget, C
 {
     private readonly Dictionary<string, HostedWorldJob> _running = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HostedWorldOutcome> _last = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _held = new(StringComparer.Ordinal); // придержанные профили: сколько раз
     private readonly Func<ModTarget, CancellationToken, Task<HostedServerState>> _state =
         state ?? ((target, ct) => HostedLogsPool.For(target).CheckNowAsync(ct, StateTimeout));
 
@@ -133,7 +134,11 @@ public sealed class HostedWorldJobs(TimeProvider? time = null, Func<ModTarget, C
     /// <summary>Операция началась (кнопкой или по расписанию).</summary>
     public event Action<HostedWorldJob>? Started;
 
-    /// <summary>Операция кончилась. Сторож оповещений подписан раньше вкладки и узнаёт об итоге первым.</summary>
+    /// <summary>
+    /// Операция кончилась (уже не в <see cref="Running"/>, итог — в <see cref="Last"/>). Обработчики зовутся сразу, в потоке
+    /// окна. Сторож оповещений на это событие не подписан: итог копии по расписанию он ждёт в <see cref="HostedWorldJob.Completion"/>,
+    /// а это продолжение приходит позже обработчиков.
+    /// </summary>
     public event Action<HostedWorldOutcome>? Finished;
 
     /// <summary>Идущая операция профиля; нет — null.</summary>
@@ -146,12 +151,42 @@ public sealed class HostedWorldJobs(TimeProvider? time = null, Func<ModTarget, C
     public HostedWorldOutcome? Last(string profileId) => _last.GetValueOrDefault(profileId);
 
     /// <summary>
+    /// Придержать профиль: пока вкладка спрашивает о восстановлении и смотрит лог, расписание копию этого профиля не
+    /// начинает. Иначе копия заняла бы соединение профиля на всю передачу, проверка лога не дождалась бы его и
+    /// восстановление отказало бы с непонятной причиной. Кнопку «Скачать копию сейчас» это не держит. Отпустить — Dispose.
+    /// </summary>
+    public IDisposable Hold(string profileId)
+    {
+        _held[profileId] = _held.GetValueOrDefault(profileId) + 1;
+        return new Release(() =>
+        {
+            if (_held.TryGetValue(profileId, out var count) && count > 1) _held[profileId] = count - 1;
+            else _held.Remove(profileId);
+        });
+    }
+
+    /// <summary>Профиль придержан (<see cref="Hold"/>): копию по расписанию сейчас не начинать.</summary>
+    public bool IsHeld(string profileId) => _held.ContainsKey(profileId);
+
+    private sealed class Release(Action release) : IDisposable
+    {
+        private Action? _release = release;
+
+        public void Dispose()
+        {
+            _release?.Invoke();
+            _release = null;
+        }
+    }
+
+    /// <summary>
     /// Скачать копию мира сюда. Откуда — решает лог: остановлен или вылетел — сам мир, иначе — свежая копия игры из
-    /// Backups и BackupSaves. У профиля уже идёт операция — null, вторая не начинается.
+    /// Backups и BackupSaves. У профиля уже идёт операция — null, вторая не начинается. По расписанию — ещё и null,
+    /// пока профиль придержан (<see cref="Hold"/>).
     /// </summary>
     public HostedWorldJob? StartBackup(ModTarget target, bool scheduled)
     {
-        if (!target.IsHosted || _running.ContainsKey(target.ProfileId)) return null;
+        if (!target.IsHosted || _running.ContainsKey(target.ProfileId) || scheduled && IsHeld(target.ProfileId)) return null;
         var job = Begin(new HostedWorldJob(target, HostedWorldJobKind.Backup, scheduled, null));
         _ = RunBackupAsync(job);
         return job;
@@ -182,9 +217,12 @@ public sealed class HostedWorldJobs(TimeProvider? time = null, Func<ModTarget, C
         return job;
     }
 
+    // итог объявляется вне try: обработчик Finished, упавший с ошибкой, не должен превращать удачную операцию в
+    // неудачную и объявлять итог второй раз. Его ошибка уходит в задачу, а оттуда — в журнал вылетов окна
     private async Task RunBackupAsync(HostedWorldJob job)
     {
         HostedServerState? state = null;
+        HostedWorldOutcome outcome;
         try
         {
             var found = await _state(job.Target, job.Token);
@@ -195,30 +233,33 @@ public sealed class HostedWorldJobs(TimeProvider? time = null, Func<ModTarget, C
             var backups = new HostedWorldBackups(job.Target) { Time = Time };
             // в пуле потоков целиком: проверка папки (бывает сетевой), сведение журнала SQLite и архив — синхронные
             var result = await Task.Run(() => backups.CreateAsync(stopped, progress, job.Token), CancellationToken.None);
-            End(new HostedWorldOutcome(job, null) { Backup = result, ServerState = found, At = Now });
+            outcome = new HostedWorldOutcome(job, null) { Backup = result, ServerState = found, At = Now };
         }
         catch (Exception ex)
         {
             Unexpected(ex);
-            End(new HostedWorldOutcome(job, ex) { ServerState = state, At = Now });
+            outcome = new HostedWorldOutcome(job, ex) { ServerState = state, At = Now };
         }
+        End(outcome);
     }
 
     private async Task RunRestoreAsync(HostedWorldJob job, HostedRestoreOptions options)
     {
+        HostedWorldOutcome outcome;
         try
         {
             var progress = new Progress<HostedTransfer>(job.Report);
             var backups = new HostedWorldBackups(job.Target) { Time = Time };
             // проверка копии и архива читает файлы целиком — тоже не в потоке окна
             var result = await Task.Run(() => backups.RestoreAsync(job.Backup!, options, progress, job.Token), CancellationToken.None);
-            End(new HostedWorldOutcome(job, null) { Restore = result, At = Now });
+            outcome = new HostedWorldOutcome(job, null) { Restore = result, At = Now };
         }
         catch (Exception ex)
         {
             Unexpected(ex);
-            End(new HostedWorldOutcome(job, ex) { At = Now });
+            outcome = new HostedWorldOutcome(job, ex) { At = Now };
         }
+        End(outcome);
     }
 
     private DateTime Now => Time.GetUtcNow().UtcDateTime;
@@ -233,7 +274,7 @@ public sealed class HostedWorldJobs(TimeProvider? time = null, Func<ModTarget, C
     }
 
     /// <summary>Ошибки сети, диска и ядра — обычный итог; остальное — ещё и в журнал вылетов, а не молча.</summary>
-    private static void Unexpected(Exception ex)
+    internal static void Unexpected(Exception ex)
     {
         if (ex is not (IOException or UnauthorizedAccessException or OperationCanceledException or InvalidOperationException
             or InvalidDataException or TimeoutException))

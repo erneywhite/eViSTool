@@ -7,7 +7,6 @@ using CommunityToolkit.Mvvm.Input;
 using eViSTool.Core.Hosting;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Mods;
-using eViSTool.Presentation.ViewModels.Mods;
 
 namespace eViSTool.Presentation.ViewModels;
 
@@ -46,26 +45,28 @@ public sealed class HostedBackupRowViewModel(HostedWorldBackup backup)
 /// Вкладка «Копии» раздела «Сервер» у сервера у хостера: копии мира на этом компьютере — на случай, если доступ к хостеру
 /// пропадёт. «Скачать копию сейчас» — откуда, решает лог: сервер остановлен или вылетел — сам мир, иначе — свежая копия
 /// игры из Backups и BackupSaves; её нет — понятный отказ. Список копий: показать в папке, удалить (в Корзину),
-/// восстановить на сервер — после вопроса с датой копии, вопроса «останови сервер» и только если по логу сервер
-/// остановлен. Настройки (расписание, сколько хранить, папка) — в профиле, сохраняются сразу и моды не перечитывают.
-/// Сами операции — общие на окно (<see cref="HostedWorldJobs"/>): ушли с вкладки или сменили профиль — операция идёт,
-/// вернулись — виден её ход или итог.
+/// восстановить на сервер — после вопроса с датой копии и только если по логу сервер не работает: остановлен — сразу,
+/// иначе после вопроса «останови сервер» и второго взгляда в лог. Настройки (расписание, сколько хранить, папка) — в
+/// профиле, сохраняются сразу и моды не перечитывают. Сами операции — общие на окно (<see cref="HostedWorldJobs"/>):
+/// ушли с вкладки или сменили профиль — операция идёт, вернулись — виден её ход или итог.
 /// </summary>
 public sealed partial class HostedBackupsViewModel : ObservableObject
 {
     private readonly MainViewModel? _main;
     private readonly HostedWorldJobs _jobs;
-    private readonly HostedStopReminder _reminder = new(); // без главного окна (тесты вкладки) — свой вопрос «останови сервер»
     private ProfileViewModel? _profile;
     private HostedWorldJob? _job;               // идущая операция открытого профиля
     private HostedWorldOutcome? _shown;         // итог, показанный в строке (пересобирается при смене языка)
+    private Func<string>? _said;                // или отказ, показанный в строке (тоже пересобирается)
     private IReadOnlyList<HostedWorldBackup> _list = [];
     private bool _active;
     private bool _loading;                      // поля настроек заполняются из профиля — не сохранять
     private int _generation;                    // сменили профиль — ответы для прежнего не показывать
     private int _dirCheck;                      // какая проверка папки последняя
+    private string? _dirOkKey;                  // что сказано под полем папки, когда она подошла
+    private string? _dirFailed;                 // какая папка не подошла (ошибку собирает ядро — при смене языка проверим заново)
 
-    /// <param name="main">Главное окно: вопрос «останови сервер» — тот же, что у модов; без него (тесты) — свой.</param>
+    /// <param name="main">Главное окно: сторож оповещений, которому сказать о смене расписания; без него (тесты) — некому.</param>
     /// <param name="jobs">Операции с копиями мира — общие с расписанием.</param>
     public HostedBackupsViewModel(MainViewModel? main, HostedWorldJobs jobs)
     {
@@ -74,9 +75,6 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
         jobs.Started += OnJobStarted;
         jobs.Finished += OnJobFinished;
     }
-
-    /// <summary>Вопрос «останови сервер» перед восстановлением (true — можно дальше); тесты подменяют.</summary>
-    internal Func<ModTarget, string, Task<bool>>? ConfirmStopped { get; set; }
 
     public ObservableCollection<HostedBackupRowViewModel> Backups { get; } = [];
     public bool HasBackups => Backups.Count > 0;
@@ -158,7 +156,7 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
             ShowOutcome(next is null ? null : _jobs.Last(next.Model.Id));
             LoadSettings();
         }
-        ProblemText = next is not null && ModTarget.For(next.Model) is null ? ModTarget.UnreadableText(next.Model) : "";
+        UpdateProblem();
         OnPropertyChanged(nameof(HasProfile));
         OnPropertyChanged(nameof(BackupDirDefault));
         UpdateTexts();
@@ -173,14 +171,22 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
         if (active) _ = RefreshAsync();
     }
 
+    /// <summary>Сменили язык: всё, что вкладка показывает своими словами, — заново на новом.</summary>
     public void OnLanguageChanged()
     {
         FillRows();
         UpdateTexts();
-        ShowOutcome(_shown);
+        if (_said is { } said) Say(said);
+        else ShowOutcome(_shown);
         ShowProgress();
+        UpdateProblem();
         if (KeepError.Length > 0) KeepError = Loc.T("sched.keepError");
+        if (_dirOkKey is { } ok) BackupDirOk = Loc.T(ok);
+        if (_dirFailed is { } failed) _ = ApplyBackupDirAsync(failed); // ошибка — текстом ядра: проверить ещё раз, уже на новом языке
     }
+
+    private void UpdateProblem() =>
+        ProblemText = _profile is { } p && ModTarget.For(p.Model) is null ? ModTarget.UnreadableText(p.Model) : "";
 
     /// <summary>Цель операций — снимок профиля сейчас; пароль не прочитать — null.</summary>
     private ModTarget? Target() => _profile is { } p && ModTarget.For(p.Model) is { IsHosted: true } target ? target : null;
@@ -275,6 +281,7 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
     private void ShowOutcome(HostedWorldOutcome? outcome)
     {
         _shown = outcome;
+        _said = null;
         if (outcome is null)
         {
             StatusText = ErrorText = WarningsText = "";
@@ -286,11 +293,13 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
         WarningsText = string.Join(Environment.NewLine, outcome.Warnings);
     }
 
-    private void Say(string error)
+    /// <summary>Отказ или ошибка без операции — в строку итога; текст собирается заново при смене языка.</summary>
+    private void Say(Func<string> error)
     {
         _shown = null;
+        _said = error;
         StatusText = WarningsText = "";
-        ErrorText = error;
+        ErrorText = error();
     }
 
     private void NotifyCommands()
@@ -317,7 +326,7 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
     private void BackupNow()
     {
         if (Target() is not { } target) return;
-        if (_jobs.StartBackup(target, scheduled: false) is null) Say(Loc.T("hostedbk.busy"));
+        if (_jobs.StartBackup(target, scheduled: false) is null) Say(() => Loc.T("hostedbk.busy"));
     }
 
     private bool CanCancel() => _job is { IsCancelling: false };
@@ -328,33 +337,47 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
     private bool CanTouch(HostedBackupRowViewModel? row) => row is not null && _profile is not null && !IsBusy;
 
     /// <summary>
-    /// «Восстановить на сервер…»: вопрос с датой копии и галочкой «и настройки модов, игроков и данные модов»; затем
-    /// «останови сервер» — тот же вопрос, что перед изменением модов (по логу остановлен — без вопроса); затем ещё раз
-    /// лог — и только если по нему сервер точно не работает (остановлен или вылетел), заливка. Работает — отказ с
-    /// объяснением: при остановке он записал бы свой мир поверх восстановленного. Нынешний мир остаётся на сервере как bak.
+    /// «Восстановить на сервер…»: вопрос с датой копии и галочкой «и настройки модов, игроков и данные модов»; затем лог.
+    /// По логу остановлен — заливка без вопроса. Иначе — вопрос «останови сервер», и задаётся он всегда: ни флажок профиля
+    /// «Напоминать остановить сервер», ни недавнее «Да» перед изменением модов его здесь не отменяют, ставка — мир. Даже
+    /// вылетевший сервер хостер может тут же запустить снова. После «Да» — лог ещё раз, и только если по нему сервер точно
+    /// не работает (остановлен или вылетел), заливка. Работает — отказ с объяснением: при остановке он записал бы свой мир
+    /// поверх восстановленного. Нынешний мир остаётся на сервере как bak. Пока всё это идёт, профиль придержан
+    /// (<see cref="HostedWorldJobs.Hold"/>): копия по расписанию не займёт соединение посреди проверки.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanTouch))]
     private async Task Restore(HostedBackupRowViewModel? row)
     {
         if (row is null || Target() is not { } target) return;
+        using var hold = _jobs.Hold(target.ProfileId);
         if (AppWindows.Current.ConfirmHostedRestore(row.Backup, target.Name) is not { } choice) return;
         var generation = _generation;
         ShowOutcome(null);
         IsChecking = true;
-        HostedServerState state;
+        HostedServerState? state;
         try
         {
-            if (!await AskStoppedAsync(target, Loc.T("hostedbk.stopAsk", target.Name)) || generation != _generation) return;
-            state = await _jobs.StateAsync(target, CancellationToken.None);
+            state = await StateAsync(target, generation);
+            if (state is { } first && first != HostedServerState.Stopped)
+            {
+                if (generation != _generation || !AskStopped(target)) return;
+                state = await StateAsync(target, generation);
+            }
         }
         finally
         {
             if (generation == _generation) IsChecking = false;
         }
-        if (generation != _generation) return;
-        if (!HostedLogs.IsSurelyDown(state))
+        if (generation != _generation || state is not { } found) return;
+        // операция у профиля могла начаться только мимо придержки; тогда «по логу не понять» — не та причина
+        if (_jobs.Running(target.ProfileId) is not null)
         {
-            Say(state == HostedServerState.Unknown ? Loc.T("hostedbk.restoreUnknown") : Loc.T("hostedbk.restoreRunning", StateWord(state)));
+            Say(() => Loc.T("hostedbk.busy"));
+            return;
+        }
+        if (!HostedLogs.IsSurelyDown(found))
+        {
+            Say(found == HostedServerState.Unknown ? () => Loc.T("hostedbk.restoreUnknown") : () => Loc.T("hostedbk.restoreRunning", StateWord(found)));
             return;
         }
         var options = new HostedRestoreOptions
@@ -363,18 +386,30 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
             KeepOldWorld = true, // нынешний мир — рядом с ним как bak: об этом и спрашивали
             Extras = choice.Extras ? HostedWorldExtras.ModConfig | HostedWorldExtras.Playerdata | HostedWorldExtras.ModData : HostedWorldExtras.None,
         };
-        if (_jobs.StartRestore(target, row.Backup, options) is null) Say(Loc.T("hostedbk.busy"));
+        if (_jobs.StartRestore(target, row.Backup, options) is null) Say(() => Loc.T("hostedbk.busy"));
     }
 
-    private Task<bool> AskStoppedAsync(ModTarget target, string question) =>
-        ConfirmStopped?.Invoke(target, question)
-        ?? (_main is { } main ? main.Mods.ConfirmIfRunningAsync(target, question) : AskOwnAsync(target, question));
-
-    private async Task<bool> AskOwnAsync(ModTarget target, string question)
+    /// <summary>
+    /// Состояние сервера по логу перед восстановлением (сеть и нехватка времени — Unknown). Лог не прочитать по другой
+    /// причине (папка логов или корень в настройках выходят за корень FTP) — отказ с причиной в строке и null.
+    /// </summary>
+    private async Task<HostedServerState?> StateAsync(ModTarget target, int generation)
     {
-        await _reminder.CheckAsync(target);
-        return _reminder.IsKnownStopped(target) || _reminder.Confirm(target, question);
+        try
+        {
+            return await _jobs.StateAsync(target, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            HostedWorldJobs.Unexpected(ex);
+            if (generation == _generation) Say(() => Loc.T("hostedbk.restoreFailed", HostedServerViewModel.Describe(ex)));
+            return null;
+        }
     }
+
+    /// <summary>«Останови сервер в панели хостера» перед восстановлением — без памяти ответа и без флажка профиля.</summary>
+    private static bool AskStopped(ModTarget target) =>
+        Ui.Confirm(Loc.T("hostedbk.stopAsk", target.Name), byDefault: Answer.No, warning: true);
 
     /// <summary>«работает», «запускается», «останавливается» — внутри фразы «По логу сервер …».</summary>
     private static string StateWord(HostedServerState state) => state switch
@@ -384,22 +419,52 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
         _ => Loc.T("hostedbk.stateRunning"),
     };
 
-    /// <summary>«Удалить»: копия, её архив и сведения — в Корзину, после вопроса.</summary>
+    /// <summary>
+    /// «Удалить»: копия, её архив и сведения — в Корзину, после вопроса. Папка на сетевом диске Windows — вопрос
+    /// другой: Корзины там нет, и система удалит файлы насовсем. Удаление — в пуле потоков: на Linux файл с другого
+    /// диска корзина копирует к себе целиком, а это гигабайты.
+    /// </summary>
     [RelayCommand(CanExecute = nameof(CanTouch))]
     private async Task Delete(HostedBackupRowViewModel? row)
     {
         if (row is null || Target() is not { } target) return;
-        if (!Ui.Confirm(Loc.T("sched.deleteAsk", row.Name), byDefault: Answer.No)) return;
+        // shortcut: файл больше, чем вмещает Корзина диска, Windows тоже удалит насовсем, не спросив. Переделать (своё
+        // удаление с FOF_WANTNUKEWARNING), если копии начнут упираться в размер Корзины
+        var question = HasNoRecycleBin(row.Backup.Path) ? Loc.T("hostedbk.deleteAskNetwork", row.Name) : Loc.T("sched.deleteAsk", row.Name);
+        if (!Ui.Confirm(question, byDefault: Answer.No)) return;
         try
         {
             var backups = new HostedWorldBackups(target);
             await Task.Run(() => backups.Delete(row.Backup, Ui.Platform.MoveToTrash));
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        // OperationCanceledException — в окне ошибки системы нажали «Отмена»
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or OperationCanceledException)
         {
-            Say(Loc.T("sched.failed", ex.Message));
+            var message = ex.Message;
+            Say(() => Loc.T("sched.failed", message));
         }
         await RefreshAsync();
+    }
+
+    /// <summary>
+    /// Папка на сетевом диске Windows (\\nas\share или подключённый диск): Корзины у неё нет, система удаляет насовсем.
+    /// На Linux корзина в домашней папке, туда переезжает и файл с другого диска.
+    /// </summary>
+    internal static bool HasNoRecycleBin(string path)
+    {
+        if (!OperatingSystem.IsWindows()) return false;
+        try
+        {
+            var root = Path.GetPathRoot(Path.GetFullPath(path)) ?? "";
+            if (root.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase) || root.StartsWith(@"\\.\UNC\", StringComparison.OrdinalIgnoreCase)) return true;
+            if (root.StartsWith(@"\\?\", StringComparison.Ordinal) || root.StartsWith(@"\\.\", StringComparison.Ordinal)) root = root[4..];
+            if (root.StartsWith(@"\\", StringComparison.Ordinal)) return true;
+            return root.Length > 0 && new DriveInfo(root).DriveType == DriveType.Network;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
+        {
+            return false; // не понять — обычный вопрос
+        }
     }
 
     [RelayCommand]
@@ -420,7 +485,8 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Say(Loc.T("backupdir.unreachable", ex.Message));
+            var message = ex.Message;
+            Say(() => Loc.T("backupdir.unreachable", message));
             return;
         }
         Ui.OpenFolder(dir);
@@ -437,6 +503,7 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
             KeepText = (_profile?.BackupKeep ?? 7).ToString(CultureInfo.InvariantCulture);
             BackupDirText = _profile?.BackupDir ?? "";
             KeepError = BackupDirError = BackupDirOk = "";
+            _dirOkKey = _dirFailed = null;
         }
         finally
         {
@@ -471,14 +538,20 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
 
     /// <summary>
     /// Новую папку сначала проверяем (создаётся ли, пишется ли — в пуле потоков: папка бывает сетевой), годится —
-    /// в профиль, нет — остаётся прежняя, а под полем сказано, что не так. Пусто — папка программы.
+    /// в профиль, нет — остаётся прежняя, а под полем сказано, что не так. Пусто — папка программы. Ответ проверки,
+    /// которую уже обогнала новая (или возврат к сохранённой папке), не показывается.
     /// </summary>
     private async Task ApplyBackupDirAsync(string dir)
     {
         if (_profile is not { } profile) return;
         var check = ++_dirCheck;
         BackupDirError = BackupDirOk = "";
-        if (string.Equals(dir, profile.BackupDir ?? "", StringComparison.Ordinal)) return;
+        _dirOkKey = _dirFailed = null;
+        if (string.Equals(dir, profile.BackupDir ?? "", StringComparison.Ordinal))
+        {
+            BackupDirChecking = false; // вернули прежнюю, пока шла проверка другой: её ответ уже не нужен
+            return;
+        }
         BackupDirChecking = true;
         var error = dir.Length == 0 ? null : await Task.Run(() => HostedWorldBackups.CheckDir(dir));
         if (check != _dirCheck) return;
@@ -486,10 +559,12 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
         if (error is not null)
         {
             BackupDirError = error;
+            _dirFailed = dir;
             return;
         }
         profile.BackupDir = dir.Length > 0 ? dir : null;
-        BackupDirOk = Loc.T(dir.Length > 0 ? "hostedbk.dirSaved" : "hostedbk.dirSavedDefault");
+        _dirOkKey = dir.Length > 0 ? "hostedbk.dirSaved" : "hostedbk.dirSavedDefault";
+        BackupDirOk = Loc.T(_dirOkKey);
         await RefreshAsync();
     }
 

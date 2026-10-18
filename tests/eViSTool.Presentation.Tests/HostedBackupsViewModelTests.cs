@@ -11,8 +11,9 @@ namespace eViSTool.Presentation.Tests;
 /// <summary>
 /// Вкладка «Копии» раздела «Сервер» у хостера: поддельный FTP «как G-Portal», настоящие миры SQLite и настоящие логи
 /// G-Portal (откуда качать, решает лог). Кнопка: остановлен — сам мир, работает — копия игры, работает без копий —
-/// понятный отказ; отмена; список и удаление в Корзину; восстановление — вопрос, отказ на работающем сервере, успех;
-/// настройки сохраняются в профиль без правки профиля; операция переживает смену профиля.
+/// понятный отказ; отмена; список и удаление в Корзину; восстановление — вопрос, отказ на работающем сервере и когда по
+/// логу не понять, успех, после вылета — вопрос всегда, лог не прочитать — причина в строке; настройки сохраняются в
+/// профиль без правки профиля; операция переживает смену профиля и отменяется удалением профиля; смена языка.
 /// </summary>
 public sealed class HostedBackupsViewModelTests : IDisposable
 {
@@ -285,6 +286,89 @@ public sealed class HostedBackupsViewModelTests : IDisposable
         Assert.True(File.Exists(newer.Path));
     });
 
+    /// <summary>Корзина, в окне ошибки которой нажали «Отмена» (так бросает VB FileSystem.DeleteFile); на вопрос — «Да».</summary>
+    private sealed class CancelledTrash : TestUiPlatform, IUiPlatform
+    {
+        public override Answer Ask(string text, AskButtons buttons, Answer? byDefault = null, bool warning = false) => Answer.Yes;
+        void IUiPlatform.MoveToTrash(string path) => throw new OperationCanceledException("cancelled in the error dialog");
+    }
+
+    [Fact]
+    public void Delete_CancelledInTheSystemErrorDialog_SaysSo_AndKeepsTheCopy() => Sta.Run(() =>
+    {
+        PutLog(HostedLogSamples.Stopped);
+        PutWorld(World, "a");
+        var copy = MakeCopy(new DateTime(2026, 10, 17, 9, 0, 0, DateTimeKind.Utc));
+        var vm = Open();
+
+        Ui.Platform = new CancelledTrash();
+        try
+        {
+            Sta.Wait(vm.DeleteCommand.ExecuteAsync(vm.Backups[0])); // не роняет окно отчётом о сбое
+        }
+        finally
+        {
+            Ui.Platform = new ScriptedPlatform(null);
+        }
+
+        Assert.Equal(Loc.T("sched.failed", "cancelled in the error dialog"), vm.ErrorText);
+        Assert.True(File.Exists(copy.Path));
+        Assert.Single(vm.Backups);
+    });
+
+    [Fact]
+    public void NetworkFolders_OnWindows_HaveNoRecycleBin_SoTheQuestionSaysPermanently()
+    {
+        Assert.False(HostedBackupsViewModel.HasNoRecycleBin(Path.Combine(Path.GetTempPath(), "copy.vcdbs")));
+        Assert.Equal(OperatingSystem.IsWindows(), HostedBackupsViewModel.HasNoRecycleBin(@"\\nas\share\copies\copy.vcdbs"));
+        Assert.Equal(OperatingSystem.IsWindows(), HostedBackupsViewModel.HasNoRecycleBin(@"\\?\UNC\nas\share\copies\copy.vcdbs"));
+        Assert.NotEqual(Loc.T("sched.deleteAsk", "x"), Loc.T("hostedbk.deleteAskNetwork", "x"));
+    }
+
+    [Fact]
+    public void RemovingTheProfile_CancelsItsDownload() => Sta.Run(() =>
+    {
+        PutLog(HostedLogSamples.Stopped);
+        PutWorld(World, "one");
+        using var reached = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        _host.Server.OnBefore = (op, path) =>
+        {
+            if (op != "download" || path != World) return;
+            reached.Set();
+            release.Wait(TimeSpan.FromSeconds(20));
+        };
+        var language = Loc.Instance.Language; // главная модель выставляет язык из настроек — другим тестам его не менять
+        var main = new MainViewModel { AutoCheckUpdates = false };
+        Loc.Instance.SetLanguage(language);
+        try
+        {
+            main.Profiles.Clear();
+            var own = new ProfileViewModel(new GameProfile { Id = "own-" + Guid.NewGuid().ToString("N"), Name = "Свой", Kind = ProfileKind.Server }, _ => { });
+            var hosted = new ProfileViewModel(_host.Profile, _ => { });
+            main.Profiles.Add(own);
+            main.Profiles.Add(hosted);
+            main.ActiveProfile = own;
+            var job = main.HostedWorldJobs.StartBackup(_host.Target, scheduled: false);
+            Assert.NotNull(job);
+            Sta.WaitFor(() => reached.IsSet);
+
+            using (new ScriptedDialogs(Answer.Yes)) Sta.Wait(main.RemoveProfileCommand.ExecuteAsync(hosted));
+
+            Assert.True(job.IsCancelling); // копию удалённого профиля не доделываем
+            release.Set();
+            Sta.WaitFor(() => job.IsFinished);
+            Assert.False(job.Completion.Result.Ok);
+            Assert.Null(main.HostedWorldJobs.Running(_host.Profile.Id));
+            Assert.DoesNotContain(CopyFiles(), f => f.Contains(".vcdbs", StringComparison.Ordinal));
+        }
+        finally
+        {
+            release.Set();
+            main.HostedWatch.Stop();
+        }
+    });
+
     // ---------- восстановление
 
     /// <summary>Окно «Восстановить мир» отвечает так; что ему показали — в asked.</summary>
@@ -400,6 +484,147 @@ public sealed class HostedBackupsViewModelTests : IDisposable
         // без строки «файлов настроек возвращено»
         Assert.Equal(Loc.T("hostedbk.restored", Dates.Stamp(copy.Time)) + " " + Loc.T("hostedbk.restoredKept", World + ".evistool.bak") + " "
                      + Loc.T("hostedbk.restoredStart"), vm.StatusText);
+    });
+
+    [Fact]
+    public void Restore_AfterACrash_AlwaysAsks_EvenWithTheReminderOff_AndHoldsTheScheduleMeanwhile() => Sta.Run(() =>
+    {
+        PutLog(HostedLogSamples.Stopped);
+        PutWorld(World, "old");
+        MakeCopy(new DateTime(2026, 10, 17, 9, 0, 0, DateTimeKind.Utc));
+        PutWorld(World, "broken");
+        _host.Settings.SkipStopReminder = true; // вопрос перед модами выключен — перед восстановлением он всё равно есть
+        var jobs = new HostedWorldJobs(state: (_, _) => Task.FromResult(HostedServerState.Crashed)); // упал: хостер может поднять его снова
+        var vm = Open(jobs);
+        var held = new List<bool>();
+        AppWindows.Current = NewProfileViewModelTests.Fake<IAppWindows>.Of((nameof(IAppWindows.ConfirmHostedRestore), _ =>
+        {
+            held.Add(jobs.IsHeld(_host.Profile.Id)); // пока спрашиваем, расписание копию не начнёт
+            return new HostedRestoreChoice(false);
+        }));
+
+        using (var no = new ScriptedDialogs(Answer.No))
+        {
+            Sta.Wait(vm.RestoreCommand.ExecuteAsync(vm.Backups[0]));
+            Assert.Equal([Loc.T("hostedbk.stopAsk", _host.Profile.Name)], no.Asked);
+        }
+        Assert.Empty(_host.Server.Writes);
+        Assert.Equal("", vm.ErrorText);
+        Assert.False(jobs.IsHeld(_host.Profile.Id));
+
+        // и «Да» минуту назад не помнится: снова спрашиваем
+        using (var yes = new ScriptedDialogs(Answer.Yes))
+        {
+            Sta.Wait(vm.RestoreCommand.ExecuteAsync(vm.Backups[0]));
+            Assert.Equal([Loc.T("hostedbk.stopAsk", _host.Profile.Name)], yes.Asked);
+        }
+        Sta.WaitFor(() => !vm.IsWorking);
+
+        Assert.Equal("", vm.ErrorText);
+        Assert.Equal(["old"], SqliteWorld.Read(ServerLocal(World)));
+        Assert.Equal([true, true], held);
+        Assert.False(jobs.IsHeld(_host.Profile.Id));
+    });
+
+    [Fact]
+    public void Restore_WhenTheLogSaysNothing_AsksAndThenRefuses_WithoutTouchingTheWorld() => Sta.Run(() =>
+    {
+        PutWorld(World, "old"); // лога нет: остановлен ли сервер, не понять
+        MakeCopy(new DateTime(2026, 10, 17, 9, 0, 0, DateTimeKind.Utc));
+        var vm = Open();
+        RestoreDialog(new HostedRestoreChoice(true), []);
+
+        using (var yes = new ScriptedDialogs(Answer.Yes))
+        {
+            Sta.Wait(vm.RestoreCommand.ExecuteAsync(vm.Backups[0]));
+            Assert.Equal([Loc.T("hostedbk.stopAsk", _host.Profile.Name)], yes.Asked);
+        }
+
+        Assert.Equal(Loc.T("hostedbk.restoreUnknown"), vm.ErrorText);
+        Assert.False(vm.IsWorking);
+        Assert.False(vm.IsChecking);
+        Assert.Empty(_host.Server.Writes);
+    });
+
+    [Fact]
+    public void Restore_WhenTheLogCannotBeReadAtAll_SaysWhy_InsteadOfCrashing() => Sta.Run(() =>
+    {
+        PutLog(HostedLogSamples.Stopped);
+        PutWorld(World, "old");
+        MakeCopy(new DateTime(2026, 10, 17, 9, 0, 0, DateTimeKind.Utc));
+        _host.Settings.Root = "/../elsewhere"; // корень вне корня FTP: путь к логам не собрать (InvalidDataException)
+        var vm = Open();
+        RestoreDialog(new HostedRestoreChoice(true), []);
+
+        using (new ScriptedDialogs()) Sta.Wait(vm.RestoreCommand.ExecuteAsync(vm.Backups[0])); // и без вопроса
+
+        Assert.StartsWith(Loc.T("hostedbk.restoreFailed", ""), vm.ErrorText);
+        Assert.Contains("..", vm.ErrorText);
+        Assert.False(vm.IsChecking);
+        Assert.Empty(_host.Server.Writes);
+    });
+
+    // ---------- папка и язык
+
+    [Fact]
+    public void BackupDir_SetBackWhileItsCheckRuns_DoesNotLeaveTheCheckingLine() => Sta.Run(() =>
+    {
+        var vm = Open();
+
+        vm.BackupDirText = Path.Combine(_host.Dir, "elsewhere");
+        Assert.True(vm.BackupDirChecking);
+        vm.BackupDirText = _copies; // вернули сохранённую, пока проверка шла
+
+        Assert.False(vm.BackupDirChecking);
+        Sta.Wait(Task.Delay(300)); // первая проверка возвращается и ничего не показывает
+        Assert.False(vm.BackupDirChecking);
+        Assert.Equal("", vm.BackupDirOk);
+        Assert.Equal("", vm.BackupDirError);
+        Assert.Equal(_copies, _host.Settings.BackupDir);
+    });
+
+    [Fact]
+    public void LanguageSwitch_RebuildsTheRefusal_AndTheFolderLines() => Sta.Run(() =>
+    {
+        PutLog(HostedLogSamples.Stopped);
+        PutWorld(World, "old");
+        MakeCopy(new DateTime(2026, 10, 17, 9, 0, 0, DateTimeKind.Utc));
+        var language = Loc.Instance.Language;
+        var other = language == "ru" ? "en" : "ru";
+        var vm = Open(new HostedWorldJobs(state: (_, _) => Task.FromResult(HostedServerState.Unknown)));
+        RestoreDialog(new HostedRestoreChoice(false), []);
+        try
+        {
+            using (new ScriptedDialogs(Answer.Yes)) Sta.Wait(vm.RestoreCommand.ExecuteAsync(vm.Backups[0]));
+            var refusal = vm.ErrorText;
+            Assert.Equal(Loc.T("hostedbk.restoreUnknown"), refusal);
+            vm.BackupDirText = Path.Combine(_host.Dir, "elsewhere");
+            Sta.WaitFor(() => vm.BackupDirOk.Length > 0);
+            var saved = vm.BackupDirOk;
+
+            Loc.Instance.SetLanguage(other);
+            vm.OnLanguageChanged();
+
+            Assert.Equal(Loc.T("hostedbk.restoreUnknown"), vm.ErrorText);
+            Assert.NotEqual(refusal, vm.ErrorText);
+            Assert.Equal(Loc.T("hostedbk.dirSaved"), vm.BackupDirOk);
+            Assert.NotEqual(saved, vm.BackupDirOk);
+
+            // что не так с папкой, пишет ядро — после смены языка проверяем заново
+            vm.BackupDirText = "relative/path";
+            Sta.WaitFor(() => vm.BackupDirError.Length > 0);
+            var error = vm.BackupDirError;
+            Loc.Instance.SetLanguage(language);
+            vm.OnLanguageChanged();
+            Sta.WaitFor(() => !vm.BackupDirChecking && vm.BackupDirError.Length > 0);
+            Assert.Equal(Loc.T(OperatingSystem.IsWindows() ? "backupdir.notFull" : "backupdir.notFullLinux"), vm.BackupDirError);
+            Assert.NotEqual(error, vm.BackupDirError);
+            Assert.Equal(Path.Combine(_host.Dir, "elsewhere"), _host.Settings.BackupDir); // не подошла — осталась прежняя
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(language);
+        }
     });
 
     // ---------- вкладка в разделе «Сервер»
