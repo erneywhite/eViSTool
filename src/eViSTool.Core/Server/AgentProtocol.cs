@@ -10,13 +10,6 @@ public static class AgentProtocol
 
     public static string DefaultAgentsDir => Path.Combine(AppPaths.Root, "agents");
 
-    /// <summary>
-    /// Переменная окружения агента, которого запустило окно (<see cref="AgentLauncher"/>). Копия после самообновления
-    /// получает её по наследству. Такой агент запуск версии не засчитывает: его засчитывает окно (<see cref="AppUpdate.AppRollback"/>),
-    /// а упавшее при старте окно, поднявшее агентов, не должно сойти за удачный запуск.
-    /// </summary>
-    public const string FromWindowVariable = "EVISTOOL_AGENT_FROM_WINDOW";
-
     /// <summary>Версия этой сборки eViSTool: окно и агент выпускаются вместе и должны совпадать.</summary>
     public static string AppVersion { get; } =
         typeof(AgentProtocol).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)

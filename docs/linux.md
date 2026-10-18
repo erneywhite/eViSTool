@@ -208,15 +208,6 @@ the server" button. The agent downloads the same version from GitHub, checks its
 world save, replaces its own files and exits, and systemd starts the new version. If the server was running, it starts
 again; if it was stopped, it stays stopped.
 
-The previous version stays next to it until the new agent has started twice and a day has passed since its first start.
-If the new version misbehaves, put the previous one back and restart the service (the server stops with a world save and
-starts again):
-
-```sh
-sudo -u vintagestory /home/vintagestory/evistool/eViSTool.Agent rollback
-sudo systemctl restart evistool
-```
-
 By hand: stop the service, unpack the new archive over the old one and start it. There is no `data` folder in the
 archive, so the settings stay.
 

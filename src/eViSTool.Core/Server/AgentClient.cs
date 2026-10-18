@@ -339,7 +339,6 @@ public static class AgentLauncher
             CreateNoWindow = true, // своя скрытая консоль: в ней сервер пишет UTF-8 и получает Ctrl+C
             WorkingDirectory = Path.GetDirectoryName(agentExe)!,
         };
-        psi.Environment[AgentProtocol.FromWindowVariable] = "1"; // запуск версии засчитывает окно, а не этот агент
         psi.ArgumentList.Add("--profile"); psi.ArgumentList.Add(profile.Id);
         psi.ArgumentList.Add("--exe"); psi.ArgumentList.Add(exe);
         psi.ArgumentList.Add("--data"); psi.ArgumentList.Add(profile.DataDir);

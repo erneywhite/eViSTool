@@ -32,12 +32,6 @@ public sealed class AppSettings
     /// <summary>Версия eViSTool, про которую попросили не напоминать («Пропустить эту версию»); вышла новее — окно покажется снова.</summary>
     public string? SkippedAppVersion { get; set; }
 
-    /// <summary>
-    /// Версия eViSTool, с которой вернулись на прежнюю («О программе» → «Вернуться на прежнюю версию»): окно «Вышла новая
-    /// версия» про неё молчит, даже если она рекомендуемая. Вышла новее — окно покажется снова.
-    /// </summary>
-    public string? RolledBackAppVersion { get; set; }
-
     /// <summary>Язык интерфейса (en, ru). По умолчанию английский.</summary>
     public string Language { get; set; } = "en";
 

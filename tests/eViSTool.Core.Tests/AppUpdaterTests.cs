@@ -93,8 +93,10 @@ public sealed class AppUpdaterTests : IDisposable
         Assert.Equal(2, Directory.GetFiles(_app, "*.old").Length);
         Assert.False(Directory.Exists(Path.Combine(_app, ".update")));
 
+        File.WriteAllText(Path.Combine(_app, ".previous-version.json"), "{}"); // так оставляет обновление из 0.14.1
         AppUpdater.CleanupOld(_app);
         Assert.Empty(Directory.GetFiles(_app, "*.old"));
+        Assert.False(File.Exists(Path.Combine(_app, ".previous-version.json")));
     }
 
     [Fact]

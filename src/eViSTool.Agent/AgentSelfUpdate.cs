@@ -55,7 +55,7 @@ internal sealed class AgentSelfUpdate(AgentState state)
             }
 
             Stage = "install";
-            AppUpdater.Install(zip, appDir, state.Version, release.Version.ToString()); // прежняя версия хранится: eViSTool.Agent rollback
+            AppUpdater.Install(zip, appDir);
 
             // под systemd новую версию поднимает служба: своя дочерняя копия погибла бы вместе с этой. Выходим с кодом 75
             // (в юните — «не сбой, перезапустить»), а что было с сервером, новая версия узнает из отметки
