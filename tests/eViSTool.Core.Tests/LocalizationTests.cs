@@ -27,7 +27,7 @@ public partial class LocalizationTests
 
         var en = Loc.Keys("en").ToHashSet();
         var used = Directory.EnumerateFiles(src, "*.*", SearchOption.AllDirectories)
-            .Where(f => (f.EndsWith(".cs") || f.EndsWith(".xaml")) && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
+            .Where(f => (f.EndsWith(".cs") || f.EndsWith(".xaml") || f.EndsWith(".axaml")) && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
             .SelectMany(f => KeyUse().Matches(File.ReadAllText(f)).Select(m => m.Groups["k"].Value))
             .ToHashSet();
 
