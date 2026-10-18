@@ -4,9 +4,12 @@ using Avalonia.Controls;
 using Avalonia.Controls.Chrome;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Interactivity;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using eViSTool.Core.Game;
+using eViSTool.Desktop.Controls;
 using eViSTool.Desktop.Platform;
 using eViSTool.Presentation.ViewModels;
 
@@ -21,6 +24,10 @@ public partial class MainWindow : Window
         InitializeComponent();
         Opened += (_, _) => OnOpened();
         Closing += OnClosing;
+        // раз в час: вдруг наступила новая неделя или праздник (выбор тот же — файл не перечитывается)
+        _backdropClock.Tick += (_, _) => UpdateBackdrop();
+        _backdropClock.Start();
+        Closed += (_, _) => _backdropClock.Stop();
         SizeChanged += (_, _) =>
         {
             if (WindowState == WindowState.Normal) _normalSize = ClientSize;
@@ -102,12 +109,62 @@ public partial class MainWindow : Window
             if (Vm.ActiveProfile is { } active) ProfileCombo.SelectedIndex = Vm.Profiles.IndexOf(active);
         }, DispatcherPriority.Background);
         ShowPage();
+        UpdateBackdrop();
     }
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MainViewModel.SelectedTab)) ShowPage();
         else if (e.PropertyName == nameof(MainViewModel.SystemWindowFrame) && OperatingSystem.IsLinux()) ApplyWindowFrame(Vm.SystemWindowFrame);
+        // папки игры (сменили активный профиль или его папку игры) и галочка «Фон из игры»
+        else if (e.PropertyName is nameof(MainViewModel.IconSearchDirs) or nameof(MainViewModel.GameBackground)) UpdateBackdrop();
+    }
+
+    // ---------- фон из игры под боковой панелью (docs/design.md, раздел 5)
+
+    private readonly DispatcherTimer _backdropClock = new() { Interval = TimeSpan.FromHours(1) };
+    private string? _backdropPath; // показанная заставка; null — заглушка
+    private int _backdropRun;      // номер пересчёта: ответ из фона, который опоздал к более свежему, отбрасывается
+
+    /// <summary>
+    /// Выбрать заставку на сегодня (<see cref="GameBackdrop"/>) и показать её: поиск файла и загрузка — в фоне, файл
+    /// читается, только если выбор поменялся. Галочка выключена, картинок нет или файл не читается — заглушка.
+    /// </summary>
+    private async void UpdateBackdrop()
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var run = ++_backdropRun;
+        try
+        {
+            string? path = null;
+            if (vm.GameBackground)
+            {
+                var dirs = vm.IconSearchDirs;
+                path = await Task.Run(() => GameBackdrop.Find(dirs, TimeProvider.System));
+                if (run != _backdropRun) return;
+            }
+            if (path == _backdropPath) return;
+
+            Bitmap? picture = null;
+            if (path is not null)
+            {
+                // под прозрачными местами праздничных заставок — цвет боковой панели
+                var underlay = this.FindResource("Forest.Side") is ISolidColorBrush side ? side.Color : Colors.Black;
+                picture = await GameBackdropImage.LoadAsync(path, underlay);
+                if (run != _backdropRun) return;
+            }
+            _backdropPath = path;
+            Backdrop.Source = picture;
+            Root.Classes.Set("backdrop", picture is not null);
+        }
+        catch (Exception ex)
+        {
+            // фон — украшение: что бы ни случилось, окно работает дальше с заглушкой
+            CrashLog.Write(ex);
+            _backdropPath = null;
+            Backdrop.Source = null;
+            Root.Classes.Set("backdrop", false);
+        }
     }
 
     // виден один раздел — по SelectedTab (порядок страниц в разметке = порядок AppTab)

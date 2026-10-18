@@ -18,6 +18,10 @@
 
 .EXAMPLE
     pwsh build/snapshot.ps1 -Screens server.config.world -NoBuild -Out C:\snap
+
+.EXAMPLE
+    pwsh build/snapshot.ps1 -Screens mods -GameDir C:\snap-game
+    # профиль стенда смотрит в C:\snap-game: заставки из assets/game/textures/gui/backgrounds — фон под боковой панелью
 #>
 param(
     [Parameter(Mandatory)][string[]]$Screens,
@@ -26,6 +30,8 @@ param(
     [string]$Size = '1400x860',
     [double]$Wait = 4,
     [string]$Profile = 'Стенд',
+    # папка игры профиля стенда (окно её только читает); по умолчанию — пустая временная, без игры и без фона из игры
+    [string]$GameDir,
     # не пересобирать: взять сборки из прошлого запуска (если они есть)
     [switch]$NoBuild
 )
@@ -57,10 +63,10 @@ foreach ($app in $apps) {
 # данные стенда: свежая копия на каждый запуск окна (окно может что-то записать — например, отключить мод)
 function Reset-Fixture([string]$appDir) {
     $vsdata = Join-Path $work 'vsdata'
-    $game = Join-Path $work 'game'
+    $game = if ($GameDir) { [IO.Path]::GetFullPath($GameDir) } else { Join-Path $work 'game' }
     if (Test-Path $vsdata) { [IO.Directory]::Delete($vsdata, $true) }
     Copy-Item (Join-Path $fixture 'vsdata') $vsdata -Recurse
-    New-Item -ItemType Directory -Force $game | Out-Null
+    if (-not $GameDir) { New-Item -ItemType Directory -Force $game | Out-Null }
 
     $data = Join-Path $appDir 'data'
     if (Test-Path $data) { [IO.Directory]::Delete($data, $true) }
