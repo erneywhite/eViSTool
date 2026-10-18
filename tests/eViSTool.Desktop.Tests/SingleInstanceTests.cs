@@ -28,7 +28,7 @@ public sealed class SingleInstanceTests : IDisposable
         var second = SingleInstance.Start(data, TimeSpan.FromSeconds(1));
 
         Assert.Null(second); // этому запуску — выйти
-        await shown.Task.WaitAsync(TimeSpan.FromSeconds(5)); // а первое окно попросили показаться
+        await shown.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken); // а первое окно попросили показаться
     }
 
     [Fact]
@@ -58,9 +58,9 @@ public sealed class SingleInstanceTests : IDisposable
         // перезапуск после обновления: новое окно стартует, пока старое ещё держит замок и уже не слушает канал
         var data = Data("app");
         var closing = new FileStream(Path.Combine(data, "window.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-        _ = Task.Delay(700).ContinueWith(_ => closing.Dispose());
+        _ = Task.Delay(700, TestContext.Current.CancellationToken).ContinueWith(_ => closing.Dispose(), TaskScheduler.Default);
 
-        using var next = await Task.Run(() => SingleInstance.Start(data, TimeSpan.FromSeconds(10)));
+        using var next = await Task.Run(() => SingleInstance.Start(data, TimeSpan.FromSeconds(10)), TestContext.Current.CancellationToken);
 
         Assert.True(next!.IsOwner);
     }
