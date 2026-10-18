@@ -270,7 +270,16 @@ public sealed class HostedWorldJobs(TimeProvider? time = null, Func<ModTarget, C
         if (_running.TryGetValue(job.ProfileId, out var running) && ReferenceEquals(running, job)) _running.Remove(job.ProfileId);
         _last[job.ProfileId] = outcome;
         job.Finish(outcome);
-        Finished?.Invoke(outcome);
+        // каждый обработчик — отдельно: упавший не должен лишать итога тех, кто подписан после него (вкладка «Копии»,
+        // плашки «Обзора» и «Моих модов» иначе остались бы «занятыми» до смены профиля). Ошибки — дальше, после всех
+        List<Exception>? errors = null;
+        foreach (var handler in Finished?.GetInvocationList() ?? [])
+        {
+            try { ((Action<HostedWorldOutcome>)handler)(outcome); }
+            catch (Exception ex) { (errors ??= []).Add(ex); }
+        }
+        if (errors is [var single]) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(single);
+        if (errors is not null) throw new AggregateException(errors);
     }
 
     /// <summary>Ошибки сети, диска и ядра — обычный итог; остальное — ещё и в журнал вылетов, а не молча.</summary>

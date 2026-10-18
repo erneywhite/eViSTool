@@ -66,6 +66,11 @@
                    IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                    AutomationProperties.AutomationId="HostedStatus" />
 
+        <!-- ===== копия мира держит соединение профиля: лог прочитаем, когда она кончится ===== -->
+        <TextBlock DockPanel.Dock="Top" Text="{Binding WorldJobText}" Foreground="{DynamicResource Forest.Warn}" TextWrapping="Wrap" Margin="0,12,0,0"
+                   IsVisible="{Binding WorldJobText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   AutomationProperties.AutomationId="HostedWorldJob" />
+
         <!-- ===== сервер по логу остановлен, а для модов вышли обновления: обновить всё перед запуском ===== -->
         <Border DockPanel.Dock="Top" Classes="card" Padding="14,12" Margin="0,12,0,0" IsVisible="{Binding ShowUpdates}"
                 AutomationProperties.AutomationId="HostedUpdates">

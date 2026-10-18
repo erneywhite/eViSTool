@@ -416,6 +416,25 @@ public sealed class HostedBackupScheduleTests : IDisposable
         Assert.Single(Copies());
     });
 
+    [Fact]
+    public void AFaultyFinishedHandler_DoesNotKeepTheOutcomeFromLaterHandlers() => Sta.Run(() =>
+    {
+        PutLog(HostedLogSamples.Stopped);
+        PutWorld(World, "one");
+        var jobs = new HostedWorldJobs(_clock);
+        var later = 0;
+        jobs.Finished += _ => throw new InvalidOperationException("handler bug");
+        jobs.Finished += _ => later++;
+
+        var job = jobs.StartBackup(_host.Target, scheduled: false);
+        Assert.NotNull(job);
+        Sta.WaitFor(() => job.IsFinished);
+        Sta.Wait(Task.Delay(100));
+
+        Assert.Equal(1, later);
+        Assert.True(job.Completion.Result.Ok);
+    });
+
     // ---------- гонки прохода
 
     [Fact]
