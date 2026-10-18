@@ -42,6 +42,9 @@ public sealed class ModInstallQueueTests
         /// <summary>Предупреждение к поставленному пункту (по modid): версия в файле не та, что на ModDB.</summary>
         public Dictionary<string, string> NoteFor { get; } = [];
 
+        /// <summary>Второе предупреждение к тому же пункту (по modid).</summary>
+        public Dictionary<string, string> MoreNotesFor { get; } = [];
+
         /// <summary>Предупреждения, пришедшие с итогом прогона (по одному списку на итог).</summary>
         public List<IReadOnlyList<string>> StatusNotes { get; } = [];
 
@@ -78,6 +81,7 @@ public sealed class ModInstallQueueTests
                 Installed.Add($"{modId} → {target.Name}");
                 installed.Add(modId);
                 if (NoteFor.TryGetValue(modId, out var note)) notes?.Add(note);
+                if (MoreNotesFor.TryGetValue(modId, out var more)) notes?.Add(more);
             }
             return ok;
         }
@@ -136,6 +140,31 @@ public sealed class ModInstallQueueTests
         Assert.Equal("", beta.Message);
         Assert.Equal(Loc.T("queue.finished", 2, 0), host.Statuses.Last()); // счёт тот же: пункт поставлен
         Assert.Equal([host.NoteFor["alpha"]], host.StatusNotes.Last());
+    });
+
+    // плашка у хостера собирает итог на смене State последнего пункта: предупреждение уже должно быть в Message.
+    // Несколько предупреждений у пункта — через « · », как в строке состояния
+    [Fact]
+    public void VersionNote_MessageIsSetBeforeTheItemBecomesDone() => Sta.Run(() =>
+    {
+        var host = new Host();
+        host.NoteFor["alpha"] = "первое";
+        host.MoreNotesFor["alpha"] = "второе";
+        var queue = new ModInstallQueue(host);
+        string? atDone = null;
+
+        var alpha = Item(A, "alpha");
+        alpha.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(UpdateQueueItem.State) && alpha.State == QueueState.Done) atDone = alpha.Message;
+        };
+
+        queue.Enqueue([alpha], ModHistorySource.UpdateAll);
+        Sta.WaitFor(() => !queue.IsRunning);
+        Assert.Same(alpha, queue.Items.Single());
+
+        Assert.Equal("первое · второе", atDone);
+        Assert.Equal("первое · второе", alpha.Message);
     });
 
     // у неудачного пункта сообщение — ошибка, цвет ошибки

@@ -161,9 +161,10 @@ internal sealed partial class ModInstallQueue(IModQueueHost host) : ObservableOb
                     problems.Add(Loc.T("dl.failed", item.Name, item.To, ex.Message));
                 }
 
+                // поставленный пункт с предупреждением — оно под названием (цветом предупреждения, не ошибки), через « · », как
+                // в строке состояния. Сообщение — раньше состояния: плашка у хостера собирает итог на смене State последнего пункта
+                item.Message = ok ? string.Join(" · ", notes) : ct.IsCancellationRequested ? "" : problems.FirstOrDefault() ?? "";
                 item.State = ok ? QueueState.Done : ct.IsCancellationRequested ? QueueState.Cancelled : QueueState.Failed;
-                // поставленный пункт с предупреждением — оно под названием (цветом предупреждения, не ошибки)
-                item.Message = ok ? string.Join(" ", notes) : ct.IsCancellationRequested ? "" : problems.FirstOrDefault() ?? "";
                 if (ok) allNotes.AddRange(notes);
                 if (ok && host.IsActive(item.Target)) await host.ReloadAsync(); // таблица и карточка сразу показывают новую версию
                 Notify();

@@ -107,8 +107,14 @@ public static class ReleaseMarks
         try
         {
             if (File.Exists(file) && JsonConvert.DeserializeObject<Dictionary<string, ReleaseMark>>(File.ReadAllText(file)) is { } read)
-                return new Dictionary<string, ReleaseMark>(
-                    read.Where(kv => kv.Value is { FileName.Length: > 0, ReleaseVersion.Length: > 0 }), StringComparer.OrdinalIgnoreCase);
+            {
+                // через индексатор, не конструктор: ключи, что отличаются только регистром (ручная правка файла), не роняют
+                // скан исключением — остаётся последний
+                var marks = new Dictionary<string, ReleaseMark>(StringComparer.OrdinalIgnoreCase);
+                foreach (var (key, mark) in read.Where(kv => kv.Value is { FileName.Length: > 0, ReleaseVersion.Length: > 0 }))
+                    marks[key] = mark;
+                return marks;
+            }
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {

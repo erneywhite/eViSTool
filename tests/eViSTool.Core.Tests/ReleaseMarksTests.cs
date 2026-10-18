@@ -129,6 +129,21 @@ public sealed class ReleaseMarksTests : IDisposable
         Assert.Empty(ReleaseMarks.Load(MarksFile));
     }
 
+    // файл правили руками: ключи отличаются только регистром — не исключение (оно уронило бы скан модов), остаётся последний
+    [Fact]
+    public void Load_KeysDifferingOnlyInCase_LastWins()
+    {
+        File.WriteAllText(MarksFile, """
+            {
+              "carryon": { "FileName": "carryon_1.8.1.zip", "FileVersion": "1.8.0", "ReleaseId": 1, "ReleaseVersion": "1.8.1" },
+              "CarryOn": { "FileName": "carryon_1.8.2.zip", "FileVersion": "1.8.1", "ReleaseId": 2, "ReleaseVersion": "1.8.2" }
+            }
+            """);
+
+        var mark = Assert.Single(ReleaseMarks.Load(MarksFile)).Value;
+        Assert.Equal("carryon_1.8.2.zip", mark.FileName);
+    }
+
     // ---- проверка обновлений
 
     [Fact]
