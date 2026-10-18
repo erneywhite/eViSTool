@@ -21,12 +21,18 @@ namespace eViSTool.Desktop.Tests;
 /// «Настройках» пишет в модель и в настройки, всё про профиль — только на «Профилях», порядок пунктов меню и страниц —
 /// как у <see cref="AppTab"/>. Настройки программы лежат в папке data рядом с тестами: на время теста там серверный
 /// профиль во временной папке, потом прежний файл возвращается. Данные пользователя тест не трогает.
+/// Главная модель сама не останавливается: её таймеры (игра, падения серверов, exe на диске, агенты, моды) создаются
+/// через шпиона платформы и гасятся после теста, а тихая проверка новой версии идёт не на GitHub, а в закрытый порт.
 /// </summary>
 public sealed class ProfilesSettingsViewTests : IDisposable
 {
+    private const string ReleasesUrl = "EVISTOOL_RELEASES_URL";
+
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "evistool-tests", "pages-" + Guid.NewGuid().ToString("N"));
     private readonly string _language = Loc.Instance.Language;
+    private readonly IUiPlatform? _oldPlatform = Ui.IsSet ? Ui.Platform : null;
     private readonly List<ResourceInclude> _theme = [];
+    private CleanupWindowTests.TimerSpy? _timers;
     private StyleInclude? _themeStyles;
     private string? _savedSettings;
     private Window? _window;
@@ -34,6 +40,9 @@ public sealed class ProfilesSettingsViewTests : IDisposable
     public void Dispose()
     {
         _window?.Close();
+        // до возврата настроек: опрос, оставшийся с этого теста, мог бы записать их поверх или открыть окно в чужом тесте
+        foreach (var timer in _timers?.Timers ?? []) timer.Stop();
+        if (_timers is not null) Ui.Platform = _oldPlatform ?? new AvaloniaUiPlatform();
         if (Application.Current is { } app)
         {
             foreach (var include in _theme) app.Resources.MergedDictionaries.Remove(include);
@@ -67,13 +76,14 @@ public sealed class ProfilesSettingsViewTests : IDisposable
 
     /// <summary>
     /// Главная модель над своими настройками: один серверный профиль «Стенд» во временной папке, фон из игры включён,
-    /// без автопроверки модов (она ходила бы в модбазу).
+    /// без автопроверки модов (она ходила бы в модбазу; каталог, который тоже ходит туда, тесты не открывают).
     /// </summary>
     private MainViewModel Main()
     {
         Assert.SkipUnless(AppPaths.IsPortable, "данные рядом с тестами недоступны для записи — настоящие данные пользователя не трогаем");
         AddTheme();
-        if (!Ui.IsSet) Ui.Platform = new AvaloniaUiPlatform();
+        _timers = CleanupWindowTests.TimerSpy.Wrap(new AvaloniaUiPlatform());
+        Ui.Platform = (IUiPlatform)(object)_timers;
         _savedSettings = File.Exists(AppPaths.SettingsFile) ? File.ReadAllText(AppPaths.SettingsFile) : null;
 
         Directory.CreateDirectory(Path.Combine(_dir, "game"));
@@ -88,7 +98,15 @@ public sealed class ProfilesSettingsViewTests : IDisposable
             Profiles = [profile], ActiveProfileId = profile.Id, Language = _language,
             AutoCheckUpdates = false, GameBackground = true,
         });
-        return new MainViewModel();
+
+        // адрес релизов читается ещё в конструкторе, до первого ожидания: потом переменную можно вернуть
+        var releases = Environment.GetEnvironmentVariable(ReleasesUrl);
+        Environment.SetEnvironmentVariable(ReleasesUrl, "http://127.0.0.1:9/releases"); // отказ — как «нет сети», тихо
+        MainViewModel main;
+        try { main = new MainViewModel(); }
+        finally { Environment.SetEnvironmentVariable(ReleasesUrl, releases); }
+        Assert.Contains(_timers.Timers, t => t.IsEnabled); // наблюдатели модели запущены, и их таймеры — у шпиона
+        return main;
     }
 
     private Window Show(Control content, double width = 1200, double height = 900)
