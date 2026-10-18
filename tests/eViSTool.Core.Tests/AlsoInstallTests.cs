@@ -71,6 +71,27 @@ public sealed class AlsoInstallTests : IDisposable
         Assert.Contains("1.1.0", older.Describe());
     }
 
+    // там уже стоит файл релиза 1.1.0, в котором автор оставил 1.0.0 (отметка ReleaseMarks), — тот же релиз не предлагается
+    [Fact]
+    public async Task MarkedReleaseFile_CountsAsThatRelease()
+    {
+        var profile = Client("marked-" + Guid.NewGuid().ToString("N")[..6], "1.0.0");
+        var marks = ReleaseMarks.FileFor(profile.Id);
+        try
+        {
+            ReleaseMarks.Update(marks, new ModInfo { ModId = "carryon", Version = "1.0.0" }, "carryon_1.0.0.zip", Releases[1]);
+
+            var option = await AlsoInstall.EvaluateAsync(ModTarget.For(profile)!, "carryon", Releases, Releases[1]);
+
+            Assert.Equal(AlsoInstallState.AlreadyThere, option.State);
+            Assert.False(option.CanInstall);
+        }
+        finally
+        {
+            if (File.Exists(marks)) File.Delete(marks);
+        }
+    }
+
     [Fact]
     public async Task UnreachableRemoteServer_IsShownButCannotBeChosen()
     {

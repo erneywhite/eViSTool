@@ -86,6 +86,8 @@ internal sealed class ServerSchedule
                 new ModUpdater(db), db, cts.Token);
             foreach (var line in result.Updated)
                 Host.Console.Add(ConsoleLineKind.System, Loc.T("autoupd.updated", line));
+            foreach (var line in result.Notes) // версия в файле не та, что на ModDB: поставлено, но стоит знать
+                Host.Console.Add(ConsoleLineKind.System, line);
             foreach (var line in result.Skipped)
                 Host.Console.Add(ConsoleLineKind.System, line);
             foreach (var line in result.Failed)
@@ -97,6 +99,7 @@ internal sealed class ServerSchedule
                 _notify.Notify(NotifyEvent.ModsUpdated,
                     Loc.T("notify.ev.modsUpdated", result.Updated.Count),
                     [.. result.Updated.Select(l => new NotifyLine("• " + l)),
+                        .. result.Notes.Select(l => new NotifyLine(l)),
                         .. result.Failed.Select(l => new NotifyLine("✗ " + Loc.T("autoupd.failed", l)))]);
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or HttpRequestException or TaskCanceledException

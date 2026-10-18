@@ -7,6 +7,7 @@ using eViSTool.Core.Localization;
 using eViSTool.Core.ModDb;
 using eViSTool.Core.Mods;
 using eViSTool.Core.Profiles;
+using eViSTool.Core.Versioning;
 using eViSTool.Presentation.ViewModels;
 using eViSTool.Presentation.ViewModels.Mods;
 using Newtonsoft.Json;
@@ -31,6 +32,7 @@ public sealed class ModInstallServiceTests : IDisposable
         var backups = Path.Combine(AppPaths.ModBackups, _id);
         if (Directory.Exists(backups)) Directory.Delete(backups, recursive: true);
         if (File.Exists(ModHistory.FileFor(_id))) File.Delete(ModHistory.FileFor(_id));
+        if (File.Exists(ReleaseMarks.FileFor(_id))) File.Delete(ReleaseMarks.FileFor(_id));
     }
 
     /// <summary>Главная модель без настроек: копии миров выключены, открытого профиля нет.</summary>
@@ -183,6 +185,61 @@ public sealed class ModInstallServiceTests : IDisposable
         Assert.Empty(problems);
         Assert.Equal(["beta_2.0.0.zip"], Directory.GetFiles(ModsDir).Select(Path.GetFileName));
     });
+
+    // версия в файле не та, что на ModDB: мод ставится, предупреждение — в итог, повторная проверка тот же релиз не предлагает
+    [Fact]
+    public void Download_VersionMismatch_InstalledWithNote_NotOfferedAgain() => Sta.Run(() =>
+    {
+        var bytes = File.ReadAllBytes(Zip("beta_2.0.0.zip", "beta", "1.9.0"));
+        var service = Service(new FakeModDb(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) }));
+        var release = new ModDbRelease
+        {
+            ReleaseId = 5, ModVersion = "2.0.0", MainFile = "https://mods.vintagestory.at/files/beta_2.0.0.zip", FileName = "beta_2.0.0.zip",
+            Tags = ["1.21.0"],
+        };
+        var target = Server();
+        var installed = new List<string>();
+        var problems = new List<string>();
+        var notes = new List<string>();
+
+        var task = service.DownloadAndInstallAsync(target, "beta", "Beta", release, installed, problems, notes: notes);
+        Sta.Wait(task);
+
+        Assert.True(task.Result);
+        Assert.Equal(["beta 1.9.0"], installed);
+        Assert.Empty(problems);
+        Assert.Equal([Loc.T("dl.versionMismatch", "Beta", "1.9.0", "2.0.0")], notes);
+
+        var scan = ModTargets.ScanAsync(target);
+        Sta.Wait(scan);
+        var remote = new Dictionary<string, ModDbResult> { ["beta"] = new(new ModDbMod { Releases = [release] }, null) };
+        var check = UpdateChecker.Evaluate(scan.Result.Mods, remote, ModVersion.ParseOrNull("1.21.6")!).Single();
+        Assert.Equal(ModStatus.UpToDate, check.Status);
+    });
+
+    [Fact]
+    public void Download_SameVersion_NoNote() => Sta.Run(() =>
+    {
+        var bytes = File.ReadAllBytes(Zip("beta_2.0.0.zip", "beta", "v2.0.0"));
+        var service = Service(new FakeModDb(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) }));
+        var release = new ModDbRelease { ModVersion = "2.0.0", MainFile = "https://mods.vintagestory.at/files/beta_2.0.0.zip", FileName = "beta_2.0.0.zip" };
+        var notes = new List<string>();
+
+        var task = service.DownloadAndInstallAsync(Server(), "beta", "Beta", release, [], [], notes: notes);
+        Sta.Wait(task);
+
+        Assert.True(task.Result);
+        Assert.Empty(notes);
+    });
+
+    [Fact]
+    public void WithNotes_AppendsOnlyWhenThereAreNotes()
+    {
+        Assert.Equal("Готово", ModInstallService.WithNotes("Готово", null));
+        Assert.Equal("Готово", ModInstallService.WithNotes("Готово", ["", ""]));
+        Assert.Equal("Готово · А · Б", ModInstallService.WithNotes("Готово", ["А", "Б", "А"]));
+        Assert.Equal("А", ModInstallService.WithNotes("", ["А"]));
+    }
 
     [Fact]
     public void Download_Fails_ProblemNamesTheRelease() => Sta.Run(() =>

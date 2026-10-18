@@ -15,6 +15,12 @@ public sealed record LocalMod(string Path, ModInfo? Info, string? Error)
 
     /// <summary>Мод самого хостера (у G-Portal — папка gportal_mods): показываем, но не обновляем, не удаляем, не выключаем.</summary>
     public bool IsHosterMod { get; init; }
+
+    /// <summary>
+    /// Файл — релиз ModDB, у которого версия в modinfo.json не та, что на ModDB (<see cref="ReleaseMarks"/>): проверка
+    /// обновлений сравнивает такой мод по версии релиза. null — отметки нет, сравнение по modinfo.
+    /// </summary>
+    public ReleaseMark? Release { get; init; }
 }
 
 /// <summary>Сканирует папку модов: zip-архивы и распакованные папки с modinfo.json.</summary>

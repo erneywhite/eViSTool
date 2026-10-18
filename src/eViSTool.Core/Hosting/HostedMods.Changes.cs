@@ -19,12 +19,15 @@ public sealed partial class HostedMods
     /// откат, журнал доведёт следующий скан;</item>
     /// <item>копии — в хранилище версий (для отката), изменение — в историю; выключенный мод остаётся выключенным.</item>
     /// </list>
+    /// <paramref name="release"/> — релиз ModDB, из которого скачан архив: версия в файле не та, что на ModDB, — отметка
+    /// «файл релиза» на этой машине (<see cref="ReleaseMarks"/>).
     /// </summary>
-    public Task<ModInstallOutcome?> InstallAsync(string zip, Func<InstallPlan, bool>? confirm, CancellationToken ct) =>
-        HostedSessions.UseAsync(Id, Hosted.Endpoint, files => InstallCoreAsync(files, zip, confirm, ct), ct);
+    public Task<ModInstallOutcome?> InstallAsync(string zip, Func<InstallPlan, bool>? confirm, CancellationToken ct,
+        ModDb.ModDbRelease? release = null) =>
+        HostedSessions.UseAsync(Id, Hosted.Endpoint, files => InstallCoreAsync(files, zip, confirm, release, ct), ct);
 
     private async Task<ModInstallOutcome?> InstallCoreAsync(IRemoteFiles files, string zip, Func<InstallPlan, bool>? confirm,
-        CancellationToken ct)
+        ModDb.ModDbRelease? release, CancellationToken ct)
     {
         var scan = await ScanCoreAsync(files, null, ct).ConfigureAwait(false);
         // прерванную установку скан довести не смог — новая затёрла бы её журнал, и копию старой версии никто бы не вернул
@@ -131,6 +134,7 @@ public sealed partial class HostedMods
         // ---- готово: копии — в хранилище версий, изменение — в историю, архив — в кэш modinfo
         HostedJournal.KeepOld(Id, pending);
         HostedJournal.Delete(Id, pending);
+        ReleaseMarks.Update(ReleaseMarks.FileFor(Id), info, RemotePath.Name(plan.TargetPath), release);
         fresh.Forget(targetDir);
         if (await fresh.FileAsync(plan.TargetPath, ct).ConfigureAwait(false) is { } placed)
         {

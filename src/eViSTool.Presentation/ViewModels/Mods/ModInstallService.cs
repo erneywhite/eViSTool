@@ -56,6 +56,18 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
     }
 
     /// <summary>
+    /// Итог операции + предупреждения к поставленному (версия в файле мода не та, что на ModDB, — см.
+    /// <see cref="DownloadAndInstallAsync"/>). Нет предупреждений — текст как есть.
+    /// </summary>
+    public static string WithNotes(string text, IEnumerable<string>? notes)
+    {
+        var list = notes?.Where(n => !string.IsNullOrEmpty(n)).Distinct().ToList() ?? [];
+        if (list.Count == 0) return text;
+        var joined = string.Join(" · ", list);
+        return string.IsNullOrEmpty(text) ? joined : text + " · " + joined;
+    }
+
+    /// <summary>
     /// То же, что <see cref="ConfirmIfRunning"/>, но у хостера сначала быстрая проверка по логу сервера (асинхронно, не
     /// дольше 5 с): по логу остановлен — без вопроса. Свой профиль и удалённый — как раньше, без ожидания.
     /// </summary>
@@ -124,8 +136,11 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
     /// <summary>
     /// Ставит один zip в профиль: старая версия — в хранилище, выключенный мод остаётся выключенным.
     /// interactive — спрашивать про ту же версию и даунгрейд (при обновлении/откате не спрашиваем: решение уже принято).
+    /// <paramref name="release"/> — релиз ModDB, из которого zip скачан (null — архив не с ModDB), для отметки «файл
+    /// релиза» (<see cref="ReleaseMarks"/>).
     /// </summary>
-    public async Task<bool> InstallZipAsync(ModTarget target, string zip, bool interactive, List<string> installed, List<string> problems)
+    public async Task<bool> InstallZipAsync(ModTarget target, string zip, bool interactive, List<string> installed, List<string> problems,
+        ModDbRelease? release = null)
     {
         await CopyWorldsAsync(target, problems, ModSides.Parse(ModScanner.ReadZip(zip).Info?.Side));
         try
@@ -158,7 +173,7 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
                     go = true;
                 });
                 return go;
-            });
+            }, release: release);
             if (outcome is null) return false;
             installed.Add(outcome.Text);
             main.HostedWatch?.ModsChanged(target, [outcome.Text], []); // у хостера — в оповещение «Обновлены моды»
@@ -174,9 +189,14 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
         }
     }
 
-    /// <summary>Скачать релиз и поставить его. Ошибки — в problems.</summary>
+    /// <summary>
+    /// Скачать релиз и поставить его. Ошибки — в problems. Версия в файле не та, что у релиза на ModDB (автор забыл поднять
+    /// её в modinfo.json), — мод всё равно ставится, а в <paramref name="notes"/> — предупреждение для итога операции;
+    /// проверка обновлений тот же релиз снова не предложит (отметка «файл релиза», <see cref="ReleaseMarks"/>).
+    /// </summary>
     public async Task<bool> DownloadAndInstallAsync(ModTarget target, string modId, string name, ModDbRelease release,
-        List<string> installed, List<string> problems, Action<double>? onProgress = null, CancellationToken ct = default)
+        List<string> installed, List<string> problems, Action<double>? onProgress = null, CancellationToken ct = default,
+        List<string>? notes = null)
     {
         string? file = null;
         try
@@ -187,7 +207,9 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
                 onProgress?.Invoke(x);
             });
             file = await updater.DownloadReleaseAsync(release, modId, progress, ct);
-            return await InstallZipAsync(target, file, interactive: false, installed, problems);
+            if (!await InstallZipAsync(target, file, interactive: false, installed, problems, release)) return false;
+            if (ReleaseMarks.Warning(name, ModScanner.ReadZip(file).Info?.Version, release.ModVersion) is { } note) notes?.Add(note);
+            return true;
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or TaskCanceledException)
         {
@@ -204,9 +226,11 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
 
     /// <summary>
     /// Докачивает недостающие/устаревшие зависимости и включает выключенные. Несколько кругов:
-    /// у зависимостей бывают свои зависимости. Без вопросов — вызывающий уже спросил.
+    /// у зависимостей бывают свои зависимости. Без вопросов — вызывающий уже спросил. Предупреждения к поставленному —
+    /// в <paramref name="notes"/> (как у <see cref="DownloadAndInstallAsync"/>).
     /// </summary>
-    public async Task FixDependencyIssuesAsync(ModTarget target, ModVersion game, List<string> installed, List<string> problems)
+    public async Task FixDependencyIssuesAsync(ModTarget target, ModVersion game, List<string> installed, List<string> problems,
+        List<string>? notes = null)
     {
         await CopyWorldsAsync(target, problems); // включение выключенных идёт мимо установки
         var tried = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -236,7 +260,7 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
                         problems.Add(Loc.T("mods.depNotFound", issue.ModId, $"{game.Major}.{game.Minor}.x"));
                         continue;
                     }
-                    await DownloadAndInstallAsync(target, issue.ModId, f.Mod.Name ?? issue.ModId, f.Release, installed, problems);
+                    await DownloadAndInstallAsync(target, issue.ModId, f.Mod.Name ?? issue.ModId, f.Release, installed, problems, notes: notes);
                 }
             }
         }

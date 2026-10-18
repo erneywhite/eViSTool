@@ -38,9 +38,11 @@ internal sealed partial class AgentApi
                 await using (var file = File.Create(zip))
                     await ctx.Request.Body.CopyToAsync(file, ctx.RequestAborted);
                 using var history = HistoryOp(ctx);
+                // архив с ModDB — окно говорит, какой это релиз: версия в файле не та — отметка «файл релиза»
+                var release = AgentClient.ParseReleaseHeader(ctx.Request.Headers[AgentClient.ReleaseHeader].ToString());
                 return Guard(() =>
                 {
-                    var result = Mods.Install(zip);
+                    var result = Mods.Install(zip, release);
                     Note(ctx, [new JournalDetail("modVersion", [result.Name, result.Version ?? "", result.OldVersion ?? ""])]);
                     return result;
                 });

@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Text;
 using eViSTool.Core.Game;
+using eViSTool.Core.Localization;
 using eViSTool.Core.ModDb;
 using eViSTool.Core.Mods;
 using eViSTool.Core.Server;
@@ -123,6 +124,39 @@ public sealed class ServerModAutoUpdateTests : IDisposable
         Assert.Equal("1.0.0", now["future"].Info!.Version);
         Assert.Equal("1.2.0", now["sleepy"].Info!.Version);
         Assert.Contains("sleepy", mods.Resolve().DisabledMods);
+    }
+
+    // в файле релиза 1.1.0 автор оставил 1.0.5: ставится с предупреждением, а следующий перезапуск его уже не трогает
+    [Fact]
+    public async Task VersionMismatch_InstalledWithNote_NotUpdatedAgain()
+    {
+        Local("alpha", "1.0.0");
+        var fake = new FakeModDb { Branch = _branch };
+        fake.Latest["alpha"] = ("1.1.0", Zip("alpha", "1.0.5"));
+        using var db = new ModDbClient(new HttpClient(fake) { BaseAddress = new Uri(ModDbClient.ApiBase) });
+        var updater = new ModUpdater(db, Path.Combine(_root, "dl"));
+        var id = "srv-autoupd-" + Guid.NewGuid().ToString("N")[..6];
+        var mods = new ServerMods(id, _game, _data);
+        try
+        {
+            var first = await mods.UpdateAllAsync(ModPolicy.Empty, allowUnstable: false, updater, db);
+
+            Assert.Equal(["alpha: 1.0.0 → 1.0.5"], first.Updated);
+            Assert.Equal([Loc.T("dl.versionMismatch", "alpha", "1.0.5", "1.1.0")], first.Notes);
+            Assert.Equal("1.1.0", Assert.Single(mods.List().Mods).Release?.ReleaseVersion); // окно увидит отметку в списке
+
+            var second = await mods.UpdateAllAsync(ModPolicy.Empty, allowUnstable: false, updater, db);
+            Assert.Empty(second.Updated);
+            Assert.Empty(second.Notes);
+            Assert.Empty(await mods.AvailableUpdatesAsync(ModPolicy.Empty, allowUnstable: false, db));
+        }
+        finally
+        {
+            foreach (var file in new[] { ReleaseMarks.FileFor(id), ModHistory.FileFor(id) })
+                if (File.Exists(file)) File.Delete(file);
+            var backups = Path.Combine(AppPaths.ModBackups, id);
+            if (Directory.Exists(backups)) Directory.Delete(backups, recursive: true);
+        }
     }
 
     [Fact]
