@@ -69,8 +69,8 @@ public sealed partial class HostedWorldBackups
                 try
                 {
                     if (!files.IsConnected) await files.ConnectAsync(CancellationToken.None).ConfigureAwait(false);
-                    count = await HostedWorldExtra.RestoreAsync(files, Root, snapshot.Layout, Id, archive, extras, CancellationToken.None)
-                        .ConfigureAwait(false);
+                    count = await HostedWorldExtra.RestoreAsync(files, Root, snapshot.Layout, Id, archive, extras, CancellationToken.None,
+                        progress).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
                 {

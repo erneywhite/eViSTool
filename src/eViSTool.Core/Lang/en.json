@@ -1626,6 +1626,7 @@
   "hostedbk.stepGameCopy": "Downloading the game backup: {0} of {1}",
   "hostedbk.stepExtra": "Saving mod settings and data: {0} of {1}",
   "hostedbk.stepUpload": "Uploading the world to the server: {0} of {1}",
+  "hostedbk.stepExtraUpload": "Returning mod settings and data: {0} of {1}",
   "hostedbk.cancelling": "Cancelling…",
   "hostedbk.done": "Backup saved: {0} · {1}",
   "hostedbk.pruned": "Old backups removed: {0}.",

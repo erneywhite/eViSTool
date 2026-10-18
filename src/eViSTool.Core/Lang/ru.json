@@ -1626,6 +1626,7 @@
   "hostedbk.stepGameCopy": "Скачиваю копию игры: {0} из {1}",
   "hostedbk.stepExtra": "Сохраняю настройки и данные модов: {0} из {1}",
   "hostedbk.stepUpload": "Заливаю мир на сервер: {0} из {1}",
+  "hostedbk.stepExtraUpload": "Возвращаю настройки и данные модов: {0} из {1}",
   "hostedbk.cancelling": "Отменяю…",
   "hostedbk.done": "Копия готова: {0} · {1}",
   "hostedbk.pruned": "Старых копий убрано: {0}.",

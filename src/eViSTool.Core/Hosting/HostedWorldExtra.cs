@@ -193,15 +193,18 @@ internal static class HostedWorldExtra
     /// нет в архиве, не удаляются. Возвращает, сколько файлов записано.
     /// </summary>
     public static async Task<int> RestoreAsync(IRemoteFiles files, string root, HostedLayout layout, string profileId, string archive,
-        HostedWorldExtras parts, CancellationToken ct)
+        HostedWorldExtras parts, CancellationToken ct, IProgress<HostedTransfer>? progress = null)
     {
         var ls = new HostedListings(files, root);
         var dataDir = layout.DataDir ?? layout.Root;
         var dirs = new Dictionary<string, string>(StringComparer.Ordinal);
         var written = 0;
         using var zip = ZipFile.OpenRead(archive);
-        foreach (var (entry, top) in Selected(zip, parts).ToList())
+        var selected = Selected(zip, parts).ToList();
+        foreach (var (entry, top) in selected)
         {
+            // у G-Portal каждый файл — несколько команд (временный, bak, переименование): без хода окно казалось зависшим
+            progress?.Report(new HostedTransfer(HostedBackupStep.ExtraUpload, written, selected.Count));
             byte[] bytes;
             using (var s = entry.Open())
             using (var buffer = new MemoryStream())
@@ -237,6 +240,7 @@ internal static class HostedWorldExtra
             ls.Forget(RemotePath.Parent(path));
             written++;
         }
+        progress?.Report(new HostedTransfer(HostedBackupStep.ExtraUpload, written, selected.Count));
         return written;
     }
 

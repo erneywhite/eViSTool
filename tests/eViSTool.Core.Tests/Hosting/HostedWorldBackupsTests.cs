@@ -645,6 +645,22 @@ public sealed class HostedWorldBackupsTests : IDisposable
     }
 
     [Fact]
+    public async Task Restore_Extras_ReportFilesOneByOne_SoTheWindowDoesNotLookStuck()
+    {
+        // на G-Portal 41 файл возвращался минуту без хода — полоса стояла на «32 МБ из 32 МБ»
+        var copy = await CopyThenChangeAsync();
+        var steps = new List<HostedTransfer>();
+
+        var result = await Backups().RestoreAsync(copy, Stopped with { Extras = HostedWorldExtras.ModConfig | HostedWorldExtras.ModData },
+            new SyncProgress<HostedTransfer>(steps.Add), default);
+
+        var files = steps.Where(s => s.Step == HostedBackupStep.ExtraUpload).ToList();
+        Assert.Equal(Enumerable.Range(0, result.ExtraFiles + 1).Select(i => (long)i), files.Select(s => s.Done));
+        Assert.All(files, s => Assert.Equal(result.ExtraFiles, s.Total));
+        Assert.True(steps.FindLastIndex(s => s.Step == HostedBackupStep.Upload) < steps.FindIndex(s => s.Step == HostedBackupStep.ExtraUpload));
+    }
+
+    [Fact]
     public async Task Restore_Extras_ByFlags_ServerConfigOnlyWhenAsked()
     {
         var copy = await CopyThenChangeAsync();

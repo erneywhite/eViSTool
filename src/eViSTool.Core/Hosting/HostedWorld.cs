@@ -30,9 +30,13 @@ public enum HostedWorldOrigin { World, GameBackup }
 public sealed record HostedWorldSource(HostedWorldOrigin Origin, RemoteEntry File, HostedWorldLocation? World);
 
 /// <summary>Шаг операции с копией мира: скачивание мира, сбор настроек и данных модов, заливка мира на сервер.</summary>
-public enum HostedBackupStep { World, Extra, Upload }
+public enum HostedBackupStep { World, Extra, Upload, ExtraUpload }
 
-/// <summary>Ход операции: шаг и сколько байт из общего размера этого шага уже прошло.</summary>
+/// <summary>
+/// Ход операции: шаг и сколько байт из общего размера этого шага уже прошло. У <see cref="HostedBackupStep.ExtraUpload"/>
+/// (возврат настроек и данных модов на сервер) — сколько файлов из скольких: их десятки мелких, и время уходит на
+/// команды FTP, а не на байты.
+/// </summary>
 public readonly record struct HostedTransfer(HostedBackupStep Step, long Done, long Total);
 
 /// <summary>Что не так с копией мира — окно по нему может подсказать следующий шаг (остановить сервер, /genbackup).</summary>

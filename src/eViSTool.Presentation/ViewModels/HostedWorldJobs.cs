@@ -293,6 +293,8 @@ internal static class HostedWorldText
             return job.Kind == HostedWorldJobKind.Restore ? Loc.T("hostedbk.restorePreparing")
                 : job.Origin is null ? Loc.T("hostedbk.checking")
                 : Loc.T("hostedbk.preparing");
+        // возврат настроек и данных модов считается файлами, а не байтами
+        if (job.Step == HostedBackupStep.ExtraUpload) return Loc.T("hostedbk.stepExtraUpload", job.Done, job.Total);
         var (done, total) = (Sizes.Format(job.Done), Sizes.Format(job.Total));
         return job.Step switch
         {
