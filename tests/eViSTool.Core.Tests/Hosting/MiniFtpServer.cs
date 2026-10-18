@@ -473,7 +473,8 @@ public sealed class MiniFtpServer : IAsyncDisposable
                     int n;
                     while (file.Position < limit && (n = await file.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, limit - file.Position)), ct)) > 0)
                         await d.Stream.WriteAsync(buffer.AsMemory(0, n), ct);
-                    cutShort = file.Position < file.Length;
+                    // обрыв — только заданный: файл, который растёт во время передачи, отдаётся как обычно
+                    cutShort = cut is not null && file.Position < file.Length;
                     await d.Stream.FlushAsync(ct);
                     if (d.Stream is SslStream ssl) await ssl.ShutdownAsync();
                 }

@@ -394,9 +394,7 @@ public sealed partial class HostedMods(ModTarget target)
     private void TrackLaunches(HostedSnapshot snapshot, IReadOnlyList<string> disabled, List<string> warnings)
     {
         if (snapshot.ConfigJson is not { } config) return; // конфига нет или он битый — сравнивать не с чем
-        var launch = config["LastLaunchMods"] is { Type: not JTokenType.Null } token
-            ? token.Type == JTokenType.String ? (string)token! : token.ToString(Formatting.None)
-            : null;
+        var launch = LastLaunchOf(config);
         var state = HostedState.Load(Id);
         var changed = false;
 
@@ -545,11 +543,15 @@ public sealed partial class HostedMods(ModTarget target)
         var state = HostedState.Load(Id);
         var (_, disabled) = ProfileResolver.ReadServerConfig(root);
         state.WrittenDisabled = [.. disabled.Select(d => d.Split('@')[0])];
-        state.LaunchAtWrite = root["LastLaunchMods"] is { Type: not JTokenType.Null } t
-            ? t.Type == JTokenType.String ? (string)t! : t.ToString(Formatting.None)
-            : null;
+        state.LaunchAtWrite = LastLaunchOf(root);
         state.Save(Id);
     }
+
+    /// <summary>LastLaunchMods из serverconfig.json сырым текстом — так его помнит <see cref="HostedState"/>; нет — null.</summary>
+    internal static string? LastLaunchOf(JObject config) =>
+        config["LastLaunchMods"] is { Type: not JTokenType.Null } token
+            ? token.Type == JTokenType.String ? (string)token! : token.ToString(Formatting.None)
+            : null;
 
     private static async Task QuietlyAsync(Func<Task> step)
     {

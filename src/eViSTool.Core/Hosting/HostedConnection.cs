@@ -91,7 +91,7 @@ public sealed class HostedConnection
 
     /// <summary>
     /// Куда складывать копии мира на этом компьютере (в том числе сетевая папка); null — папка данных программы,
-    /// HostedBackups/&lt;профиль&gt; (<see cref="HostedWorldBackups.DefaultDir"/>). Проверка — <see cref="HostedWorldBackups.CheckDir"/>.
+    /// HostedBackups/&lt;id профиля&gt; (<see cref="HostedWorldBackups.DefaultDir"/>). Проверка — <see cref="HostedWorldBackups.CheckDir"/>.
     /// </summary>
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     public string? BackupDir { get; set; }

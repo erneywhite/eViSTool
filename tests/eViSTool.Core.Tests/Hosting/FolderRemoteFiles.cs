@@ -44,6 +44,12 @@ public sealed class FolderRemoteFiles(string root) : IRemoteFiles
     public bool DropNext { get; set; }
 
     /// <summary>
+    /// Ответ потерялся: (операция, путь) → true — переименование выполняется, а потом соединение падает
+    /// (<see cref="RemoteFailure.Connect"/>), будто ответ сервера не дошёл. Путь — откуда.
+    /// </summary>
+    public Func<string, string, bool>? LoseReplyOn { get; set; }
+
+    /// <summary>
     /// Передачи файла (скачивание и докачка), которые рвутся, отдав столько байт: соединение падает
     /// (<see cref="RemoteFailure.Connect"/>), как у G-Portal после обрыва посреди файла. Каждая запись — один раз, по порядку.
     /// </summary>
@@ -189,6 +195,7 @@ public sealed class FolderRemoteFiles(string root) : IRemoteFiles
     public Task RenameAsync(string from, string to, CancellationToken ct)
     {
         Step("rename", from);
+        ct.ThrowIfCancellationRequested(); // отменили до команды — команда не уходит
         var src = Exact(from) ?? throw new RemoteFilesException(RemoteFailure.NotFound, $"550 {from}: no such file");
         var existing = Exact(to);
         if (existing is not null && NoRenameOverwrite) throw new RemoteFilesException(RemoteFailure.Exists, "550 path already exists");
@@ -196,6 +203,11 @@ public sealed class FolderRemoteFiles(string root) : IRemoteFiles
         if (Directory.Exists(src)) Directory.Move(src, dest);
         else System.IO.File.Move(src, dest, overwrite: true);
         lock (_gate) Writes.Add($"rename {RemotePath.Normalize(from)} → {RemotePath.Normalize(to)}");
+        if (LoseReplyOn?.Invoke("rename", RemotePath.Normalize(from)) == true)
+        {
+            IsConnected = false;
+            throw new RemoteFilesException(RemoteFailure.Connect, "421 connection lost");
+        }
         return Task.CompletedTask;
     }
 

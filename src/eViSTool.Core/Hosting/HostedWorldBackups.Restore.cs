@@ -1,3 +1,4 @@
+using System.Globalization;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Platform;
 using Newtonsoft.Json;
@@ -166,8 +167,7 @@ public sealed partial class HostedWorldBackups
             if (!await LandedAsync(files, world, tmp, local.Length).ConfigureAwait(false))
             {
                 if (!await PutBackAsync(files, moves).ConfigureAwait(false))
-                    throw new HostedWorldException(HostedWorldProblem.RestoreStuck,
-                        Loc.T("hosted.worldRestoreStuck", hadWorld ? bak : world, HostedSecret.Describe(ex)), ex); // отметка остаётся
+                    throw Stuck(moves, world, HostedSecret.Describe(ex), ex); // отметка остаётся
                 SwapMark.Clear(Id);
                 await QuietlyAsync(files, f => f.DeleteFileAsync(tmp, CancellationToken.None)).ConfigureAwait(false);
                 if (ex is OperationCanceledException) throw;
@@ -222,37 +222,84 @@ public sealed partial class HostedWorldBackups
         }
     }
 
+    /// <summary>Возврат не удался — отметка остаётся, вернёт следующая операция. Текст — про прежний мир, а если мира не было, про журнал SQLite.</summary>
+    private static HostedWorldException Stuck(IReadOnlyList<string[]> moves, string world, string reason, Exception? inner = null) =>
+        moves.FirstOrDefault(m => m[0] == world) is { } worldMove
+            ? new HostedWorldException(HostedWorldProblem.RestoreStuck, Loc.T("hosted.worldRestoreStuck", worldMove[1], reason), inner)
+            : new HostedWorldException(HostedWorldProblem.RestoreStuck,
+                Loc.T("hosted.worldRestoreStuckJournal", moves.FirstOrDefault()?[1] ?? world, reason), inner);
+
     /// <summary>
     /// Прошлое восстановление оборвалось (процесс закрыли, возврат не удался): по отметке на этой машине вернуть прежний
-    /// мир на место, если нового там нет. Новый на месте — убрать лишнее (bak, если не просили оставить, и временный файл).
-    /// На месте мира чужой файл (сервер запускали, и он создал новый мир) — прежний мир не удаляется, а предупреждение
-    /// говорит, где он. Сбой — исключение, отметка остаётся до следующего раза.
+    /// мир на место, если нового там нет. Новый на месте (временного файла нет, размер — залитого) — убрать лишнее (bak,
+    /// если не просили оставить). На месте мира чужой файл (сервер запускали, и он создал новый мир) — прежний мир из bak
+    /// переименовывается в «….evistool.bak-&lt;время&gt;»: bak следующее восстановление заменяет, а этот файл не тронет
+    /// никто; предупреждение говорит, где он. Сбой — исключение, отметка остаётся до следующего раза.
     /// </summary>
     private async Task<IReadOnlyList<string>> RecoverAsync(IRemoteFiles files, CancellationToken ct)
     {
         if (SwapMark.Read(Id) is not { } mark) return [];
         var warnings = new List<string>();
         var ls = new HostedListings(files, Root);
-        var bak = mark.World + HostedSafeWrite.BakSuffix;
         var now = await ls.FileAsync(mark.World, ct).ConfigureAwait(false);
+        // временный файл на месте — значит, на место мира он так и не встал: что бы там ни лежало, это не новый мир, даже
+        // если размер совпал (у SQLite он кратен странице, совпадения бывают)
+        var tmpLeft = await ls.FileAsync(mark.Tmp, ct).ConfigureAwait(false) is not null;
         if (now is null)
         {
-            if (!await PutBackAsync(files, mark.Moves).ConfigureAwait(false))
-                throw new HostedWorldException(HostedWorldProblem.RestoreStuck, Loc.T("hosted.worldRestoreStuck", bak, ""));
-            warnings.Add(Loc.T("hosted.worldRecovered"));
+            if (!await PutBackAsync(files, mark.Moves).ConfigureAwait(false)) throw Stuck(mark.Moves, mark.World, "");
+            ls.Forget(RemotePath.Parent(mark.World));
+            // мира могло и не быть (восстанавливали на сервер без мира) — тогда и возвращать было нечего
+            warnings.Add(await ls.FileAsync(mark.World, ct).ConfigureAwait(false) is not null
+                ? Loc.T("hosted.worldRecovered")
+                : Loc.T("hosted.worldRecoveredNoWorld"));
         }
-        else if (now.Size != mark.Size)
+        else if (!tmpLeft && now.Size == mark.Size)
         {
-            if (await ls.FileAsync(bak, ct).ConfigureAwait(false) is not null) warnings.Add(Loc.T("hosted.worldBakLeft", bak));
+            if (!mark.KeepOld)
+                foreach (var move in mark.Moves)
+                    if (await ls.FileAsync(move[1], ct).ConfigureAwait(false) is not null)
+                        await files.DeleteFileAsync(move[1], ct).ConfigureAwait(false);
         }
-        else if (!mark.KeepOld)
-            foreach (var move in mark.Moves)
-                if (await ls.FileAsync(move[1], ct).ConfigureAwait(false) is not null)
-                    await files.DeleteFileAsync(move[1], ct).ConfigureAwait(false);
+        else if (await SetAsideAsync(files, ls, mark, ct).ConfigureAwait(false) is { } kept)
+            warnings.Add(Loc.T("hosted.worldBakLeft", kept));
         ls.Forget(RemotePath.Parent(mark.World));
         if (await ls.FileAsync(mark.Tmp, ct).ConfigureAwait(false) is not null) await files.DeleteFileAsync(mark.Tmp, ct).ConfigureAwait(false);
         SwapMark.Clear(Id);
         return warnings;
+    }
+
+    /// <summary>
+    /// Отложить прежний мир (и его журнал) из bak под имя с отметкой времени, чтобы следующее восстановление, которое bak
+    /// заменяет, его не удалило. Возвращает, где теперь прежний мир; его bak нет — null.
+    /// </summary>
+    private async Task<string?> SetAsideAsync(IRemoteFiles files, HostedListings ls, SwapMark mark, CancellationToken ct)
+    {
+        var stamp = "-" + Time.GetUtcNow().UtcDateTime.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+        string? kept = null;
+        foreach (var move in mark.Moves)
+        {
+            if (await ls.FileAsync(move[1], ct).ConfigureAwait(false) is null) continue;
+            await files.RenameAsync(move[1], move[1] + stamp, ct).ConfigureAwait(false);
+            if (move[0] == mark.World) kept = move[1] + stamp;
+        }
+        return kept;
+    }
+
+    /// <summary>
+    /// Убрать свой остаток на сервере попутно с другой операцией: отказ (занято, нет прав) — не беда, это только место у
+    /// хостера. Связь упала — как есть: сеанс откроет новое соединение.
+    /// </summary>
+    private static async Task DeleteLeftoverAsync(IRemoteFiles files, string path, CancellationToken ct)
+    {
+        try
+        {
+            await files.DeleteFileAsync(path, ct).ConfigureAwait(false);
+        }
+        catch (RemoteFilesException) when (files.IsConnected)
+        {
+            // уберёт следующая операция
+        }
     }
 
     /// <summary>Уборка на сервере, которая не должна заслонить основную ошибку; связь упала — сначала переподключиться.</summary>

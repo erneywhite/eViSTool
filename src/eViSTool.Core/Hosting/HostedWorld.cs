@@ -47,7 +47,10 @@ public enum HostedWorldProblem
     /// <summary>В Saves несколько миров, и не понять, какой из них сервера.</summary>
     Ambiguous,
 
-    /// <summary>Сервер работает, а целой копии игры нет: остановить сервер или сделать /genbackup.</summary>
+    /// <summary>
+    /// Сервер работает, а свежей целой копии игры нет (нет совсем, старая или уже скачана): остановить сервер или
+    /// сделать /genbackup.
+    /// </summary>
     NeedsStop,
 
     /// <summary>Мир менялся во время скачивания.</summary>
@@ -61,6 +64,9 @@ public enum HostedWorldProblem
 
     /// <summary>Файл — не база SQLite, то есть не мир.</summary>
     NotAWorld,
+
+    /// <summary>База мира обрезана: файл короче, чем говорит её заголовок.</summary>
+    Damaged,
 
     /// <summary>Восстановление без подтверждения «сервер остановлен по логу».</summary>
     NotStopped,
@@ -172,8 +178,8 @@ internal static partial class HostedWorldLocator
     private static partial Regex RepeatedSlashes();
 
     /// <summary>
-    /// Путь с машины сервера → мир на FTP: папка — по хвостам пути (как папки модов), имя файла — точное, потом без учёта
-    /// регистра. Путь Windows, путь не к .vcdbs, мусор («..», управляющие знаки) и папка, которой не видно, — null.
+    /// Путь с машины сервера → мир на FTP: папка — по хвостам пути (как папки модов), имя файла — только точное. Путь
+    /// Windows, путь не к .vcdbs, мусор («..», управляющие знаки) и папка, которой не видно, — null.
     /// Папка нашлась, а файла в ней нет — место мира с <see cref="HostedWorldLocation.Entry"/> = null.
     /// </summary>
     private static async Task<HostedWorldLocation?> MatchAsync(HostedListings ls, string serverPath, HostedLayout layout, string dataDir,
@@ -215,9 +221,10 @@ internal static partial class HostedWorldLocator
         }
         if (dir is null || !IsWorldName(name)) return null;
 
+        // имя — только точное: сервер на Linux откроет ровно его, а файл, отличный регистром, — не его мир (копия сохранила
+        // бы не тот файл, а восстановление записало бы туда, откуда сервер не читает)
         var list = await ls.ListAsync(dir, ct).ConfigureAwait(false) ?? [];
-        var hit = list.FirstOrDefault(e => !e.IsDirectory && e.Name == name)
-                  ?? list.FirstOrDefault(e => !e.IsDirectory && string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
+        var hit = list.FirstOrDefault(e => !e.IsDirectory && e.Name == name);
         return new HostedWorldLocation(hit?.Path ?? RemotePath.Combine(dir, name), display, HostedWorldFoundBy.Config, hit, dataDir);
     }
 }

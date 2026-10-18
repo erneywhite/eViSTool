@@ -404,7 +404,17 @@ public sealed partial class FluentFtpFiles(HostedEndpoint endpoint) : IRemoteFil
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            throw Translate(ex, "upload", path);
+            // передача оборвалась посередине: у G-Portal управляющее соединение после этого мёртвое, а узнали бы мы об этом
+            // только по молчанию на следующей команде (уборка временного файла ушла бы в никуда) — следующая операция
+            // подключится заново
+            var error = Translate(ex, "upload", path);
+            if (error.Kind is RemoteFailure.Connect or RemoteFailure.Timeout || ct.IsCancellationRequested) _broken = true;
+            throw error;
+        }
+        catch (OperationCanceledException)
+        {
+            _broken = true; // отмена посреди передачи — то же самое
+            throw;
         }
     }
 

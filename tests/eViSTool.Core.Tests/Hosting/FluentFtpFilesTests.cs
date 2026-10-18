@@ -365,6 +365,57 @@ public sealed class FluentFtpFilesTests
         Assert.Equal(RemoteFailure.Quota, ex.Kind);
     }
 
+    [Theory, MemberData(nameof(Modes))]
+    public async Task Upload_CancelledMidway_DropsTheConnection_TheNextCommandWorks(string mode)
+    {
+        await using var server = new MiniFtpServer(Options(mode));
+        server.Put("/Mods/a.zip", [1]);
+        await using var files = await ConnectAsync(server);
+        using var cts = new CancellationTokenSource();
+        var source = new CancelOnRead(new MemoryStream(Random(4 * 1024 * 1024)), 256 * 1024, cts);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => files.UploadAsync(source, "/Mods/big.zip", null, cts.Token));
+
+        // в соединение с недоделанной передачей больше ничего не шлём: у G-Portal оно мёртвое, и уборка ушла бы в никуда
+        Assert.False(files.IsConnected);
+        Assert.Contains(await files.ListAsync("/Mods", None), e => e.Name == "a.zip");
+    }
+
+    /// <summary>Источник заливки, который отменяет её, когда из него прочитали столько-то байт.</summary>
+    private sealed class CancelOnRead(Stream inner, long after, CancellationTokenSource cts) : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => inner.CanSeek;
+        public override bool CanWrite => false;
+        public override long Length => inner.Length;
+
+        public override long Position
+        {
+            get => inner.Position;
+            set => inner.Position = value;
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (inner.Position >= after) cts.Cancel();
+            return inner.Read(buffer, offset, count);
+        }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (inner.Position >= after) cts.Cancel();
+            return inner.ReadAsync(buffer, cancellationToken);
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
     // ---------- пассивный режим
 
     [Fact]

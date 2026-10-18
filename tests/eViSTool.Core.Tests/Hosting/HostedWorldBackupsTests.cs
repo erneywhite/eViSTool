@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.IO.Compression;
 using eViSTool.Core.Hosting;
 using eViSTool.Core.Mods;
+using eViSTool.Core.Server;
 using Newtonsoft.Json.Linq;
 
 namespace eViSTool.Core.Tests.Hosting;
@@ -149,6 +151,7 @@ public sealed class HostedWorldBackupsTests : IDisposable
     public async Task Source_StoppedServer_TakesTheWorld_RunningServer_TheFreshestGameCopy()
     {
         PutWorld("live");
+        SetTime(World, _time.UtcNow); // возраст копий игры считается от времени мира
         PutWorldAt("/Backups/old.vcdbs", "old");
         PutWorldAt("/BackupSaves/fresh.vcdbs", "fresh");
         PutWorldAt("/Backups/older.vcdbs", "older");
@@ -480,12 +483,13 @@ public sealed class HostedWorldBackupsTests : IDisposable
     }
 
     [Fact]
-    public void Folder_DefaultIsInTheDataFolder_UnderASafeName_OwnFolderOnlyAsAFullPath()
+    public void Folder_DefaultIsInTheDataFolder_ByProfileId_OwnFolderOnlyAsAFullPath()
     {
-        Assert.Equal(Path.Combine(AppPaths.Root, "HostedBackups", "My__server"), HostedWorldBackups.DefaultDir("My: server"));
+        Assert.Equal(Path.Combine(AppPaths.Root, "HostedBackups", _host.Profile.Id), HostedWorldBackups.DefaultDir(_host.Profile.Id));
+        Assert.Throws<ArgumentException>(() => HostedWorldBackups.DefaultDir("../elsewhere"));
 
         _host.Settings.BackupDir = "relative/dir";
-        Assert.Equal(HostedWorldBackups.DefaultDir("Hosted"), new HostedWorldBackups(_host.Target).Dir);
+        Assert.Equal(HostedWorldBackups.DefaultDir(_host.Profile.Id), new HostedWorldBackups(_host.Target).Dir);
 
         _host.Settings.BackupDir = _copies;
         Assert.Equal(_copies, new HostedWorldBackups(_host.Target).Dir);
@@ -756,8 +760,332 @@ public sealed class HostedWorldBackupsTests : IDisposable
 
         AssertLike("hosted.worldBakLeft", Assert.Single(result.Warnings));
         Assert.Contains(Bak, result.Warnings[0]);
-        Assert.Equal(["old"], SqliteWorld.Read(ServerLocal(Bak)));
+        // прежний мир отложен под имя с отметкой времени: bak следующее восстановление заменяет
+        Assert.Equal(["old"], SqliteWorld.Read(ServerLocal(SetAside)));
+        Assert.Contains(SetAside, result.Warnings[0]);
         Assert.False(File.Exists(SwapMarkFile));
+    }
+
+    /// <summary>Куда восстановление откладывает прежний мир, когда на его месте оказался чужой файл (время — часов теста).</summary>
+    private string SetAside => Bak + "-" + _time.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+
+    [Fact]
+    public async Task Recover_TmpStillThere_SameSize_IsNotTakenForTheNewWorld()
+    {
+        PutWorld("created-by-the-server");
+        PutWorldAt(Bak, "old");
+        _host.Server.Put(Tmp, [1, 2, 3]); // залитое на место так и не встало
+        LeaveSwapMark(new FileInfo(ServerLocal(World)).Length); // а размер того, что на месте, совпал с залитым
+
+        var result = await Backups().CreateAsync(serverStopped: true, null, default);
+
+        AssertLike("hosted.worldBakLeft", Assert.Single(result.Warnings));
+        Assert.Equal(["old"], SqliteWorld.Read(ServerLocal(SetAside)));
+        Assert.False(_host.Server.Has(Tmp));
+        Assert.False(File.Exists(SwapMarkFile));
+    }
+
+    [Fact]
+    public async Task Restore_StuckThenTheServerMadeANewWorld_ThePreviousWorldIsSetAside_NotReplaced()
+    {
+        var copy = await CopyThenChangeAsync();
+        var broken = true;
+        _host.Server.FailOn = (op, path) => broken && op == "rename" && path is Tmp or Bak;
+        var keep = Stopped with { KeepOldWorld = true };
+        var stuck = await Assert.ThrowsAsync<HostedWorldException>(() => Backups().RestoreAsync(copy, keep, null, default));
+        Assert.Equal(HostedWorldProblem.RestoreStuck, stuck.Problem);
+
+        // мир остался только в bak, а сервер всё-таки запустили — он создал новый пустой мир
+        broken = false;
+        PutWorld("fresh");
+        var result = await Backups().RestoreAsync(copy, keep, null, default);
+
+        AssertLike("hosted.worldBakLeft", Assert.Single(result.Warnings));
+        Assert.Contains(SetAside, result.Warnings[0]);
+        Assert.Equal(["v2"], SqliteWorld.Read(ServerLocal(SetAside))); // последний настоящий мир цел
+        Assert.Equal(["v1"], ServerRows());
+        Assert.Equal(Bak, result.KeptOldWorld);
+        Assert.Equal(["fresh"], SqliteWorld.Read(ServerLocal(Bak)));
+        Assert.False(_host.Server.Has(Tmp));
+        Assert.False(File.Exists(SwapMarkFile));
+    }
+
+    [Fact]
+    public async Task Recover_InterruptedRestoreOntoAServerWithoutAWorld_DoesNotSayTheWorldIsBack()
+    {
+        var copy = await CopyThenChangeAsync();
+        foreach (var tail in new[] { "", "-wal", "-shm" }) File.Delete(ServerLocal(World + tail));
+        _host.Server.Put(Tmp, [1, 2, 3]);
+        new HostedWorldBackups.SwapMark { World = World, Tmp = Tmp, Size = 3, Moves = [] }.Save(_host.Profile.Id);
+
+        var result = await Backups().RestoreAsync(copy, Stopped, null, default);
+
+        HostedTestText.AssertIs("hosted.worldRecoveredNoWorld", Assert.Single(result.Warnings));
+        Assert.Equal(["v1"], ServerRows());
+    }
+
+    [Fact]
+    public async Task Restore_OntoAServerWithOnlyAJournal_Stuck_SaysItIsTheJournal()
+    {
+        var copy = await CopyThenChangeAsync();
+        File.Delete(ServerLocal(World)); // мира нет, а журнал SQLite остался
+        _host.Server.FailOn = (op, path) => op == "rename" && (path == Tmp || path.EndsWith(".evistool.bak", StringComparison.Ordinal));
+
+        var stuck = await Assert.ThrowsAsync<HostedWorldException>(() => Backups().RestoreAsync(copy, Stopped, null, default));
+
+        Assert.Equal(HostedWorldProblem.RestoreStuck, stuck.Problem);
+        AssertLike("hosted.worldRestoreStuckJournal", stuck.Message);
+        Assert.Contains(World + "-wal.evistool.bak", stuck.Message);
+    }
+
+    [Fact]
+    public async Task Restore_ReplyToTheLastRenameLost_ButTheWorldIsInPlace_Succeeds()
+    {
+        var copy = await CopyThenChangeAsync();
+        _host.Server.LoseReplyOn = (op, path) => op == "rename" && path == Tmp;
+
+        var result = await Backups().RestoreAsync(copy, Stopped, null, default);
+
+        Assert.Equal(["v1"], ServerRows());
+        Assert.Empty(result.Warnings);
+        Assert.False(_host.Server.Has(Tmp));
+        Assert.False(_host.Server.Has(Bak)); // прежний мир убран, как при обычном успехе
+        Assert.False(File.Exists(SwapMarkFile));
+    }
+
+    [Fact]
+    public async Task Restore_CancelledBetweenTheMoves_PutsEverythingBack()
+    {
+        var copy = await CopyThenChangeAsync();
+        using var cts = new CancellationTokenSource();
+        _host.Server.OnBefore = (op, path) => { if (op == "rename" && path == World + "-wal") cts.Cancel(); };
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Backups().RestoreAsync(copy, Stopped, null, cts.Token));
+
+        Assert.Equal(["v2"], ServerRows());
+        Assert.Equal([3L, 3L], new[] { "-wal", "-shm" }.Select(t => new FileInfo(ServerLocal(World + t)).Length));
+        Assert.False(_host.Server.Has(Tmp));
+        Assert.False(_host.Server.Has(Bak));
+        Assert.False(File.Exists(SwapMarkFile));
+    }
+
+    [Fact]
+    public async Task Create_DropDuringTheJournalDownload_ResumesTheJournal()
+    {
+        SqliteWorld.WriteCrashed(ServerLocal(World), ["saved"], BigRows("p"));
+        _host.Server.CutDownloads.Add((World + "-wal", 100_000));
+
+        var result = await Backups().CreateAsync(serverStopped: true, null, default);
+
+        Assert.Equal(["saved", .. BigRows("p")], SqliteWorld.Read(result.Backup.Path));
+        Assert.Equal([0L, 100_000L], _host.Server.DownloadOffsets.Where(d => d.Path == World + "-wal").Select(d => d.Offset));
+    }
+
+    [Fact]
+    public async Task Create_ServerWithoutRangeReads_ProgressStartsOverWithTheDownload()
+    {
+        PutWorld([.. Enumerable.Range(0, 300).Select(i => "r" + i + new string('x', 8000))]);
+        _host.Server.NoRange = true;
+        _host.Server.CutDownloads.Add((World, 2_000_000));
+        var steps = new List<HostedTransfer>();
+
+        await Backups().CreateAsync(serverStopped: true, new SyncProgress<HostedTransfer>(steps.Add), default);
+
+        var done = steps.Where(s => s.Step == HostedBackupStep.World).Select(s => s.Done).ToList();
+        var far = done.FindIndex(d => d >= 1_000_000);
+        Assert.True(far >= 0);
+        // после обрыва мир качается заново — ход сразу показывает начало, а не стоит на прежней позиции
+        Assert.Contains(done.Skip(far + 1), d => d < 1_000_000);
+    }
+
+    // ---------- копии игры на работающем сервере
+
+    [Fact]
+    public async Task Create_RunningServer_StaleGameCopy_IsRefused_OldOneComesWithAWarning()
+    {
+        const string ancient = "/BackupSaves/old-before-update.vcdbs";
+        PutWorld("live");
+        SetTime(World, _time.UtcNow);
+        PutWorldAt(ancient, "ancient");
+        SetTime(ancient, _time.UtcNow.AddDays(-120));
+
+        var stale = await Assert.ThrowsAsync<HostedWorldException>(() => Backups().CreateAsync(serverStopped: false, null, default));
+
+        Assert.Equal(HostedWorldProblem.NeedsStop, stale.Problem);
+        AssertLike("hosted.worldCopyStale", stale.Message);
+        Assert.Contains("old-before-update.vcdbs", stale.Message);
+        Assert.Empty(CopyFiles());
+        Assert.DoesNotContain(_host.Server.DownloadOffsets, d => d.Path == ancient);
+
+        // мира не видно — возраст копии по часам этой машины (время MLSD — UTC)
+        File.Delete(ServerLocal(World));
+        var noWorld = await Assert.ThrowsAsync<HostedWorldException>(() => Backups().SourceAsync(serverStopped: false, default));
+        Assert.Equal(HostedWorldProblem.NeedsStop, noWorld.Problem);
+
+        // копия /genbackup двухчасовой давности — берётся, но с предупреждением, от какого она времени
+        PutWorld("live");
+        SetTime(World, _time.UtcNow);
+        PutWorldAt("/Backups/genbackup.vcdbs", "two-hours-ago");
+        SetTime("/Backups/genbackup.vcdbs", _time.UtcNow.AddHours(-2));
+        var result = await Backups().CreateAsync(serverStopped: false, null, default);
+
+        Assert.Equal(["two-hours-ago"], SqliteWorld.Read(result.Backup.Path));
+        AssertLike("hosted.worldCopyOld", Assert.Single(result.Warnings));
+    }
+
+    [Fact]
+    public async Task Create_RunningServer_SameGameCopyTwice_TheSecondIsRefused()
+    {
+        _host.Settings.BackupKeep = 2;
+        PutWorld("live");
+        PutWorldAt("/Backups/genbackup.vcdbs", "g1");
+        foreach (var file in new[] { World, "/Backups/genbackup.vcdbs" }) SetTime(file, _time.UtcNow);
+        var first = await Backups().CreateAsync(serverStopped: false, null, default);
+        _time.UtcNow = _time.UtcNow.AddMinutes(10);
+
+        var again = await Assert.ThrowsAsync<HostedWorldException>(() => Backups().CreateAsync(serverStopped: false, null, default));
+
+        Assert.Equal(HostedWorldProblem.NeedsStop, again.Problem);
+        AssertLike("hosted.worldCopySaved", again.Message);
+        Assert.Contains(first.Backup.Name, again.Message);
+        Assert.Single(Backups().List()); // дубль не скачан и ничего не вытеснил
+
+        // свежий /genbackup — уже другая копия
+        PutWorldAt("/Backups/genbackup.vcdbs", "g2");
+        SetTime("/Backups/genbackup.vcdbs", _time.UtcNow);
+        var next = await Backups().CreateAsync(serverStopped: false, null, default);
+        Assert.Equal(["g2"], SqliteWorld.Read(next.Backup.Path));
+    }
+
+    // ---------- чьи копии
+
+    [Fact]
+    public async Task SameNamedProfiles_DefaultFoldersDiffer_InOneOwnFolderTheyDoNotRotateEachOthersCopies()
+    {
+        using var other = new HostedFixture(); // профиль с тем же именем «Hosted»
+        other.GPortalLayout();
+        other.Settings.BackupDir = _copies;
+        other.Settings.BackupKeep = 1;
+        SqliteWorld.WriteClean(Path.Combine(other.Server.Root, "Saves", "MyVintageStoryWorld.vcdbs"), "theirs");
+        _host.Settings.BackupKeep = 2;
+        PutWorld("mine");
+        HostedWorldBackups Theirs() => new(other.Target) { Time = _time, FreeSpace = _ => null };
+
+        var mine1 = (await Backups().CreateAsync(serverStopped: true, null, default)).Backup;
+        _time.UtcNow = _time.UtcNow.AddMinutes(10);
+        await Backups().CreateAsync(serverStopped: true, null, default);
+        _time.UtcNow = _time.UtcNow.AddMinutes(10);
+        var theirs = await Theirs().CreateAsync(serverStopped: true, null, default);
+        _time.UtcNow = _time.UtcNow.AddMinutes(10);
+        var mine3 = await Backups().CreateAsync(serverStopped: true, null, default);
+
+        Assert.Empty(theirs.Pruned); // своя у него одна — чужие две не в счёт
+        Assert.Equal(mine1.Name, Assert.Single(mine3.Pruned).Name);
+        var seen = Backups().List().Single(b => b.Name == theirs.Backup.Name);
+        Assert.Equal((false, true), (seen.IsOwn, seen.FromOtherProfile));
+        Assert.True(File.Exists(theirs.Backup.Path));
+        Assert.All(Theirs().List().Where(b => b.Name != theirs.Backup.Name), b => Assert.True(b.FromOtherProfile && !b.IsOwn));
+
+        _host.Settings.BackupDir = null;
+        other.Settings.BackupDir = null;
+        Assert.NotEqual(new HostedWorldBackups(_host.Target).Dir, new HostedWorldBackups(other.Target).Dir);
+    }
+
+    // ---------- проверки и уборка
+
+    [Fact]
+    public async Task Create_FreeSpace_IsMeasuredOnTheDiskOfTheCopiesFolder()
+    {
+        PutWorld("one");
+        string? asked = null;
+        var backups = new HostedWorldBackups(_host.Target) { Time = _time, FreeSpace = disk => { asked = disk; return 1024; } };
+
+        var ex = await Assert.ThrowsAsync<HostedWorldException>(() => backups.CreateAsync(serverStopped: true, null, default));
+
+        Assert.Equal(HostedWorldProblem.NoSpace, ex.Problem);
+        Assert.Equal(LowDiskWatch.DiskOf(_copies), asked);
+        Assert.Contains(asked!, ex.Message);
+    }
+
+    [Fact]
+    public async Task Locate_FileDiffersOnlyInCase_IsNotTheWorld()
+    {
+        PutWorldAt("/Saves/myvintagestoryworld.vcdbs", "other-case");
+
+        var world = await Backups().LocateAsync(default);
+
+        Assert.Equal((World, false), (world.Path, world.Exists));
+        var ex = await Assert.ThrowsAsync<HostedWorldException>(() => Backups().CreateAsync(serverStopped: true, null, default));
+        Assert.Equal(HostedWorldProblem.Missing, ex.Problem);
+    }
+
+    [Fact]
+    public void LengthByHeader_OfARealWorld_IsItsLength()
+    {
+        var path = Path.Combine(_host.Dir, "real.vcdbs");
+        SqliteWorld.WriteClean(path, BigRows("h"));
+
+        Assert.Equal(new FileInfo(path).Length, HostedWorldBackups.LengthByHeader(File.ReadAllBytes(path).AsSpan(0, 100)));
+    }
+
+    [Fact]
+    public async Task Create_TruncatedWorld_IsRefused()
+    {
+        PutWorld(BigRows("r"));
+        using (var file = new FileStream(ServerLocal(World), FileMode.Open)) file.SetLength(file.Length / 2);
+
+        var ex = await Assert.ThrowsAsync<HostedWorldException>(() => Backups().CreateAsync(serverStopped: true, null, default));
+
+        Assert.Equal(HostedWorldProblem.Damaged, ex.Problem);
+        AssertLike("hosted.worldTruncated", ex.Message);
+        Assert.Empty(CopyFiles());
+    }
+
+    [Fact]
+    public async Task Restore_TruncatedCopy_IsRefused_TheServerIsNotTouched()
+    {
+        var copy = await CopyThenChangeAsync();
+        using (var file = new FileStream(copy.Path, FileMode.Open)) file.SetLength(file.Length - 512);
+
+        var ex = await Assert.ThrowsAsync<HostedWorldException>(() => Backups().RestoreAsync(copy, Stopped, null, default));
+
+        Assert.Equal(HostedWorldProblem.Damaged, ex.Problem);
+        Assert.Empty(_host.Server.Writes);
+        Assert.Equal(["v2"], ServerRows());
+    }
+
+    [Fact]
+    public async Task Create_RemovesOwnLeftovers_JournalFolder_ArchiveTmp_AndTheUploadOnTheServer()
+    {
+        var work = Directory.CreateDirectory(Path.Combine(_copies, "Hosted-2026-01-01_00-00-00.vcdbs.evistool-db")).FullName;
+        File.WriteAllBytes(Path.Combine(work, "world.vcdbs"), [1]);
+        File.WriteAllBytes(Path.Combine(_copies, "Hosted-2026-01-01_00-00-00.extra.zip.tmp"), [1]);
+        File.WriteAllBytes(Path.Combine(_copies, "Other-2026-01-01_00-00-00.extra.zip.tmp"), [1]);
+        PutWorld("one");
+        _host.Server.Put(Tmp, new byte[4096]); // заливка, оборванная до отметки
+
+        await Backups().CreateAsync(serverStopped: true, null, default);
+
+        Assert.False(Directory.Exists(work));
+        Assert.DoesNotContain(CopyFiles(), f => f.StartsWith("Hosted-2026-01-01", StringComparison.Ordinal));
+        Assert.Contains("Other-2026-01-01_00-00-00.extra.zip.tmp", CopyFiles());
+        Assert.False(_host.Server.Has(Tmp));
+    }
+
+    [Fact]
+    public async Task Restore_ServerConfig_RemembersItsLastLaunch_SoTheNextScanSeesNoLaunch()
+    {
+        var copy = await CopyThenChangeAsync();
+        var config = JObject.Parse(_host.Server.Text("/serverconfig.json"));
+        config["LastLaunchMods"] = """[{"id":"game","version":"1.22.8"}]"""; // сервер запускали после копии
+        _host.Server.Put("/serverconfig.json", config.ToString());
+        await ModTargets.ScanAsync(_host.Target);
+        var original = JObject.Parse(await ReadExtraAsync(copy, "serverconfig.json"));
+
+        await Backups().RestoreAsync(copy, Stopped with { Extras = HostedWorldExtras.ServerConfig }, null, default);
+
+        Assert.NotNull(HostedMods.LastLaunchOf(original));
+        Assert.Equal(HostedMods.LastLaunchOf(original), HostedState.Load(_host.Profile.Id).LastLaunch);
     }
 
     [Fact]

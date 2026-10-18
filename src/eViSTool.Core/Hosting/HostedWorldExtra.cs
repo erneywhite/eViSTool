@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using eViSTool.Core.Mods;
+using eViSTool.Core.Profiles;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -216,10 +217,12 @@ internal static class HostedWorldExtra
                     .ConfigureAwait(false);
                 ls.Forget(RemotePath.Parent(config));
                 // выключенные моды теперь — из копии, а не из нашей последней правки: проверке «хостер переписал конфиг»
-                // сравнивать больше не с чем
+                // сравнивать больше не с чем. LastLaunchMods тоже из копии: запомнить его, иначе следующий скан принял бы
+                // его за новый запуск сервера и отметил в истории модов запуск, которого не было
                 var state = HostedState.Load(profileId);
                 state.WrittenDisabled = null;
                 state.LaunchAtWrite = null;
+                state.LastLaunch = LastLaunchIn(bytes);
                 state.Save(profileId);
                 written++;
                 continue;
@@ -235,6 +238,20 @@ internal static class HostedWorldExtra
             written++;
         }
         return written;
+    }
+
+    /// <summary>LastLaunchMods возвращённого serverconfig.json (как его помнит <see cref="HostedState"/>); конфиг не читается — null.</summary>
+    private static string? LastLaunchIn(byte[] config)
+    {
+        try
+        {
+            using var reader = new StreamReader(new MemoryStream(config)); // BOM, если есть, снимается
+            return HostedMods.LastLaunchOf(ModConfigEditor.ParseText(reader.ReadToEnd()));
+        }
+        catch (JsonException)
+        {
+            return null; // битый конфиг скан тоже не разберёт — сравнивать ему будет не с чем
+        }
     }
 
     /// <summary>Папка есть — ничего; нет — создать недостающие сверху вниз (выше папки данных не поднимаемся: она есть).</summary>

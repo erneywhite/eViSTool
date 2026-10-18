@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Globalization;
 using System.Runtime.ExceptionServices;
 using System.Text.RegularExpressions;
@@ -11,7 +12,7 @@ namespace eViSTool.Core.Hosting;
 
 /// <summary>
 /// Копия мира сервера у хостера на этом компьютере: «&lt;профиль&gt;-ГГГГ-ММ-ДД_ЧЧ-ММ-СС.vcdbs» (время этой машины), рядом
-/// архив настроек и данных модов «….extra.zip» и сведения «….info.json» (откуда скачана).
+/// архив настроек и данных модов «….extra.zip» и сведения «….info.json» (каким профилем и откуда скачана).
 /// </summary>
 /// <param name="Time">Время копии: из отметки в имени, у копии без отметки — время файла.</param>
 /// <param name="Size">Размер мира.</param>
@@ -20,8 +21,17 @@ public sealed record HostedWorldBackup(string Path, string Name, DateTime Time, 
     /// <summary>В имени есть отметка времени.</summary>
     public bool IsStamped { get; init; }
 
-    /// <summary>Копия этого профиля, сделанная eViSTool: только такие удаляет ротация.</summary>
+    /// <summary>
+    /// Копия этого профиля, сделанная eViSTool: имя «&lt;профиль&gt;-&lt;время&gt;.vcdbs» и id профиля в сведениях рядом.
+    /// Только такие удаляет ротация.
+    /// </summary>
     public bool IsOwn { get; init; }
+
+    /// <summary>
+    /// По сведениям рядом копию сделал другой профиль (одна своя папка на два профиля). Ротация её не трогает; перед
+    /// восстановлением такой копии окно должно переспросить: это мир другого сервера.
+    /// </summary>
+    public bool FromOtherProfile { get; init; }
 
     /// <summary>Размер архива с настройками и данными модов; 0 — архива нет.</summary>
     public long ExtraSize { get; init; }
@@ -31,6 +41,9 @@ public sealed record HostedWorldBackup(string Path, string Name, DateTime Time, 
 
     /// <summary>Путь на FTP, откуда скачана.</summary>
     public string? SourcePath { get; init; }
+
+    /// <summary>Размер файла на сервере, как его отдал листинг; 0 — сведений нет.</summary>
+    public long SourceSize { get; init; }
 
     /// <summary>Время файла на сервере, как его отдал листинг (MLSD — UTC, LIST — время сервера).</summary>
     public DateTime? SourceTime { get; init; }
@@ -90,7 +103,7 @@ public sealed partial class HostedWorldBackups
         Prefix = BackupStore.Slug(target.Name);
         var chosen = Hosted.Settings.BackupDir?.Trim();
         // своя папка — только полным путём (окно проверяет её CheckDir); мусор в настройках не уводит копии в текущую папку
-        Dir = !string.IsNullOrEmpty(chosen) && Path.IsPathFullyQualified(chosen) ? chosen : DefaultDir(target.Name);
+        Dir = !string.IsNullOrEmpty(chosen) && Path.IsPathFullyQualified(chosen) ? chosen : DefaultDir(target.ProfileId);
     }
 
     public ModTarget Target { get; }
@@ -104,15 +117,20 @@ public sealed partial class HostedWorldBackups
     /// <summary>Часы этой машины: имя копии — по местному времени.</summary>
     public TimeProvider Time { get; init; } = TimeProvider.System;
 
-    /// <summary>Свободное место на диске папки (для тестов); null — неизвестно, не проверять.</summary>
+    /// <summary>Свободное место на диске папки (для тестов): получает диск папки копий; null — неизвестно, не проверять.</summary>
     internal Func<string, long?>? FreeSpace { get; init; }
 
     private HostedTarget Hosted => Target.Hosted!;
     private string Id => Target.ProfileId;
     private string Root => HostedLayoutProbe.Root(Hosted.Settings);
 
-    /// <summary>Папка копий по умолчанию: папка данных программы, HostedBackups/&lt;имя профиля&gt;.</summary>
-    public static string DefaultDir(string? profileName) => Path.Combine(AppPaths.Root, "HostedBackups", BackupStore.Slug(profileName));
+    /// <summary>
+    /// Папка копий по умолчанию: папка данных программы, HostedBackups/&lt;id профиля&gt;. По id, а не по имени: имена
+    /// профилей повторяются (новый получает «Сервер N», номер освобождается при удалении) и меняются, а два профиля в одной
+    /// папке удаляли бы ротацией копии друг друга. Имя профиля — в именах самих копий.
+    /// </summary>
+    public static string DefaultDir(string profileId) =>
+        PathRules.FileIn(Path.Combine(AppPaths.Root, "HostedBackups"), profileId) ?? throw new ArgumentException("bad profile id", nameof(profileId));
 
     /// <summary>Можно ли складывать копии в эту папку (как у копий своего сервера); null — можно, иначе — что не так.</summary>
     public static string? CheckDir(string? dir) => BackupStore.CheckDir(dir);
@@ -136,7 +154,8 @@ public sealed partial class HostedWorldBackups
 
     /// <summary>
     /// Что скачает <see cref="CreateAsync"/>: при <paramref name="serverStopped"/> — сам мир, иначе — самая свежая целая
-    /// копия игры из Backups и BackupSaves; её нет — отказ «останови сервер или сделай /genbackup».
+    /// копия игры из Backups и BackupSaves. Её нет, она старше мира больше чем на <see cref="StaleGameCopy"/> или уже
+    /// скачана — отказ «останови сервер или сделай /genbackup» (<see cref="HostedWorldProblem.NeedsStop"/>).
     /// </summary>
     public Task<HostedWorldSource> SourceAsync(bool serverStopped, CancellationToken ct) =>
         HostedSessions.UseAsync(Id, Hosted.Endpoint, async files =>
@@ -145,7 +164,16 @@ public sealed partial class HostedWorldBackups
             return await PickAsync(snapshot, serverStopped, ct).ConfigureAwait(false);
         }, readOnly: true, ct);
 
-    private static async Task<HostedWorldSource> PickAsync(HostedSnapshot snapshot, bool serverStopped, CancellationToken ct)
+    /// <summary>
+    /// Копия игры старше мира на сервере больше чем на столько — не берём: в ней мир того времени, а в BackupSaves лежат
+    /// копии перед обновлением игры, им бывают месяцы. Восстановление «последней копии» откатило бы мир на это время.
+    /// </summary>
+    internal static readonly TimeSpan StaleGameCopy = TimeSpan.FromDays(1);
+
+    /// <summary>Копия игры старше мира больше чем на столько — берём, но предупреждаем, от какого она времени.</summary>
+    internal static readonly TimeSpan OldGameCopy = TimeSpan.FromHours(1);
+
+    private async Task<HostedWorldSource> PickAsync(HostedSnapshot snapshot, bool serverStopped, CancellationToken ct)
     {
         if (serverStopped)
         {
@@ -166,8 +194,30 @@ public sealed partial class HostedWorldBackups
         var copy = await HostedWorldLocator.FreshestGameCopyAsync(snapshot.Listings, snapshot.Layout.DataDir ?? snapshot.Layout.Root, ct)
                        .ConfigureAwait(false)
                    ?? throw new HostedWorldException(HostedWorldProblem.NeedsStop, Loc.T("hosted.worldNeedsStop"));
+        if (GameCopyAge(copy, located) > StaleGameCopy)
+            throw new HostedWorldException(HostedWorldProblem.NeedsStop, Loc.T("hosted.worldCopyStale", copy.Name, When(copy.Modified!.Value)));
+        // эта копия игры уже скачана: ещё один её дубль под новым временем только вытеснил бы ротацией настоящие копии
+        if (List().FirstOrDefault(b => !b.FromOtherProfile && b.Origin == HostedWorldOrigin.GameBackup && b.SourcePath == copy.Path
+                                       && b.SourceSize == copy.Size && b.SourceTime == copy.Modified) is { } saved)
+            throw new HostedWorldException(HostedWorldProblem.NeedsStop, Loc.T("hosted.worldCopySaved", copy.Name, saved.Name));
         return new HostedWorldSource(HostedWorldOrigin.GameBackup, copy, located);
     }
+
+    /// <summary>
+    /// На сколько копия игры старше мира. Время мира и копии — из одного вида листинга (MLSD — UTC, LIST — время сервера),
+    /// их можно вычитать; мира не нашлось — от часов этой машины, если время копии в UTC. Не узнать — null.
+    /// </summary>
+    private TimeSpan? GameCopyAge(RemoteEntry copy, HostedWorldLocation? world)
+    {
+        if (copy.Modified is not { } made) return null;
+        if (world?.Entry?.Modified is { } changed) return changed - made;
+        // shortcut: время LIST без мира сравнить не с чем — копию берём без проверки возраста; переделать, если у хостера
+        // с LIST мир перестанет находиться
+        return made.Kind == DateTimeKind.Utc ? Time.GetUtcNow().UtcDateTime - made : null;
+    }
+
+    /// <summary>Время файла на сервере для текста: UTC — по часам этой машины, время сервера (LIST) — как есть.</summary>
+    private static string When(DateTime serverTime) => Dates.Stamp(serverTime.Kind == DateTimeKind.Utc ? serverTime.ToLocalTime() : serverTime);
 
     /// <summary>
     /// Сделать копию мира на этом компьютере. <paramref name="serverStopped"/> — сервер точно остановлен (решает вызывающий
@@ -189,11 +239,20 @@ public sealed partial class HostedWorldBackups
             var snapshot = await HostedLayoutProbe.ReadAsync(files, Hosted.Settings, ct).ConfigureAwait(false);
             var picked = await PickAsync(snapshot, serverStopped, ct).ConfigureAwait(false);
             RemoteEntry? wal = null;
-            if (picked.Origin == HostedWorldOrigin.World)
-                wal = (await snapshot.Listings.ListAsync(RemotePath.Parent(picked.File.Path), ct).ConfigureAwait(false))?
-                    .FirstOrDefault(e => !e.IsDirectory && e.Name == picked.File.Name + "-wal" && e.Size > 0);
+            if (picked.World is { } world)
+            {
+                var siblings = await snapshot.Listings.ListAsync(RemotePath.Parent(world.Path), ct).ConfigureAwait(false) ?? [];
+                if (picked.Origin == HostedWorldOrigin.World)
+                    wal = siblings.FirstOrDefault(e => !e.IsDirectory && e.Name == picked.File.Name + "-wal" && e.Size > 0);
+                // временный файл заливки размером с мир без отметки: заливку оборвали до неё, или удаление после сбоя ушло в
+                // мёртвое соединение. Продолжать его некому, а место у хостера он занимает
+                if (siblings.FirstOrDefault(e => !e.IsDirectory && e.Name == world.Name + HostedSafeWrite.TmpSuffix) is { } leftover)
+                    await DeleteLeftoverAsync(files, leftover.Path, ct).ConfigureAwait(false);
+            }
             return (picked, wal, snapshot.Layout);
         }, readOnly: SwapMark.Read(Id) is null, ct).ConfigureAwait(false);
+        if (source.Origin == HostedWorldOrigin.GameBackup && GameCopyAge(source.File, source.World) > OldGameCopy)
+            warnings.Add(Loc.T("hosted.worldCopyOld", source.File.Name, When(source.File.Modified!.Value)));
 
         var total = source.File.Size + (journal?.Size ?? 0);
         // с журналом копия собирается ещё раз рядом (SQLite сводит журнал в базу) — места нужно вдвое
@@ -211,7 +270,8 @@ public sealed partial class HostedWorldBackups
             var downloaded = new List<(RemoteEntry, string)> { (source.File, part) };
             if (journal is not null) downloaded.Add((journal, partWal));
             await VerifyAsync(source.Origin, downloaded, ct).ConfigureAwait(false);
-            CheckWorldFile(part, source.File.Name);
+            // с журналом длина самой базы может быть любой — целиком проверяется уже сведённая копия
+            CheckWorldFile(part, source.File.Name, whole: journal is null);
             if (journal is null) File.Move(part, target);
             else
             {
@@ -222,6 +282,15 @@ public sealed partial class HostedWorldBackups
                 catch (InvalidOperationException ex)
                 {
                     throw new IOException(ex.Message, ex); // журнал не свёлся — для окна это обычная ошибка операции
+                }
+                try
+                {
+                    CheckWorldFile(target, source.File.Name);
+                }
+                catch
+                {
+                    DeleteQuietly(target);
+                    throw;
                 }
             }
         }
@@ -343,11 +412,13 @@ public sealed partial class HostedWorldBackups
 
     private void CheckSpace(long bytes)
     {
-        var root = Path.GetPathRoot(Path.GetFullPath(Dir)) ?? Dir;
-        var free = FreeSpace is { } hook ? hook(root) : AvailableFreeSpace(root);
+        // место — на том разделе, где папка копий: на Linux это её точка монтирования, а не «/» (своя папка копий часто
+        // как раз на другом диске)
+        var disk = LowDiskWatch.DiskOf(Dir);
+        var free = FreeSpace is { } hook ? hook(disk ?? Dir) : disk is null ? null : AvailableFreeSpace(disk);
         if (free is { } f && f < bytes + Margin)
             throw new HostedWorldException(HostedWorldProblem.NoSpace,
-                Loc.T("hosted.worldNoSpace", root, (bytes + Margin) / (1024 * 1024), f / (1024 * 1024)));
+                Loc.T("hosted.worldNoSpace", disk ?? Dir, (bytes + Margin) / (1024 * 1024), f / (1024 * 1024)));
     }
 
     /// <summary>Свободно на диске; сетевую папку DriveInfo не знает — null, не проверяем.</summary>
@@ -365,20 +436,55 @@ public sealed partial class HostedWorldBackups
 
     private static ReadOnlySpan<byte> SqliteHeader => "SQLite format 3\0"u8;
 
-    /// <summary>Файл мира Vintage Story — база SQLite: заголовок проверяется до того, как копия встанет на место или уйдёт на сервер.</summary>
-    internal static void CheckWorldFile(string path, string name)
+    /// <summary>Длина заголовка базы SQLite: файл короче — не база.</summary>
+    private const int SqliteHeaderSize = 100;
+
+    /// <summary>
+    /// Файл мира Vintage Story — база SQLite: проверяется до того, как копия встанет на место или уйдёт на сервер. Заголовок —
+    /// «SQLite format 3»; у цельного файла (<paramref name="whole"/>) ещё и длина: обрезанная база (короче, чем размер
+    /// страницы × число страниц из заголовка) не откроется. Хвост длиннее — не ошибка: SQLite читает столько страниц,
+    /// сколько записано в заголовке. Файл с журналом рядом (-wal упавшего сервера) — только по заголовку: до сведения
+    /// журнала его длина может быть любой.
+    /// </summary>
+    internal static void CheckWorldFile(string path, string name, bool whole = true)
     {
-        Span<byte> head = stackalloc byte[16];
+        Span<byte> head = stackalloc byte[SqliteHeaderSize];
         int read;
+        long length;
         using (var s = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            length = s.Length;
             read = s.ReadAtLeast(head, head.Length, throwOnEndOfStream: false);
-        if (read < head.Length || !head.SequenceEqual(SqliteHeader))
+        }
+        if (read < SqliteHeaderSize || !head[..SqliteHeader.Length].SequenceEqual(SqliteHeader))
             throw new HostedWorldException(HostedWorldProblem.NotAWorld, Loc.T("hosted.worldNotDb", name));
+        if (whole && LengthByHeader(head) is { } expected && length < expected)
+            throw new HostedWorldException(HostedWorldProblem.Damaged, Loc.T("hosted.worldTruncated", name, expected, length));
+    }
+
+    /// <summary>
+    /// Длина базы по заголовку SQLite: размер страницы (смещение 16, 1 — это 65536) × число страниц (смещение 28). Число
+    /// страниц верно, только если счётчик изменений (24) равен «version-valid-for» (92) — так пишут все SQLite с 3.7.0.
+    /// Иначе, как и при невозможном размере страницы, — null: сверять не с чем.
+    /// </summary>
+    internal static long? LengthByHeader(ReadOnlySpan<byte> head)
+    {
+        if (head.Length < SqliteHeaderSize) return null;
+        var raw = BinaryPrimitives.ReadUInt16BigEndian(head[16..]);
+        long pageSize = raw == 1 ? 65536 : raw;
+        if (pageSize < 512 || (pageSize & (pageSize - 1)) != 0) return null;
+        var pages = BinaryPrimitives.ReadUInt32BigEndian(head[28..]);
+        if (pages == 0 || BinaryPrimitives.ReadUInt32BigEndian(head[24..]) != BinaryPrimitives.ReadUInt32BigEndian(head[92..])) return null;
+        return pageSize * pages;
     }
 
     // ---------- на этом компьютере
 
-    /// <summary>Копии в папке, новые сверху. Папки нет или она недоступна (сетевая) — пусто.</summary>
+    /// <summary>
+    /// Копии в папке, новые сверху. Копии другого профиля (одна своя папка на двоих) тоже здесь, с пометкой
+    /// <see cref="HostedWorldBackup.FromOtherProfile"/>: так переносят мир между серверами. Папки нет или она недоступна
+    /// (сетевая) — пусто.
+    /// </summary>
     public IReadOnlyList<HostedWorldBackup> List()
     {
         try
@@ -442,12 +548,19 @@ public sealed partial class HostedWorldBackups
         try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
     }
 
-    /// <summary>Недокачанное своё от прошлого раза (программу закрыли посреди скачивания) — удалить: продолжать его некому.</summary>
+    /// <summary>
+    /// Недоделанное своё от прошлого раза (программу закрыли посреди копии) — удалить: продолжать его некому. Это
+    /// «….part» с журналом, папка, где сводился журнал (в ней целый мир), и недописанный архив «….extra.zip.tmp».
+    /// </summary>
     private void CleanStaleParts()
     {
         try
         {
+            if (!Directory.Exists(Dir)) return;
             foreach (var file in Directory.EnumerateFiles(Dir, Prefix + "-*" + Extension + PartSuffix + "*")) DeleteQuietly(file);
+            foreach (var file in Directory.EnumerateFiles(Dir, Prefix + "-*" + ExtraSuffix + ".tmp")) DeleteQuietly(file);
+            foreach (var work in Directory.EnumerateDirectories(Dir, Prefix + "-*" + Extension + WorldDb.WorkSuffix))
+                try { Directory.Delete(work, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -462,11 +575,16 @@ public sealed partial class HostedWorldBackups
         return new HostedWorldBackup(file.FullName, file.Name, stamped ? time : file.LastWriteTime, file.Length)
         {
             IsStamped = stamped,
+            // имя профиля не уникально (и в имени файла «A: b» и «A? b» одинаковы): копия, у которой в сведениях другой
+            // профиль, — не своя, даже если имя совпало. Без сведений (не записались, положили руками) — по имени
             IsOwn = stamped && file.Name.StartsWith(Prefix + "-", StringComparison.OrdinalIgnoreCase)
-                    && file.Name.Length == Prefix.Length + 1 + StampFormat.Length + Extension.Length,
+                    && file.Name.Length == Prefix.Length + 1 + StampFormat.Length + Extension.Length
+                    && (info?.ProfileId is null || info.ProfileId == Id),
+            FromOtherProfile = info?.ProfileId is { } owner && owner != Id,
             ExtraSize = new FileInfo(ExtraFor(file.FullName)) is { Exists: true } extra ? extra.Length : 0,
             Origin = info?.Origin,
             SourcePath = info?.Source,
+            SourceSize = info?.SourceSize ?? 0,
             SourceTime = info?.SourceModified,
         };
     }
@@ -481,9 +599,12 @@ public sealed partial class HostedWorldBackups
     [GeneratedRegex(@"-(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})\.vcdbs$", RegexOptions.IgnoreCase)]
     private static partial Regex Stamp();
 
-    /// <summary>Сведения о копии рядом с ней: откуда скачана и когда.</summary>
+    /// <summary>Сведения о копии рядом с ней: чья, откуда скачана и когда.</summary>
     private sealed class Info
     {
+        /// <summary>Профиль, который сделал копию: по нему ротация отличает свои копии от копий одноимённого профиля.</summary>
+        public string? ProfileId { get; set; }
+
         [JsonConverter(typeof(TolerantEnumConverter))]
         public HostedWorldOrigin? Origin { get; set; }
 
@@ -498,6 +619,7 @@ public sealed partial class HostedWorldBackups
     {
         var info = new Info
         {
+            ProfileId = Id,
             Origin = source.Origin,
             Source = source.File.Path,
             ServerPath = source.World?.ServerPath,
@@ -615,7 +737,8 @@ internal sealed class ProgressStream(Stream inner, Action<long>? position) : Str
     {
         if (position is null) return;
         var at = inner.Position;
-        if (!end && _reported >= 0 && at - _reported < Step) return;
+        // поток перемотали назад (сервер не докачивает — качаем заново) — сообщаем сразу, иначе ход стоял бы до прежней позиции
+        if (!end && _reported >= 0 && at >= _reported && at - _reported < Step) return;
         _reported = at;
         position(at);
     }
