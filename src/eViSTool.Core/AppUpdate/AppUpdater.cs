@@ -317,7 +317,7 @@ public sealed class AppUpdater
     {
         var stale = Directory.GetFiles(appDir, "*.old"); // прошлое поколение: уберём, когда встанет новое
         var previous = AppRollback.InstalledVersion(appDir) ?? fromVersion;
-        var staging = Path.Combine(appDir, ".update");
+        var staging = Path.Combine(appDir, StagingDir);
         if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
         if (zipPath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
         {
@@ -378,6 +378,12 @@ public sealed class AppUpdater
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         }
     }
+
+    /// <summary>
+    /// Папка, куда распаковывается архив обновления. Пока она есть, в папке программы переставляются файлы: запуск
+    /// в это время «*.old» не трогает (<see cref="AppRollback.NoteStart"/>).
+    /// </summary>
+    internal const string StagingDir = ".update";
 
     /// <summary>
     /// Имя, под которое уходит заменяемый файл. Уникальное: прежний «.old» может быть ещё занят агентом, запущенным до

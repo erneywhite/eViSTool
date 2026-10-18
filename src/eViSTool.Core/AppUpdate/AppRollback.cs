@@ -46,7 +46,12 @@ internal sealed class AppRollbackState
 /// </para>
 /// <para>
 /// Запуски окна и агента считаются отдельно: окно, запустившись, поднимает агентов, и один его запуск не должен сойти за
-/// два. Если окно новой версии запускали, считаются его запуски, иначе (сервер без окна) — запуски агента.
+/// два. Если окно новой версии запускали, считаются его запуски, иначе (сервер без окна) — запуски агента. Агенты, которых
+/// подняло окно, запуск не засчитывают вовсе (<see cref="Server.AgentProtocol.FromWindowVariable"/>): окно, упавшее при
+/// старте, успевает их поднять, и прежняя версия ушла бы именно тогда, когда она нужна.
+/// </para>
+/// <para>
+/// Пока идёт обновление или откат (<see cref="AppUpdater.StagingDir"/>), запуск ничего не засчитывает и «*.old» не трогает.
 /// </para>
 /// </summary>
 public static class AppRollback
@@ -78,6 +83,11 @@ public static class AppRollback
     {
         try
         {
+            var now = (time ?? TimeProvider.System).GetUtcNow();
+            // окно или агент как раз ставят обновление (или откат): свежие «*.old» нужны ему, чтобы вернуть всё при сбое,
+            // а запись ещё про прежнее состояние. Запуск не засчитываем — запись сейчас сменится
+            if (Rearranging(appDir, now)) return;
+
             var path = Path.Combine(appDir, FileName);
             var state = Read(appDir);
             if (state is null || !Tracks(appDir, state, version))
@@ -92,7 +102,6 @@ public static class AppRollback
                 return;
             }
 
-            var now = (time ?? TimeProvider.System).GetUtcNow();
             state.FirstStart ??= now;
             if (program == AppProgram.Window) state.WindowStarts++;
             else state.AgentStarts++;
@@ -136,6 +145,9 @@ public static class AppRollback
             File.Move(from, to);
             moves.Add((from, to));
         }
+        // пока файлы переставляются, запуск в этой папке «*.old» не трогает: снятые файлы нужны, чтобы вернуть всё при сбое
+        var marker = Path.Combine(appDir, AppUpdater.StagingDir);
+        Directory.CreateDirectory(marker);
         try
         {
             foreach (var file in state.Files)
@@ -155,6 +167,11 @@ public static class AppRollback
             }
             throw;
         }
+        finally
+        {
+            try { Directory.Delete(marker, recursive: true); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
 
         // в папке теперь прежняя версия; снятые файлы новой — обычные хвосты «*.old», их уберёт следующий запуск.
         // Вернуться обратно на новую — обновлением, а не этим путём: поколение одно
@@ -163,7 +180,7 @@ public static class AppRollback
     }
 
     /// <summary>Какая версия стоит в папке по записи последнего обновления; null — записи нет.</summary>
-    internal static string? InstalledVersion(string appDir) => Read(appDir)?.Version;
+    public static string? InstalledVersion(string appDir) => Read(appDir)?.Version;
 
     /// <summary>
     /// После удачной установки (<see cref="AppUpdater.Install"/>): «*.old» прошлых поколений — прочь (одно поколение),
@@ -184,6 +201,19 @@ public static class AppRollback
     {
         var starts = state.WindowStarts > 0 ? state.WindowStarts : state.AgentStarts;
         return starts >= StartsNeeded && state.FirstStart is { } first && now - first >= KeepAtLeast;
+    }
+
+    /// <summary>Сколько папка <see cref="AppUpdater.StagingDir"/> считается признаком идущей установки: дольше — хвост сорванной.</summary>
+    internal static TimeSpan RearrangeTimeout { get; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    /// Идёт обновление или откат: есть <see cref="AppUpdater.StagingDir"/>, и её меняли недавно. Старую папку оставил
+    /// убитый посреди установки процесс — её не ждём, иначе «*.old» не убирались бы никогда (её уберёт следующая установка).
+    /// </summary>
+    private static bool Rearranging(string appDir, DateTimeOffset now)
+    {
+        var dir = Path.Combine(appDir, AppUpdater.StagingDir);
+        return Directory.Exists(dir) && now - Directory.GetLastWriteTimeUtc(dir) < RearrangeTimeout;
     }
 
     /// <summary>Запись описывает прежнюю версию запущенной <paramref name="version"/>, и все её файлы на месте.</summary>

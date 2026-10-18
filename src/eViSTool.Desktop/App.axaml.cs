@@ -51,7 +51,7 @@ public partial class App : Application
                 Core.AppUpdate.AppRollback.NoteStart(AppContext.BaseDirectory, Core.AppUpdate.AppProgram.Window, vm.About.AppVersion);
                 vm.About.RefreshRollback();
             }
-            main.Opened += Started;
+            if (Snapshots.FromEnvironment() is null) main.Opened += Started; // прогон для снимков — не запуск этой версии
             // второй запуск из той же папки — показать это окно, а не открывать новое
             if (Program.Instance is { } instance)
                 instance.ActivateRequested += () => Dispatcher.UIThread.Post(() => BringToFront(main));

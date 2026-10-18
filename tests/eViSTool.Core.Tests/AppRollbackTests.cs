@@ -187,6 +187,48 @@ public sealed class AppRollbackTests : IDisposable
         Assert.Empty(Olds);
     }
 
+    // агент стартовал, пока окно ставит обновление: свежие «*.old» нужны установке, чтобы вернуть всё при сбое
+    [Theory]
+    [InlineData(false)] // записи нет: без установки их убрали бы сразу
+    [InlineData(true)] // запись есть: без установки ушли бы «*.old», которых в ней нет
+    public void StartDuringInstall_LeavesTheOldsAlone(bool withRecord)
+    {
+        if (withRecord) Update("1.0.0", "2.0.0");
+        var record = withRecord ? File.ReadAllText(Path.Combine(_app, AppRollback.FileName)) : null;
+        Write("lib.dll.12345678.old", "свежий хвост идущей установки");
+        var staging = Directory.CreateDirectory(Path.Combine(_app, AppUpdater.StagingDir));
+        staging.LastWriteTimeUtc = T0.AddMinutes(-1).UtcDateTime;
+
+        AppRollback.NoteStart(_app, AppProgram.Agent, "2.0.0", new Clock(T0));
+
+        Assert.True(File.Exists(Path.Combine(_app, "lib.dll.12345678.old")));
+        Assert.Equal(withRecord ? 3 : 1, Olds.Length);
+        Assert.Equal(record, withRecord ? File.ReadAllText(Path.Combine(_app, AppRollback.FileName)) : null);
+        Assert.Equal(withRecord, HasRecord);
+    }
+
+    // папку установки оставил убитый посреди работы процесс — её не ждём, «*.old» убираются как обычно
+    [Fact]
+    public void StaleStagingFolder_DoesNotBlockTheCleanup()
+    {
+        AppUpdater.Install(Zip("2.0.0"), _app);
+        var staging = Directory.CreateDirectory(Path.Combine(_app, AppUpdater.StagingDir));
+        staging.LastWriteTimeUtc = (T0 - AppRollback.RearrangeTimeout - TimeSpan.FromMinutes(1)).UtcDateTime;
+
+        AppRollback.NoteStart(_app, AppProgram.Window, "2.0.0", new Clock(T0));
+
+        Assert.Empty(Olds);
+    }
+
+    [Fact]
+    public void RollBack_RemovesItsMarker()
+    {
+        Update("1.0.0", "2.0.0");
+        AppRollback.RollBack(_app, "2.0.0");
+        Assert.False(Directory.Exists(Path.Combine(_app, AppUpdater.StagingDir)));
+        Assert.Equal("1.0.0", AppRollback.InstalledVersion(_app)); // в папке прежняя, хотя работает ещё 2.0.0
+    }
+
     // файлы в папке поменяли мимо обновления: запись не про них — убирается вместе с «*.old»
     [Fact]
     public void RecordAboutOtherFiles_IsDropped()

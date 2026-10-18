@@ -136,8 +136,10 @@ Directory.CreateDirectory(Path.GetDirectoryName(stateFile)!);
 File.WriteAllText(stateFile, JsonConvert.SerializeObject(new AgentEndpoint(Environment.ProcessId, port, DateTime.Now, version)));
 Console.WriteLine($"eViSTool.Agent {version}: profile {opts.ProfileId}, http://127.0.0.1:{port}");
 // агент поднялся и слушает — запуск этой версии удался. Прежние exe и dll, переименованные при установке в «*.old»,
-// хранятся, пока новая версия не проработала (на них можно вернуться: eViSTool.Agent rollback), потом убираются
-eViSTool.Core.AppUpdate.AppRollback.NoteStart(AppContext.BaseDirectory, eViSTool.Core.AppUpdate.AppProgram.Agent, version);
+// хранятся, пока новая версия не проработала (на них можно вернуться: eViSTool.Agent rollback), потом убираются.
+// Агента, которого подняло окно, не считаем: запуск засчитывает окно, а упавшее при старте окно — не удачный запуск
+if (Environment.GetEnvironmentVariable(AgentProtocol.FromWindowVariable) is not { Length: > 0 })
+    eViSTool.Core.AppUpdate.AppRollback.NoteStart(AppContext.BaseDirectory, eViSTool.Core.AppUpdate.AppProgram.Agent, version);
 if (opts.AfterUpdate)
     host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("selfupd.done", version));
 
