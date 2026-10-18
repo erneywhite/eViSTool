@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using eViSTool.Core.Hosting;
 using eViSTool.Core.Profiles;
 
 namespace eViSTool.Presentation.ViewModels;
@@ -123,9 +124,12 @@ public sealed partial class MainViewModel
         if (_profileActions.NewServer() is { } created) AddProfile(created);
     }
 
+    private static string HostedBackupsRoot => Path.Combine(Core.AppPaths.Root, "HostedBackups");
+
     private void AddProfile(GameProfile model)
     {
         _settings.Profiles.Add(model);
+        HostedBackupFolders.Assign(_settings.Profiles, HostedBackupsRoot); // новый и клонированный хостовый профиль получают свою папку копий
         var vm = new ProfileViewModel(model, OnProfileChanged, _ => Save());
         Profiles.Add(vm);
         EditedProfile = vm;
