@@ -19,18 +19,27 @@
                         <DockPanel>
                             <TextBlock DockPanel.Dock="Right" Text="↗" Foreground="{DynamicResource Forest.Accent}" />
                             <ContentPresenter x:Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
-                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}" Foreground="{TemplateBinding Foreground}"
                                               HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" />
                         </DockPanel>
                     </Border>
                 </ControlTemplate>
             </Setter>
-            <Style Selector="^:pointerover">
+            <!-- цвет меняется плавно, как у элементов темы (180 мс, «торможение») -->
+            <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
+                <Setter Property="Transitions">
+                    <Transitions>
+                        <BrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    </Transitions>
+                </Setter>
+            </Style>
+            <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
                 <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
             </Style>
         </ControlTheme>
 
-        <!-- кнопка без рамки и фона вокруг картинки (Ko-fi): в фокус клавишей не берётся, при наведении чуть бледнее -->
+        <!-- кнопка без рамки и фона вокруг картинки (Ko-fi): в фокус клавишей не берётся, при наведении чуть приподнимается
+             (наведение не делает картинку бледнее — см. docs/design.md, раздел 3) -->
         <ControlTheme x:Key="ImageButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Cursor" Value="Hand" />
@@ -41,8 +50,16 @@
                                       Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" />
                 </ControlTemplate>
             </Setter>
+            <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
+                <Setter Property="Transitions">
+                    <Transitions>
+                        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    </Transitions>
+                </Setter>
+                <Setter Property="RenderTransform" Value="none" />
+            </Style>
             <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-                <Setter Property="Opacity" Value="0.85" />
+                <Setter Property="RenderTransform" Value="translateY(-1px)" />
             </Style>
         </ControlTheme>
     </UserControl.Resources>

@@ -1,232 +1,452 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:conv="using:eViSTool.Desktop.Converters">
     <!--
         Шаблоны элементов лесной темы.
         Правила:
         • стиль с шаблоном → ControlTheme с тем же ключом; в разметке Style="{StaticResource Forest.X}" становится
           Theme="{StaticResource Forest.X}", ItemContainerStyle — ItemContainerTheme;
         • триггеры → вложенные стили ^:pointerover, ^:checked и т.п. Победителя при совпадении решает порядок
-          объявления (последний), поэтому :checked/:selected идут после :pointerover;
+          объявления (последний), поэтому :checked/:selected идут после :pointerover, а :disabled — в самом конце;
         • варианты кнопки (песочная, «опасная», половинки «Играть ▾») — классы на той же теме: Classes="primary".
+        Движение (docs/design.md, раздел 3): наведение и смена цвета — 180 мс, нажатие — 60 мс, отпускание — 100 мс,
+        кривая «торможение» 0.2,0.7,0.2,1. Анимируются только цвет, прозрачность и RenderTransform. Наведение делает
+        элемент ярче, а не тусклее: прозрачность на наведении не используется. Переходы висят на частях шаблона, а не на
+        самом элементе: свойство Transitions элемента остаётся свободным для разметки.
+        Кольцо фокуса клавиатуры — отдельная рамка шаблона FocusRing: 2 px песка снаружи, с зазором 2 px (поле −4),
+        скругление — на 4 больше, чем у элемента; появляется сразу, без перехода.
+        Ресурсы из ForestResources — только через DynamicResource: тесты подключают этот файл отдельно, и StaticResource
+        на чужой файл при загрузке не находится. Поэтому кривая записана строкой, а не ссылкой на ресурс.
     -->
 
     <!-- ===== кнопки ===== -->
-    <!-- обычная: поверхность + линия; .primary — песочная; .danger — розоватый текст -->
+    <!-- обычная: поверхность, линия и светлая кромка сверху; наведение — приподнятый фон и рамка ярче; нажатие —
+         проседает. .primary — выпуклая песочная; .danger — розоватый текст; .flat — плоская; выключенная — только
+         тусклый текст -->
     <ControlTheme x:Key="Forest.Button" TargetType="Button">
         <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
         <Setter Property="Background" Value="{DynamicResource Forest.Surface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Forest.Line}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="CornerRadius" Value="7" />
         <Setter Property="Padding" Value="13,8" />
         <Setter Property="MinHeight" Value="34" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Cursor" Value="Hand" />
+        <!-- кольцо фокуса — своё (FocusRing) и выходит за края: не обрезать, рамку фокуса Fluent не рисовать -->
+        <Setter Property="ClipToBounds" Value="False" />
+        <Setter Property="FocusAdorner" Value="{x:Null}" />
         <Setter Property="Template">
             <ControlTemplate>
-                <!-- содержимое всегда по центру. RequiresFullOpacityHandling: прозрачность выключенной кнопки
-                     применяется к ней целиком; иначе тёмный текст песочной кнопки
-                     смешивается с уже приглушённой заливкой и светлеет -->
-                <ContentPresenter x:Name="PART_ContentPresenter"
-                                  Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
-                                  Padding="{TemplateBinding Padding}" Content="{TemplateBinding Content}"
-                                  ContentTemplate="{TemplateBinding ContentTemplate}" RecognizesAccessKey="True"
-                                  HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                  RenderOptions.RequiresFullOpacityHandling="True" />
+                <!-- содержимое всегда по центру -->
+                <Panel>
+                    <ContentPresenter x:Name="PART_ContentPresenter"
+                                      Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                      BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
+                                      Padding="{TemplateBinding Padding}" Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}" RecognizesAccessKey="True"
+                                      HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+                    <Border x:Name="FocusRing" Margin="-4" CornerRadius="11" BorderThickness="2" BorderBrush="{DynamicResource Forest.Accent}"
+                            IsVisible="False" IsHitTestVisible="False" />
+                </Panel>
             </ControlTemplate>
         </Setter>
+        <!-- переходы. Порядок сеттеров важен: Avalonia применяет их по порядку, и Transitions должен стоять раньше
+             RenderTransform — тогда при нажатии и отпускании сначала встаёт нужная длительность (60 / 100 мс), а потом
+             начинается сдвиг. Наоборот — смена Transitions обрывает только что начатый переход, и кнопка прыгает
+             (проверяет ThemeTests) -->
+        <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="BoxShadow" Value="{DynamicResource Forest.EdgeShadow}" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.1" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+            <Setter Property="RenderTransform" Value="none" />
+        </Style>
         <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource Forest.Raised}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Forest.LineStrong}" />
         </Style>
-        <Style Selector="^:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="BorderBrush" Value="{DynamicResource Forest.Accent}" />
-        </Style>
+        <!-- нажатие: кнопка проседает за 60 мс, тень и кромка на это время пропадают -->
         <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Opacity" Value="0.85" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.06" Easing="0.2,0.7,0.2,1" />
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.06" Easing="0.2,0.7,0.2,1" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.06" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+            <Setter Property="RenderTransform" Value="scale(0.985) translateY(1px)" />
+            <Setter Property="BoxShadow" Value="none" />
         </Style>
-        <Style Selector="^:disabled /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Opacity" Value="0.45" />
+        <Style Selector="^:focus-visible /template/ Border#FocusRing">
+            <Setter Property="IsVisible" Value="True" />
         </Style>
 
+        <!-- главная: градиент сверху вниз, яркая кромка и тень в 1 px -->
         <Style Selector="^.primary">
-            <Setter Property="Background" Value="{DynamicResource Forest.Accent}" />
+            <Setter Property="Background" Value="{DynamicResource Forest.AccentGradient}" />
             <Setter Property="BorderBrush" Value="{DynamicResource Forest.Accent}" />
             <Setter Property="Foreground" Value="{DynamicResource Forest.AccentInk}" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
-        <Style Selector="^.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#DFCB96" />
+        <Style Selector="^.primary /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="BoxShadow" Value="{DynamicResource Forest.PrimaryShadow}" />
         </Style>
-        <Style Selector="^.primary:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="BorderBrush" Value="{DynamicResource Forest.Accent}" />
+        <Style Selector="^.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Forest.AccentHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Forest.AccentHover}" />
         </Style>
         <Style Selector="^.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#C8B177" />
-            <Setter Property="Opacity" Value="1" />
-        </Style>
-        <Style Selector="^.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Opacity" Value="0.45" />
+            <Setter Property="Background" Value="{DynamicResource Forest.AccentPressed}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Forest.AccentPressed}" />
+            <Setter Property="BoxShadow" Value="none" />
         </Style>
 
         <Style Selector="^.danger">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Danger}" />
         </Style>
 
+        <!-- плоская: без фона, рамки и кромки, пока не наведёшь («Дополнительно ▾» и т. п.) -->
+        <Style Selector="^.flat">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="^.flat /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="BoxShadow" Value="none" />
+        </Style>
+
         <!-- основная кнопка с выпадающей частью справа («Играть ▾»): у основной правые углы прямые, у стрелки — левые -->
         <Style Selector="^.splitMain">
-            <Setter Property="CornerRadius" Value="6,0,0,6" />
+            <Setter Property="CornerRadius" Value="7,0,0,7" />
+        </Style>
+        <Style Selector="^.splitMain /template/ Border#FocusRing">
+            <Setter Property="CornerRadius" Value="11,0,0,11" />
         </Style>
         <Style Selector="^.splitArrow">
-            <Setter Property="CornerRadius" Value="0,6,6,0" />
+            <Setter Property="CornerRadius" Value="0,7,7,0" />
+        </Style>
+        <Style Selector="^.splitArrow /template/ Border#FocusRing">
+            <Setter Property="CornerRadius" Value="0,11,11,0" />
+        </Style>
+
+        <!-- выключенная — без фона, рамки и тени, текст тусклый (не полупрозрачная копия обычной); в конце — сильнее
+             вариантов .primary и .danger -->
+        <Style Selector="^:disabled">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Faint}" />
+        </Style>
+        <Style Selector="^:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BoxShadow" Value="none" />
         </Style>
     </ControlTheme>
 
     <!-- все кнопки по умолчанию — лесные -->
     <ControlTheme x:Key="{x:Type Button}" TargetType="Button" BasedOn="{StaticResource Forest.Button}" />
 
-    <!-- кнопка-ссылка: подчёркнутый текст без рамки («Модбаза ↗», «Удалить») -->
+    <!-- кнопка-ссылка: подчёркнутый текст без рамки («Модбаза ↗», «Удалить»); наведение — песок светлее -->
     <ControlTheme x:Key="Forest.LinkButton" TargetType="Button">
         <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="ClipToBounds" Value="False" />
+        <Setter Property="FocusAdorner" Value="{x:Null}" />
         <Setter Property="Template">
             <ControlTemplate>
-                <TextBlock x:Name="T" Text="{TemplateBinding Content}" TextDecorations="Underline"
-                           Background="{TemplateBinding Background}" />
+                <Panel>
+                    <TextBlock x:Name="T" Text="{TemplateBinding Content}" TextDecorations="Underline"
+                               Foreground="{TemplateBinding Foreground}" Background="{TemplateBinding Background}" />
+                    <Border x:Name="FocusRing" Margin="-4" CornerRadius="6" BorderThickness="2" BorderBrush="{DynamicResource Forest.Accent}"
+                            IsVisible="False" IsHitTestVisible="False" />
+                </Panel>
             </ControlTemplate>
         </Setter>
-        <Style Selector="^:pointerover /template/ TextBlock#T">
-            <Setter Property="Opacity" Value="0.8" />
+        <Style Selector="^ /template/ TextBlock#T">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <!-- наведение и нажатие меняют цвет самой кнопки, а не текста шаблона: у ссылки своего цвета («Удалить» —
+             розовая, подпись внизу меню — приглушённая) он задан в разметке и сильнее темы — такая ссылка не
+             становится песочной. Выключенная — тусклая всегда, поэтому уже на тексте шаблона -->
+        <Style Selector="^:pointerover">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.AccentHover}" />
+        </Style>
+        <Style Selector="^:pressed">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.AccentPressed}" />
+        </Style>
+        <Style Selector="^:focus-visible /template/ Border#FocusRing">
+            <Setter Property="IsVisible" Value="True" />
         </Style>
         <Style Selector="^:disabled /template/ TextBlock#T">
-            <Setter Property="Opacity" Value="0.45" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Faint}" />
         </Style>
     </ControlTheme>
 
-    <!-- большое число-счётчик над таблицей (кликабельное: включает фильтр) -->
+    <!-- большое число-счётчик (кликабельное: включает фильтр): приглушённое, при наведении — светлое -->
     <ControlTheme x:Key="Forest.StatButton" TargetType="Button">
-        <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Margin" Value="0,0,28,0" />
+        <Setter Property="ClipToBounds" Value="False" />
+        <Setter Property="FocusAdorner" Value="{x:Null}" />
         <Setter Property="Template">
             <ControlTemplate>
-                <ContentPresenter x:Name="PART_ContentPresenter" Background="{TemplateBinding Background}"
-                                  Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" />
+                <Panel>
+                    <ContentPresenter x:Name="PART_ContentPresenter" Background="{TemplateBinding Background}"
+                                      Foreground="{TemplateBinding Foreground}"
+                                      Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" />
+                    <Border x:Name="FocusRing" Margin="-4" CornerRadius="6" BorderThickness="2" BorderBrush="{DynamicResource Forest.Accent}"
+                            IsVisible="False" IsHitTestVisible="False" />
+                </Panel>
             </ControlTemplate>
         </Setter>
+        <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+        </Style>
         <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Opacity" Value="0.8" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+        </Style>
+        <Style Selector="^:focus-visible /template/ Border#FocusRing">
+            <Setter Property="IsVisible" Value="True" />
         </Style>
     </ControlTheme>
 
     <!-- ===== переключатель вкл/выкл (CheckBox): песочная дорожка, тёмная ручка ===== -->
+    <!-- ручка едет сдвигом (RenderTransform), а не сменой выравнивания: выравнивание не анимируется. Ход ручки — 13 px:
+         дорожка 30 − рамка 2 − поля ручки 4 − ручка 11 -->
     <ControlTheme x:Key="Forest.Switch" TargetType="CheckBox">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Background" Value="Transparent" />
+        <Setter Property="ClipToBounds" Value="False" />
+        <Setter Property="FocusAdorner" Value="{x:Null}" />
         <Setter Property="Template">
             <ControlTemplate>
-                <Border x:Name="Track" Width="30" Height="17" CornerRadius="8.5" Background="{DynamicResource Forest.Raised}"
-                        BorderBrush="{DynamicResource Forest.Line}" BorderThickness="1">
-                    <Ellipse x:Name="Knob" Width="11" Height="11" Margin="2,0" HorizontalAlignment="Left"
-                             Fill="{DynamicResource Forest.Muted}" />
-                </Border>
+                <Panel>
+                    <Border x:Name="Track" Width="30" Height="17" CornerRadius="8.5" Background="{DynamicResource Forest.Raised}"
+                            BorderBrush="{DynamicResource Forest.Line}" BorderThickness="1">
+                        <Ellipse x:Name="Knob" Width="11" Height="11" Margin="2,0" HorizontalAlignment="Left"
+                                 Fill="{DynamicResource Forest.Muted}" />
+                    </Border>
+                    <Border x:Name="FocusRing" Margin="-4" CornerRadius="12.5" BorderThickness="2"
+                            BorderBrush="{DynamicResource Forest.Accent}" IsVisible="False" IsHitTestVisible="False" />
+                </Panel>
             </ControlTemplate>
         </Setter>
+        <Style Selector="^ /template/ Border#Track">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="^ /template/ Ellipse#Knob">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <BrushTransition Property="Fill" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+            <Setter Property="RenderTransform" Value="translateX(0px)" />
+        </Style>
+        <Style Selector="^:pointerover /template/ Border#Track">
+            <Setter Property="BorderBrush" Value="{DynamicResource Forest.LineStrong}" />
+        </Style>
         <Style Selector="^:checked /template/ Border#Track">
             <Setter Property="Background" Value="{DynamicResource Forest.Accent}" />
             <Setter Property="BorderBrush" Value="{DynamicResource Forest.Accent}" />
         </Style>
+        <Style Selector="^:checked:pointerover /template/ Border#Track">
+            <Setter Property="Background" Value="{DynamicResource Forest.AccentHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Forest.AccentHover}" />
+        </Style>
         <Style Selector="^:checked /template/ Ellipse#Knob">
-            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="RenderTransform" Value="translateX(13px)" />
             <Setter Property="Fill" Value="{DynamicResource Forest.AccentInk}" />
         </Style>
-        <Style Selector="^:pointerover /template/ Border#Track">
-            <Setter Property="Opacity" Value="0.85" />
+        <Style Selector="^:focus-visible /template/ Border#FocusRing">
+            <Setter Property="IsVisible" Value="True" />
         </Style>
+        <!-- выключенный: положение ручки видно, сам приглушён целиком (не наведение — здесь прозрачность уместна) -->
         <Style Selector="^:disabled /template/ Border#Track">
             <Setter Property="Opacity" Value="0.4" />
         </Style>
     </ControlTheme>
 
     <!-- ===== переключатели-вкладки (RadioButton) ===== -->
-    <!-- чип-фильтр: выбранный — приподнятый фон и светлый текст -->
+    <!-- чип-фильтр: при наведении — светлый текст и лёгкая подложка; выбранный — приподнятый фон с кромкой -->
     <ControlTheme x:Key="Forest.Chip" TargetType="RadioButton">
         <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Margin" Value="0,0,6,0" />
+        <Setter Property="ClipToBounds" Value="False" />
+        <Setter Property="FocusAdorner" Value="{x:Null}" />
         <Setter Property="Template">
             <ControlTemplate>
-                <Border x:Name="Bd" CornerRadius="6" Padding="10,5" Background="Transparent" BorderThickness="1" BorderBrush="Transparent">
-                    <ContentPresenter x:Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
-                                      ContentTemplate="{TemplateBinding ContentTemplate}" />
-                </Border>
+                <Panel>
+                    <Border x:Name="Bd" CornerRadius="6" Padding="10,5" Background="Transparent" BorderThickness="1" BorderBrush="Transparent">
+                        <ContentPresenter x:Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}" Foreground="{TemplateBinding Foreground}" />
+                    </Border>
+                    <Border x:Name="FocusRing" Margin="-4" CornerRadius="10" BorderThickness="2" BorderBrush="{DynamicResource Forest.Accent}"
+                            IsVisible="False" IsHitTestVisible="False" />
+                </Panel>
             </ControlTemplate>
         </Setter>
-        <Style Selector="^:pointerover">
+        <Style Selector="^ /template/ Border#Bd">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
         </Style>
-        <Style Selector="^:checked">
+        <Style Selector="^:pointerover /template/ Border#Bd">
+            <Setter Property="Background" Value="{DynamicResource Forest.NavHover}" />
+        </Style>
+        <Style Selector="^:checked /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
         </Style>
         <Style Selector="^:checked /template/ Border#Bd">
             <Setter Property="Background" Value="{DynamicResource Forest.Raised}" />
             <Setter Property="BorderBrush" Value="{DynamicResource Forest.Line}" />
+            <Setter Property="BoxShadow" Value="{DynamicResource Forest.EdgeShadow}" />
+        </Style>
+        <Style Selector="^:focus-visible /template/ Border#FocusRing">
+            <Setter Property="IsVisible" Value="True" />
         </Style>
     </ControlTheme>
 
-    <!-- вкладка внутри карточки: выбранная — песочный текст и подчёркивание -->
+    <!-- вкладка внутри карточки: при наведении — светлый текст; выбранная — песочный текст и подчёркивание, которое
+         плавно вырастает от середины. Подчёркивание — отдельная полоска 2 px под текстом (зазор 7 px, как был отступ) -->
     <ControlTheme x:Key="Forest.TabHeader" TargetType="RadioButton">
         <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Margin" Value="0,0,18,0" />
+        <Setter Property="ClipToBounds" Value="False" />
+        <Setter Property="FocusAdorner" Value="{x:Null}" />
         <Setter Property="Template">
             <ControlTemplate>
-                <Border x:Name="Bd" Background="Transparent" BorderBrush="Transparent" BorderThickness="0,0,0,2" Padding="0,0,0,7">
-                    <ContentPresenter x:Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
-                                      ContentTemplate="{TemplateBinding ContentTemplate}" />
-                </Border>
+                <Panel Background="Transparent">
+                    <ContentPresenter x:Name="PART_ContentPresenter" Margin="0,0,0,9" Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}" Foreground="{TemplateBinding Foreground}" />
+                    <Border x:Name="Underline" Height="2" VerticalAlignment="Bottom" Background="{DynamicResource Forest.Accent}" />
+                    <Border x:Name="FocusRing" Margin="-4" CornerRadius="6" BorderThickness="2" BorderBrush="{DynamicResource Forest.Accent}"
+                            IsVisible="False" IsHitTestVisible="False" />
+                </Panel>
             </ControlTemplate>
         </Setter>
-        <Style Selector="^:pointerover">
+        <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="^ /template/ Border#Underline">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+            <Setter Property="RenderTransform" Value="scaleX(0)" />
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
         </Style>
-        <Style Selector="^:checked">
+        <Style Selector="^:checked /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
         </Style>
-        <Style Selector="^:checked /template/ Border#Bd">
-            <Setter Property="BorderBrush" Value="{DynamicResource Forest.Accent}" />
+        <Style Selector="^:checked /template/ Border#Underline">
+            <Setter Property="RenderTransform" Value="scaleX(1)" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="^:focus-visible /template/ Border#FocusRing">
+            <Setter Property="IsVisible" Value="True" />
         </Style>
     </ControlTheme>
 
-    <!-- вкладка-счётчик «Моих модов»: число и подпись; выбранная — песочное подчёркивание на линии ряда -->
+    <!-- вкладка-счётчик «Моих модов»: число и подпись; невыбранная приглушена, при наведении — светлая; выбранная —
+         светлая и с песочным подчёркиванием на линии ряда (полоска 2 px, зазор 12 px) -->
     <ControlTheme x:Key="Forest.StatTab" TargetType="RadioButton">
-        <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Margin" Value="0,0,26,0" />
+        <Setter Property="ClipToBounds" Value="False" />
+        <Setter Property="FocusAdorner" Value="{x:Null}" />
         <Setter Property="Template">
             <ControlTemplate>
-                <Border x:Name="C" Background="Transparent" BorderThickness="0,0,0,2" BorderBrush="Transparent" Padding="0,0,0,12">
-                    <ContentPresenter x:Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
-                                      ContentTemplate="{TemplateBinding ContentTemplate}" />
-                </Border>
+                <Panel Background="Transparent">
+                    <ContentPresenter x:Name="PART_ContentPresenter" Margin="0,0,0,14" Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}" Foreground="{TemplateBinding Foreground}" />
+                    <Border x:Name="Underline" Height="2" VerticalAlignment="Bottom" Background="{DynamicResource Forest.Accent}" />
+                    <Border x:Name="FocusRing" Margin="-4" CornerRadius="6" BorderThickness="2" BorderBrush="{DynamicResource Forest.Accent}"
+                            IsVisible="False" IsHitTestVisible="False" />
+                </Panel>
             </ControlTemplate>
         </Setter>
-        <Style Selector="^:pointerover /template/ Border#C">
-            <Setter Property="Opacity" Value="0.8" />
+        <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
         </Style>
-        <Style Selector="^:checked /template/ Border#C">
-            <Setter Property="BorderBrush" Value="{DynamicResource Forest.Accent}" />
+        <Style Selector="^ /template/ Border#Underline">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+            <Setter Property="RenderTransform" Value="scaleX(0)" />
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+        </Style>
+        <Style Selector="^:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+        </Style>
+        <Style Selector="^:checked /template/ Border#Underline">
+            <Setter Property="RenderTransform" Value="scaleX(1)" />
             <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="^:focus-visible /template/ Border#FocusRing">
+            <Setter Property="IsVisible" Value="True" />
         </Style>
     </ControlTheme>
 
     <!-- ===== элементы списков (ListBoxItem) ===== -->
-    <!-- плитка-карточка: поверхность и линия; выбранная — песочная рамка -->
+    <!-- плитка-карточка: поверхность, линия и кромка; наведение — чуть светлее; выбранная — приподнятая, песочная рамка.
+         Кольца фокуса у пунктов списков нет: клавиши двигают выбор, его и видно -->
     <ControlTheme x:Key="Forest.CardItem" TargetType="ListBoxItem">
         <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
         <Setter Property="Margin" Value="0,0,0,8" />
@@ -235,15 +455,25 @@
         <Setter Property="Template">
             <ControlTemplate>
                 <Border x:Name="Bd" Background="{DynamicResource Forest.Surface}" BorderBrush="{DynamicResource Forest.Line}"
-                        BorderThickness="1" CornerRadius="7" Padding="14,12">
+                        BorderThickness="1" CornerRadius="10" Padding="14,12">
                     <ContentPresenter x:Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
                                       ContentTemplate="{TemplateBinding ContentTemplate}"
                                       HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" />
                 </Border>
             </ControlTemplate>
         </Setter>
+        <Style Selector="^ /template/ Border#Bd">
+            <Setter Property="BoxShadow" Value="{DynamicResource Forest.EdgeShadow}" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+        </Style>
         <Style Selector="^:pointerover /template/ Border#Bd">
-            <Setter Property="Background" Value="#2C372E" />
+            <Setter Property="Background" Value="{DynamicResource Forest.CardHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Forest.LineStrong}" />
         </Style>
         <Style Selector="^:selected /template/ Border#Bd">
             <Setter Property="BorderBrush" Value="{DynamicResource Forest.Accent}" />
@@ -251,7 +481,8 @@
         </Style>
     </ControlTheme>
 
-    <!-- пункт боковой навигации -->
+    <!-- пункт боковой навигации: лежит над фоном из игры, поэтому подложки — «вуалевые» (полупрозрачные) токены;
+         выбранный — с кромкой -->
     <ControlTheme x:Key="Forest.NavItem" TargetType="ListBoxItem">
         <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
         <Setter Property="Padding" Value="12,10" />
@@ -261,25 +492,42 @@
             <ControlTemplate>
                 <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="{TemplateBinding Padding}">
                     <ContentPresenter x:Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
-                                      ContentTemplate="{TemplateBinding ContentTemplate}" />
+                                      ContentTemplate="{TemplateBinding ContentTemplate}" Foreground="{TemplateBinding Foreground}" />
                 </Border>
             </ControlTemplate>
         </Setter>
-        <Style Selector="^:pointerover">
+        <Style Selector="^ /template/ Border#Bd">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
         </Style>
         <Style Selector="^:pointerover /template/ Border#Bd">
-            <Setter Property="Background" Value="#22303D32" />
+            <Setter Property="Background" Value="{DynamicResource Forest.NavHoverVeil}" />
         </Style>
-        <Style Selector="^:selected">
+        <Style Selector="^:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
         </Style>
         <Style Selector="^:selected /template/ Border#Bd">
-            <Setter Property="Background" Value="{DynamicResource Forest.Selected}" />
+            <Setter Property="Background" Value="{DynamicResource Forest.NavSelectedVeil}" />
+            <Setter Property="BoxShadow" Value="{DynamicResource Forest.EdgeShadowFlat}" />
         </Style>
     </ControlTheme>
 
     <!-- ===== тонкая полоска прогресса (значение — доля 0..1) ===== -->
+    <!-- неопределённая (IsIndeterminate): отрезок в 30 % ширины пробегает дорожку слева направо за 1 с, по кругу —
+         от «весь левее края» до «весь правее края». Сдвиг считается от ширины полоски (ScaleConverter) -->
     <ControlTheme x:Key="Forest.Progress" TargetType="ProgressBar">
         <Setter Property="Height" Value="4" />
         <Setter Property="MinHeight" Value="0" />
@@ -290,13 +538,32 @@
                 <Border CornerRadius="2" Background="{DynamicResource Forest.Raised}" ClipToBounds="True">
                     <Panel>
                         <Border x:Name="PART_Indicator" HorizontalAlignment="Left" CornerRadius="2" Background="{DynamicResource Forest.Accent}" />
+                        <Border x:Name="Runner" HorizontalAlignment="Left" CornerRadius="2" Background="{DynamicResource Forest.Accent}" IsVisible="False"
+                                Width="{Binding $parent[ProgressBar].Bounds.Width, Converter={x:Static conv:ScaleConverter.Instance}, ConverterParameter=0.3}" />
                     </Panel>
                 </Border>
             </ControlTemplate>
         </Setter>
+        <Style Selector="^:indeterminate /template/ Border#PART_Indicator">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="^:indeterminate /template/ Border#Runner">
+            <Setter Property="IsVisible" Value="True" />
+            <Style.Animations>
+                <Animation Duration="0:0:1" IterationCount="Infinite">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="TranslateTransform.X"
+                                Value="{Binding $parent[ProgressBar].Bounds.Width, Converter={x:Static conv:ScaleConverter.Instance}, ConverterParameter=-0.3}" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="TranslateTransform.X" Value="{Binding $parent[ProgressBar].Bounds.Width}" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
     </ControlTheme>
 
-    <!-- ===== заголовок колонки таблицы: мелкий приглушённый текст, стрелка сортировки ===== -->
+    <!-- ===== заголовок колонки таблицы: мелкий приглушённый текст, стрелка сортировки; наведение — светлый ===== -->
     <ControlTheme x:Key="Forest.ColumnHeader" TargetType="DataGridColumnHeader">
         <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
         <Setter Property="Background" Value="Transparent" />
@@ -306,7 +573,8 @@
         <Setter Property="Template">
             <ControlTemplate>
                 <Border Background="{TemplateBinding Background}" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1" Padding="10">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}">
+                    <StackPanel x:Name="Row" Orientation="Horizontal" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                TextElement.Foreground="{TemplateBinding Foreground}">
                         <ContentPresenter x:Name="PART_ContentPresenter" VerticalAlignment="Center"
                                           Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" />
                         <TextBlock x:Name="Arrow" Margin="4,0,0,0" FontSize="9" VerticalAlignment="Center" />
@@ -314,14 +582,21 @@
                 </Border>
             </ControlTemplate>
         </Setter>
+        <Style Selector="^ /template/ StackPanel#Row">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="TextElement.Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+        </Style>
         <Style Selector="^:sortascending /template/ TextBlock#Arrow">
             <Setter Property="Text" Value="▲" />
         </Style>
         <Style Selector="^:sortdescending /template/ TextBlock#Arrow">
             <Setter Property="Text" Value="▼" />
         </Style>
-        <Style Selector="^:pointerover">
-            <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+        <Style Selector="^:pointerover /template/ StackPanel#Row">
+            <Setter Property="TextElement.Foreground" Value="{DynamicResource Forest.Text}" />
         </Style>
     </ControlTheme>
 </ResourceDictionary>

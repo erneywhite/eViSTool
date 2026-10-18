@@ -10,7 +10,9 @@
 
     <x:Double x:Key="Forest.TitleBarHeight">60</x:Double>
 
-    <!-- кнопка окна Windows: прямоугольник без рамки, «закрыть» при наведении — красная -->
+    <!-- кнопка окна Windows: прямоугольник без рамки, наведение подсвечивает плавно (как у системных); «закрыть» при
+         наведении — красная. Красный — системный цвет кнопки «закрыть» Windows 11, а не лесной: так её узнают сразу, и
+         токеном он не становится -->
     <ControlTheme x:Key="Forest.CaptionButtonWin" TargetType="Button">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Width" Value="46" />
@@ -23,6 +25,13 @@
                                   Content="{TemplateBinding Content}" />
             </ControlTemplate>
         </Setter>
+        <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+        </Style>
         <Style Selector="^:pointerover">
             <Setter Property="Background" Value="{DynamicResource Forest.Raised}" />
         </Style>
@@ -50,6 +59,13 @@
                                   Content="{TemplateBinding Content}" />
             </ControlTemplate>
         </Setter>
+        <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+        </Style>
         <Style Selector="^:pointerover">
             <Setter Property="Background" Value="{DynamicResource Forest.SelectedHover}" />
         </Style>
@@ -171,7 +187,7 @@
             <Setter Property="Margin" Value="{TemplateBinding ShadowThickness}" />
         </Style>
         <Style Selector="^:has-shadow /template/ Border#PART_WindowBorder">
-            <Setter Property="BoxShadow" Value="0 2 10 2 #80000000" />
+            <Setter Property="BoxShadow" Value="{DynamicResource Forest.WindowShadow}" />
         </Style>
         <Style Selector="^:has-shadow /template/ Panel#PART_OverlayWrapper">
             <Setter Property="Margin" Value="{TemplateBinding ShadowThickness}" />
