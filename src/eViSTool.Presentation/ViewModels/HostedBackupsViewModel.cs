@@ -269,7 +269,7 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
     private void OnJobChanged(object? sender, PropertyChangedEventArgs e)
     {
         ShowProgress();
-        if (e.PropertyName == nameof(HostedWorldJob.IsCancelling)) CancelCommand.NotifyCanExecuteChanged();
+        if (e.PropertyName is nameof(HostedWorldJob.IsCancelling) or nameof(HostedWorldJob.Step)) CancelCommand.NotifyCanExecuteChanged();
     }
 
     private void ShowProgress()
@@ -329,7 +329,8 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
         if (_jobs.StartBackup(target, scheduled: false) is null) Say(() => Loc.T("hostedbk.busy"));
     }
 
-    private bool CanCancel() => _job is { IsCancelling: false };
+    // возврат настроек после замены мира не отменяется (мир уже на месте, наполовину возвращённое хуже) — кнопка гаснет
+    private bool CanCancel() => _job is { IsCancelling: false } job && job.Step != HostedBackupStep.ExtraUpload;
 
     [RelayCommand(CanExecute = nameof(CanCancel))]
     private void Cancel() => _job?.Cancel();

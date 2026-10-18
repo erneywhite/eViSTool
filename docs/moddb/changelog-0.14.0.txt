@@ -1,0 +1,31 @@
+eViSTool 0.14.0: copies of a hosted server's world on your own computer.
+
+If you stop paying the host or lose access to it, the server and its world go with it. Now eViSTool can keep copies of the world on your computer and put one back on the server.
+
+New
+- Hosted server → Server → Backups: "Back up now". When the server is stopped (by its log), the world itself is downloaded; when it is running, the freshest complete copy the game made (/genbackup) is taken. Next to the world eViSTool keeps serverconfig.json, mod settings, player data, mod data and the list of mods with their versions.
+- The download resumes after a dropped connection, and a copy is thrown away if the world changed while it was being downloaded: a broken copy is worse than none.
+- On a schedule: once a day or once a week, while eViSTool is running. Keep the last N copies (7 by default) in the program folder or a folder of your choice. If a scheduled copy fails, you get a "Backup failed" notification.
+- "Restore to the server": only when the server is stopped by its log. The current world stays on the server next to the restored one (….evistool.bak), and if anything fails halfway, the old world is put back. Optionally the mod settings, player data and mod data are restored too.
+
+Fixes
+- Restore no longer asks "is the server stopped?" when the log already shows it running: it refuses right away and says why.
+
+Update from About.
+
+---
+
+eViSTool 0.14.0: копии мира сервера у хостера на твоём компьютере.
+
+Перестал платить хостеру или потерял к нему доступ — вместе с сервером пропадает и мир. Теперь eViSTool может держать копии мира у тебя на компьютере и вернуть копию на сервер.
+
+Новое
+- Сервер у хостера → «Сервер» → «Копии»: «Скачать копию сейчас». Если сервер по логу остановлен, скачивается сам мир; если работает — свежая целая копия, которую сделала игра (/genbackup). Рядом с миром eViSTool сохраняет serverconfig.json, настройки модов, данные игроков, данные модов и список модов с версиями.
+- Скачивание продолжается после обрыва связи, а копия выбрасывается, если мир поменялся, пока она качалась: битая копия хуже никакой.
+- По расписанию: раз в сутки или раз в неделю, пока eViSTool запущен. Хранятся последние N копий (по умолчанию 7) в папке программы или в своей папке. Если копия по расписанию не получилась, придёт оповещение.
+- «Восстановить на сервер»: только когда сервер по логу остановлен. Нынешний мир остаётся на сервере рядом с восстановленным (….evistool.bak), а если что-то оборвётся посередине, прежний мир вернётся на место. По желанию возвращаются и настройки модов, данные игроков и данные модов.
+
+Исправления
+- Восстановление больше не спрашивает «сервер остановлен?», когда по логу он работает: сразу отказывает и объясняет почему.
+
+Обнови из «О программе».
