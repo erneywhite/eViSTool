@@ -42,6 +42,15 @@ public sealed partial class MainViewModel
         Save();
     }
 
+    /// <summary>Фон из игры под боковой панелью (окно следит за свойством и включает или убирает фон сразу).</summary>
+    [ObservableProperty] private bool _gameBackground;
+
+    partial void OnGameBackgroundChanged(bool value)
+    {
+        _settings.GameBackground = value;
+        Save();
+    }
+
     [ObservableProperty] private bool _allowUnstable;
     [ObservableProperty] private bool _autoCheckUpdates;
 

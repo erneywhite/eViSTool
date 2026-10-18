@@ -29,6 +29,12 @@ public sealed class AppSettings
     /// <summary>Рамка главного окна от оконного менеджера, а не своя шапка (только Linux: на Windows шапка всегда своя).</summary>
     public bool SystemWindowFrame { get; set; }
 
+    /// <summary>
+    /// Фон из игры под боковой панелью — размытая заставка главного меню из папки игры (её же картинки, их можно
+    /// подменить своими). По умолчанию включено; выключено или картинок нет — спокойный узор.
+    /// </summary>
+    public bool GameBackground { get; set; } = true;
+
     /// <summary>Версия eViSTool, про которую попросили не напоминать («Пропустить эту версию»); вышла новее — окно покажется снова.</summary>
     public string? SkippedAppVersion { get; set; }
 

@@ -193,6 +193,7 @@ public sealed partial class MainViewModel : ObservableObject
         _alsoInstallWithoutAsking = _settings.AlsoInstallWithoutAsking;
         _copyWorldsBeforeModChanges = _settings.CopyWorldsBeforeModChanges;
         _systemWindowFrame = _settings.SystemWindowFrame;
+        _gameBackground = _settings.GameBackground;
         _autoCheckUpdates = _settings.AutoCheckUpdates;
         _selectedLanguage = Languages.FirstOrDefault(l => l.Value == Loc.Instance.Language) ?? Languages[0];
         _activeProfile = Profiles.FirstOrDefault(p => p.Model == _settings.ActiveProfile);
