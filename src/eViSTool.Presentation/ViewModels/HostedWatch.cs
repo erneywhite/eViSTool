@@ -87,8 +87,32 @@ public sealed partial class HostedWatch(IEnumerable<ProfileViewModel> profiles, 
     /// <summary>Отправка в канал; null — настоящая. Тесты перехватывают сообщения здесь.</summary>
     internal Func<NotifyChannel, NotifyMessage, Task>? Send { get; set; }
 
-    /// <summary>Оповещение в канал не ушло: профиль и текст для вкладки «Оповещения». Не повторяется — следующее событие уйдёт как обычно.</summary>
-    public event Action<string, string>? SendFailed;
+    // профиль → канал → последняя неудачная отправка в него (только в потоке окна)
+    private readonly Dictionary<string, Dictionary<string, HostedSendFailure>> _failures = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Оповещение профиля в канал не ушло (id профиля). Не повторяется — следующее событие уйдёт как обычно, — но ошибка
+    /// помнится (<see cref="SendFailures"/>), пока в этот канал не уйдёт удачное оповещение или проверочное.
+    /// </summary>
+    public event Action<string>? SendFailed;
+
+    /// <summary>В канал профиля ушло оповещение после неудачи (id профиля): его ошибка забыта.</summary>
+    public event Action<string>? SendRecovered;
+
+    /// <summary>Неудачные отправки профиля, которые ещё в силе: по каналу — последняя.</summary>
+    public IReadOnlyList<HostedSendFailure> SendFailures(string profileId) =>
+        _failures.TryGetValue(profileId, out var byChannel) ? [.. byChannel.Values] : [];
+
+    /// <summary>
+    /// Забыть ошибки профиля, которые уже не про его каналы: канал поправили в «Настройках», убрали или выключили у
+    /// сервера (решает вкладка «Оповещения» — она знает, что сейчас настроено).
+    /// </summary>
+    public void ForgetSendFailures(string profileId, Func<HostedSendFailure, bool> stale)
+    {
+        if (!_failures.TryGetValue(profileId, out var byChannel)) return;
+        foreach (var id in byChannel.Where(kv => stale(kv.Value)).Select(kv => kv.Key).ToList()) byChannel.Remove(id);
+        if (byChannel.Count == 0) _failures.Remove(profileId);
+    }
 
     /// <summary>За какими профилями следит (тесты).</summary>
     internal IReadOnlyCollection<string> Watched => _watches.Keys;
@@ -187,6 +211,8 @@ public sealed partial class HostedWatch(IEnumerable<ProfileViewModel> profiles, 
             _watches[id].Dispose();
             _watches.Remove(id);
         }
+        // профиль удалили, он не у хостера или маршруты выключены — его прежние ошибки отправки уже ни к чему
+        foreach (var id in _failures.Keys.Where(id => !wanted.ContainsKey(id)).ToList()) _failures.Remove(id);
     }
 
     /// <summary>
@@ -240,18 +266,59 @@ public sealed partial class HostedWatch(IEnumerable<ProfileViewModel> profiles, 
     /// <summary>
     /// Отправить, если событие у сервера включено. Настройки — с диска на момент события; имя сервера в заголовке —
     /// нынешнее имя профиля. Оповещения одного сервера уходят по очереди, в том порядке, в каком случились; ошибка канала
-    /// не повторяется и не роняет окно — она приходит в <see cref="SendFailed"/>.
+    /// не повторяется и не роняет окно — она приходит в <see cref="SendFailed"/> и помнится до удачной отправки в канал.
     /// </summary>
     private void Notify(GameProfile profile, NotifyEvent e, string title, NotifyLine[] details)
     {
         var settings = ServerNotifySettings.Load(profile.Id, _agentsDir) with { ServerName = profile.Name };
         if (!settings.ChannelsFor(e).Any()) return;
         var id = profile.Id;
-        var notifier = new ServerNotifier(() => settings, NotifyChannelsViewModel.Http,
-            (channel, error) => Ui.Post(() => SendFailed?.Invoke(id, Loc.T("notify.sendFailed", channel, error))), Send);
+        // итог по каналам — в Tracked: там виден сам канал, а не только его имя
+        var notifier = new ServerNotifier(() => settings, NotifyChannelsViewModel.Http, (_, _) => { }, Tracked(id, remember: true));
         var previous = _sending.GetValueOrDefault(id) ?? Task.CompletedTask;
         _sending[id] = previous.ContinueWith(_ => notifier.NotifyAsync(e, title, details), CancellationToken.None,
             TaskContinuationOptions.None, TaskScheduler.Default).Unwrap();
+    }
+
+    /// <summary>
+    /// Проверочное сервера у хостера — так же, как уйдут настоящие (этим окном, во все включённые каналы). Ответ — ошибки по
+    /// каналам («Telegram: …»), пусто — всё ушло. Дошло до канала — его прежняя ошибка отправки забыта.
+    /// </summary>
+    public Task<IReadOnlyList<string>> TestAsync(string profileId, string title, params NotifyLine[] details) =>
+        new ServerNotifier(() => ServerNotifySettings.Load(profileId, _agentsDir), NotifyChannelsViewModel.Http, (_, _) => { },
+            Tracked(profileId, remember: false)).TestAsync(title, details);
+
+    /// <summary>
+    /// Отправка в канал с учётом итога (в пуле потоков; что запомнить — в поток окна). Ушло — прежняя ошибка канала забыта;
+    /// не ушло и <paramref name="remember"/> — запомнена (проверочное свою ошибку показывает само). Ошибка идёт дальше,
+    /// к <see cref="ServerNotifier"/>: он собирает их по каналам, как раньше.
+    /// </summary>
+    private Func<NotifyChannel, NotifyMessage, Task> Tracked(string profileId, bool remember) => async (channel, message) =>
+    {
+        try
+        {
+            await (Send?.Invoke(channel, message) ?? new Notifier(NotifyChannelsViewModel.Http).SendAsync(channel, message)).ConfigureAwait(false);
+        }
+        catch (NotifyException ex)
+        {
+            if (remember) Ui.Post(() => Failed(profileId, channel, ex.Message));
+            throw;
+        }
+        Ui.Post(() => Recovered(profileId, channel.Id));
+    };
+
+    private void Failed(string profileId, NotifyChannel channel, string error)
+    {
+        if (!_failures.TryGetValue(profileId, out var byChannel)) _failures[profileId] = byChannel = new(StringComparer.Ordinal);
+        byChannel[channel.Id] = new HostedSendFailure(channel, error);
+        SendFailed?.Invoke(profileId);
+    }
+
+    private void Recovered(string profileId, string channelId)
+    {
+        if (!_failures.TryGetValue(profileId, out var byChannel) || !byChannel.Remove(channelId)) return;
+        if (byChannel.Count == 0) _failures.Remove(profileId);
+        SendRecovered?.Invoke(profileId);
     }
 
     private DateTime UtcNow => _time.GetUtcNow().UtcDateTime;
@@ -610,4 +677,14 @@ public sealed partial class HostedWatch(IEnumerable<ProfileViewModel> profiles, 
         }
     }
 
+}
+
+/// <summary>
+/// Неудачная отправка оповещения сервера у хостера: канал — каким он был настроен в ту минуту (поправят в «Настройках» —
+/// это уже другой канал), и что ответил сервис.
+/// </summary>
+public sealed record HostedSendFailure(NotifyChannel Channel, string Error)
+{
+    /// <summary>«▸ Оповещение в «Telegram» не ушло: …» — на текущем языке.</summary>
+    public string Text => Loc.T("notify.sendFailed", Channel.Name, Error);
 }

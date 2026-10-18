@@ -191,9 +191,9 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         // операции с копиями мира — общие на окно (их делает и расписание); без главной модели (тесты раздела) — свои
         HostedBackups = new HostedBackupsViewModel(main, main?.HostedWorldJobs ?? new HostedWorldJobs());
         // включили или выключили маршрут — сторож оповещений берёт профиль сразу, а не через минуту; не ушло — скажем на вкладке
-        // (главной модели нет только в тестах раздела)
+        // и будем говорить, пока в канал не уйдёт удачное (главной модели нет только в тестах раздела)
         HostedNotify.Saved += () => main?.HostedWatch?.Refresh();
-        if (main?.HostedWatch is { } watch) watch.SendFailed += HostedNotify.ShowSendError;
+        HostedNotify.Watch = main?.HostedWatch;
     }
 
     /// <summary>
