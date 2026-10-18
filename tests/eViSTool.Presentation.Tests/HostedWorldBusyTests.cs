@@ -171,32 +171,39 @@ public sealed class HostedWorldBusyTests : IDisposable
             var calls = Calls();
 
             // любой вопрос уронил бы тест: команда должна ответить сразу, а не спрашивать и потом висеть
-            using (new ScriptedDialogs())
+            using (var dialogs = new ScriptedDialogs())
             {
+                // нажатая команда говорит об отказе окном: строка статуса внизу повторяет плашку, и клик казался пустым
                 Sta.Wait(mods.DeleteCommand.ExecuteAsync(alpha));
                 Assert.Equal(HostedWorldBusy.Describe(job), mods.StatusText);
+                Assert.Equal([HostedWorldBusy.Describe(job)], dialogs.Warned);
 
                 mods.StatusText = "";
                 Sta.Wait(mods.ToggleEnabledCommand.ExecuteAsync(alpha));
                 Assert.Equal(HostedWorldBusy.Describe(job), mods.StatusText);
+                Assert.Equal(2, dialogs.Warned.Count);
 
                 mods.StatusText = "";
                 Sta.Wait(mods.CheckCommand.ExecuteAsync(null));
                 Assert.Equal(HostedWorldBusy.Describe(job), mods.StatusText);
+                Assert.Equal(2, dialogs.Warned.Count); // проверка идёт и сама, при открытии вкладки, — только строка статуса
 
                 mods.StatusText = "";
                 mods.Enqueue([new UpdateQueueItem(_host.Target, "alpha", "alpha", "1.0.0", "1.1.0", null, _host.Zip("alpha_1.1.0.zip", "alpha", "1.1.0"))],
                     ModHistorySource.Update);
                 Assert.Equal(HostedWorldBusy.Describe(job), mods.StatusText);
                 Assert.Empty(mods.Queue);
+                Assert.Equal(3, dialogs.Warned.Count);
 
                 mods.StatusText = "";
                 Sta.Wait(mods.AddFilesAsync([_host.Zip("beta_1.0.0.zip", "beta", "1.0.0")]));
                 Assert.Equal(HostedWorldBusy.Describe(job), mods.StatusText);
+                Assert.Equal(4, dialogs.Warned.Count);
 
                 Sta.Wait(mods.PollHostedAsync()); // опрос «поменяли ли моды со стороны» — молчит
                 Sta.Wait(mods.ReloadAsync());     // и перечитать — тоже не идёт, а откладывается
                 Assert.Equal(HostedWorldBusy.Describe(job), mods.StatusText);
+                Assert.Equal(4, dialogs.Warned.Count);
             }
             Assert.Equal(calls, Calls()); // на сервер — ни запроса
             Assert.True(_host.Server.Has("/Mods/alpha_1.0.0.zip"));
@@ -243,8 +250,12 @@ public sealed class HostedWorldBusyTests : IDisposable
 
             var job = StartCopy(main.HostedWorldJobs);
             Assert.Equal("", mods.WorldJobText); // копия — не у открытого сервера
-            mods.Enqueue([new UpdateQueueItem(_host.Target, "alpha", "alpha", "1.0.0", "1.1.0", null, _host.Zip("alpha_1.1.0.zip", "alpha", "1.1.0"))],
-                ModHistorySource.Update);
+            using (var dialogs = new ScriptedDialogs())
+            {
+                mods.Enqueue([new UpdateQueueItem(_host.Target, "alpha", "alpha", "1.0.0", "1.1.0", null, _host.Zip("alpha_1.1.0.zip", "alpha", "1.1.0"))],
+                    ModHistorySource.Update);
+                Assert.Equal([HostedWorldBusy.Describe(job, _host.Profile.Name)], dialogs.Warned);
+            }
             Assert.Equal(HostedWorldBusy.Describe(job, _host.Profile.Name), mods.StatusText);
             Assert.Contains(_host.Profile.Name, mods.StatusText);
             Assert.Empty(mods.Queue);

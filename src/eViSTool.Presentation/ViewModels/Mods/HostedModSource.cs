@@ -105,7 +105,7 @@ internal sealed class HostedModSource : IModSource
             return false;
         }
         // копия мира держит соединение: чтение ждало бы её конца молча — причина в статусе, прочитаем после неё (Resume)
-        if (_owner.RejectWorldJob(target))
+        if (_owner.RejectWorldJob(target, tell: false))
         {
             _stale = true;
             return false;

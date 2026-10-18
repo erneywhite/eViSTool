@@ -480,7 +480,7 @@ public sealed partial class ModsViewModel : ObservableObject
     {
         if (Profile is null || _main.ActiveProfile is not { } owner) return;
         // у хостера проверка начинается с чтения модов по FTP — во время копии мира оно ждало бы её конца
-        if (ModTarget.For(owner.Model) is { IsHosted: true } hosted && RejectWorldJob(hosted)) return;
+        if (ModTarget.For(owner.Model) is { IsHosted: true } hosted && RejectWorldJob(hosted, tell: false)) return;
 
         try
         {
@@ -751,7 +751,7 @@ public sealed partial class ModsViewModel : ObservableObject
     {
         var list = items.ToList();
         // сервер у хостера занят копией мира — установка ждала бы её конца: сразу сказать, ничего не ставить
-        if (list.Select(i => i.Target).DistinctBy(t => t.ProfileId).Any(RejectWorldJob)) return;
+        if (list.Select(i => i.Target).DistinctBy(t => t.ProfileId).Any(t => RejectWorldJob(t))) return;
         List<ModTarget> hosted = runningConfirmed ? [] : [.. list.Select(i => i.Target).Where(t => t.IsHosted).DistinctBy(t => t.ProfileId)];
         if (hosted.Count == 0)
         {
@@ -1056,9 +1056,11 @@ public sealed partial class ModsViewModel : ObservableObject
 
     /// <summary>
     /// У сервера у хостера цели идёт операция с копией мира — сказать это в строке статуса и вернуть true: операцию не
-    /// начинать, иначе она молча ждала бы конца передачи. Не у хостера или копии нет — false.
+    /// начинать, иначе она молча ждала бы конца передачи. Не у хостера или копии нет — false. Команду нажали
+    /// (<paramref name="tell"/>) — ещё и окно с причиной: строка статуса внизу повторяет плашку сверху, и отказ на клик
+    /// выглядел так, будто кнопка не сработала. Фоновое чтение и автопроверка — только строка статуса.
     /// </summary>
-    internal bool RejectWorldJob(ModTarget target)
+    internal bool RejectWorldJob(ModTarget target, bool tell = true)
     {
         if (WorldJob(target) is not { } job) return false;
         if (!ReferenceEquals(job, _saidJob))
@@ -1069,6 +1071,7 @@ public sealed partial class ModsViewModel : ObservableObject
             _ = ClearWhenDoneAsync(job);
         }
         StatusText = _worldJobSaid = SaidText(job);
+        if (tell) Ui.Warn(StatusText);
         return true;
     }
 
