@@ -94,10 +94,17 @@ public sealed class HostedConnection
 
     /// <summary>
     /// Куда складывать копии мира на этом компьютере (в том числе сетевая папка); null — папка данных программы,
-    /// HostedBackups/&lt;id профиля&gt; (<see cref="HostedWorldBackups.DefaultDir"/>). Проверка — <see cref="HostedWorldBackups.CheckDir"/>.
+    /// HostedBackups/&lt;<see cref="BackupFolder"/>&gt; (<see cref="HostedWorldBackups.DefaultDir"/>). Проверка — <see cref="HostedWorldBackups.CheckDir"/>.
     /// </summary>
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     public string? BackupDir { get; set; }
+
+    /// <summary>
+    /// Имя подпапки в HostedBackups для копий, когда своя папка не выбрана. Назначается один раз (<see cref="HostedBackupFolders.Assign"/>)
+    /// и с переименованием профиля не меняется; null — ещё не назначена, действует старое место HostedBackups/&lt;id профиля&gt;.
+    /// </summary>
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public string? BackupFolder { get; set; }
 
     /// <summary>Сколько последних своих копий мира хранить; 0 — не удалять старые.</summary>
     public int BackupKeep { get; set; } = 7;
