@@ -8,13 +8,16 @@ namespace eViSTool.Core.Mods;
 /// <summary>Проверка обновлений для папки модов целиком.</summary>
 public sealed class ModUpdateService(ModDbClient db)
 {
-    /// <summary>Моды профиля на диске, с отметкой «выключен». Быстро, без сети.</summary>
+    /// <summary>
+    /// Моды профиля на диске, с отметками «выключен» и «файл релиза с ModDB» (<see cref="ReleaseMarks"/>). Быстро, без сети.
+    /// </summary>
     public static IReadOnlyList<LocalMod> ScanLocal(ResolvedProfile profile)
     {
         if (profile.OffMachine) return []; // пути чужой машины или сервера у хостера: на этом диске их не читаем
         var disabled = new HashSet<string>(profile.DisabledMods); // игра сравнивает с учётом регистра
+        var marks = ReleaseMarks.Load(ReleaseMarks.FileFor(profile.Profile.Id));
         return ModScanner.Scan(profile.ModDirs)
-            .Select(l => l with { IsDisabled = IsDisabled(l, disabled) })
+            .Select(l => l with { IsDisabled = IsDisabled(l, disabled), Release = ReleaseMarks.Match(marks, l) })
             .ToList();
     }
 

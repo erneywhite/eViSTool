@@ -110,7 +110,10 @@ public static class UpdateChecker
             if (r.Mod is null)
                 return new ModCheckResult { Local = local, Status = ModStatus.NotInModDb, IsDuplicate = dup };
 
-            var installed = ModVersion.ParseOrNull(local.Info.Version);
+            // файл — релиз ModDB, в чьём modinfo.json автор не поднял версию: сравниваем по версии релиза, иначе тот же
+            // релиз предлагался бы снова после каждой установки (в файле 1.8.0, на ModDB 1.8.1)
+            var marked = ModVersion.ParseOrNull(local.Release?.ReleaseVersion);
+            var installed = marked ?? ModVersion.ParseOrNull(local.Info.Version);
             // стоит пре-релиз — значит, человек сознательно на нестабильной ветке этого мода
             var unstable = allowUnstable || installed?.IsPrerelease == true;
 
@@ -152,6 +155,7 @@ public static class UpdateChecker
                 var target = ModVersion.ParseOrNull(compatible.ModVersion)!;
                 status = target > installed ? ModStatus.UpdateAvailable : ModStatus.UpToDate;
                 if (installed > target) message = Loc.T("status.newerThanModDb");
+                else if (status == ModStatus.UpToDate && marked is not null) message = Loc.T("status.releaseFile", local.Release!.ReleaseVersion);
                 if (status == ModStatus.UpdateAvailable && policy.IsPinned(modId))
                 {
                     status = ModStatus.Pinned;

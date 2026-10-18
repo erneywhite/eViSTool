@@ -15,8 +15,11 @@ internal interface IModQueueHost
     /// <summary>Идёт операция с модами. Очередь занимает вкладку на время прогона; занято чем-то другим — не добавляет.</summary>
     bool IsBusy { get; set; }
 
-    /// <summary>Итог прогона — в строку статуса вкладки.</summary>
-    void SetStatus(string text);
+    /// <summary>
+    /// Итог прогона — в строку статуса вкладки. <paramref name="notes"/> — предупреждения к поставленному (версия в файле
+    /// не та, что на ModDB): в конец строки, после подсказок вкладки.
+    /// </summary>
+    void SetStatus(string text, IReadOnlyList<string> notes);
 
     /// <summary>Цель — открытый сейчас профиль (после её пункта таблицу стоит перечитать сразу).</summary>
     bool IsActive(ModTarget target);
@@ -27,9 +30,12 @@ internal interface IModQueueHost
     /// <summary>Поставить сохранённую копию (без вопросов: решение уже принято). Ошибки — в problems.</summary>
     Task<bool> InstallZipAsync(ModTarget target, string zip, List<string> installed, List<string> problems);
 
-    /// <summary>Скачать релиз модбазы и поставить. Ошибки — в problems.</summary>
+    /// <summary>
+    /// Скачать релиз модбазы и поставить. Ошибки — в problems, мягкие предупреждения к поставленному (версия в файле не та,
+    /// что на ModDB) — в notes.
+    /// </summary>
     Task<bool> DownloadAndInstallAsync(ModTarget target, string modId, string name, ModDbRelease release,
-        List<string> installed, List<string> problems, Action<double> onProgress, CancellationToken ct);
+        List<string> installed, List<string> problems, List<string> notes, Action<double> onProgress, CancellationToken ct);
 
     /// <summary>Перечитать моды открытого профиля и дождаться.</summary>
     Task ReloadAsync();
@@ -122,6 +128,7 @@ internal sealed partial class ModInstallQueue(IModQueueHost host) : ObservableOb
         host.IsBusy = true;
         IsRunning = true;
         var installed = new List<string>();
+        var allNotes = new List<string>(); // предупреждения прогона — в его итоговую строку
         try
         {
             while (!ct.IsCancellationRequested && Items.FirstOrDefault(i => i.State == QueueState.Waiting) is { } item)
@@ -130,6 +137,7 @@ internal sealed partial class ModInstallQueue(IModQueueHost host) : ObservableOb
                 item.Progress = 0;
                 Notify();
                 var problems = new List<string>();
+                var notes = new List<string>();
                 var ok = false;
                 using var history = ModHistory.Join(item.History?.Id, item.History?.Source, item.History?.Undoes);
                 try
@@ -138,7 +146,7 @@ internal sealed partial class ModInstallQueue(IModQueueHost host) : ObservableOb
                     if (item.Path is not null)
                         ok = await host.InstallZipAsync(item.Target, item.Path, installed, problems);
                     else
-                        ok = await host.DownloadAndInstallAsync(item.Target, item.ModId, item.Name, item.Release!, installed, problems,
+                        ok = await host.DownloadAndInstallAsync(item.Target, item.ModId, item.Name, item.Release!, installed, problems, notes,
                             x => { item.Progress = x; OnPropertyChanged(nameof(Progress)); }, ct);
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -154,7 +162,9 @@ internal sealed partial class ModInstallQueue(IModQueueHost host) : ObservableOb
                 }
 
                 item.State = ok ? QueueState.Done : ct.IsCancellationRequested ? QueueState.Cancelled : QueueState.Failed;
-                item.Message = ok ? "" : ct.IsCancellationRequested ? "" : problems.FirstOrDefault() ?? "";
+                // поставленный пункт с предупреждением — оно под названием (цветом предупреждения, не ошибки)
+                item.Message = ok ? string.Join(" ", notes) : ct.IsCancellationRequested ? "" : problems.FirstOrDefault() ?? "";
+                if (ok) allNotes.AddRange(notes);
                 if (ok && host.IsActive(item.Target)) await host.ReloadAsync(); // таблица и карточка сразу показывают новую версию
                 Notify();
             }
@@ -172,7 +182,7 @@ internal sealed partial class ModInstallQueue(IModQueueHost host) : ObservableOb
         _ = host.FetchNewModsAsync();
         var done = Items.Count(i => i.State == QueueState.Done);
         var failed = Items.Count(i => i.State == QueueState.Failed);
-        host.SetStatus(Loc.T("queue.finished", done, failed));
+        host.SetStatus(Loc.T("queue.finished", done, failed), allNotes);
     }
 
     /// <summary>Остановить прогон: текущий пункт прерывается, ждущие станут «отменены».</summary>

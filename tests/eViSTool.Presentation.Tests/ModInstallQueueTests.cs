@@ -39,7 +39,17 @@ public sealed class ModInstallQueueTests
         public int Reloads { get; private set; }
         public int Fetches { get; private set; }
 
-        public void SetStatus(string text) => Statuses.Add(text);
+        /// <summary>Предупреждение к поставленному пункту (по modid): версия в файле не та, что на ModDB.</summary>
+        public Dictionary<string, string> NoteFor { get; } = [];
+
+        /// <summary>Предупреждения, пришедшие с итогом прогона (по одному списку на итог).</summary>
+        public List<IReadOnlyList<string>> StatusNotes { get; } = [];
+
+        public void SetStatus(string text, IReadOnlyList<string> notes)
+        {
+            Statuses.Add(text);
+            StatusNotes.Add(notes);
+        }
         public bool IsActive(ModTarget target) => target.ProfileId == ActiveProfileId;
 
         public bool ConfirmIfRunning(ModTarget target)
@@ -50,22 +60,24 @@ public sealed class ModInstallQueueTests
         }
 
         public Task<bool> InstallZipAsync(ModTarget target, string zip, List<string> installed, List<string> problems) =>
-            Install(target, Path.GetFileNameWithoutExtension(zip), installed, problems, CancellationToken.None);
+            Install(target, Path.GetFileNameWithoutExtension(zip), installed, problems, null, CancellationToken.None);
 
         public Task<bool> DownloadAndInstallAsync(ModTarget target, string modId, string name, ModDbRelease release,
-            List<string> installed, List<string> problems, Action<double> onProgress, CancellationToken ct)
+            List<string> installed, List<string> problems, List<string> notes, Action<double> onProgress, CancellationToken ct)
         {
             onProgress(0.5);
-            return Install(target, modId, installed, problems, ct);
+            return Install(target, modId, installed, problems, notes, ct);
         }
 
-        private async Task<bool> Install(ModTarget target, string modId, List<string> installed, List<string> problems, CancellationToken ct)
+        private async Task<bool> Install(ModTarget target, string modId, List<string> installed, List<string> problems,
+            List<string>? notes, CancellationToken ct)
         {
             var ok = Scripts.TryGetValue(modId, out var script) ? await script(problems, ct) : true;
             if (ok)
             {
                 Installed.Add($"{modId} → {target.Name}");
                 installed.Add(modId);
+                if (NoteFor.TryGetValue(modId, out var note)) notes?.Add(note);
             }
             return ok;
         }
@@ -104,6 +116,38 @@ public sealed class ModInstallQueueTests
         Assert.Equal(1.0, queue.Progress);
         Assert.False(queue.HasRetry);
     });
+
+    // версия в файле не та, что на ModDB: пункт поставлен, предупреждение — под ним (цветом предупреждения) и в итоге прогона
+    [Fact]
+    public void VersionNote_ItemDone_NoteUnderItAndInSummary() => Sta.Run(() =>
+    {
+        var host = new Host();
+        host.NoteFor["alpha"] = "Внимание: в файле мода alpha версия 1.0.0, а на ModDB — 2.0.0";
+        var queue = new ModInstallQueue(host);
+
+        queue.Enqueue([Item(A, "alpha"), Item(A, "beta")], ModHistorySource.UpdateAll);
+        Sta.WaitFor(() => !queue.IsRunning);
+
+        var alpha = queue.Items.Single(i => i.ModId == "alpha");
+        var beta = queue.Items.Single(i => i.ModId == "beta");
+        Assert.Equal(QueueState.Done, alpha.State);
+        Assert.Equal(host.NoteFor["alpha"], alpha.Message);
+        Assert.Equal(RowTone.Warn, alpha.MessageTone);
+        Assert.Equal("", beta.Message);
+        Assert.Equal(Loc.T("queue.finished", 2, 0), host.Statuses.Last()); // счёт тот же: пункт поставлен
+        Assert.Equal([host.NoteFor["alpha"]], host.StatusNotes.Last());
+    });
+
+    // у неудачного пункта сообщение — ошибка, цвет ошибки
+    [Fact]
+    public void FailedItem_MessageToneIsDanger()
+    {
+        var item = Item(A, "alpha");
+        item.State = QueueState.Failed;
+        Assert.Equal(RowTone.Danger, item.MessageTone);
+        item.State = QueueState.Done;
+        Assert.Equal(RowTone.Warn, item.MessageTone);
+    }
 
     // всё, что добавлено одним нажатием, — одно действие в истории модов
     [Fact]

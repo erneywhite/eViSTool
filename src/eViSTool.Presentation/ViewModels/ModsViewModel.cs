@@ -598,8 +598,12 @@ public sealed partial class ModsViewModel : ObservableObject
     /// </summary>
     public static bool NeedsWorldCopy(ModSide side) => ModInstallService.NeedsWorldCopy(side);
 
-    /// <summary>Итог операции: таблица перечитана, итоговая строка — в статус, что требует внимания — отдельным окном.</summary>
-    internal async Task ReportAsync(string title, List<string> installed, List<string> problems)
+    /// <summary>
+    /// Итог операции: таблица перечитана, итоговая строка — в статус, что требует внимания — отдельным окном.
+    /// <paramref name="notes"/> — мягкие предупреждения к поставленному (версия в файле мода не та, что на ModDB): в
+    /// итоговую строку, отдельного окна ради них нет.
+    /// </summary>
+    internal async Task ReportAsync(string title, List<string> installed, List<string> problems, IReadOnlyList<string>? notes = null)
     {
         _main.HostedWatch?.ModsChangeDone(); // поставленное на сервер у хостера — оповещением «Обновлены моды»
         await ReloadAsync();
@@ -607,14 +611,17 @@ public sealed partial class ModsViewModel : ObservableObject
         // зависимости — по итоговому состоянию, а не на момент установки каждого мода
         if (installed.Count > 0)
             problems.AddRange(DependencyIssues.Select(i => Loc.T("report.dependency", i.Describe())));
-        StatusText = WithStartHint(_installer.WithWorldCopies(installed.Count switch
+        // предупреждения — в самый конец: подсказка «запусти сервер у хостера» важнее и не должна обрезаться
+        StatusText = ModInstallService.WithNotes(WithStartHint(_installer.WithWorldCopies(installed.Count switch
         {
             0 => Loc.T("report.nothingChanged", title),
             <= 3 => $"{title}: " + string.Join("; ", installed),
             _ => Loc.T("report.changedCount", title, installed.Count), // длинный список — только число
-        }), IsHosted && installed.Count > 0);
+        }), IsHosted && installed.Count > 0), notes);
         if (problems.Count == 0) return;
+        // окно всё равно открывается — предупреждения в нём тоже, под списком поставленного
         var text = (installed.Count > 0 ? $"{title}:\n• " + string.Join("\n• ", installed) + "\n\n" : "")
+                   + (notes is { Count: > 0 } ? string.Join("\n", notes.Distinct()) + "\n\n" : "")
                    + Loc.T("report.attention") + ":\n• " + string.Join("\n• ", problems);
         Ui.Warn(text);
     }
@@ -796,10 +803,11 @@ public sealed partial class ModsViewModel : ObservableObject
         }
 
         // итог прогона: на сервере у хостера что-то поставилось — напомнить запустить его в панели и оповестить
-        public void SetStatus(string text)
+        public void SetStatus(string text, IReadOnlyList<string> notes)
         {
             owner._main.HostedWatch?.ModsChangeDone();
-            owner.StatusText = WithStartHint(text, owner._queue.Items.Any(i => i.State == QueueState.Done && i.Target.IsHosted));
+            owner.StatusText = ModInstallService.WithNotes(
+                WithStartHint(text, owner._queue.Items.Any(i => i.State == QueueState.Done && i.Target.IsHosted)), notes);
         }
 
         public bool IsActive(ModTarget target) => owner._installer.IsActive(target);
@@ -811,8 +819,8 @@ public sealed partial class ModsViewModel : ObservableObject
             owner._installer.InstallZipAsync(target, zip, interactive: false, installed, problems);
 
         public Task<bool> DownloadAndInstallAsync(ModTarget target, string modId, string name, ModDbRelease release,
-            List<string> installed, List<string> problems, Action<double> onProgress, CancellationToken ct) =>
-            owner._installer.DownloadAndInstallAsync(target, modId, name, release, installed, problems, onProgress, ct);
+            List<string> installed, List<string> problems, List<string> notes, Action<double> onProgress, CancellationToken ct) =>
+            owner._installer.DownloadAndInstallAsync(target, modId, name, release, installed, problems, onProgress, ct, notes);
 
         public Task ReloadAsync() => owner.ReloadAsync();
 
@@ -836,8 +844,10 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             // без сети — только сохранённые копии
         }
-        // прежние копии удалённого сервера лежат на той машине — отсюда предлагаем только релизы модбазы
-        return VersionOptions.Build(IsRemote ? null : ModBackupStore.ForProfile(profile.Profile), info.ModId, info.Version, releases);
+        // прежние копии удалённого сервера лежат на той машине — отсюда предлагаем только релизы модбазы.
+        // «Установлена» — у релиза, чей это файл, даже если автор не поднял версию внутри (ReleaseMarks)
+        return VersionOptions.Build(IsRemote ? null : ModBackupStore.ForProfile(profile.Profile), info.ModId,
+            row.Local.Release?.ReleaseVersion ?? info.Version, releases);
     }
 
     /// <summary>Поставить выбранную версию (через очередь).</summary>
@@ -868,11 +878,15 @@ public sealed partial class ModsViewModel : ObservableObject
 
     // ---------- установка из каталога ----------
 
-    /// <summary>modid установленных модов активного профиля (для отметки «установлен» в каталоге).</summary>
+    /// <summary>
+    /// modid установленных модов активного профиля (для отметки «установлен» в каталоге). Каталог говорит версиями ModDB:
+    /// у файла релиза, в котором автор не поднял версию (<see cref="ReleaseMarks"/>), — версия релиза, иначе карточка звала
+    /// бы обновиться до того же релиза.
+    /// </summary>
     public IReadOnlyDictionary<string, string> InstalledVersions =>
         Locals.Where(l => l.Info is not null)
             .GroupBy(l => l.Info!.ModId, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First().Info!.Version ?? "", StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(g => g.Key, g => g.First().Release?.ReleaseVersion ?? g.First().Info!.Version ?? "", StringComparer.OrdinalIgnoreCase);
 
     public event EventHandler? LocalModsChanged;
 

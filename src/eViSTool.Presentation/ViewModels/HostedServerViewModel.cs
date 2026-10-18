@@ -716,7 +716,10 @@ public sealed partial class HostedServerViewModel : ObservableObject
         var done = items.Count(i => i.State == QueueState.Done);
         if (report)
         {
-            UpdatesNote = ModsViewModel.WithStartHint(Loc.T("queue.finished", done, items.Count(i => i.State == QueueState.Failed)), done > 0);
+            // у поставленных пунктов сообщение — предупреждение (версия в файле не та, что на ModDB): в итог плашки
+            var notes = items.Where(i => i.State == QueueState.Done).Select(i => i.Message);
+            UpdatesNote = Mods.ModInstallService.WithNotes(
+                ModsViewModel.WithStartHint(Loc.T("queue.finished", done, items.Count(i => i.State == QueueState.Failed)), done > 0), notes);
             // до свежей проверки (очередь устарит прежнюю, когда закончит) — без поставленных
             UpdatesCount = Math.Max(0, UpdatesCount - done);
         }

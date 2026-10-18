@@ -100,7 +100,10 @@ public static class AlsoInstall
         }
 
         var game = resolved.GameVersion;
-        var installed = mods.FirstOrDefault(m => string.Equals(m.Info?.ModId, modId, StringComparison.OrdinalIgnoreCase))?.Info?.Version;
+        // файл релиза с ModDB, в котором автор не поднял версию, — по версии релиза, как в проверке обновлений (ReleaseMarks):
+        // иначе тот же релиз предлагался бы и сюда
+        var local = mods.FirstOrDefault(m => string.Equals(m.Info?.ModId, modId, StringComparison.OrdinalIgnoreCase));
+        var installed = local?.Release?.ReleaseVersion ?? local?.Info?.Version;
         var release = game is null || CatalogPick.Fits(chosen, game) ? chosen : CatalogPick.Best(releases, game).Release;
         if (release is null) return new AlsoInstallOption(target, AlsoInstallState.NoRelease, game, installed, null);
 
