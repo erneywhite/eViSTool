@@ -4,8 +4,11 @@ using eViSTool.Core.Profiles;
 
 namespace eViSTool.Core.Server;
 
-/// <summary>Мод на сервере — путь на той машине (для окна это просто имя), modinfo или ошибка чтения.</summary>
-public sealed record RemoteMod(string Path, ModInfo? Info, string? Error);
+/// <summary>
+/// Мод на сервере — путь на той машине (для окна это просто имя), modinfo или ошибка чтения. <see cref="Release"/> —
+/// отметка агента «файл релиза с ModDB» (<see cref="ReleaseMarks"/>; агент до 0.14.1 её не присылает).
+/// </summary>
+public sealed record RemoteMod(string Path, ModInfo? Info, string? Error, ReleaseMark? Release = null);
 
 /// <summary>Моды сервера для окна на другой машине: что стоит, что выключено, куда ставить новые и какая версия игры.</summary>
 public sealed record RemoteModList(string? GameVersion, IReadOnlyList<string> DisabledMods, IReadOnlyList<string> ModDirs,
@@ -14,8 +17,14 @@ public sealed record RemoteModList(string? GameVersion, IReadOnlyList<string> Di
 public sealed record ModToggleRequest(string Path, bool Enabled);
 public sealed record ModPathRequest(string Path);
 
-/// <summary>Итог обновления модов перед перезапуском: что обновлено («имя: было → стало»), что пропущено и почему, что не вышло.</summary>
-public sealed record ModAutoUpdateResult(IReadOnlyList<string> Updated, IReadOnlyList<string> Skipped, IReadOnlyList<string> Failed);
+/// <summary>
+/// Итог обновления модов перед перезапуском: что обновлено («имя: было → стало»), что пропущено и почему, что не вышло.
+/// <see cref="Notes"/> — предупреждения к обновлённым: версия в файле мода не та, что у релиза на ModDB.
+/// </summary>
+public sealed record ModAutoUpdateResult(IReadOnlyList<string> Updated, IReadOnlyList<string> Skipped, IReadOnlyList<string> Failed)
+{
+    public IReadOnlyList<string> Notes { get; init; } = [];
+}
 
 /// <summary>Итог установки: «имя: было → стало» или «имя версия».</summary>
 public sealed record ModInstallResult(string Name, string? Version, string? OldVersion);
@@ -37,7 +46,7 @@ public sealed class ServerMods(string profileId, string gameDir, string dataDir)
     {
         var resolved = Resolve();
         return new RemoteModList(resolved.GameVersion?.ToString(), resolved.DisabledMods, resolved.ModDirs, resolved.InstallDir,
-            [.. ModUpdateService.ScanLocal(resolved).Select(m => new RemoteMod(m.Path, m.Info, m.Error))], StampOf(resolved));
+            [.. ModUpdateService.ScanLocal(resolved).Select(m => new RemoteMod(m.Path, m.Info, m.Error, m.Release))], StampOf(resolved));
     }
 
     /// <summary>Мод по пути — только из списка установленных: чужой путь сюда не пройдёт.</summary>
@@ -64,15 +73,19 @@ public sealed class ServerMods(string profileId, string gameDir, string dataDir)
             ModConfigEditor.Forget(resolved, info);
     }
 
-    /// <summary>Поставить присланный архив: заменённые версии — в хранилище для отката, выключенный мод остаётся выключенным.</summary>
-    public ModInstallResult Install(string zipPath)
+    /// <summary>
+    /// Поставить присланный архив: заменённые версии — в хранилище для отката, выключенный мод остаётся выключенным.
+    /// <paramref name="release"/> — релиз ModDB, из которого архив скачан (окно присылает его в заголовке): по нему
+    /// отметка «файл релиза», если версия в файле не та, что на ModDB.
+    /// </summary>
+    public ModInstallResult Install(string zipPath, ModDb.ModDbRelease? release = null)
     {
         var resolved = Resolve();
         var plan = ModInstaller.Plan(zipPath, resolved, ModUpdateService.ScanLocal(resolved));
         var info = plan.Incoming.Info!;
         var disabled = new HashSet<string>(resolved.DisabledMods);
         var wasDisabled = plan.Replaces.Any(r => ModUpdateService.IsDisabled(r, disabled));
-        ModInstaller.Apply(plan, ModBackupStore.ForProfileId(profileId));
+        ModInstaller.Apply(plan, ModBackupStore.ForProfileId(profileId), release);
         if (wasDisabled) ModConfigEditor.SetEnabled(Resolve(), info, enabled: false);
         return new ModInstallResult(info.Name, info.Version, plan.Replaces.FirstOrDefault()?.Info?.Version);
     }
@@ -115,6 +128,7 @@ public sealed class ServerMods(string profileId, string gameDir, string dataDir)
         var updated = new List<string>();
         var skipped = new List<string>();
         var failed = new List<string>();
+        var notes = new List<string>();
         foreach (var r in due)
         {
             var info = r.Local.Info!;
@@ -130,8 +144,10 @@ public sealed class ServerMods(string profileId, string gameDir, string dataDir)
                     skipped.Add(Loc.T("autoupd.needsGame", name, release.ModVersion, need));
                     continue;
                 }
-                var result = Install(file);
+                var result = Install(file, release);
                 updated.Add($"{name}: {result.OldVersion ?? info.Version} → {result.Version}");
+                // ставим всё равно; отметка «файл релиза» не даст предлагать его снова (ReleaseMarks)
+                if (ReleaseMarks.Warning(name, result.Version, release.ModVersion) is { } note) notes.Add(note);
             }
             catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException
                                            or HttpRequestException or UnauthorizedAccessException
@@ -144,7 +160,7 @@ public sealed class ServerMods(string profileId, string gameDir, string dataDir)
                 if (file is not null) updater.Cleanup(file);
             }
         }
-        return new ModAutoUpdateResult(updated, skipped, failed);
+        return new ModAutoUpdateResult(updated, skipped, failed) { Notes = notes };
     }
 
     /// <summary>Когда последний раз менялись моды: папки модов (файл добавили, заменили, убрали) и конфиг (включили/выключили).</summary>

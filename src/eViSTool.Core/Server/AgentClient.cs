@@ -191,12 +191,17 @@ public sealed class AgentClient : IDisposable
     public Task<ModConfigContent> ResetModConfigAsync(string path, CancellationToken ct = default) =>
         Post<ModConfigContent>("modconfig/reset", new ModConfigPathRequest(path), ct);
 
-    /// <summary>Отправить архив мода агенту — он поставит его в папку модов сервера (как установка на этой машине).</summary>
-    public async Task<ModInstallResult> InstallModAsync(string zipPath, CancellationToken ct = default)
+    /// <summary>
+    /// Отправить архив мода агенту — он поставит его в папку модов сервера (как установка на этой машине).
+    /// <paramref name="release"/> — релиз ModDB, из которого архив скачан: агент по нему ставит отметку «файл релиза»
+    /// (<see cref="ReleaseMarks"/>), иначе его проверка обновлений по расписанию предлагала бы тот же релиз снова.
+    /// </summary>
+    public async Task<ModInstallResult> InstallModAsync(string zipPath, CancellationToken ct = default, ModDb.ModDbRelease? release = null)
     {
         await using var file = File.OpenRead(zipPath);
         using var content = new StreamContent(file);
         content.Headers.Add(ModFileHeader, Uri.EscapeDataString(Path.GetFileName(zipPath)));
+        if (ReleaseHeaderValue(release) is { } releaseValue) content.Headers.Add(ReleaseHeader, releaseValue);
         TagHistory(content);
         using var cts = Timed(ct, TimeSpan.FromMinutes(15));
         using var resp = await _http.PostAsync("mods/install", content, cts.Token).ConfigureAwait(false);
@@ -205,6 +210,29 @@ public sealed class AgentClient : IDisposable
 
     /// <summary>Имя файла присланного архива (имя важно: мод ляжет в папку под ним).</summary>
     public const string ModFileHeader = "X-eViSTool-File";
+
+    /// <summary>Релиз ModDB присланного архива: «id;версия» (версия — через Uri.EscapeDataString). Нет — архив не с ModDB.</summary>
+    public const string ReleaseHeader = "X-eViSTool-Release";
+
+    /// <summary>Значение <see cref="ReleaseHeader"/>; null — релиза нет или у него нет версии (отмечать нечего).</summary>
+    public static string? ReleaseHeaderValue(ModDb.ModDbRelease? release) =>
+        release is { ModVersion: { } version } && !string.IsNullOrWhiteSpace(version)
+            ? $"{release.ReleaseId.ToString(System.Globalization.CultureInfo.InvariantCulture)};{Uri.EscapeDataString(version.Trim())}"
+            : null;
+
+    /// <summary>
+    /// Релиз из <see cref="ReleaseHeader"/> (у агента). Заголовок пришёл по сети, поэтому всё непонятное — null: архив
+    /// поставится как не с ModDB, без отметки.
+    /// </summary>
+    public static ModDb.ModDbRelease? ParseReleaseHeader(string? value)
+    {
+        var split = value?.IndexOf(';') ?? -1;
+        if (split <= 0 || value!.Length > 300) return null;
+        if (!long.TryParse(value[..split], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var id))
+            return null;
+        var version = Uri.UnescapeDataString(value[(split + 1)..]).Trim(); // битые %-последовательности остаются как есть
+        return version.Length is > 0 and <= 100 ? new ModDb.ModDbRelease { ReleaseId = id, ModVersion = version } : null;
+    }
 
     /// <summary>
     /// Действие окна для истории модов (<see cref="ModHistory"/>): id, источник и что оно откатывает. Агент пишет свои
@@ -311,6 +339,7 @@ public static class AgentLauncher
             CreateNoWindow = true, // своя скрытая консоль: в ней сервер пишет UTF-8 и получает Ctrl+C
             WorkingDirectory = Path.GetDirectoryName(agentExe)!,
         };
+        psi.Environment[AgentProtocol.FromWindowVariable] = "1"; // запуск версии засчитывает окно, а не этот агент
         psi.ArgumentList.Add("--profile"); psi.ArgumentList.Add(profile.Id);
         psi.ArgumentList.Add("--exe"); psi.ArgumentList.Add(exe);
         psi.ArgumentList.Add("--data"); psi.ArgumentList.Add(profile.DataDir);

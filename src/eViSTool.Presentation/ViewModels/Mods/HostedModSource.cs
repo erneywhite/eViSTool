@@ -9,6 +9,8 @@ namespace eViSTool.Presentation.ViewModels.Mods;
 /// Моды сервера у хостера — по FTP: листинг папок модов плюс кэш modinfo (<see cref="HostedMods"/>). Пока вкладка
 /// «Мои моды» открыта, раз в <see cref="PollInterval"/> сверяется отпечаток папок и конфига (1–2 листинга): моды
 /// могли поменять в панели хостера или в другом окне. Свои операции опрос не перебивает: пока они идут, он молчит.
+/// Пока у профиля идёт операция с копией мира, соединение занято ею: ни чтения, ни опроса — прочитаем, когда она
+/// кончится (<see cref="Resume"/>).
 /// </summary>
 internal sealed class HostedModSource : IModSource
 {
@@ -75,6 +77,17 @@ internal sealed class HostedModSource : IModSource
             return;
         }
         if (!_poll.IsEnabled) _poll.Start();
+        Wake();
+    }
+
+    /// <summary>Копия мира кончилась, соединение свободно: вкладка открыта — отложенное чтение или сверка с сервером сейчас.</summary>
+    public void Resume()
+    {
+        if (_poll.IsEnabled) Wake();
+    }
+
+    private void Wake()
+    {
         if (!_owner.IsHosted || _loading) return;
         if (_stale || _resolved is null) _ = ReloadAsync();
         else _ = PollAsync(); // вкладку открыли после перерыва — сервер мог измениться
@@ -89,6 +102,12 @@ internal sealed class HostedModSource : IModSource
         if (ModTarget.For(profile.Model) is not { IsHosted: true } target)
         {
             _owner.StatusText = ModTarget.UnreadableText(profile.Model);
+            return false;
+        }
+        // копия мира держит соединение: чтение ждало бы её конца молча — причина в статусе, прочитаем после неё (Resume)
+        if (_owner.RejectWorldJob(target, tell: false))
+        {
+            _stale = true;
             return false;
         }
 
@@ -160,7 +179,8 @@ internal sealed class HostedModSource : IModSource
     /// </summary>
     internal async Task PollAsync()
     {
-        if (_polling || !IsQuiet() || _main.ActiveProfile is not { } profile || ModTarget.For(profile.Model) is not { IsHosted: true } target) return;
+        if (_polling || !IsQuiet() || _main.ActiveProfile is not { } profile || ModTarget.For(profile.Model) is not { IsHosted: true } target
+            || _owner.IsWorldJobRunning(target)) return; // копия мира держит соединение — сверимся, когда она кончится
         _polling = true;
         var generation = _generation;
         try

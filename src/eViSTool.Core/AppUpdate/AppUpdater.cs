@@ -44,7 +44,8 @@ public sealed record AppRelease
 /// Обновление программы из релизов GitHub без установщика. Работающий exe нельзя перезаписать, но можно переименовать:
 /// старые файлы становятся «*.old», новые встают на их место, окно перезапускается. Запущенный агент при этом
 /// продолжает работать со старым файлом — сервер не останавливается; новый агент возьмётся при следующем запуске.
-/// Хвосты «*.old» убираются при следующем старте (<see cref="CleanupOld"/>).
+/// «*.old» хранятся, пока новая версия не проработала, — на них можно вернуться (<see cref="AppRollback"/>); потом их
+/// убирает <see cref="CleanupOld"/>.
 /// </summary>
 public sealed class AppUpdater
 {
@@ -304,10 +305,19 @@ public sealed class AppUpdater
     /// Поставить скачанный архив в папку программы: каждый файл архива встаёт на место прежнего, прежний переименовывается
     /// в «*.old». Папку data не трогаем — её в архиве нет. Если что-то пошло не так — всё возвращается как было.
     /// Архив — zip (Windows) или tar.gz (Linux: права файлов, в том числе «исполняемый», берутся из архива).
+    /// Встало — «*.old» прошлого обновления убираются (хранится одно поколение), а новые записываются как прежняя
+    /// версия (<see cref="AppRollback"/>).
     /// </summary>
-    public static void Install(string zipPath, string appDir)
+    /// <param name="fromVersion">
+    /// Версия, которая стоит в папке (обычно — того, кто ставит); null — неизвестна, прежнюю версию не храним. Если
+    /// версию в папке записало прошлое обновление, берётся записанная: окно могло не перезапуститься после него.
+    /// </param>
+    /// <param name="toVersion">Версия в архиве.</param>
+    public static void Install(string zipPath, string appDir, string? fromVersion = null, string? toVersion = null)
     {
-        var staging = Path.Combine(appDir, ".update");
+        var stale = Directory.GetFiles(appDir, "*.old"); // прошлое поколение: уберём, когда встанет новое
+        var previous = AppRollback.InstalledVersion(appDir) ?? fromVersion;
+        var staging = Path.Combine(appDir, StagingDir);
         if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
         if (zipPath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
         {
@@ -330,14 +340,14 @@ public sealed class AppUpdater
             var done = new List<(string Target, string? Old)>();
             try
             {
-                foreach (var file in Directory.GetFiles(root))
+                // по порядку имён: так же по порядку их переставит и откат
+                foreach (var file in Directory.GetFiles(root).Order(StringComparer.Ordinal))
                 {
                     var target = Path.Combine(appDir, Path.GetFileName(file));
                     string? old = null;
                     if (File.Exists(target))
                     {
-                        // уникальное имя: прежний «.old» может быть ещё занят агентом, запущенным до прошлого обновления
-                        old = $"{target}.{Guid.NewGuid().ToString("N")[..8]}.old";
+                        old = OldName(target);
                         File.Move(target, old);
                     }
                     done.Add((target, old));
@@ -358,6 +368,9 @@ public sealed class AppUpdater
                 }
                 throw;
             }
+
+            AppRollback.Installed(appDir, previous, toVersion,
+                done.Select(d => new ReplacedFile(Path.GetFileName(d.Target), d.Old is null ? null : Path.GetFileName(d.Old))), stale);
         }
         finally
         {
@@ -366,7 +379,22 @@ public sealed class AppUpdater
         }
     }
 
-    /// <summary>Убрать «*.old» от прошлых обновлений. Занятые (старый агент ещё работает) остаются до следующего раза.</summary>
+    /// <summary>
+    /// Папка, куда распаковывается архив обновления. Пока она есть, в папке программы переставляются файлы: запуск
+    /// в это время «*.old» не трогает (<see cref="AppRollback.NoteStart"/>).
+    /// </summary>
+    internal const string StagingDir = ".update";
+
+    /// <summary>
+    /// Имя, под которое уходит заменяемый файл. Уникальное: прежний «.old» может быть ещё занят агентом, запущенным до
+    /// прошлого обновления.
+    /// </summary>
+    internal static string OldName(string target) => $"{target}.{Guid.NewGuid().ToString("N")[..8]}.old";
+
+    /// <summary>
+    /// Убрать все «*.old» от прошлых обновлений. Занятые (старый агент ещё работает) остаются до следующего раза. Когда
+    /// это делать при запуске, решает <see cref="AppRollback.NoteStart"/>.
+    /// </summary>
     public static void CleanupOld(string appDir)
     {
         foreach (var file in Directory.EnumerateFiles(appDir, "*.old"))

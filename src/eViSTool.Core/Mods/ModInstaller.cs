@@ -1,3 +1,4 @@
+using eViSTool.Core.ModDb;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Versioning;
 using eViSTool.Core.Localization;
@@ -124,8 +125,10 @@ public static class ModInstaller
     /// <summary>
     /// Ставит мод по плану. Перед записью ещё раз проверяет назначение: файл, появившийся после планирования,
     /// или заменяемый файл, в котором уже другой мод, не перезаписывается. При сбое прежние версии возвращаются на место.
+    /// <paramref name="release"/> — релиз ModDB, из которого скачан архив (null — архив не с ModDB): по нему отметка
+    /// «файл релиза» (<see cref="ReleaseMarks"/>), если версия в файле не та, что на ModDB.
     /// </summary>
-    public static void Apply(InstallPlan plan, ModBackupStore backups)
+    public static void Apply(InstallPlan plan, ModBackupStore backups, ModDbRelease? release = null)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(plan.TargetPath)!);
         if (IsTaken(plan.TargetPath, plan.SourcePath, plan.Replaces) || !StillSameMod(plan))
@@ -160,6 +163,8 @@ public static class ModInstaller
 
         if (backups.HistoryFile is { } history && plan.Incoming.Info is { } info)
             ModHistory.Record(history, info.ModId, info.Name, plan.Replaces.FirstOrDefault()?.Info?.Version, info.Version);
+        if (backups.ReleasesFile is { } releases && plan.Incoming.Info is { } placed)
+            ReleaseMarks.Update(releases, placed, Path.GetFileName(plan.TargetPath), release);
     }
 
     /// <summary>Если назначение — заменяемый файл, в нём по-прежнему этот же мод (его не подменили после планирования).</summary>
@@ -175,17 +180,21 @@ public static class ModInstaller
 /// Хранилище старых версий модов: &lt;папка данных&gt;\ModBackups\&lt;профиль&gt;\&lt;modid&gt;\.
 /// Отсюда — откат (этап 2c). Держим несколько последних версий каждого мода.
 /// </summary>
-public sealed class ModBackupStore(string root, int keepPerMod = 3, string? historyFile = null)
+public sealed class ModBackupStore(string root, int keepPerMod = 3, string? historyFile = null, string? releasesFile = null)
 {
     public string Root { get; } = root;
 
     /// <summary>Куда писать историю изменений модов этого профиля (null — не писать).</summary>
     public string? HistoryFile { get; } = historyFile;
 
+    /// <summary>Отметки «файл релиза с ModDB» этого профиля (<see cref="ReleaseMarks"/>; null — не вести).</summary>
+    public string? ReleasesFile { get; } = releasesFile;
+
     public static ModBackupStore ForProfile(GameProfile profile) => ForProfileId(profile.Id);
 
     public static ModBackupStore ForProfileId(string profileId) =>
-        new(Path.Combine(AppPaths.ModBackups, profileId), historyFile: ModHistory.FileFor(profileId));
+        new(Path.Combine(AppPaths.ModBackups, profileId), historyFile: ModHistory.FileFor(profileId),
+            releasesFile: ReleaseMarks.FileFor(profileId));
 
     /// <summary>Папка мода в хранилище; modid, уводящий за пределы хранилища, — отказ (сканер такие моды и не пускает).</summary>
     public string DirFor(string modId) =>

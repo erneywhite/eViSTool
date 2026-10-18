@@ -1,0 +1,15 @@
+eViSTool 0.14.1 for Linux: going back to the previous version after an update, and fixes.
+
+- After an update the previous version stays next to the program until the new one has started twice and a day has passed. Until then you can go back: "Go back to the previous version" in About, or on a server without a window "eViSTool.Agent rollback" followed by "sudo systemctl restart evistool". The first time this works is when you update from 0.14.1 to the next release.
+- If the mod file from ModDB says a different version inside than the ModDB release, the mod is installed with a warning, including scheduled updates by the agent (in the server console and the "Mods updated" notification). The same release is no longer offered as an update again and again.
+- Hosted server: while a world backup is downloading or restoring, Overview and My mods show its progress, and changing mods is refused at once with the reason. A notification send error stays under its channel until a message goes through.
+- Schedule: "Checking the folder…" no longer gets stuck; the folder lines follow the language switch.
+
+---
+
+eViSTool 0.14.1 для Linux: возврат на прежнюю версию после обновления и исправления.
+
+- После обновления прежняя версия хранится рядом с программой, пока новая не запустится дважды и не пройдут сутки. До тех пор на неё можно вернуться: «Вернуться на прежнюю версию» в «О программе», а на сервере без окна командой «eViSTool.Agent rollback» и затем «sudo systemctl restart evistool». Впервые это сработает при обновлении с 0.14.1 на следующий выпуск.
+- Если в файле мода с ModDB версия не та, что у релиза, мод ставится с предупреждением, в том числе при обновлении агентом по расписанию (в консоли сервера и в оповещении «Обновлены моды»). Тот же релиз больше не предлагается как обновление раз за разом.
+- Сервер у хостера: пока копия мира скачивается или восстанавливается, «Обзор» и «Мои моды» показывают её ход, а менять моды сразу нельзя, с объяснением. Ошибка отправки оповещения держится под каналом, пока сообщение не уйдёт.
+- «Расписание»: «Проверяю папку…» больше не зависает, строки под папкой переводятся при смене языка.

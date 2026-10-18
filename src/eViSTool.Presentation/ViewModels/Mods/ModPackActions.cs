@@ -67,7 +67,7 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
 
     public async Task ImportFileAsync(string path)
     {
-        if (owner.Profile is not { } profile || owner.IsBusy || owner.CurrentTarget() is not { } target) return;
+        if (owner.Profile is not { } profile || owner.IsBusy || owner.ChangeTarget() is not { } target) return;
 
         PackFile pack;
         try

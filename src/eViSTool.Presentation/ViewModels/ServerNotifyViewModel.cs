@@ -37,7 +37,8 @@ public sealed class NotifyEventRowViewModel(NotifyEvent e, string title, string 
 /// что окно можно закрыть. Каналы, включённые у сервера, копируются ему вместе с секретами: своему серверу — в файл рядом
 /// с расписанием, удалённому — по защищённому соединению (там их шифруют заново). Каждое открытие вкладки обновляет копии —
 /// поправленный в «Настройках» токен доедет до сервера сам. У сервера у хостера агента нет: настройки лежат здесь же,
-/// отправляет само окно (<see cref="HostedWatch"/>), событий меньше, а чата в Discord нет (<see cref="IsHosted"/>).
+/// отправляет само окно (<see cref="HostedWatch"/>), событий меньше, а чата в Discord нет (<see cref="IsHosted"/>). Не
+/// ушло оповещение у хостера — ошибка видна на вкладке, пока в этот канал не уйдёт удачное (<see cref="SendErrors"/>).
 /// </summary>
 public sealed partial class ServerNotifyViewModel : ObservableObject
 {
@@ -65,12 +66,35 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
     private DateTime? _seenChange;
     private ServerNotifySettings _saved = new();
     private List<NotifyChannel> _channels = [];
+    private HostedWatch? _watch;
+    private string _sendShown = ""; // ошибки отправки, показанные в ErrorText последними (пересобираются при смене языка)
 
     /// <param name="hosted">Вкладка сервера у хостера (<see cref="IsHosted"/>).</param>
     public ServerNotifyViewModel(ServerViewModel server, bool hosted = false)
     {
         _server = server;
         IsHosted = hosted;
+    }
+
+    /// <summary>
+    /// Сторож оповещений серверов у хостера: он шлёт их из окна и помнит, какие не ушли (<see cref="SendErrors"/>), через
+    /// него же уходит проверочное. Нужен только вкладке хостера; null — тесты раздела без главной модели.
+    /// </summary>
+    internal HostedWatch? Watch
+    {
+        get => _watch;
+        set
+        {
+            if (_watch is { } old)
+            {
+                old.SendFailed -= OnSendFailed;
+                old.SendRecovered -= OnSendRecovered;
+            }
+            _watch = value;
+            if (value is null) return;
+            value.SendFailed += OnSendFailed;
+            value.SendRecovered += OnSendRecovered;
+        }
     }
 
     public ObservableCollection<NotifyEventRowViewModel> Rows { get; } = [];
@@ -108,7 +132,8 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
         _seenChange = null;
         _saved = new();
         Loaded = false;
-        StatusText = ErrorText = "";
+        StatusText = "";
+        ErrorText = SendErrors(); // у хостера — ошибки отправки этого профиля, если не ушло, пока смотрели другой
         Build(new ServerNotifySettings());
         if (_active) _ = LoadAsync(resync: true);
     }
@@ -125,13 +150,39 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
         Build(_saved);
         OnPropertyChanged(nameof(TestText));
         OnPropertyChanged(nameof(TestTip));
+        if (_sendShown.Length > 0 && ErrorText == _sendShown) ErrorText = SendErrors();
     }
 
-    /// <summary>Оповещение сервера у хостера не ушло (его шлёт окно) — сказать здесь, если открыт этот профиль.</summary>
-    public void ShowSendError(string profileId, string text)
+    /// <summary>Оповещение сервера у хостера не ушло (его шлёт окно) — сказать здесь, если открыт этот профиль: поверх прочего, как раньше.</summary>
+    private void OnSendFailed(string profileId)
     {
-        if (IsHosted && _profile?.Id == profileId) ErrorText = text;
+        if (IsHosted && _profile?.Id == profileId) ErrorText = SendErrors();
     }
+
+    /// <summary>В канал снова ушло: из строки ошибок отправки он пропадает. Другую ошибку вкладки (запись, проверочное) не трогаем.</summary>
+    private void OnSendRecovered(string profileId)
+    {
+        if (IsHosted && _profile?.Id == profileId && ErrorText == _sendShown) ErrorText = SendErrors();
+    }
+
+    /// <summary>
+    /// Ошибки отправки оповещений сервера у хостера, которые ещё в силе (их помнит сторож, <see cref="HostedWatch.SendFailures"/>):
+    /// по каналу — последняя, пока в него не уйдёт удачное оповещение или проверочное. Вкладку открыли заново, сменили
+    /// профиль и вернулись — они на месте. Канал поправили в «Настройках», убрали или выключили у этого сервера во всех
+    /// событиях — ошибка уже не про него и забывается. Судим по настройкам, прочитанным вкладкой; пока их не прочитали —
+    /// показываем все. У своего сервера — пусто: там шлёт агент, и его ошибки сюда не приходят.
+    /// </summary>
+    private string SendErrors()
+    {
+        if (!IsHosted || _profile is not { } profile || Watch is not { } watch) return _sendShown = "";
+        if (Loaded) watch.ForgetSendFailures(profile.Id, f => !StillApplies(f));
+        return _sendShown = string.Join(Environment.NewLine, watch.SendFailures(profile.Id).Select(f => f.Text));
+    }
+
+    /// <summary>Канал ошибки включён у сервера хоть для одного события и настроен так же, как когда отправка не удалась.</summary>
+    private bool StillApplies(HostedSendFailure failure) =>
+        _saved.Routes.Values.Any(ids => ids.Contains(failure.Channel.Id))
+        && _saved.Channels.FirstOrDefault(c => c.Id == failure.Channel.Id) == failure.Channel;
 
     public void ShowStatus(AgentStatus? s)
     {
@@ -179,7 +230,7 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
             _saved = settings;
             Build(settings);
             Loaded = true;
-            ErrorText = "";
+            ErrorText = SendErrors(); // у своего сервера — пусто, как раньше
             // поправленные в «Настройках» каналы (новый токен, другой чат) — до сервера
             if (resync && (settings.Routes.Values.Any(v => v.Count > 0) || settings.ChatChannelId is not null)) await SaveAsync(quiet: true);
         }
@@ -256,7 +307,7 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
                 _seenChange = ServerNotifySettings.ChangedAt(profile.Id);
             }
             _saved = settings;
-            ErrorText = "";
+            ErrorText = SendErrors(); // канал выключили у сервера или поправили — его ошибка отправки уходит
             if (!quiet) StatusText = "";
             Saved?.Invoke();
         }
@@ -291,6 +342,10 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
         {
             IReadOnlyList<string> errors;
             if (!IsHosted && _server.Client is { } client) errors = await client.TestNotifyAsync();
+            // у хостера — через сторожа: так же, как уйдут настоящие, и дошедшее снимает прежнюю ошибку канала
+            else if (IsHosted && Watch is { } watch && _profile is { } hosted)
+                errors = await watch.TestAsync(hosted.Id, Loc.T("notify.testTitle"),
+                    new NotifyLine("◇", Loc.T("notify.lbl.from"), Loc.T("notify.testFromWindow", Environment.MachineName)));
             else if (_profile is { IsRemote: false } p)
                 // агент своего сервера не запущен (или это сервер у хостера) — отправляем отсюда же: каналы те же
                 errors = await new ServerNotifier(() => ServerNotifySettings.Load(p.Id), NotifyChannelsViewModel.Http, (_, _) => { })

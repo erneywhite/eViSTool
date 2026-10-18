@@ -1,5 +1,6 @@
 using eViSTool.Core.Hosting;
 using eViSTool.Core.Localization;
+using eViSTool.Core.ModDb;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Server;
 using eViSTool.Core.Server.Remote;
@@ -108,7 +109,7 @@ public static class ModTargets
             OffMachine = true, // пути — на машине агента
         };
         var disabled = new HashSet<string>(list.DisabledMods);
-        var mods = list.Mods.Select(m => new LocalMod(m.Path, m.Info, m.Error))
+        var mods = list.Mods.Select(m => new LocalMod(m.Path, m.Info, m.Error) { Release = m.Release })
             .Select(l => l with { IsDisabled = ModUpdateService.IsDisabled(l, disabled) })
             .ToList();
         return (resolved, mods);
@@ -117,11 +118,14 @@ public static class ModTargets
     /// <summary>
     /// Поставить архив в цель: прежняя версия — в хранилище для отката, выключенный мод остаётся выключенным.
     /// <paramref name="confirm"/> видит план (та же версия, даунгрейд) и может отказаться — тогда null, ничего не изменено.
+    /// <paramref name="release"/> — релиз ModDB, из которого скачан архив (null — архив не с ModDB): версия в файле не та,
+    /// что на ModDB, — отметка «файл релиза» (<see cref="ReleaseMarks"/>) там, где мод лежит: у своего профиля и у хостера —
+    /// на этой машине, у удалённого сервера — у его агента.
     /// </summary>
     public static async Task<ModInstallOutcome?> InstallAsync(ModTarget target, string zip, Func<InstallPlan, bool>? confirm = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default, ModDbRelease? release = null)
     {
-        if (target.IsHosted) return await new HostedMods(target).InstallAsync(zip, confirm, ct).ConfigureAwait(false);
+        if (target.IsHosted) return await new HostedMods(target).InstallAsync(zip, confirm, ct, release).ConfigureAwait(false);
         var (resolved, mods) = await ScanAsync(target, ct).ConfigureAwait(false);
         var plan = ModInstaller.Plan(zip, resolved, mods);
         if (confirm is not null && !confirm(plan)) return null;
@@ -130,14 +134,14 @@ public static class ModTargets
         {
             // удалённому серверу план нужен только для вопросов: ставит его агент, по тем же правилам
             using var agent = AgentClient.ForRemote(code);
-            var result = await agent.InstallModAsync(zip, ct).ConfigureAwait(false);
+            var result = await agent.InstallModAsync(zip, ct, release).ConfigureAwait(false);
             return new ModInstallOutcome(result.Name, result.Version, result.OldVersion);
         }
 
         var info = plan.Incoming.Info!;
         var disabled = new HashSet<string>(resolved.DisabledMods);
         var wasDisabled = plan.Replaces.Any(r => ModUpdateService.IsDisabled(r, disabled));
-        ModInstaller.Apply(plan, ModBackupStore.ForProfile(target.Profile));
+        ModInstaller.Apply(plan, ModBackupStore.ForProfile(target.Profile), release);
         if (wasDisabled) ModConfigEditor.SetEnabled(ProfileResolver.Resolve(target.Profile), info, enabled: false);
         return new ModInstallOutcome(info.Name, info.Version, plan.Replaces.FirstOrDefault()?.Info?.Version);
     }

@@ -42,6 +42,7 @@ public sealed partial class ModsViewModel : ObservableObject
     private readonly ModPackActions _packs;
     private readonly ModCodeActions _codes;
     private readonly ModHistoryActions _historyActions;
+    private readonly HostedWorldBusy _worldJob;
 
     /// <summary>Последний ответ модбазы (modid → что там есть): после локальных операций статусы не теряются.</summary>
     internal Dictionary<string, ModDbResult> ModDbAnswers { get; set; } = new(StringComparer.OrdinalIgnoreCase);
@@ -117,6 +118,8 @@ public sealed partial class ModsViewModel : ObservableObject
         foreach (var name in new[] { nameof(InstalledLabel), nameof(UpdatesLabel), nameof(ProblemsLabel), nameof(DisabledLabel),
                      nameof(PinnedLabel), nameof(UnneededLabel), nameof(ShownText), nameof(UpdateAllText), nameof(DependencyText) })
             OnPropertyChanged(name);
+        WorldJobText = _worldJob.Text;
+        RefreshSaidJob();
     }
 
     /// <summary>Ширина карточки (тянется разделителем, запоминается).</summary>
@@ -176,6 +179,10 @@ public sealed partial class ModsViewModel : ObservableObject
         _installs = new ModInstallActions(this, _installer, _packs);
         _codes = new ModCodeActions(this, _packs, _service, db);
         _historyActions = new ModHistoryActions(this, _installer, db);
+        // главной модели, собранной в тесте без конструктора, операций с копиями мира нет — тогда и следить не за чем
+        _worldJob = new HostedWorldBusy(() => _main.HostedWorldJobs);
+        _worldJob.TextChanged += () => WorldJobText = _worldJob.Text;
+        _worldJob.BusyChanged += OnWorldJobBusyChanged;
         View = new FilteredList<ModRowViewModel>(Rows);
         View.Filter = r => ModListRules.Matches(r, Filter, Search);
         ApplySort();
@@ -330,6 +337,9 @@ public sealed partial class ModsViewModel : ObservableObject
         ModDbAnswers = new(StringComparer.OrdinalIgnoreCase);
         _agent.Reset();
         _hosted.Reset();
+        _worldJob.SetProfile(IsHosted ? _main.ActiveProfile?.Model.Id : null);
+        WorldJobText = _worldJob.Text;
+        ForgetSaidJob();
         Locals = [];
         OnPropertyChanged(nameof(IsLocalProfile));
         OnPropertyChanged(nameof(IsHosted));
@@ -469,6 +479,8 @@ public sealed partial class ModsViewModel : ObservableObject
     private async Task CheckAsync(CancellationToken ct)
     {
         if (Profile is null || _main.ActiveProfile is not { } owner) return;
+        // у хостера проверка начинается с чтения модов по FTP — во время копии мира оно ждало бы её конца
+        if (ModTarget.For(owner.Model) is { IsHosted: true } hosted && RejectWorldJob(hosted, tell: false)) return;
 
         try
         {
@@ -510,8 +522,8 @@ public sealed partial class ModsViewModel : ObservableObject
         if (target.IsHosted)
         {
             // у хостера запущен ли сервер, видно только по логу: не остановлен — спрашиваем «останови в панели хостера»;
-            // мод хостера и папку менять нельзя
-            if (RejectHostReadOnly(row) || !await _installer.ConfirmIfRunningAsync(target))
+            // мод хостера и папку менять нельзя; идёт копия мира — соединение занято ею
+            if (RejectHostReadOnly(row) || RejectWorldJob(target) || !await _installer.ConfirmIfRunningAsync(target))
             {
                 Rebuild(); // вернуть галочку как было (без сети)
                 return;
@@ -551,7 +563,7 @@ public sealed partial class ModsViewModel : ObservableObject
     [RelayCommand]
     private async Task DeleteAsync(ModRowViewModel? row)
     {
-        if (row is null || Profile is null || CurrentTarget() is not { } target) return;
+        if (row is null || Profile is null || ChangeTarget() is not { } target) return;
         if (RejectHostReadOnly(row)) return;
 
         // у хостера корзины на сервере нет: свой вопрос (файл удалится сразу) и строка про копию на этой машине
@@ -598,8 +610,12 @@ public sealed partial class ModsViewModel : ObservableObject
     /// </summary>
     public static bool NeedsWorldCopy(ModSide side) => ModInstallService.NeedsWorldCopy(side);
 
-    /// <summary>Итог операции: таблица перечитана, итоговая строка — в статус, что требует внимания — отдельным окном.</summary>
-    internal async Task ReportAsync(string title, List<string> installed, List<string> problems)
+    /// <summary>
+    /// Итог операции: таблица перечитана, итоговая строка — в статус, что требует внимания — отдельным окном.
+    /// <paramref name="notes"/> — мягкие предупреждения к поставленному (версия в файле мода не та, что на ModDB): в
+    /// итоговую строку, отдельного окна ради них нет.
+    /// </summary>
+    internal async Task ReportAsync(string title, List<string> installed, List<string> problems, IReadOnlyList<string>? notes = null)
     {
         _main.HostedWatch?.ModsChangeDone(); // поставленное на сервер у хостера — оповещением «Обновлены моды»
         await ReloadAsync();
@@ -607,14 +623,17 @@ public sealed partial class ModsViewModel : ObservableObject
         // зависимости — по итоговому состоянию, а не на момент установки каждого мода
         if (installed.Count > 0)
             problems.AddRange(DependencyIssues.Select(i => Loc.T("report.dependency", i.Describe())));
-        StatusText = WithStartHint(_installer.WithWorldCopies(installed.Count switch
+        // предупреждения — в самый конец: подсказка «запусти сервер у хостера» важнее и не должна обрезаться
+        StatusText = ModInstallService.WithNotes(WithStartHint(_installer.WithWorldCopies(installed.Count switch
         {
             0 => Loc.T("report.nothingChanged", title),
             <= 3 => $"{title}: " + string.Join("; ", installed),
             _ => Loc.T("report.changedCount", title, installed.Count), // длинный список — только число
-        }), IsHosted && installed.Count > 0);
+        }), IsHosted && installed.Count > 0), notes);
         if (problems.Count == 0) return;
+        // окно всё равно открывается — предупреждения в нём тоже, под списком поставленного
         var text = (installed.Count > 0 ? $"{title}:\n• " + string.Join("\n• ", installed) + "\n\n" : "")
+                   + (notes is { Count: > 0 } ? string.Join("\n", notes.Distinct()) + "\n\n" : "")
                    + Loc.T("report.attention") + ":\n• " + string.Join("\n• ", problems);
         Ui.Warn(text);
     }
@@ -654,7 +673,7 @@ public sealed partial class ModsViewModel : ObservableObject
         if (todo.Count == 0) return;
 
         var list = string.Join("\n", todo.Select(r => $"• {r.Name}: {r.Installed} → {r.Latest}"));
-        if (CurrentTarget() is not { } target || !Confirm(Loc.T("mods.updateAllConfirm", todo.Count, list))) return;
+        if (ChangeTarget() is not { } target || !Confirm(Loc.T("mods.updateAllConfirm", todo.Count, list))) return;
         Enqueue(todo.Select(r => QueueItemFor(target, r, r.Result.LatestCompatible!)), ModHistorySource.UpdateAll);
     }
 
@@ -667,7 +686,7 @@ public sealed partial class ModsViewModel : ObservableObject
     /// </summary>
     internal async Task<IReadOnlyList<UpdateQueueItem>> UpdateAllAsync(ModTarget target, IReadOnlyList<UpdateQueueItem> items)
     {
-        if (items.Count == 0 || !_queue.CanEnqueue) return [];
+        if (items.Count == 0 || !_queue.CanEnqueue || RejectWorldJob(target)) return [];
         var list = string.Join("\n", items.Select(i => $"• {i.Name}: {i.From} → {i.To}"));
         if (!Confirm(Loc.T("mods.updateAllConfirm", items.Count, list))) return [];
         if (target.IsHosted) await EnqueueCheckedAsync([.. items], [target], ModHistorySource.UpdateAll, null);
@@ -731,6 +750,8 @@ public sealed partial class ModsViewModel : ObservableObject
     public void Enqueue(IEnumerable<UpdateQueueItem> items, string source, string? undoes = null, bool runningConfirmed = false)
     {
         var list = items.ToList();
+        // сервер у хостера занят копией мира — установка ждала бы её конца: сразу сказать, ничего не ставить
+        if (list.Select(i => i.Target).DistinctBy(t => t.ProfileId).Any(t => RejectWorldJob(t))) return;
         List<ModTarget> hosted = runningConfirmed ? [] : [.. list.Select(i => i.Target).Where(t => t.IsHosted).DistinctBy(t => t.ProfileId)];
         if (hosted.Count == 0)
         {
@@ -796,10 +817,11 @@ public sealed partial class ModsViewModel : ObservableObject
         }
 
         // итог прогона: на сервере у хостера что-то поставилось — напомнить запустить его в панели и оповестить
-        public void SetStatus(string text)
+        public void SetStatus(string text, IReadOnlyList<string> notes)
         {
             owner._main.HostedWatch?.ModsChangeDone();
-            owner.StatusText = WithStartHint(text, owner._queue.Items.Any(i => i.State == QueueState.Done && i.Target.IsHosted));
+            owner.StatusText = ModInstallService.WithNotes(
+                WithStartHint(text, owner._queue.Items.Any(i => i.State == QueueState.Done && i.Target.IsHosted)), notes);
         }
 
         public bool IsActive(ModTarget target) => owner._installer.IsActive(target);
@@ -811,8 +833,8 @@ public sealed partial class ModsViewModel : ObservableObject
             owner._installer.InstallZipAsync(target, zip, interactive: false, installed, problems);
 
         public Task<bool> DownloadAndInstallAsync(ModTarget target, string modId, string name, ModDbRelease release,
-            List<string> installed, List<string> problems, Action<double> onProgress, CancellationToken ct) =>
-            owner._installer.DownloadAndInstallAsync(target, modId, name, release, installed, problems, onProgress, ct);
+            List<string> installed, List<string> problems, List<string> notes, Action<double> onProgress, CancellationToken ct) =>
+            owner._installer.DownloadAndInstallAsync(target, modId, name, release, installed, problems, onProgress, ct, notes);
 
         public Task ReloadAsync() => owner.ReloadAsync();
 
@@ -836,8 +858,10 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             // без сети — только сохранённые копии
         }
-        // прежние копии удалённого сервера лежат на той машине — отсюда предлагаем только релизы модбазы
-        return VersionOptions.Build(IsRemote ? null : ModBackupStore.ForProfile(profile.Profile), info.ModId, info.Version, releases);
+        // прежние копии удалённого сервера лежат на той машине — отсюда предлагаем только релизы модбазы.
+        // «Установлена» — у релиза, чей это файл, даже если автор не поднял версию внутри (ReleaseMarks)
+        return VersionOptions.Build(IsRemote ? null : ModBackupStore.ForProfile(profile.Profile), info.ModId,
+            row.Local.Release?.ReleaseVersion ?? info.Version, releases);
     }
 
     /// <summary>Поставить выбранную версию (через очередь).</summary>
@@ -852,6 +876,8 @@ public sealed partial class ModsViewModel : ObservableObject
     private async Task RollbackAsync(ModRowViewModel? row)
     {
         if (row?.Local.Info is null || Profile is null || (IsBusy && !IsQueueRunning)) return;
+        // выбрать версию можно и сейчас, но поставить её не выйдет, пока копия мира держит соединение, — сказать сразу
+        if (_main.ActiveProfile is { } active && ModTarget.For(active.Model) is { IsHosted: true } hosted && RejectWorldJob(hosted)) return;
 
         StatusText = Loc.T("mods.findingVersions", row.Name);
         var options = await LoadVersionOptionsAsync(row);
@@ -868,11 +894,15 @@ public sealed partial class ModsViewModel : ObservableObject
 
     // ---------- установка из каталога ----------
 
-    /// <summary>modid установленных модов активного профиля (для отметки «установлен» в каталоге).</summary>
+    /// <summary>
+    /// modid установленных модов активного профиля (для отметки «установлен» в каталоге). Каталог говорит версиями ModDB:
+    /// у файла релиза, в котором автор не поднял версию (<see cref="ReleaseMarks"/>), — версия релиза, иначе карточка звала
+    /// бы обновиться до того же релиза.
+    /// </summary>
     public IReadOnlyDictionary<string, string> InstalledVersions =>
         Locals.Where(l => l.Info is not null)
             .GroupBy(l => l.Info!.ModId, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First().Info!.Version ?? "", StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(g => g.Key, g => g.First().Release?.ReleaseVersion ?? g.First().Info!.Version ?? "", StringComparer.OrdinalIgnoreCase);
 
     public event EventHandler? LocalModsChanged;
 
@@ -1000,6 +1030,97 @@ public sealed partial class ModsViewModel : ObservableObject
         if (HostReadOnlyReason(row) is not { } reason) return false;
         StatusText = reason;
         return true;
+    }
+
+    // ---------- сервер у хостера: копия мира держит соединение
+
+    /// <summary>
+    /// У открытого сервера у хостера идёт операция с копией мира (вкладка «Копии» или расписание): «Идёт копия мира
+    /// (Скачиваю мир: 12 МБ из 90 МБ). Подожди или отмени её во вкладке «Копии».» Она держит соединение профиля до конца
+    /// передачи, поэтому чтение модов и их изменения ждут её конца, а команды, которые пошли бы на сервер, говорят то же
+    /// самое в строке статуса. Пусто — не идёт.
+    /// </summary>
+    [ObservableProperty] private string _worldJobText = "";
+
+    /// <summary>Что сказала строка статуса, когда команду не начали из-за копии мира (кончится копия — строку убрать).</summary>
+    private string? _worldJobSaid;
+
+    /// <summary>Чью копию назвала строка статуса: её ход строка повторяет, её конец строку убирает (профиль может быть и не открытый).</summary>
+    private HostedWorldJob? _saidJob;
+
+    /// <summary>Идущая операция с копией мира у сервера у хостера этой цели; не у хостера или не идёт — null.</summary>
+    private HostedWorldJob? WorldJob(ModTarget target) => target.IsHosted ? _main.HostedWorldJobs?.Running(target.ProfileId) : null;
+
+    /// <summary>У сервера у хостера этой цели идёт операция с копией мира: в его сеть сейчас не ходить.</summary>
+    internal bool IsWorldJobRunning(ModTarget target) => WorldJob(target) is not null;
+
+    /// <summary>
+    /// У сервера у хостера цели идёт операция с копией мира — сказать это в строке статуса и вернуть true: операцию не
+    /// начинать, иначе она молча ждала бы конца передачи. Не у хостера или копии нет — false. Команду нажали
+    /// (<paramref name="tell"/>) — ещё и окно с причиной: строка статуса внизу повторяет плашку сверху, и отказ на клик
+    /// выглядел так, будто кнопка не сработала. Фоновое чтение и автопроверка — только строка статуса.
+    /// </summary>
+    internal bool RejectWorldJob(ModTarget target, bool tell = true)
+    {
+        if (WorldJob(target) is not { } job) return false;
+        if (!ReferenceEquals(job, _saidJob))
+        {
+            ForgetSaidJob();
+            _saidJob = job;
+            job.PropertyChanged += OnSaidJobChanged;
+            _ = ClearWhenDoneAsync(job);
+        }
+        StatusText = _worldJobSaid = SaidText(job);
+        if (tell) Ui.Warn(StatusText);
+        return true;
+    }
+
+    // копия чужого профиля (пункт «Установить также в») — с именем сервера: вкладка «Копии» открытого профиля про неё не знает
+    private string SaidText(HostedWorldJob job) =>
+        IsHosted && job.ProfileId == _main.ActiveProfile?.Model.Id ? HostedWorldBusy.Describe(job) : HostedWorldBusy.Describe(job, job.Target.Name);
+
+    private void OnSaidJobChanged(object? sender, PropertyChangedEventArgs e) => RefreshSaidJob();
+
+    /// <summary>Строка статуса ещё говорит о копии — пересказать её ход на текущем языке.</summary>
+    private void RefreshSaidJob()
+    {
+        if (_saidJob is not { } job || _worldJobSaid is not { } said || StatusText != said) return;
+        StatusText = _worldJobSaid = SaidText(job);
+    }
+
+    private async Task ClearWhenDoneAsync(HostedWorldJob job)
+    {
+        await job.Completion; // исключений не бросает
+        if (ReferenceEquals(job, _saidJob)) ClearSaidJob();
+    }
+
+    /// <summary>Копия кончилась: строка статуса «идёт копия мира» уже неправда — убрать её.</summary>
+    private void ClearSaidJob()
+    {
+        if (_worldJobSaid is { } said && StatusText == said) StatusText = "";
+        ForgetSaidJob();
+    }
+
+    private void ForgetSaidJob()
+    {
+        if (_saidJob is { } old) old.PropertyChanged -= OnSaidJobChanged;
+        _saidJob = null;
+        _worldJobSaid = null;
+    }
+
+    /// <summary>Цель для изменения модов: как <see cref="CurrentTarget"/>, но пока у сервера у хостера идёт копия мира — null и причина в статусе.</summary>
+    internal ModTarget? ChangeTarget() => CurrentTarget() is { } target && !RejectWorldJob(target) ? target : null;
+
+    /// <summary>
+    /// Копия мира началась или кончилась. Кончилась — соединение свободно: строка статуса «идёт копия мира» уже неправда, а
+    /// отложенное чтение модов или сверка с сервером — сейчас, если вкладка открыта.
+    /// </summary>
+    private void OnWorldJobBusyChanged()
+    {
+        if (_worldJob.IsBusy) return;
+        // копия открытого профиля кончилась — строку убрать сразу, не дожидаясь продолжения ClearWhenDoneAsync
+        if (_saidJob is null or { IsFinished: true }) ClearSaidJob();
+        _hosted.Resume();
     }
 
     /// <summary>Текст ошибки операции с целью: у хостера — словами (вход, права, место), у остальных — текст исключения.</summary>

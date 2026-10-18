@@ -35,8 +35,23 @@ public sealed partial class AboutViewModel : ObservableObject
     private AppRelease? _availableUpdate;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(InstallUpdateCommand), nameof(CheckAppUpdateCommand))]
+    [NotifyCanExecuteChangedFor(nameof(InstallUpdateCommand), nameof(CheckAppUpdateCommand), nameof(RollBackCommand))]
     private bool _isUpdating;
+
+    /// <summary>Папка программы: там после обновления хранится прежняя версия (тесты дают свою).</summary>
+    public string AppDir { get; init; } = AppContext.BaseDirectory;
+
+    /// <summary>Вернулись на прежнюю версию с этой (текст версии): главное окно больше её не предлагает.</summary>
+    public Action<string>? RolledBack { get; set; }
+
+    /// <summary>Версия, на которую можно вернуться (<see cref="AppRollback"/>); null — некуда.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPreviousVersion), nameof(PreviousVersionText))]
+    [NotifyCanExecuteChangedFor(nameof(RollBackCommand))]
+    private string? _previousVersion;
+
+    public bool HasPreviousVersion => PreviousVersion is not null;
+    public string PreviousVersionText => PreviousVersion is { } v ? Loc.T("about.rollbackAvailable", v) : "";
 
     public bool HasUpdate => AvailableUpdate is not null;
 
@@ -144,11 +159,14 @@ public sealed partial class AboutViewModel : ObservableObject
             var progress = new Progress<double>(p => UpdateStatus = Loc.T("about.updateDownloading", (int)(p * 100)));
             var zip = await _updater.DownloadAsync(release, AppPaths.Downloads, progress);
             UpdateStatus = Loc.T("about.updateInstalling");
-            var appDir = AppContext.BaseDirectory;
-            await Task.Run(() => AppUpdater.Install(zip, appDir));
+            var appDir = AppDir;
+            // второе обновление за один запуск: в папке уже не эта версия, а поставленная первым (её возьмёт запись о нём)
+            var from = UpdatedHere ? null : AppVersion;
+            await Task.Run(() => AppUpdater.Install(zip, appDir, from, release.Version.ToString()));
             try { File.Delete(zip); } catch (IOException) { }
 
             AvailableUpdate = null;
+            PreviousVersion = null; // прежней теперь стала эта версия, а вернуться на неё — уже из новой
             UpdatedHere = true; // сами и спросим про перезапуск — наблюдатель за exe не перебивает
             UpdateStatus = Loc.T("about.updateInstalled", release.Version);
             // агенты без работающего сервера — на выход: новое окно поднимет агентов уже новой версии
@@ -165,5 +183,60 @@ public sealed partial class AboutViewModel : ObservableObject
         {
             IsUpdating = false;
         }
+    }
+
+    // ---------- возврат на прежнюю версию ----------
+
+    /// <summary>
+    /// Перечитать, хранится ли прежняя версия. Окно зовёт после того, как засчитало свой запуск: проработавшая новая
+    /// версия прежнюю убирает. После обновления в этом запуске возвращаться не на что: прежней стала эта версия.
+    /// </summary>
+    public void RefreshRollback() => PreviousVersion = UpdatedHere ? null : AppRollback.Available(AppDir, AppVersion);
+
+    private bool CanRollBack => PreviousVersion is not null && !IsUpdating;
+
+    /// <summary>
+    /// Вернуться на прежнюю версию (после вопроса) и перезапуститься в неё. Версию, с которой ушли, главное окно больше
+    /// не предлагает (<see cref="RolledBack"/>). Агенты без работающего сервера выходят, как после обновления.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanRollBack))]
+    private async Task RollBack()
+    {
+        if (PreviousVersion is not { } previous || IsUpdating
+            || !Ui.Confirm(Loc.T("about.rollbackAsk", previous, AppVersion), byDefault: Answer.No))
+            return;
+        IsUpdating = true;
+        try
+        {
+            try
+            {
+                var (appDir, version) = (AppDir, AppVersion);
+                await Task.Run(() => AppRollback.RollBack(appDir, version));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                // файлы вернулись как были — работает та же версия
+                UpdateStatus = Loc.T("about.rollbackFailed", ex.Message);
+                RefreshRollback();
+                return;
+            }
+            PreviousVersion = null;
+            UpdatedHere = true; // на диске теперь другая версия, перезапуск — наш: наблюдатель за exe не вмешивается
+            RolledBack?.Invoke(AppVersion);
+            UpdateStatus = Loc.T("about.rollbackDone", previous);
+            try
+            {
+                if (Profiles is { } profiles) await Core.Server.AgentLauncher.StopIdleAgentsAsync([.. profiles()]);
+            }
+            catch (TimeoutException)
+            {
+                // агент не вышел вовремя — выйдет сам, когда ему станет нечего делать
+            }
+        }
+        finally
+        {
+            IsUpdating = false;
+        }
+        Ui.Platform.RestartAfterClose(Path.Combine(AppDir, AppUpdater.WindowExe));
     }
 }

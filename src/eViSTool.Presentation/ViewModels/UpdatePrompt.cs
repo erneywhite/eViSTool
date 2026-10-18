@@ -3,13 +3,15 @@ namespace eViSTool.Presentation.ViewModels;
 /// <summary>
 /// Окно «Вышла новая версия eViSTool» — раз за запуск программы. Не поверх игры: пока она запущена или запускается,
 /// ждём её выхода. Версию, которую попросили пропустить, не предлагаем (ссылка в боковой панели остаётся) — кроме
-/// рекомендуемой.
+/// рекомендуемой. Версию, с которой вернулись на прежнюю, не предлагаем совсем.
 /// </summary>
 /// <param name="about">Вкладка «О программе»: найденное обновление и его установка.</param>
 /// <param name="skipped">Версия, которую попросили пропустить (из настроек).</param>
 /// <param name="skip">Запомнить версию как пропущенную (кнопка в окне).</param>
 /// <param name="gameBusy">Игра запущена, запускается или за ней ещё следим.</param>
-public sealed class UpdatePrompt(AboutViewModel about, Func<string?> skipped, Action<string> skip, Func<bool> gameBusy)
+/// <param name="rolledBack">Версия, с которой вернулись на прежнюю (из настроек); null — не возвращались.</param>
+public sealed class UpdatePrompt(AboutViewModel about, Func<string?> skipped, Action<string> skip, Func<bool> gameBusy,
+    Func<string?>? rolledBack = null)
 {
     private bool _shown;
     private int _waits;
@@ -19,6 +21,7 @@ public sealed class UpdatePrompt(AboutViewModel about, Func<string?> skipped, Ac
     {
         if (_shown || about.AvailableUpdate is not { } release || about.IsUpdating
             || (release.Version.ToString() == skipped() && !about.IsRecommended)
+            || release.Version.ToString() == rolledBack?.Invoke()
             || gameBusy())
             return;
         if (!Ui.Platform.IsMainWindowVisible)

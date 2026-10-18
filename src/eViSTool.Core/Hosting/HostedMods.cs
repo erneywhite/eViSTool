@@ -249,10 +249,12 @@ public sealed partial class HostedMods(ModTarget target)
         mods.AddRange(await ReadZipsAsync(files, zips, progress, ct).ConfigureAwait(false));
 
         var disabled = new HashSet<string>(disabledList); // игра сравнивает с учётом регистра
+        var marks = ReleaseMarks.Load(ReleaseMarks.FileFor(Id)); // «файл релиза с ModDB» — отметки этой машины
         var result = mods.Select(l => l with
             {
                 IsDisabled = ModUpdateService.IsDisabled(l, disabled),
                 IsHosterMod = HostedLayoutProbe.IsHosterDir(RemotePath.Parent(l.Path)),
+                Release = ReleaseMarks.Match(marks, l),
             })
             .OrderBy(m => m.Info?.Name ?? m.FileName, StringComparer.OrdinalIgnoreCase)
             .ToList();

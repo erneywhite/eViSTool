@@ -71,6 +71,8 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     [ObservableProperty] private string _backupDirOk = "";
     [ObservableProperty] private bool _backupDirChecking;
     private int _backupDirCheck; // какая проверка последняя: ответ на прежнюю не должен перебить свежую
+    private string? _backupDirOkKey;  // что сказано под полем, когда папка подошла (при смене языка — заново)
+    private string? _backupDirFailed; // какая папка не подошла (ошибку пишет проверка — при смене языка проверим заново)
 
     /// <summary>Где копии сейчас, если своя папка не выбрана.</summary>
     public string BackupDirDefault => _dataDir is { } d ? Path.Combine(d, "Backups") : Loc.T("backupdir.defaultRemote");
@@ -160,6 +162,9 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         }
         _profileKey = key;
         _generation++;
+        // проверка папки прежнего профиля новому не нужна: её ответ не показываем и не сохраняем в его настройки
+        _backupDirCheck++;
+        BackupDirChecking = false;
         _dataDir = profile is { IsRemote: false } ? profile.DataDir : null;
         _data = profile is null ? null
             : profile.IsRemote ? new RemoteServerData(remoteClient)
@@ -228,6 +233,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
             Announce = settings.BackupAnnounce;
             BackupDirText = settings.BackupDir ?? "";
             BackupDirError = BackupDirOk = "";
+            _backupDirOkKey = _backupDirFailed = null;
             RestartMode = settings.RestartMode;
             RestartIntervalText = settings.RestartIntervalHours.ToString("0.##", CultureInfo.CurrentCulture);
             RestartTimesText = string.Join(", ", settings.RestartTimes.Select(t => ShiftTime(t, ClockShift)));
@@ -320,7 +326,13 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         RestoreCommand.NotifyCanExecuteChanged();
     }
 
-    public void OnLanguageChanged() => UpdateTexts();
+    /// <summary>Сменили язык: подписи — заново; что сказано под полем папки, — тоже (ошибку пишет проверка — проверить ещё раз).</summary>
+    public void OnLanguageChanged()
+    {
+        UpdateTexts();
+        if (_backupDirOkKey is { } ok) BackupDirOk = Loc.T(ok);
+        if (_backupDirFailed is { } failed && _data is { } data) _ = ApplyBackupDirAsync(data, failed, relabel: true);
+    }
 
     partial void OnBackupEnabledChanged(bool value) => SaveSettings();
     partial void OnIntervalTextChanged(string value) => SaveSettings();
@@ -336,13 +348,22 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
 
     /// <summary>
     /// Новую папку сначала проверяет машина с сервером (там её и будут открывать): создаётся ли, пишется ли.
-    /// Годится — сохраняем, нет — оставляем прежнюю и говорим, что не так.
+    /// Годится — сохраняем, нет — оставляем прежнюю и говорим, что не так. Ответ проверки, которую уже обогнала новая
+    /// (или возврат к сохранённой папке), не показывается.
     /// </summary>
-    private async Task ApplyBackupDirAsync(IServerData data, string dir)
+    /// <param name="relabel">Проверка лишь пересказывает ошибку на новом языке (сменили язык): папку она не сохраняет,
+    /// даже если та теперь подошла, — настройки от смены языка не пишутся.</param>
+    private async Task ApplyBackupDirAsync(IServerData data, string dir, bool relabel = false)
     {
         var check = ++_backupDirCheck;
+        var before = BackupDirError;
         BackupDirError = BackupDirOk = "";
-        if (string.Equals(dir, _saved.BackupDir ?? "", StringComparison.OrdinalIgnoreCase)) return;
+        _backupDirOkKey = _backupDirFailed = null;
+        if (string.Equals(dir, _saved.BackupDir ?? "", StringComparison.OrdinalIgnoreCase))
+        {
+            BackupDirChecking = false; // вернули сохранённую, пока шла проверка другой: её ответ уже не нужен
+            return;
+        }
         BackupDirChecking = true;
         string? error;
         try
@@ -358,11 +379,21 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         if (error is not null)
         {
             BackupDirError = error;
+            _backupDirFailed = dir;
+            return;
+        }
+        if (relabel)
+        {
+            // shortcut: папка теперь подошла, но не сохранена — под полем остаётся прежняя ошибка (на прежнем языке), пока
+            // поле не применят снова; переделать, если понадобится отдельная строка «папка подошла, примени её»
+            BackupDirError = before;
+            _backupDirFailed = dir;
             return;
         }
         _saved = _saved with { BackupDir = dir.Length > 0 ? dir : null };
         await SaveAsync(data, _saved);
-        BackupDirOk = Loc.T(dir.Length > 0 ? "backupdir.saved" : "backupdir.savedDefault");
+        _backupDirOkKey = dir.Length > 0 ? "backupdir.saved" : "backupdir.savedDefault";
+        BackupDirOk = Loc.T(_backupDirOkKey);
         await RefreshListAsync();
     }
 

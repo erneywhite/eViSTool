@@ -1,3 +1,4 @@
+using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Server;
 using eViSTool.Presentation.ViewModels;
@@ -6,7 +7,8 @@ namespace eViSTool.Presentation.Tests;
 
 /// <summary>
 /// Вкладка «Расписание»: поле папки для копий применяется, когда поле отпустили или нажали Enter. Отпускание —
-/// привязка поля (LostFocus), Enter окно передаёт в <see cref="ServerScheduleViewModel.CommitBackupDir"/>.
+/// привязка поля (LostFocus), Enter окно передаёт в <see cref="ServerScheduleViewModel.CommitBackupDir"/>. Ответ проверки,
+/// которую обогнали (вернули сохранённую папку, сменили профиль), не показывается; строки под полем — на текущем языке.
 /// </summary>
 public sealed class ServerScheduleBackupDirTests : IDisposable
 {
@@ -104,5 +106,123 @@ public sealed class ServerScheduleBackupDirTests : IDisposable
         Assert.False(schedule.BackupDirChecking);
         Assert.Equal("", schedule.BackupDirOk); // повторной проверки не было — сообщение не вернулось
         Assert.NotEqual("", ok);
+    });
+
+    // поле вернули к сохранённой папке, пока шла проверка другой: «Проверяю папку…» не остаётся висеть
+    [Fact]
+    public void BackupDir_SetBackWhileItsCheckRuns_DoesNotLeaveTheCheckingLine() => WithSchedule(schedule =>
+    {
+        var dir = Path.Combine(_tmp, "copies");
+        schedule.CommitBackupDir(dir);
+        Assert.True(schedule.BackupDirChecking);
+
+        schedule.CommitBackupDir(""); // сохранена папка по умолчанию — к ней и вернули
+
+        Assert.False(schedule.BackupDirChecking);
+        Until(() => Directory.Exists(dir), "первой проверки");
+        Sta.Wait(Task.Delay(300)); // первая проверка возвращается и ничего не показывает
+        Assert.False(schedule.BackupDirChecking);
+        Assert.Equal("", schedule.BackupDirOk);
+        Assert.Equal("", schedule.BackupDirError);
+        Assert.Null(ServerAutomation.Load(_profile.Id).BackupDir);
+    });
+
+    // профиль сменили, пока шла проверка папки: её ответ новому не показывается и ни в чьи настройки не пишется
+    [Fact]
+    public void BackupDir_CheckOfThePreviousProfile_IsDroppedOnSwitch() => WithSchedule(schedule =>
+    {
+        var other = new GameProfile
+        {
+            Id = "sched-" + Guid.NewGuid().ToString("N")[..8], Name = "other", Kind = ProfileKind.Server,
+            DataDir = Directory.CreateDirectory(Path.Combine(_tmp, "other")).FullName,
+        };
+        new ServerAutomation { BackupKeep = 9 }.Save(other.Id);
+        try
+        {
+            var dir = Path.Combine(_tmp, "copies");
+            schedule.CommitBackupDir(dir);
+            Assert.True(schedule.BackupDirChecking);
+
+            schedule.OnProfileSwitched(other, () => null);
+
+            Assert.False(schedule.BackupDirChecking);
+            Until(() => schedule.KeepText == "9", "чтение настроек второго профиля");
+            Until(() => Directory.Exists(dir), "проверки папки первого профиля");
+            Sta.Wait(Task.Delay(300));
+            Assert.Equal("", schedule.BackupDirOk);
+            Assert.False(schedule.BackupDirChecking);
+            Assert.Null(ServerAutomation.Load(_profile.Id).BackupDir);
+            Assert.Equal(5, ServerAutomation.Load(_profile.Id).BackupKeep); // настройки второго в файл первого не попали
+            Assert.Null(ServerAutomation.Load(other.Id).BackupDir);
+        }
+        finally
+        {
+            try { File.Delete(ServerAutomation.FileFor(other.Id)); } catch (IOException) { }
+        }
+    });
+
+    // смена языка: «папка подошла» — на новом языке, а ошибку пишет проверка — она проходит заново
+    [Fact]
+    public void LanguageSwitch_RebuildsTheFolderLines() => WithSchedule(schedule =>
+    {
+        var language = Loc.Instance.Language;
+        try
+        {
+            var dir = Path.Combine(_tmp, "copies");
+            schedule.CommitBackupDir(dir);
+            Until(() => schedule.BackupDirOk.Length > 0);
+            var ok = schedule.BackupDirOk;
+
+            Loc.Instance.SetLanguage(language == "ru" ? "en" : "ru");
+            schedule.OnLanguageChanged();
+
+            Assert.Equal(Loc.T("backupdir.saved"), schedule.BackupDirOk);
+            Assert.NotEqual(ok, schedule.BackupDirOk);
+
+            schedule.CommitBackupDir("relative");
+            Until(() => schedule.BackupDirError.Length > 0);
+            var error = schedule.BackupDirError;
+            Loc.Instance.SetLanguage(language);
+            schedule.OnLanguageChanged();
+
+            Until(() => !schedule.BackupDirChecking && schedule.BackupDirError.Length > 0, "повторной проверки");
+            Assert.Equal(Loc.T(OperatingSystem.IsWindows() ? "backupdir.notFull" : "backupdir.notFullLinux"), schedule.BackupDirError);
+            Assert.NotEqual(error, schedule.BackupDirError);
+            Assert.Equal("", schedule.BackupDirOk);
+            Assert.Equal(dir, ServerAutomation.Load(_profile.Id).BackupDir); // не подошла — осталась прежняя
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(language);
+        }
+    });
+
+    // папка не подошла, а к смене языка её уже можно создать: повторная проверка её не сохраняет — настройки от смены
+    // языка не пишутся
+    [Fact]
+    public void LanguageSwitch_DoesNotSaveAFolderThatPassesNow() => WithSchedule(schedule =>
+    {
+        var language = Loc.Instance.Language;
+        try
+        {
+            var blocker = Path.Combine(_tmp, "blocker");
+            File.WriteAllText(blocker, "file, not a folder");
+            var dir = Path.Combine(blocker, "copies");
+            schedule.CommitBackupDir(dir);
+            Until(() => !schedule.BackupDirChecking && schedule.BackupDirError.Length > 0, "первой проверки");
+            File.Delete(blocker);
+
+            Loc.Instance.SetLanguage(language == "ru" ? "en" : "ru");
+            schedule.OnLanguageChanged();
+
+            Until(() => !schedule.BackupDirChecking && schedule.BackupDirError.Length > 0, "повторной проверки");
+            Sta.Wait(Task.Delay(200));
+            Assert.Equal("", schedule.BackupDirOk);
+            Assert.Null(ServerAutomation.Load(_profile.Id).BackupDir);
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(language);
+        }
     });
 }

@@ -27,7 +27,9 @@ public sealed record HostedPlayerRow(string Name, string SinceText);
 /// раздел не откроют заново. Новый вылет показывается тем же окном, что у своего сервера. Сам лог — <see cref="HostedLogs"/>
 /// (один на профиль, <see cref="HostedLogsPool"/>), строки консоли и их цвет — те же <see cref="ConsoleLineViewModel"/>,
 /// что у своей консоли. Сервер по логу остановлен, а для модов вышли обновления — плашка «Обновить всё»: самое время
-/// обновить их перед запуском.
+/// обновить их перед запуском. Пока у профиля идёт операция с копией мира (вкладка «Копии» или расписание), она держит
+/// его соединение: опрос лога в сеть не ходит, а раздел говорит, что идёт и где отменить (<see cref="WorldJobText"/>);
+/// кончилась — опрос сразу продолжается.
 /// </summary>
 public sealed partial class HostedServerViewModel : ObservableObject
 {
@@ -71,11 +73,16 @@ public sealed partial class HostedServerViewModel : ObservableObject
     private Func<ModTarget, IReadOnlyList<UpdateQueueItem>, Task<IReadOnlyList<UpdateQueueItem>>>? _runUpdates;
     private DateTime? _updatesTried;           // последняя попытка проверить обновления (UTC): не удалась — не раньше чем через UpdatesRetry
     private List<UpdateQueueItem>? _updating;  // пункты очереди, которые сейчас ставят «Обновить всё»
+    private HostedWorldJobs? _jobs;            // операции с копиями мира, заданные тестом (иначе — общие окна)
+    private readonly HostedWorldBusy _worldJob;
 
     /// <param name="main">Главная модель: окно вылета выключает мод через неё.</param>
     public HostedServerViewModel(MainViewModel main)
     {
         _main = main;
+        _worldJob = new HostedWorldBusy(() => Jobs);
+        _worldJob.TextChanged += () => WorldJobText = _worldJob.Text;
+        _worldJob.BusyChanged += OnWorldJobBusyChanged;
         ShowState();
     }
 
@@ -121,6 +128,25 @@ public sealed partial class HostedServerViewModel : ObservableObject
     /// <summary>Лог не читается (нет связи, пароль не прочитать): что случилось и что дальше. Пусто — всё в порядке.</summary>
     [ObservableProperty] private string _statusText = "";
 
+    /// <summary>
+    /// У профиля идёт операция с копией мира, и опрос лога ждёт её конца: «Идёт копия мира (Скачиваю мир: 12 МБ из 90 МБ).
+    /// Подожди или отмени её во вкладке «Копии».» Пусто — не идёт.
+    /// </summary>
+    [ObservableProperty] private string _worldJobText = "";
+
+    /// <summary>Операции с копиями мира — общие с вкладкой «Копии» (<see cref="MainViewModel.HostedWorldJobs"/>); тесты ставят свои.</summary>
+    public HostedWorldJobs? Jobs
+    {
+        get => _jobs ?? _main?.HostedWorldJobs;
+        set
+        {
+            _jobs = value;
+            _worldJob.SetProfile(_profile?.Id);
+            WorldJobText = _worldJob.Text;
+            UpdateAllCommand.NotifyCanExecuteChanged();
+        }
+    }
+
     /// <summary>Консоль текущего запуска пуста: лога нет или сервер ещё не запускали.</summary>
     public bool ShowEmpty => !IsPast && Lines.Count == 0 && _attached;
 
@@ -145,6 +171,9 @@ public sealed partial class HostedServerViewModel : ObservableObject
                    && (target is null ? _logs is null : _logs is not null && HostedLogsPool.SameServer(_logs.Target, target));
         _profile = profile is { IsHosted: true } ? profile : null;
         WatchUpdates();
+        _worldJob.SetProfile(_profile?.Id);
+        WorldJobText = _worldJob.Text;
+        UpdateAllCommand.NotifyCanExecuteChanged();
         if (same) return;
 
         Reset();
@@ -230,6 +259,7 @@ public sealed partial class HostedServerViewModel : ObservableObject
         ShowState();
         OnPropertyChanged(nameof(UpdatesText));
         ShowUpdateProgress();
+        WorldJobText = _worldJob.Text;
         if (_error is not null) StatusText = ErrorText(_error);
         if (_past is not null) RunNote = Outcome(_past);
         if (_logs is { } logs && Runs.Count > 0)
@@ -244,11 +274,12 @@ public sealed partial class HostedServerViewModel : ObservableObject
     /// <summary>
     /// Один опрос лога: новые строки — в консоль, состояние и игроки — в плитки. Сервер запущен заново — консоль с чистого
     /// листа и свежий список запусков. Вылетел (или перезапущен после вылета) — найти вылет и показать окно. Сбой сети —
-    /// строкой в статусе, следующий опрос — через <see cref="RetryInterval"/>.
+    /// строкой в статусе, следующий опрос — через <see cref="RetryInterval"/>. Идёт операция с копией мира — опроса нет:
+    /// соединение профиля занято ею до конца передачи, как у сторожа оповещений (<see cref="HostedWatch"/>).
     /// </summary>
     public async Task PollAsync()
     {
-        if (_polling || _logs is not { } logs || _profile is not { } profile) return;
+        if (_polling || _worldJob.IsBusy || _logs is not { } logs || _profile is not { } profile) return;
         _polling = true;
         var generation = _generation;
         var ct = _cts.Token;
@@ -296,6 +327,13 @@ public sealed partial class HostedServerViewModel : ObservableObject
         {
             if (generation == _generation) _polling = false;
         }
+    }
+
+    /// <summary>Копия мира началась или кончилась: «Обновить всё» ждёт её конца, опрос после неё — сразу, не по тику.</summary>
+    private void OnWorldJobBusyChanged()
+    {
+        UpdateAllCommand.NotifyCanExecuteChanged();
+        if (!_worldJob.IsBusy && IsPolling) _ = PollAsync();
     }
 
     // таймер окна при смене интервала отсчитывает заново — меняем, только когда интервал правда другой
@@ -626,7 +664,8 @@ public sealed partial class HostedServerViewModel : ObservableObject
     /// </summary>
     private async Task RefreshUpdatesAsync()
     {
-        if (!HostedLogs.IsSurelyDown(State) || IsUpdating || _profile is not { } profile || Updates is not { } updates) return;
+        // проверка читает моды по FTP — во время копии мира она ждала бы её конца
+        if (!HostedLogs.IsSurelyDown(State) || IsUpdating || _worldJob.IsBusy || _profile is not { } profile || Updates is not { } updates) return;
         if (updates.Fresh(profile.Id, UpdatesFreshFor) is { } fresh)
         {
             UpdatesCount = fresh.Due.Count;
@@ -650,7 +689,8 @@ public sealed partial class HostedServerViewModel : ObservableObject
         }
     }
 
-    private bool CanUpdateAll() => !IsUpdating && UpdatesCount > 0 && HostedLogs.IsSurelyDown(State);
+    // копия мира держит соединение: установка ждала бы её конца — кнопка недоступна, пока она идёт
+    private bool CanUpdateAll() => !IsUpdating && UpdatesCount > 0 && HostedLogs.IsSurelyDown(State) && !_worldJob.IsBusy;
 
     /// <summary>
     /// «Обновить всё» — та же операция, что в «Моих модах»: вопрос со списком, очередь (копии прежних версий, журнал,
@@ -716,7 +756,10 @@ public sealed partial class HostedServerViewModel : ObservableObject
         var done = items.Count(i => i.State == QueueState.Done);
         if (report)
         {
-            UpdatesNote = ModsViewModel.WithStartHint(Loc.T("queue.finished", done, items.Count(i => i.State == QueueState.Failed)), done > 0);
+            // у поставленных пунктов сообщение — предупреждение (версия в файле не та, что на ModDB): в итог плашки
+            var notes = items.Where(i => i.State == QueueState.Done).Select(i => i.Message);
+            UpdatesNote = Mods.ModInstallService.WithNotes(
+                ModsViewModel.WithStartHint(Loc.T("queue.finished", done, items.Count(i => i.State == QueueState.Failed)), done > 0), notes);
             // до свежей проверки (очередь устарит прежнюю, когда закончит) — без поставленных
             UpdatesCount = Math.Max(0, UpdatesCount - done);
         }

@@ -31,7 +31,7 @@ internal sealed class ModInstallActions(ModsViewModel owner, ModInstallService i
             return;
         }
 
-        if (owner.CurrentTarget() is not { } target) return;
+        if (owner.ChangeTarget() is not { } target) return;
 
         var installed = new List<string>();
         var problems = new List<string>();
@@ -73,7 +73,7 @@ internal sealed class ModInstallActions(ModsViewModel owner, ModInstallService i
     /// <summary>Докачать недостающие и устаревшие зависимости открытого профиля и включить выключенные — после вопроса.</summary>
     public async Task FixDependenciesAsync()
     {
-        if (owner.Profile is not { } start || owner.IsBusy || owner.DependencyIssues.Count == 0 || owner.CurrentTarget() is not { } target) return;
+        if (owner.Profile is not { } start || owner.IsBusy || owner.DependencyIssues.Count == 0 || owner.ChangeTarget() is not { } target) return;
         if (start.GameVersion is not { } game)
         {
             Error(Loc.T("mods.noGameVersion"));
@@ -97,16 +97,17 @@ internal sealed class ModInstallActions(ModsViewModel owner, ModInstallService i
 
         var installed = new List<string>();
         var problems = new List<string>();
+        var notes = new List<string>();
         using var history = ModHistory.Begin(ModHistorySource.Dependencies);
         try
         {
-            await installer.FixDependencyIssuesAsync(target, game, installed, problems);
+            await installer.FixDependencyIssuesAsync(target, game, installed, problems, notes);
         }
         finally
         {
             owner.IsBusy = false;
         }
-        await owner.ReportAsync(Loc.T("report.dependencies"), installed, problems);
+        await owner.ReportAsync(Loc.T("report.dependencies"), installed, problems, notes);
     }
 
     /// <summary>
@@ -116,7 +117,7 @@ internal sealed class ModInstallActions(ModsViewModel owner, ModInstallService i
     public async Task<bool> InstallFromCatalogAsync(string modId, string name, ModDbRelease release,
         IReadOnlyList<(ModTarget Target, ModDbRelease Release)>? also)
     {
-        if (owner.Profile is not { } profile || owner.IsBusy || owner.CurrentTarget() is not { } target) return false;
+        if (owner.Profile is not { } profile || owner.IsBusy || owner.ChangeTarget() is not { } target) return false;
         // занято до первого await: второй щелчок, пока идёт проверка сервера у хостера, не начнёт вторую установку
         owner.IsBusy = true;
         List<(ModTarget Target, ModDbRelease Release)>? extra = null;
@@ -133,6 +134,7 @@ internal sealed class ModInstallActions(ModsViewModel owner, ModInstallService i
 
         var installed = new List<string>();
         var problems = new List<string>();
+        var notes = new List<string>(); // версия в файле не та, что на ModDB: поставлено, но в итоге — предупреждение
         owner.IsBusy = true;
         using var history = ModHistory.Begin(ModHistorySource.Catalog);
         try
@@ -140,11 +142,11 @@ internal sealed class ModInstallActions(ModsViewModel owner, ModInstallService i
             var done = new List<ModTarget>();
             foreach (var (t, r) in extra.Prepend((target, release)))
                 if (await ModInstallService.Labelled(t, t != target && extra.Count > 0, installed, problems,
-                        () => installer.DownloadAndInstallAsync(t, modId, name, r, installed, problems)))
+                        () => installer.DownloadAndInstallAsync(t, modId, name, r, installed, problems, notes: notes)))
                     done.Add(t);
             if (done.Count == 0)
             {
-                await owner.ReportAsync(Loc.T("report.install"), installed, problems);
+                await owner.ReportAsync(Loc.T("report.install"), installed, problems, notes);
                 return false;
             }
 
@@ -167,7 +169,7 @@ internal sealed class ModInstallActions(ModsViewModel owner, ModInstallService i
                     foreach (var (t, game, _) in pending)
                         await ModInstallService.Labelled(t, pending.Count > 1 || t != target, installed, problems, async () =>
                         {
-                            await installer.FixDependencyIssuesAsync(t, game, installed, problems);
+                            await installer.FixDependencyIssuesAsync(t, game, installed, problems, notes);
                             return true;
                         });
                 if (done.Any(installer.IsActive)) await owner.ReloadAsync();
@@ -177,7 +179,7 @@ internal sealed class ModInstallActions(ModsViewModel owner, ModInstallService i
         {
             owner.IsBusy = false;
         }
-        await owner.ReportAsync(Loc.T("report.installed"), installed, problems);
+        await owner.ReportAsync(Loc.T("report.installed"), installed, problems, notes);
         return true;
     }
 

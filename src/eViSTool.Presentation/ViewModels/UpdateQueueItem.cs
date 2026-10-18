@@ -64,11 +64,15 @@ public sealed partial class UpdateQueueItem : ObservableObject
         _ => RowTone.Muted,
     };
 
+    /// <summary>Цвет <see cref="Message"/>: у поставленного пункта это предупреждение (версия в файле не та, что на ModDB), иначе — ошибка.</summary>
+    public RowTone MessageTone => State == QueueState.Done ? RowTone.Warn : RowTone.Danger;
+
     partial void OnStateChanged(QueueState value)
     {
         OnPropertyChanged(nameof(IsWorking));
         OnPropertyChanged(nameof(StateText));
         OnPropertyChanged(nameof(Tone));
+        OnPropertyChanged(nameof(MessageTone));
     }
 
     partial void OnProgressChanged(double value) => OnPropertyChanged(nameof(StateText));

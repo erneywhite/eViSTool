@@ -3,7 +3,7 @@ using eViSTool.Core.Localization;
 /// <summary>
 /// Команды агента для сервера без окна (Linux): первое слово командной строки. Без команды агент просто работает —
 /// держит сервер, как и с окном. Каждая группа команд — в своём файле (setup, remote, status/start/stop/restart/command,
-/// service). Код выхода: 0 — получилось, 1 — не получилось (причина — в stderr), 2 — неверные слова или ключи.
+/// service, rollback). Код выхода: 0 — получилось, 1 — не получилось (причина — в stderr), 2 — неверные слова или ключи.
 /// </summary>
 internal static class Commands
 {
@@ -23,6 +23,7 @@ internal static class Commands
             "remote" => RemoteCommand.Run(cli, rest),
             "status" or "start" or "stop" or "restart" or "command" => ControlCommand.Run(cli.Command, cli, rest),
             "service" => ServiceCommand.Run(cli, rest),
+            "rollback" => RollbackCommand.Run(cli, rest),
             _ => Unknown(cli.Command),
         };
     }

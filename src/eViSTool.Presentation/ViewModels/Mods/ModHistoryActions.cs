@@ -23,7 +23,7 @@ internal sealed class ModHistoryActions(ModsViewModel owner, ModInstallService i
 
     public async Task RevertAsync(HistorySessionRow session, IReadOnlyList<HistoryChangeRow> changes)
     {
-        if ((owner.IsBusy && !owner.IsQueueRunning) || owner.CurrentTarget() is not { } target) return;
+        if ((owner.IsBusy && !owner.IsQueueRunning) || owner.ChangeTarget() is not { } target) return;
         if (changes.Count == 0)
         {
             owner.StatusText = Loc.T("hist.nothingToRevert");

@@ -122,6 +122,17 @@
             </DockPanel>
         </Border>
 
+        <!-- ===== сервер у хостера: копия мира держит соединение — чтение и изменения модов ждут её конца ===== -->
+        <Border DockPanel.Dock="Top" Classes="warning" Margin="0,14,0,0" AutomationProperties.AutomationId="HostedWorldJob"
+                IsVisible="{Binding WorldJobText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <DockPanel>
+                <Path Classes="icon" DockPanel.Dock="Left" Data="{StaticResource Icon.Warning}" Stroke="{DynamicResource Forest.Warn}"
+                      VerticalAlignment="Center" Margin="0,0,12,0" />
+                <TextBlock Text="{Binding WorldJobText}" Foreground="{DynamicResource Forest.Warn}" FontSize="13" TextWrapping="Wrap"
+                           VerticalAlignment="Center" />
+            </DockPanel>
+        </Border>
+
         <!-- ===== зависимости ===== -->
         <Border DockPanel.Dock="Top" Classes="warning" Margin="0,14,0,0" IsVisible="{Binding HasDependencyIssues}">
             <DockPanel>
@@ -173,8 +184,9 @@
                                                IsVisible="{Binding ShowTarget}" />
                                     <StackPanel>
                                         <TextBlock Text="{Binding Name}" FontSize="12" Foreground="{DynamicResource Forest.Text}" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding Message}" FontSize="11" Foreground="{DynamicResource Forest.Danger}" TextWrapping="Wrap"
-                                                   IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        <!-- ошибка пункта или, у поставленного, предупреждение: цвет — по MessageTone -->
+                                        <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding MessageTone}" Text="{Binding Message}" FontSize="11"
+                                                   TextWrapping="Wrap" IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                                     </StackPanel>
                                 </DockPanel>
                             </DataTemplate>
