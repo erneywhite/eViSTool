@@ -165,9 +165,9 @@
                         </Border>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Vintage Story" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />
-                            <ctl:RunTextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap">
+                            <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap">
                                 <Run Text="{local:Tr shell.profileVersion}" /><Run Text=" · " /><Run Text="{Binding ActiveProfile.GameVersionText, Mode=OneWay}" />
-                            </ctl:RunTextBlock>
+                            </TextBlock>
                         </StackPanel>
                     </DockPanel>
                 </Border>
@@ -311,17 +311,17 @@
                                         <!-- сервер у хостера — облако перед именем -->
                                         <Path Classes="icon" Data="{StaticResource Icon.Cloud}" Width="13" Height="13" Margin="0,0,7,0" VerticalAlignment="Center"
                                               Stroke="{DynamicResource Forest.Accent}" IsVisible="{Binding IsHosted}" />
-                                        <ctl:RunTextBlock>
+                                        <TextBlock>
                                             <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding KindText, Mode=OneWay}" Foreground="{DynamicResource Forest.Muted}" />
-                                        </ctl:RunTextBlock>
+                                        </TextBlock>
                                     </StackPanel>
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
                     </StackPanel>
-                    <ctl:RunTextBlock VerticalAlignment="Center" FontSize="13" TextTrimming="CharacterEllipsis">
+                    <TextBlock VerticalAlignment="Center" FontSize="13" TextTrimming="CharacterEllipsis">
                         <Run Text="{local:Tr shell.workspaceCrumb}" Foreground="{DynamicResource Forest.Muted}" /><Run Text="   /   " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding PageTitle, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />
-                    </ctl:RunTextBlock>
+                    </TextBlock>
                 </DockPanel>
             </Border>
 

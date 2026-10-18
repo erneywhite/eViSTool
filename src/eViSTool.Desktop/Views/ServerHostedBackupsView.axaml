@@ -61,9 +61,9 @@
                         <StackPanel>
                             <TextBlock Text="{local:Tr hostedbk.title}" Classes="cardTitle" />
                             <TextBlock Text="{local:Tr hostedbk.hint}" Classes="hint" />
-                            <ctl:RunTextBlock Classes="hint" FontSize="12" Margin="0,6,0,0" AutomationProperties.AutomationId="HostedBackupsWhen">
+                            <TextBlock Classes="hint" FontSize="12" Margin="0,6,0,0" AutomationProperties.AutomationId="HostedBackupsWhen">
                                 <Run Text="{Binding LastText, Mode=OneWay}" /><Run Text="   ·   " /><Run Text="{Binding NextText, Mode=OneWay}" />
-                            </ctl:RunTextBlock>
+                            </TextBlock>
                             <TextBlock Text="{Binding TotalText}" Classes="hint" FontSize="12"
                                        IsVisible="{Binding TotalText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                        AutomationProperties.AutomationId="HostedBackupsTotal" />

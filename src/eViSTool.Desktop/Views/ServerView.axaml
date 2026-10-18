@@ -176,9 +176,9 @@
                         <TextBlock Classes="tileLabel" Text="{local:Tr server.tileMemory}" />
                         <TextBlock Classes="tileValue" Text="{Binding MemoryText}" />
                         <!-- номер процесса сервера — мелко: нужен редко (диспетчер задач) -->
-                        <ctl:RunTextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0">
+                        <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0">
                             <Run Text="PID" /><Run Text=" " /><Run Text="{Binding PidText, Mode=OneWay}" />
-                        </ctl:RunTextBlock>
+                        </TextBlock>
                     </StackPanel>
                 </Border>
                 <!-- кто на сервере: число, имена; подсказка — кто с какого времени -->

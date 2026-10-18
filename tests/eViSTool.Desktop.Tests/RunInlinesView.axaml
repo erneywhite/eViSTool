@@ -1,7 +1,7 @@
 <!--
   Подписи из нескольких Run так, как они были в «Моих модах» до обхода двумя TextBlock (1881d1e, ae4ce48): счётчик
   над таблицей и строка modid в ячейке DataGrid; куски — {Binding} и {local:Tr}, цвета — DynamicResource и класс.
-  Каждая подпись — дважды: обычным TextBlock (на нём видна ошибка Avalonia) и ctl:RunTextBlock (обход).
+  Ошибка была в Avalonia до 12.1.4 (обходил её RunTextBlock); теперь все подписи — обычные TextBlock.
   RunInlinesTests меняет язык и данные, в том числе пока страница скрыта, и проверяет, что подписи нарисованы.
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
@@ -25,17 +25,17 @@
         <StackPanel DockPanel.Dock="Top">
             <!-- счётчик-вкладка: число и подпись, подпись переводит модель -->
             <TextBlock x:Name="PlainCounter" Foreground="{DynamicResource Probe.Text}"><Run Text="{Binding ModCount, Mode=OneWay}" FontSize="24" /><Run Text="  " /><Run Text="{Binding InstalledLabel, Mode=OneWay}" Foreground="{DynamicResource Probe.Muted}" FontSize="13" /></TextBlock>
-            <ctl:RunTextBlock x:Name="Counter" Foreground="{DynamicResource Probe.Text}"><Run Text="{Binding ModCount, Mode=OneWay}" FontSize="24" /><Run Text="  " /><Run Text="{Binding InstalledLabel, Mode=OneWay}" Foreground="{DynamicResource Probe.Muted}" FontSize="13" /></ctl:RunTextBlock>
+            <TextBlock x:Name="Counter" Foreground="{DynamicResource Probe.Text}"><Run Text="{Binding ModCount, Mode=OneWay}" FontSize="24" /><Run Text="  " /><Run Text="{Binding InstalledLabel, Mode=OneWay}" Foreground="{DynamicResource Probe.Muted}" FontSize="13" /></TextBlock>
             <!-- перевод в разметке рядом с привязкой -->
-            <ctl:RunTextBlock x:Name="Translated" Foreground="{DynamicResource Probe.Text}"><Run Text="{local:Tr about.version}" /><Run Text=" " /><Run Text="{Binding Version, Mode=OneWay}" FontWeight="SemiBold" /></ctl:RunTextBlock>
+            <TextBlock x:Name="Translated" Foreground="{DynamicResource Probe.Text}"><Run Text="{local:Tr about.version}" /><Run Text=" " /><Run Text="{Binding Version, Mode=OneWay}" FontWeight="SemiBold" /></TextBlock>
             <!-- размер задан: измерение получает то же место, что и прошлая раскладка, поэтому пустая раскладка кадра доживает
                  до измерения. Ширину подписи задаёт Width, а не текст, а раскладка (TextBlock.ArrangeOverride) собирается
-                 заново всегда, так что сброс в RunTextBlock.MeasureOverride эта подпись не проверяет — его проверяет Clamped -->
-            <ctl:RunTextBlock x:Name="Sized" Width="300" Height="20" HorizontalAlignment="Left" Foreground="{DynamicResource Probe.Text}"><Run Text="{local:Tr about.version}" /><Run Text=" " /><Run Text="{Binding Version, Mode=OneWay}" /></ctl:RunTextBlock>
+                 заново всегда, так что пустую раскладку кадра эта подпись не проверяет — её проверяет Clamped -->
+            <TextBlock x:Name="Sized" Width="300" Height="20" HorizontalAlignment="Left" Foreground="{DynamicResource Probe.Text}"><Run Text="{local:Tr about.version}" /><Run Text=" " /><Run Text="{Binding Version, Mode=OneWay}" /></TextBlock>
             <!-- текст длиннее MaxWidth, высота задана: измерение получает то же место, что и прошлая раскладка, а ширину
-                 подписи решает уже измерение (выравнивание влево). Без сброса в RunTextBlock.MeasureOverride измерение взяло бы
-                 пустую раскладку кадра, и подпись получила бы ширину 0 -->
-            <ctl:RunTextBlock x:Name="Clamped" MaxWidth="100" Height="20" HorizontalAlignment="Left" Foreground="{DynamicResource Probe.Text}"><Run Text="{local:Tr about.version}" /><Run Text=" " /><Run Text="{Binding InstalledLabel, Mode=OneWay}" /><Run Text=" " /><Run Text="{Binding Version, Mode=OneWay}" /></ctl:RunTextBlock>
+                 подписи решает уже измерение (выравнивание влево). Если бы измерение взяло
+                 пустую раскладку кадра, подпись получила бы ширину 0 -->
+            <TextBlock x:Name="Clamped" MaxWidth="100" Height="20" HorizontalAlignment="Left" Foreground="{DynamicResource Probe.Text}"><Run Text="{local:Tr about.version}" /><Run Text=" " /><Run Text="{Binding InstalledLabel, Mode=OneWay}" /><Run Text=" " /><Run Text="{Binding Version, Mode=OneWay}" /></TextBlock>
         </StackPanel>
         <DataGrid x:Name="Grid" ItemsSource="{Binding Rows}" AutoGenerateColumns="False" HeadersVisibility="None" CanUserSortColumns="False">
             <DataGrid.Columns>
@@ -45,7 +45,7 @@
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{DynamicResource Probe.Text}" />
                                 <TextBlock Classes="plain" FontSize="11" Foreground="{DynamicResource Probe.Muted}" TextTrimming="CharacterEllipsis"><Run Text="{Binding ModId, Mode=OneWay}" /><Run Text="{Binding SideNote, Mode=OneWay}" Classes.warn="{Binding IsUnneeded}" /><Run Text="{local:Tr mods.sortName}" /></TextBlock>
-                                <ctl:RunTextBlock Classes="row" FontSize="11" Foreground="{DynamicResource Probe.Muted}" TextTrimming="CharacterEllipsis"><Run Text="{Binding ModId, Mode=OneWay}" /><Run Text="{Binding SideNote, Mode=OneWay}" Classes.warn="{Binding IsUnneeded}" /><Run Text="{local:Tr mods.sortName}" /></ctl:RunTextBlock>
+                                <TextBlock Classes="row" FontSize="11" Foreground="{DynamicResource Probe.Muted}" TextTrimming="CharacterEllipsis"><Run Text="{Binding ModId, Mode=OneWay}" /><Run Text="{Binding SideNote, Mode=OneWay}" Classes.warn="{Binding IsUnneeded}" /><Run Text="{local:Tr mods.sortName}" /></TextBlock>
                             </StackPanel>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
