@@ -50,8 +50,8 @@ public interface IAppWindows
     /// <summary>Вставить и проверить код подключения к серверу на другом компьютере.</summary>
     ConnectionCode? AskConnectionCode(string okText);
     /// <summary>
-    /// Подключение к серверу у хостера по FTP: новое (existing = null) или правка. Ответ — с уже зашифрованным паролем
-    /// и закреплёнными путями; null — закрыли без «ОК».
+    /// Подключение к серверу у хостера по FTP или SFTP: новое (existing = null) или правка. Ответ — с уже зашифрованными
+    /// паролями и закреплёнными путями; null — закрыли без «ОК».
     /// </summary>
     HostedConnection? AskHostedConnection(HostedConnection? existing, string okText);
     void ShowCleanup(GameProfile profile);

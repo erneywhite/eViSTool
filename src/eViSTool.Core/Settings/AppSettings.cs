@@ -74,13 +74,39 @@ public sealed class SettingsStore(string? path = null)
 {
     public string Path { get; } = path ?? AppPaths.SettingsFile;
 
+    // текст файла, каким его последний раз прочитали или записали отсюда: другое окно eViSTool пишет тот же файл, и без
+    // сверки последнее сохранение молча затирало бы его правки (добавленный там профиль пропадал)
+    private string? _known;
+
+    /// <summary>
+    /// Файл с прошлого чтения или записи отсюда поменяли снаружи — другое окно eViSTool (или человек руками). Сохранить
+    /// поверх — значит потерять те правки.
+    /// </summary>
+    public bool ChangedElsewhere
+    {
+        get
+        {
+            try
+            {
+                return File.Exists(Path) && File.ReadAllText(Path) != _known;
+            }
+            catch (IOException)
+            {
+                return false; // файл как раз переписывают — не повод мешать сохранению
+            }
+        }
+    }
+
     public AppSettings Load()
     {
         var settings = new AppSettings();
         try
         {
             if (File.Exists(Path))
-                settings = JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText(Path)) ?? new AppSettings();
+            {
+                _known = File.ReadAllText(Path);
+                settings = JsonConvert.DeserializeObject<AppSettings>(_known) ?? new AppSettings();
+            }
         }
         catch (Exception ex) when (ex is JsonException or IOException)
         {
@@ -95,7 +121,9 @@ public sealed class SettingsStore(string? path = null)
     {
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
         var tmp = Path + ".tmp";
-        File.WriteAllText(tmp, JsonConvert.SerializeObject(settings, Formatting.Indented));
+        var text = JsonConvert.SerializeObject(settings, Formatting.Indented);
+        File.WriteAllText(tmp, text);
         Platform.SafeFile.Replace(tmp, Path);
+        _known = text;
     }
 }

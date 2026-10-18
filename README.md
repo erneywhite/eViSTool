@@ -442,7 +442,19 @@ computer.
 
 A running server won't see new mods, so before a change eViSTool checks the log: if the server is stopped, it just
 goes ahead, otherwise it asks you to stop it in the host's panel. Starting and stopping the server and console
-commands stay in the host's panel. The password is stored encrypted and is never shown. SFTP is not supported yet.
+commands stay in the host's panel. The password is stored encrypted and is never shown. SFTP works too: pick it with the
+switch above the address (or write `sftp://host:port`) and sign in with a password or with a private key file on your computer. You confirm the
+server's key on the first connection, like an FTPS certificate; if the key changes later, eViSTool won't connect until
+you trust the new one.
+
+When the log says the server is stopped and mod updates are out, the Server section shows an Update all bar. It is
+the same operation as in My mods, old versions are kept for rollback. Then you start the server in the host's panel.
+
+Notifications are set up on the Notifications tab of the Server section, with the same channels as for your own
+server. There is no agent at the host, so eViSTool itself sends them while it is open on your computer: it reads the
+log once a minute and checks mod updates every 6 hours. It tells you when the server crashed (and which mod is to
+blame, if one is found), started or stopped, a player joined or left, the server can't keep up, mod updates are out or
+mods were updated. Once eViSTool is closed, nobody is watching the server.
 
 ## Server on Linux
 
@@ -503,7 +515,8 @@ and the release signature, and replaces the program. A running server is not int
 
 **Your data** — settings, saved versions of mods, downloads and logs — lives in the `data` folder next to `eViSTool.exe`.
 Move the program folder, and everything moves with it. (If eViSTool cannot write there, for example in `Program Files`,
-it uses `%LOCALAPPDATA%\eViSTool` instead.)
+it uses `%LOCALAPPDATA%\eViSTool` instead.) One window opens per data folder: starting eViSTool again brings the open
+window to the front. A copy of the program in another folder is a separate installation with its own data and runs alongside.
 
 **What eViSTool changes:** only mod folders, the game and server settings files (keeping a `.evistool.bak` copy of the previous state),
 backups in the `Backups` folder of server profiles (or in the chosen backup folder), and the data folders of profiles it created.

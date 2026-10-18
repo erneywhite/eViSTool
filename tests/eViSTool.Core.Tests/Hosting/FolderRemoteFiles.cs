@@ -33,6 +33,10 @@ public sealed class FolderRemoteFiles(string root) : IRemoteFiles
     /// <summary>Вид сбоя для <see cref="FailOn"/>.</summary>
     public RemoteFailure FailKind { get; set; } = RemoteFailure.Denied;
 
+    /// <summary>Готовое исключение для <see cref="FailOn"/> вместо собранного по <see cref="FailKind"/> — когда важны его
+    /// подробности (ключ сервера SFTP сменился и т. п.).</summary>
+    public Func<RemoteFilesException>? FailWith { get; set; }
+
     /// <summary>Вызывается перед каждой операцией (операция, путь) — для гонок: «пока мы читали, файл поменяли».</summary>
     public Action<string, string>? OnBefore { get; set; }
 
@@ -177,7 +181,7 @@ public sealed class FolderRemoteFiles(string root) : IRemoteFiles
             throw new RemoteFilesException(RemoteFailure.Connect, "421 connection lost");
         }
         if (FailOn?.Invoke(op, RemotePath.Normalize(path)) == true)
-            throw new RemoteFilesException(FailKind, $"550 {op} {path}: refused");
+            throw FailWith?.Invoke() ?? new RemoteFilesException(FailKind, $"550 {op} {path}: refused");
     }
 
     private RemoteEntry EntryOf(string remote, string local)

@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:eViSTool.Presentation.ViewModels"
              xmlns:local="using:eViSTool.Desktop"
+             xmlns:ctl="using:eViSTool.Desktop.Controls"
              x:Class="eViSTool.Desktop.Views.AboutView"
              x:DataType="vm:AboutViewModel">
     <UserControl.Resources>
@@ -98,9 +99,9 @@
                         </StackPanel>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="eViSTool" FontSize="28" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />
-                            <TextBlock FontSize="13" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0">
+                            <ctl:RunTextBlock FontSize="13" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0">
                                 <Run Text="{local:Tr about.version}" /><Run Text=" " /><Run Text="{Binding AppVersion, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Accent}" /><Run Text="   ·   Erney White" />
-                            </TextBlock>
+                            </ctl:RunTextBlock>
                             <TextBlock Text="{local:Tr shell.slogan}" Foreground="{DynamicResource Forest.Muted}" FontSize="12" Margin="0,8,0,0" FontStyle="Italic" />
                         </StackPanel>
                     </DockPanel>

@@ -3,6 +3,7 @@
                       xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
                       xmlns:vm="using:eViSTool.Presentation.ViewModels"
                       xmlns:local="using:eViSTool.Desktop"
+                      xmlns:ctl="using:eViSTool.Desktop.Controls"
                       x:Class="eViSTool.Desktop.Dialogs.ModErrorsWindow"
                       x:DataType="vm:ModErrorsViewModel"
                       Title="{local:Tr errs.title}"
@@ -46,7 +47,7 @@
                                             CommandParameter="{Binding}" AutomationProperties.AutomationId="ErrsCatalog" />
                                 </StackPanel>
                                 <StackPanel>
-                                    <TextBlock FontSize="13" TextWrapping="Wrap"><Run Text="{Binding Line.Name}" FontWeight="SemiBold" /><Run Text=" " /><Run Text="{Binding Line.Version}" Foreground="{DynamicResource Forest.Muted}" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding CountText}" Foreground="{DynamicResource Forest.Warn}" /></TextBlock>
+                                    <ctl:RunTextBlock FontSize="13" TextWrapping="Wrap"><Run Text="{Binding Line.Name}" FontWeight="SemiBold" /><Run Text=" " /><Run Text="{Binding Line.Version}" Foreground="{DynamicResource Forest.Muted}" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding CountText}" Foreground="{DynamicResource Forest.Warn}" /></ctl:RunTextBlock>
                                     <TextBlock Classes="mono" Text="{Binding Line.Example}" FontSize="11" Foreground="{DynamicResource Forest.Muted}"
                                                TextWrapping="Wrap" Margin="0,4,0,0" />
                                 </StackPanel>

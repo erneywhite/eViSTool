@@ -14,6 +14,26 @@ namespace eViSTool.Core.Hosting;
 public sealed record HostedLogUpdate(HostedServerState State, bool Restarted, IReadOnlyList<string> NewLines,
     IReadOnlyList<OnlinePlayer> Players);
 
+/// <summary>Строка лога и её время — время сервера; у строки без отметки (стек) — время предыдущей.</summary>
+public sealed record HostedLogLine(string Text, DateTime? Time);
+
+/// <summary>Игрок зашёл (<paramref name="Joined"/>) или вышел.</summary>
+/// <param name="Online">Сколько игроков на сервере после этого.</param>
+/// <param name="Time">Время строки — время сервера.</param>
+public sealed record HostedPlayerMove(string Name, bool Joined, int Online, DateTime? Time);
+
+/// <summary>
+/// Один удачный опрос лога — для тех, кто следит за сервером в фоне (<see cref="HostedLogs.WatchAsync"/>). В отличие от
+/// <see cref="HostedLogUpdate"/>, здесь строки и входы-выходы именно этого опроса, кто бы его ни начал: каждая строка
+/// приходит наблюдателю ровно один раз.
+/// </summary>
+/// <param name="Restarted">Сервер запущен заново с прошлого опроса.</param>
+/// <param name="Run">Имя запуска, под которым он ляжет в архив; лога нет или начала не видно — null.</param>
+/// <param name="Moves">Входы и выходы, пока сервер работал: вышедшие во время остановки сюда не попадают.</param>
+/// <param name="Players">Кто на сервере после опроса.</param>
+public sealed record HostedLogPoll(HostedServerState State, bool Restarted, string? Run, IReadOnlyList<HostedLogLine> Lines,
+    IReadOnlyList<HostedPlayerMove> Moves, IReadOnlyList<OnlinePlayer> Players);
+
 /// <summary>Прошлый запуск сервера — папка Logs/Archive/&lt;yyyy-MM-dd_HH_mm_ss&gt;.</summary>
 /// <param name="Name">Имя папки.</param>
 /// <param name="Path">Папка на FTP.</param>
@@ -40,8 +60,9 @@ public sealed record HostedCrash(ServerCrashInfo Info, CrashFinding Finding, str
 /// <summary>
 /// Лог сервера у хостера по FTP: опрос текущего запуска (листинг папки Logs и дочитывание нового хвоста
 /// server-main.log), состояние сервера, игроки онлайн, прошлые запуски из Logs/Archive и поиск вылета. Окно держит
-/// один экземпляр на профиль и опрашивает его по таймеру; опросы одного экземпляра идут по одному. Вся сеть — через
-/// очередь соединения профиля (<see cref="HostedSessions"/>). server-debug.log не читается никогда.
+/// один экземпляр на профиль и опрашивает его по таймеру; опросы одного экземпляра идут по одному. Фоновый сторож
+/// оповещений получает каждый опрос, кто бы его ни начал (<see cref="WatchAsync"/>). Вся сеть — через очередь
+/// соединения профиля (<see cref="HostedSessions"/>). server-debug.log не читается никогда.
 /// <para>
 /// Время: в строках лога и в именах папок архива — местное время сервера (у G-Portal UTC+2); время файлов из MLSD —
 /// UTC, из LIST — снова время сервера, но до минуты. Напрямую UTC и время сервера не сравниваются: сдвиг часов сервера
@@ -105,6 +126,10 @@ public sealed class HostedLogs
     private bool _crashOfRun;       // и он записан во время текущего запуска
     private HostedServerState _state = HostedServerState.Unknown;
     private TimeSpan? _serverOffset;
+    private event Action<HostedLogPoll>? Polled;    // наблюдатели (WatchAsync): каждый удачный опрос
+    private event Action<HostedCrash>? CrashFound;  // и каждый отданный вылет
+    private readonly List<HostedCrash> _found = []; // отданные вылеты, последние FoundLimit (под _lock)
+    private const int FoundLimit = 10;
 
     public HostedLogs(ModTarget target) =>
         Target = target.IsHosted ? target : throw new ArgumentException("not a hosted target", nameof(target));
@@ -153,6 +178,15 @@ public sealed class HostedLogs
     public bool CurrentCrashReported
     {
         get { lock (_lock) return _known && _reported.Contains(_marks.RunName ?? "current"); }
+    }
+
+    /// <summary>
+    /// Вылеты, которые уже отдал <see cref="FindCrashAsync"/> (последние десять), кто бы его ни звал: раздел «Сервер»
+    /// покажет окном и вылет, который нашёл сторож оповещений, пока раздел был закрыт.
+    /// </summary>
+    public IReadOnlyList<HostedCrash> FoundCrashes
+    {
+        get { lock (_lock) return [.. _found]; }
     }
 
     /// <summary>Папка логов на FTP; ещё не искали — null.</summary>
@@ -239,11 +273,61 @@ public sealed class HostedLogs
         }
     }
 
+    /// <summary>
+    /// Опрос для фонового наблюдателя (<see cref="WatchAsync"/>): как <see cref="PollAsync"/>, но новые строки остаются
+    /// следующему PollAsync — их ждёт раздел «Сервер», а наблюдатель получит их в своём обработчике. Сбой сети —
+    /// <see cref="RemoteFilesException"/>, состояние остаётся прежним.
+    /// </summary>
+    public async Task<HostedServerState> RefreshAsync(CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return (await PollCoreAsync(ct).ConfigureAwait(false)).State;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Следить за логами в фоне. <paramref name="polled"/> — после каждого удачного опроса, кто бы его ни начал (раздел
+    /// «Сервер», сам наблюдатель через <see cref="RefreshAsync"/>, проверка перед изменением модов), с его строками и
+    /// входами-выходами: ни одна строка не теряется и не приходит дважды. <paramref name="crashed"/> — каждый вылет,
+    /// отданный <see cref="FindCrashAsync"/> кому угодно: вылет отдаётся один раз, и наблюдатель узнает о нём, даже если
+    /// его нашёл раздел. Подписка — между опросами: первый опрос, пришедший в polled, — первый после подписки, целиком.
+    /// Обработчики зовутся из потока опроса, пока следующий опрос ждёт: долгого в них не делать и методы этих логов из
+    /// них не звать.
+    /// </summary>
+    public async Task WatchAsync(Action<HostedLogPoll> polled, Action<HostedCrash> crashed, CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            Polled += polled;
+            CrashFound += crashed;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Перестать следить (<see cref="WatchAsync"/>).</summary>
+    public void Unwatch(Action<HostedLogPoll> polled, Action<HostedCrash> crashed)
+    {
+        Polled -= polled;
+        CrashFound -= crashed;
+    }
+
     private async Task<HostedLogUpdate> PollCoreAsync(CancellationToken ct)
     {
         // работа в очереди только читает поля и сеть; меняет их Apply — уже после, так повтор после обрыва безопасен
         var fetch = await HostedSessions.UseAsync(Id, Hosted.Endpoint, files => FetchAsync(files, ct), readOnly: true, ct).ConfigureAwait(false);
-        return Apply(fetch);
+        var (update, poll) = Apply(fetch);
+        Polled?.Invoke(poll); // ещё под замком опросов: наблюдатели получают опросы по порядку
+        return update;
     }
 
     /// <summary>Что принёс опрос: листинг папки логов и новые байты лога с позиции <paramref name="From"/>.</summary>
@@ -299,12 +383,13 @@ public sealed class HostedLogs
     private bool ArchiveChanged(RemoteEntry? archive) =>
         archive is not null && (!_archiveSeen || archive.Modified is { } stamp && _archiveStamp is { } before && stamp != before);
 
-    private HostedLogUpdate Apply(Fetch fetch)
+    private (HostedLogUpdate Update, HostedLogPoll Poll) Apply(Fetch fetch)
     {
         var now = Time.GetUtcNow().UtcDateTime;
-        var fresh = new List<(string Line, DateTime? Time)>();
+        var fresh = new List<(string Line, DateTime? Time, bool Running)>(); // Running — сервер работал на этой строке
         bool newRun, restarted;
         HostedServerState state;
+        string? run;
         lock (_lock)
         {
             _logsDir = fetch.LogsDir;
@@ -342,7 +427,7 @@ public sealed class HostedLogs
                 else if (fetch.FromMiddle) _partial = []; // середину пропустили: недописанная строка уже не продолжится
 
                 var lines = SplitLines(_partial, fetch.Bytes, skipFirst: fetch.FromMiddle, atStart: fetch.From == 0, out _partial);
-                foreach (var line in lines) fresh.Add((line, _marks.Add(line)));
+                foreach (var line in lines) fresh.Add((line, _marks.Add(line), _marks.State(stale: false) == HostedServerState.Running));
                 _lines.AddRange(lines);
                 if (_lines.Count > MaxLines) _lines.RemoveRange(0, _lines.Count - MaxLines);
                 if (restarted)
@@ -363,14 +448,34 @@ public sealed class HostedLogs
                 _crashOfRun = fetch.Crash is { } crash && IsOfRun(crash.Modified, _marks.Started ?? _marks.FirstTime, null, _serverOffset);
                 _state = state = _crashOfRun ? HostedServerState.Crashed : _marks.State(IsStale(main, now));
             }
+            run = _known && !_missing ? _marks.RunName : null;
         }
 
-        // игроки — вне замка: подписчик Changed может читать состояние
+        // игроки — вне замка: подписчик Changed может читать состояние. Входы и выходы — по строкам, а не по разнице
+        // составов до и после опроса: зашёл и вышел между двумя опросами — тоже вход и выход. Опустевший при остановке
+        // или перезапуске сервер — не «все вышли»: как у агента, входы и выходы считаются, только пока сервер работает,
+        // а «вышел», записанное во время остановки, лишь меняет состав
         if (newRun) Players.Reset();
-        foreach (var (line, time) in fresh) Players.Process(line, time ?? default);
+        var moves = new List<HostedPlayerMove>();
+        var online = Names(Players.Players);
+        foreach (var (line, time, running) in fresh)
+        {
+            if (!Players.Process(line, time ?? default)) continue;
+            var names = Names(Players.Players);
+            if (running)
+            {
+                foreach (var name in names.Where(n => !online.Contains(n))) moves.Add(new HostedPlayerMove(name, true, names.Count, time));
+                foreach (var name in online.Where(n => !names.Contains(n))) moves.Add(new HostedPlayerMove(name, false, names.Count, time));
+            }
+            online = names;
+        }
         if (IsSurelyDown(state)) Players.Reset(); // упал или остановлен — на нём никого, даже если «вышел» не дописалось
-        return new HostedLogUpdate(state, restarted, [.. fresh.Select(f => f.Line)], Players.Players);
+        var players = Players.Players;
+        return (new HostedLogUpdate(state, restarted, [.. fresh.Select(f => f.Line)], players),
+            new HostedLogPoll(state, restarted, run, [.. fresh.Select(f => new HostedLogLine(f.Line, f.Time))], moves, players));
     }
+
+    private static HashSet<string> Names(IEnumerable<OnlinePlayer> players) => players.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
 
     /// <summary>
     /// Лог давно не растёт: и по времени файла (MLSD — UTC), и по своим наблюдениям. Одним часам сервера не верим:
@@ -472,9 +577,19 @@ public sealed class HostedLogs
         {
             var poll = await PollCoreAsync(ct).ConfigureAwait(false);
             var prints = ModFingerprints.WithoutCode(mods ?? HostedMods.LastScanMods(Id) ?? []);
-            return poll.State == HostedServerState.Crashed
+            var crash = poll.State == HostedServerState.Crashed
                 ? await CurrentCrashAsync(prints, ct).ConfigureAwait(false)
                 : await ArchivedCrashAsync(prints, ct).ConfigureAwait(false);
+            if (crash is not null)
+            {
+                lock (_lock)
+                {
+                    _found.Add(crash);
+                    if (_found.Count > FoundLimit) _found.RemoveAt(0);
+                }
+                CrashFound?.Invoke(crash); // наблюдателям — до ответа: вылет отдаётся один раз
+            }
+            return crash;
         }
         finally
         {

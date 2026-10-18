@@ -1,0 +1,35 @@
+eViSTool 0.13.0: notifications and "update all" for a hosted server, SFTP, one window per installation.
+
+New
+- Hosted server: notifications to Telegram, Discord, ntfy or a webhook, now also for a server rented from a host. Server → Notifications: the server crashed (with the mod to blame), started, stopped, a player joined or left, the server is overloaded, mod updates are out, mods were updated. eViSTool watches the server log in the background (once a minute) and checks mod updates every 6 hours. It works while eViSTool is running on this computer; when it is closed, nobody watches.
+- Hosted server: when the server is stopped and mod updates are out, Server → Overview shows "Mod updates: N" with an "Update all" button: old versions are kept on this computer, then start the server in the host's panel.
+- Hosted server over SFTP: choose FTP or SFTP above the address. Sign in with a password or a key file (OpenSSH, PEM, PuTTY .ppk); the server's key is shown on the first connection and remembered, and a changed key is refused until you trust it again.
+- One eViSTool window per installation: starting it again brings the open window to the front instead of opening a second one. A portable copy in another folder is a separate installation and runs alongside.
+
+Fixes
+- Linux: labels made of several pieces (counters, versions, hints) no longer disappear after they change while their page is hidden — an Avalonia bug, worked around.
+- Settings changed in another eViSTool window are no longer silently overwritten: you are asked whose changes to keep.
+- The "New version" window shows the list of changes even when GitHub limits requests, not only a link.
+- Server watchdog: pressing Stop right when an automatic restart was due no longer lets the server start again.
+- My mods: switching the profile while a check is running no longer leaves the old check's message or skips the new profile's check.
+
+Update from About. For notifications of your own server nothing changes: the agent sends them, as before.
+
+---
+
+eViSTool 0.13.0: оповещения и «Обновить всё» для сервера у хостера, SFTP, одно окно на установку.
+
+Новое
+- Сервер у хостера: оповещения в Telegram, Discord, ntfy или вебхук теперь есть и для арендованного сервера. «Сервер» → «Оповещения»: сервер упал (с виноватым модом), запустился, остановился, игрок зашёл или вышел, сервер перегружен, вышли обновления модов, моды обновлены. eViSTool следит за логом сервера в фоне (раз в минуту) и проверяет обновления модов раз в 6 часов. Работает, пока eViSTool запущен на этом компьютере; закрыт — никто не следит.
+- Сервер у хостера: когда сервер остановлен и вышли обновления модов, в «Сервер» → «Обзор» появляется «Обновления модов: N» с кнопкой «Обновить всё»: старые версии остаются на этом компьютере, потом запусти сервер в панели хостера.
+- Сервер у хостера по SFTP: над адресом выбор FTP или SFTP. Вход по паролю или по файлу ключа (OpenSSH, PEM, PuTTY .ppk); ключ сервера показывается при первом подключении и запоминается, сменившийся ключ не принимается, пока ему снова не доверишь.
+- Одно окно eViSTool на установку: повторный запуск выводит вперёд уже открытое окно, а не открывает второе. Портативная копия в другой папке — отдельная установка и работает рядом.
+
+Исправления
+- Linux: подписи из нескольких кусков (счётчики, версии, подсказки) больше не пропадают, если поменялись, пока их страница была скрыта. Это ошибка Avalonia, обойдена.
+- Настройки, поменянные в другом окне eViSTool, больше не затираются молча: окно спросит, чьи изменения оставить.
+- Окно «Вышла новая версия» показывает список изменений, даже когда GitHub ограничивает запросы, а не только ссылку.
+- Сторож сервера: «Стоп», нажатый ровно в момент автоперезапуска, больше не даёт серверу подняться снова.
+- «Мои моды»: смена профиля во время проверки больше не оставляет сообщение прежней проверки и не пропускает проверку нового профиля.
+
+Обнови из «О программе». Оповещения своего сервера работают как раньше: их шлёт агент.

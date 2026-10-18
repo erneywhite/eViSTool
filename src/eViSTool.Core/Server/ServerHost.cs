@@ -161,21 +161,30 @@ public sealed class ServerHost : IAsyncDisposable
 
     public Task StartAsync()
     {
+        Start(CancellationToken.None);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Запуск; <paramref name="watchdog"/> — отмена ожидания сторожа, если запускает он (см. <see cref="StartLocked"/>).</summary>
+    private void Start(CancellationToken watchdog)
+    {
         try
         {
-            StartLocked();
+            StartLocked(watchdog);
         }
         finally
         {
             RaiseStateChanges();
         }
-        return Task.CompletedTask;
     }
 
-    private void StartLocked()
+    private void StartLocked(CancellationToken watchdog)
     {
         lock (_lock)
         {
+            // запускает сторож, а «Стоп» нажали уже после конца паузы, но до этого замка: отмену ставит «Стоп» под этим же
+            // замком, поэтому проверка здесь — последняя и надёжная; иначе сервер поднялся бы вопреки «Стоп»
+            if (watchdog.IsCancellationRequested) return;
             if (State is ServerState.Starting or ServerState.Running or ServerState.Stopping) return;
 
             // мир занят (идёт восстановление, копия) — не стартуем на меняющихся файлах; бронь — до выхода процесса.
@@ -298,6 +307,7 @@ public sealed class ServerHost : IAsyncDisposable
 
         bool unexpected;
         TaskCompletionSource? exited;
+        CancellationToken? restart = null;
         lock (_lock)
         {
             if (!ReferenceEquals(process, _process)) return;
@@ -312,6 +322,7 @@ public sealed class ServerHost : IAsyncDisposable
             ReleaseWorld(); // до «остановлен»: кто увидит это состояние, сразу может занять мир
             SetState(ServerState.Stopped);
             exited = _exited; // под замком: после него новый запуск может завести свой
+            if (unexpected && _options.Watchdog) restart = PlanRestartLocked();
         }
         RaiseStateChanges();
         exited?.TrySetResult(); // после события: кто дождался выхода, видит уже обработанное «остановлен»
@@ -323,7 +334,25 @@ public sealed class ServerHost : IAsyncDisposable
         }
 
         Sys(Loc.T("srv.crashed", code));
-        if (_options.Watchdog) ScheduleRestart();
+        if (!_options.Watchdog) return;
+        if (restart is { } wait) ScheduleRestart(wait);
+        else Sys(Loc.T("srv.watchdogGaveUp", _options.MaxRestartsPerHour));
+    }
+
+    /// <summary>
+    /// Решение сторожа после падения — под <see cref="_lock"/>, тем же, под которым сервер стал «остановлен». Ожидание
+    /// заводится сразу, поэтому «Стоп» или отмена перезапуска (восстановление мира), пришедшие следом, его уже застанут
+    /// и отменят. Раньше оно заводилось после рассылки «остановлен» и сообщений в консоль: «Стоп» в этот промежуток не
+    /// отменял ничего, и сторож поднимал сервер вопреки ему. null — сторож сдался: слишком много падений за час.
+    /// </summary>
+    private CancellationToken? PlanRestartLocked()
+    {
+        _crashes.RemoveAll(t => DateTime.Now - t > TimeSpan.FromHours(1));
+        _crashes.Add(DateTime.Now);
+        if (_crashes.Count > _options.MaxRestartsPerHour) return null;
+        _restartCts = new CancellationTokenSource();
+        RestartScheduledAt = DateTime.Now + _options.RestartDelay;
+        return _restartCts.Token;
     }
 
     private void ReleaseWorld()
@@ -332,43 +361,41 @@ public sealed class ServerHost : IAsyncDisposable
         _world = null;
     }
 
+    /// <summary>Тестам: пауза сторожа истекла, запуск — следующий шаг (сюда тест вставляет «Стоп», нажатый в этот миг).</summary>
+    internal Action? BeforeWatchdogStart { get; set; }
+
     /// <summary>
     /// Сторож: поднять сервер через паузу. Мир в это время занят (идёт восстановление) — не стартуем, а ждём:
     /// пробуем снова через ту же паузу, пока не освободится или ожидание не отменят.
     /// </summary>
-    private void ScheduleRestart(bool afterCrash = true)
+    /// <param name="ct">
+    /// Отмена ожидания, заведённого <see cref="PlanRestartLocked"/>: одна на всё ожидание, и на продления при занятом мире
+    /// тоже. Её отменяют «Стоп», запуск руками и отмена перезапуска (под <see cref="_lock"/>).
+    /// </param>
+    private void ScheduleRestart(CancellationToken ct, bool afterCrash = true)
     {
         lock (_lock)
         {
-            if (afterCrash)
-            {
-                _crashes.RemoveAll(t => DateTime.Now - t > TimeSpan.FromHours(1));
-                _crashes.Add(DateTime.Now);
-                if (_crashes.Count > _options.MaxRestartsPerHour)
-                {
-                    Sys(Loc.T("srv.watchdogGaveUp", _options.MaxRestartsPerHour));
-                    return;
-                }
-                Sys(Loc.T("srv.watchdogRestart", (int)_options.RestartDelay.TotalSeconds));
-            }
+            // «Стоп» успел после того, как ожидание завели (сразу после падения или после отказа занятого мира), —
+            // оно отменено, пауза не начинается
+            if (ct.IsCancellationRequested) return;
+            if (afterCrash) Sys(Loc.T("srv.watchdogRestart", (int)_options.RestartDelay.TotalSeconds));
 
-            _restartCts = new CancellationTokenSource();
-            var ct = _restartCts.Token;
             RestartScheduledAt = DateTime.Now + _options.RestartDelay;
-            _ = Task.Delay(_options.RestartDelay, ct).ContinueWith(async t =>
+            _ = Task.Delay(_options.RestartDelay, ct).ContinueWith(t =>
             {
-                // задержка истекла, а «Стоп» нажали в этот же миг: отмену проверяем под тем же замком, под которым её
-                // ставит «Стоп», — иначе сервер поднялся бы вопреки ему
                 lock (_lock)
                 {
                     if (t.IsCanceled || ct.IsCancellationRequested) return;
                     RestartScheduledAt = null;
                 }
-                try { await StartAsync().ConfigureAwait(false); }
+                BeforeWatchdogStart?.Invoke();
+                // «Стоп» мог прийти и после проверки выше — запуск сверяет отмену ещё раз, под своим замком
+                try { Start(ct); }
                 catch (WorldBusyException ex)
                 {
                     if (afterCrash) Sys(Loc.T("srv.watchdogWaiting", ex.Message)); // один раз за ожидание, без спама
-                    if (!ct.IsCancellationRequested) ScheduleRestart(afterCrash: false);
+                    ScheduleRestart(ct, afterCrash: false);
                 }
                 catch (Exception ex)
                 {

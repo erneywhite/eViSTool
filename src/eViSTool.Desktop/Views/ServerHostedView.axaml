@@ -66,6 +66,36 @@
                    IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                    AutomationProperties.AutomationId="HostedStatus" />
 
+        <!-- ===== сервер по логу остановлен, а для модов вышли обновления: обновить всё перед запуском ===== -->
+        <Border DockPanel.Dock="Top" Classes="card" Padding="14,12" Margin="0,12,0,0" IsVisible="{Binding ShowUpdates}"
+                AutomationProperties.AutomationId="HostedUpdates">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Classes="primary" Command="{Binding UpdateAllCommand}" Padding="16,8" Margin="16,0,0,0"
+                        VerticalAlignment="Center" ToolTip.Tip="{local:Tr mods.updateAllTip}" AutomationProperties.AutomationId="HostedUpdateAll">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Classes="icon" Data="{StaticResource Icon.Download}" Width="14" Height="14" Margin="0,0,8,0" />
+                        <TextBlock Text="{local:Tr server.hostedUpdateAll}" />
+                    </StackPanel>
+                </Button>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="{Binding UpdatesText}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}"
+                               AutomationProperties.AutomationId="HostedUpdatesText" />
+                    <TextBlock Text="{local:Tr server.hostedUpdatesHint}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap"
+                               Margin="0,2,0,0" IsVisible="{Binding !IsUpdating}" />
+                    <!-- пока ставятся — ход, как у очереди «Моих модов» -->
+                    <TextBlock Text="{Binding UpdatesProgressText}" FontSize="12" Foreground="{DynamicResource Forest.Accent}" Margin="0,2,0,0"
+                               IsVisible="{Binding IsUpdating}" AutomationProperties.AutomationId="HostedUpdatesProgress" />
+                    <ProgressBar Theme="{StaticResource Forest.Progress}" Value="{Binding UpdatesProgress, Mode=OneWay}" Margin="0,8,0,0"
+                                 IsVisible="{Binding IsUpdating}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- итог «Обновить всё»: запусти сервер в панели хостера -->
+        <TextBlock DockPanel.Dock="Top" Text="{Binding UpdatesNote}" Foreground="{DynamicResource Forest.Accent}" TextWrapping="Wrap" Margin="0,12,0,0"
+                   IsVisible="{Binding UpdatesNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   AutomationProperties.AutomationId="HostedUpdatesNote" />
+
         <!-- ===== консоль (только чтение) и игроки онлайн ===== -->
         <Grid Margin="0,14,0,12" ColumnDefinitions="*,280">
             <Border Classes="card" ClipToBounds="True">

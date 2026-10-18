@@ -102,6 +102,7 @@ public sealed partial class MainViewModel
     private void OnProfileChanged(ProfileViewModel profile)
     {
         Save();
+        if (profile.Model.IsHosted) HostedWatch?.Refresh(); // подключение поменяли — сторож оповещений берёт новое сразу
         if (profile == ActiveProfile)
         {
             NotifyPlay(); // имя, тип или папка данных профиля — в кнопке «Играть» и её подсказке
@@ -157,7 +158,8 @@ public sealed partial class MainViewModel
         Profiles.Remove(profile);
         if (ActiveProfile == profile) ActiveProfile = Profiles[0];
         if (EditedProfile == profile) EditedProfile = ActiveProfile;
-        ProfileActions.AfterRemoved(model); // соединение и кэш хостового профиля — когда окно уже ушло с него
+        if (model.IsHosted) HostedWatch?.Refresh(); // сторож оповещений его отпускает сразу (и замок), не дожидаясь прохода
+        ProfileActions.AfterRemoved(model); // соединение, кэш и оповещения хостового профиля — когда окно уже ушло с него
         foreach (var p in _settings.Profiles) p.LinkedProfiles.RemoveAll(id => id == model.Id); // связи с удалённым — не нужны
         RefreshLinks();
         Save();

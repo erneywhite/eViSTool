@@ -114,20 +114,22 @@ public sealed class HostedConnectViewModelTests
     }
 
     [Fact]
-    public void SftpUrl_ExplainsAndBlocksCheckAndOk()
+    public void SftpUrl_IsAccepted_AndKeepsTheScheme()
     {
         var vm = Model();
         vm.Address = "sftp://" + Host + ":2022";
 
         Assert.True(vm.IsSftp);
-        Assert.Equal(Loc.T("hosted.sftpLater"), vm.AddressHint);
-        Assert.Equal(RowTone.Warn, vm.AddressTone);
-        Assert.False(vm.CanAccept);
-        Assert.False(vm.CheckCommand.CanExecute(null));
-        Assert.Null(vm.Accept());
+        Assert.Equal(Loc.T("hosted.sftpHint"), vm.AddressHint);
+        Assert.Equal(RowTone.Muted, vm.AddressTone);
+        Assert.True(vm.CanAccept); // SFTP подключается, как и FTP
+        Assert.True(vm.CheckCommand.CanExecute(null));
 
-        vm.CommitAddress(); // sftp:// остаётся в поле: иначе пропадёт объяснение
+        vm.CommitAddress(); // sftp:// остаётся в поле: по нему выбран протокол
         Assert.StartsWith("sftp://", vm.Address);
+        var result = vm.Accept()!;
+        Assert.Equal(HostedProtocol.Sftp, result.Protocol);
+        Assert.Equal(2022, result.Port);
 
         vm.Address = Host; // исправили на обычный адрес
         Assert.False(vm.IsSftp);
@@ -638,7 +640,7 @@ public sealed class HostedConnectViewModelTests
         Assert.Equal("sftp://" + Host, vm.Address);
         Assert.DoesNotContain("made-up-password", vm.Address);
         Assert.True(vm.IsSftp);
-        Assert.Equal(Loc.T("hosted.sftpLater"), vm.AddressHint);
+        Assert.Equal(Loc.T("hosted.sftpHint"), vm.AddressHint);
     }
 
     // ===== проверка: причины словами =====

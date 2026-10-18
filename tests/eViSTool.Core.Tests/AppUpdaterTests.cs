@@ -258,6 +258,27 @@ public sealed class AppUpdaterTests : IDisposable
         Assert.Null(alpha.Sha256);
     }
 
+    [Fact]
+    public void ParseFeed_RealEntry_KeepsTheNotesAndTheDate_ForTheUpdateWindow()
+    {
+        // настоящая запись ленты GitHub: текст релиза там в HTML — окно «Вышла новая версия» должно показать список
+        // изменений, а не только ссылку (лента — запасной путь, когда API упёрся в лимит)
+        var feed = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestData", "releases-0.12.1.atom"));
+
+        var release = Assert.Single(AppUpdater.ParseFeed(feed));
+        Assert.Equal(new DateTimeOffset(2026, 10, 17, 17, 46, 11, TimeSpan.Zero), release.Published);
+
+        var ru = ReleaseNotes.Parse(release.Notes, russian: true);
+        Assert.Equal("Статистика показывает, сколько у сервера памяти и ядер", ru.Summary); // точку в конце окно убирает
+        Assert.Equal(["Новое", "Исправления"], ru.Sections.Select(s => s.Heading));
+        Assert.Equal([2, 2], ru.Sections.Select(s => s.Items.Count));
+        Assert.StartsWith("«Сервер» → «Статистика»", ru.Sections[0].Items[0]);
+
+        var en = ReleaseNotes.Parse(release.Notes, russian: false);
+        Assert.Equal(["New", "Fixes"], en.Sections.Select(s => s.Heading));
+        Assert.Contains("server's machine", en.Sections[0].Items[0]); // &#39; раскодирован
+    }
+
     private sealed class RoutedHandler(Func<string, HttpResponseMessage> route) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>

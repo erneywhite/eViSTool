@@ -36,13 +36,28 @@ public sealed class NotifyEventRowViewModel(NotifyEvent e, string title, string 
 /// Вкладка «Оповещения» раздела «Сервер»: какие события в какие каналы (каналы — из «Настроек»). Отправляет агент, так
 /// что окно можно закрыть. Каналы, включённые у сервера, копируются ему вместе с секретами: своему серверу — в файл рядом
 /// с расписанием, удалённому — по защищённому соединению (там их шифруют заново). Каждое открытие вкладки обновляет копии —
-/// поправленный в «Настройках» токен доедет до сервера сам.
+/// поправленный в «Настройках» токен доедет до сервера сам. У сервера у хостера агента нет: настройки лежат здесь же,
+/// отправляет само окно (<see cref="HostedWatch"/>), событий меньше, а чата в Discord нет (<see cref="IsHosted"/>).
 /// </summary>
 public sealed partial class ServerNotifyViewModel : ObservableObject
 {
     private static readonly NotifyEvent[] Events = Enum.GetValues<NotifyEvent>();
 
     private readonly ServerViewModel _server;
+
+    /// <summary>Вкладка сервера у хостера: события — только видные по логу и окну, без чата в Discord, отправляет окно.</summary>
+    public bool IsHosted { get; }
+
+    /// <summary>Настройки сохранены (сторож оповещений хостера пересобирает список сразу).</summary>
+    public event Action? Saved;
+
+    /// <summary>Строки таблицы: у хостера — только его события, в том же порядке.</summary>
+    private IEnumerable<NotifyEvent> Shown => IsHosted ? Events.Where(HostedWatch.Events.Contains) : Events;
+
+    /// <summary>Кнопка проверочного: у хостера оно уходит отсюда, а не «с сервера».</summary>
+    public string TestText => IsHosted ? Loc.T("notify.test") : Loc.T("srvnotify.test");
+
+    public string TestTip => IsHosted ? Loc.T("srvnotify.hostedTestTip") : Loc.T("srvnotify.testTip");
     private GameProfile? _profile;
     private bool _active;
     private bool _loading;
@@ -51,7 +66,12 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
     private ServerNotifySettings _saved = new();
     private List<NotifyChannel> _channels = [];
 
-    public ServerNotifyViewModel(ServerViewModel server) => _server = server;
+    /// <param name="hosted">Вкладка сервера у хостера (<see cref="IsHosted"/>).</param>
+    public ServerNotifyViewModel(ServerViewModel server, bool hosted = false)
+    {
+        _server = server;
+        IsHosted = hosted;
+    }
 
     public ObservableCollection<NotifyEventRowViewModel> Rows { get; } = [];
     public ObservableCollection<string> ChannelNames { get; } = [];
@@ -100,7 +120,18 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
         if (active) _ = LoadAsync(resync: true);
     }
 
-    public void OnLanguageChanged() => Build(_saved);
+    public void OnLanguageChanged()
+    {
+        Build(_saved);
+        OnPropertyChanged(nameof(TestText));
+        OnPropertyChanged(nameof(TestTip));
+    }
+
+    /// <summary>Оповещение сервера у хостера не ушло (его шлёт окно) — сказать здесь, если открыт этот профиль.</summary>
+    public void ShowSendError(string profileId, string text)
+    {
+        if (IsHosted && _profile?.Id == profileId) ErrorText = text;
+    }
 
     public void ShowStatus(AgentStatus? s)
     {
@@ -176,8 +207,8 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
             ChatJoins = settings.ChatJoins;
             OnPropertyChanged(nameof(HasDiscordChannels));
             Rows.Clear();
-            foreach (var e in Events)
-                Rows.Add(new NotifyEventRowViewModel(e, Title(e), Hint(e),
+            foreach (var e in Shown)
+                Rows.Add(new NotifyEventRowViewModel(e, Title(e), IsHosted ? HostedHint(e) : Hint(e),
                     [.. _channels.Select(c => new NotifyCellViewModel(this, c.Id, c.Name, settings.IsOn(e, c.Id)))]));
         }
         finally { _loading = false; }
@@ -196,11 +227,12 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
     {
         var routes = Rows.ToDictionary(r => r.Event, r => r.Cells.Where(c => c.IsOn).Select(c => c.ChannelId).ToList());
         var used = routes.Values.SelectMany(v => v).ToHashSet();
-        if (ChatChannelId.Length > 0) used.Add(ChatChannelId);
+        var chat = IsHosted ? "" : ChatChannelId; // чат игры в Discord — только у своего сервера
+        if (chat.Length > 0) used.Add(chat);
         return new ServerNotifySettings
         {
             ServerName = _profile?.Name,
-            ChatChannelId = ChatChannelId.Length > 0 ? ChatChannelId : null,
+            ChatChannelId = chat.Length > 0 ? chat : null,
             ChatJoins = ChatJoins,
             Routes = routes.Where(kv => kv.Value.Count > 0).ToDictionary(kv => kv.Key, kv => kv.Value),
             Channels = [.. _channels.Where(c => used.Contains(c.Id))],
@@ -226,6 +258,7 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
             _saved = settings;
             ErrorText = "";
             if (!quiet) StatusText = "";
+            Saved?.Invoke();
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or IOException or TaskCanceledException
                                        or UnauthorizedAccessException)
@@ -243,22 +276,27 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
 
     private bool CanTest() => !IsTesting && _saved.Routes.Values.Any(v => v.Count > 0);
 
-    /// <summary>Проверочное — так, как пойдут настоящие: с сервера (через агента), во все включённые каналы.</summary>
+    /// <summary>
+    /// Проверочное — так, как пойдут настоящие: с сервера (через агента), во все включённые каналы. У хостера агента
+    /// нет — настоящие шлёт это окно, и проверочное тоже.
+    /// </summary>
     [RelayCommand(CanExecute = nameof(CanTest))]
     private async Task Test()
     {
         IsTesting = true;
         TestCommand.NotifyCanExecuteChanged();
-        StatusText = Loc.T("srvnotify.testing");
+        StatusText = IsHosted ? Loc.T("srvnotify.hostedTesting") : Loc.T("srvnotify.testing");
         ErrorText = "";
         try
         {
             IReadOnlyList<string> errors;
-            if (_server.Client is { } client) errors = await client.TestNotifyAsync();
+            if (!IsHosted && _server.Client is { } client) errors = await client.TestNotifyAsync();
             else if (_profile is { IsRemote: false } p)
-                // агент своего сервера не запущен — отправляем отсюда же: машина та же, каналы те же
+                // агент своего сервера не запущен (или это сервер у хостера) — отправляем отсюда же: каналы те же
                 errors = await new ServerNotifier(() => ServerNotifySettings.Load(p.Id), NotifyChannelsViewModel.Http, (_, _) => { })
-                    .TestAsync(Loc.T("notify.testTitle"), new NotifyLine("◇", Loc.T("notify.lbl.from"), Loc.T("notify.testFromServer", Environment.MachineName)));
+                    .TestAsync(Loc.T("notify.testTitle"), new NotifyLine("◇", Loc.T("notify.lbl.from"), IsHosted
+                        ? Loc.T("notify.testFromWindow", Environment.MachineName)
+                        : Loc.T("notify.testFromServer", Environment.MachineName)));
             else throw new InvalidOperationException(Loc.T("server.stateOffline"));
             StatusText = errors.Count == 0 ? Loc.T("srvnotify.testSent") : "";
             ErrorText = string.Join(Environment.NewLine, errors);
@@ -308,5 +346,15 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
         NotifyEvent.PlayerJoined => Loc.T("srvnotify.joinedHint"),
         NotifyEvent.PlayerLeft => Loc.T("srvnotify.leftHint"),
         _ => "",
+    };
+
+    /// <summary>Подсказки у хостера: где событие узнаётся иначе, чем у агента (по логу, раз в 6 часов, окном), — свои.</summary>
+    private static string HostedHint(NotifyEvent e) => e switch
+    {
+        NotifyEvent.ServerCrashed => Loc.T("srvnotify.hostedCrashedHint"),
+        NotifyEvent.ServerStopped => Loc.T("srvnotify.hostedStoppedHint"),
+        NotifyEvent.ModUpdates => Loc.T("srvnotify.hostedModUpdatesHint"),
+        NotifyEvent.ModsUpdated => Loc.T("srvnotify.hostedModsUpdatedHint"),
+        _ => Hint(e),
     };
 }

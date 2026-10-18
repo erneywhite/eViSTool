@@ -8,6 +8,8 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using eViSTool.Core.Hosting;
 using eViSTool.Core.Localization;
+using eViSTool.Core.ModDb;
+using eViSTool.Core.Mods;
 using eViSTool.Core.Tests.Hosting;
 using eViSTool.Desktop.Platform;
 using eViSTool.Desktop.Views;
@@ -109,6 +111,55 @@ public sealed class ServerHostedViewTests : IDisposable
         Assert.Equal(Resource("Forest.Danger"), Of("Something broke"));
         Assert.Equal(Resource("Forest.Warn"), Of("Server overloaded"));
         Assert.Equal(Color.Parse("#D8DCCF"), Of("Nothing special"));
+        window.Close();
+    }
+
+    /// <summary>Раздел с поддельной проверкой обновлений модов: одно обновление, alpha 1.0.0 → 1.1.0.</summary>
+    private async Task<HostedServerViewModel> PolledWithUpdatesAsync()
+    {
+        IReadOnlyList<ModCheckResult> due =
+        [
+            new ModCheckResult
+            {
+                Local = new LocalMod("/Mods/alpha_1.0.0.zip", new ModInfo { ModId = "alpha", OriginalModId = "alpha", Name = "alpha", Version = "1.0.0" }, null),
+                Status = ModStatus.UpdateAvailable,
+                LatestCompatible = new ModDbRelease { ModVersion = "1.1.0", MainFile = "https://example.test/alpha_1.1.0.zip" },
+            },
+        ];
+        var model = new HostedServerViewModel(null!) { Updates = new HostedModUpdates((_, _) => Task.FromResult(due)) };
+        model.OnProfileSwitched(_host.Profile);
+        var poll = model.PollAsync();
+        await Wait.Until(() => poll.IsCompleted);
+        await poll;
+        return model;
+    }
+
+    [AvaloniaFact]
+    public async Task Stopped_server_with_mod_updates_shows_the_update_all_plate()
+    {
+        PutLog(HostedLogSamples.Stopped);
+        var model = await PolledWithUpdatesAsync();
+        await Wait.Until(() => model.ShowUpdates);
+        var window = Show(model);
+
+        Assert.True(Named<Border>(window, "HostedUpdates").IsEffectivelyVisible);
+        Assert.Equal(Loc.T("server.hostedUpdates", 1), Named<TextBlock>(window, "HostedUpdatesText").Text);
+        var button = Named<Button>(window, "HostedUpdateAll");
+        Assert.True(button.IsEffectivelyVisible);
+        Assert.True(button.IsEffectivelyEnabled);
+        Assert.False(Named<TextBlock>(window, "HostedUpdatesProgress").IsEffectivelyVisible); // ход — только пока ставится
+        Assert.False(Named<TextBlock>(window, "HostedUpdatesNote").IsEffectivelyVisible);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task Running_server_has_no_update_all_plate_even_with_updates()
+    {
+        PutLog(HostedLogSamples.Running);
+        var model = await PolledWithUpdatesAsync();
+        var window = Show(model);
+
+        Assert.False(Named<Border>(window, "HostedUpdates").IsEffectivelyVisible); // работает — моды не трогаем
         window.Close();
     }
 

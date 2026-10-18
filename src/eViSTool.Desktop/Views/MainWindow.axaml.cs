@@ -140,7 +140,7 @@ public partial class MainWindow : Window
         var size = l.Maximized ? _normalSize : ClientSize;
         l.Width = size.Width;
         l.Height = size.Height;
-        Vm.SaveSettings();
+        Vm.SaveOnExit();
         // несохранённые правки конфигурации сервера и конфига мода — спросить; отказались — окно остаётся
         if (!Vm.ConfirmExit()) e.Cancel = true;
     }

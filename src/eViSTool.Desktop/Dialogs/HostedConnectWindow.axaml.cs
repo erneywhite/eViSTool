@@ -4,9 +4,9 @@ using eViSTool.Presentation.ViewModels;
 namespace eViSTool.Desktop.Dialogs;
 
 /// <summary>
-/// Подключение к серверу у хостера по FTP: адрес, порт, шифрование, логин и пароль, проверка связи. Разбор адреса и сама
-/// проверка — в <see cref="HostedConnectViewModel"/> (DataContext); здесь — раскрытие «Дополнительно» и ответ окна:
-/// подключение по «ОК».
+/// Подключение к серверу у хостера по FTP или SFTP: адрес, порт, шифрование FTP или способ входа SFTP (пароль или файл
+/// ключа), логин и пароль, проверка связи. Разбор адреса и сама проверка — в <see cref="HostedConnectViewModel"/>
+/// (DataContext); здесь — раскрытие «Дополнительно» и ответ окна: подключение по «ОК».
 /// </summary>
 public partial class HostedConnectWindow : DialogWindow
 {

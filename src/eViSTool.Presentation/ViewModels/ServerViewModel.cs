@@ -62,6 +62,13 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     /// <summary>Сервер у хостера: лог, состояние и игроки по FTP — вместо всех видов своего сервера.</summary>
     public HostedServerViewModel Hosted { get; }
 
+    /// <summary>
+    /// Оповещения сервера у хостера — второй (и последний) вид его раздела рядом с «Обзором»: та же вкладка, что у своего
+    /// сервера, но события — только его, а шлёт их окно. Свой экземпляр: вкладке своего сервера хостовый профиль не
+    /// передаётся.
+    /// </summary>
+    public ServerNotifyViewModel HostedNotify { get; }
+
     /// <summary>Какой вид раздела открыт. Консоль продолжает получать строки при любом.</summary>
     [ObservableProperty] private ServerTab _tab;
 
@@ -173,6 +180,11 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         Journal = new ServerJournalViewModel(this);
         Notify = new ServerNotifyViewModel(this);
         Hosted = new HostedServerViewModel(main);
+        HostedNotify = new ServerNotifyViewModel(this, hosted: true);
+        // включили или выключили маршрут — сторож оповещений берёт профиль сразу, а не через минуту; не ушло — скажем на вкладке
+        // (главной модели нет только в тестах раздела)
+        HostedNotify.Saved += () => main?.HostedWatch?.Refresh();
+        if (main?.HostedWatch is { } watch) watch.SendFailed += HostedNotify.ShowSendError;
     }
 
     /// <summary>
@@ -203,6 +215,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         Stats.SetActive(value == ServerTab.Stats);
         Journal.SetActive(value == ServerTab.Journal);
         Notify.SetActive(value == ServerTab.Notify);
+        HostedNotify.SetActive(value == ServerTab.Notify);
         if (value != ServerTab.Remote) Remote.Hide(); // ушли с вкладки — код подключения снова закрыт
     }
 
@@ -260,6 +273,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         Players.OnLanguageChanged();
         Notify.OnLanguageChanged();
         Hosted.OnLanguageChanged();
+        HostedNotify.OnLanguageChanged();
     }
 
     /// <summary>Сменился профиль: отключиться от старого агента, подключиться к агенту нового (если он работает).</summary>
@@ -288,11 +302,14 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         // хостовый профиль — Kind = Server, но серверным разделом это не считается: монитора и вкладок нет, свой вид — Hosted
         IsServerProfile = _main.ActiveProfile?.Kind == ProfileKind.Server && !IsHostedProfile;
         Hosted.OnProfileSwitched(IsHostedProfile ? _main.ActiveProfile?.Model : null);
+        HostedNotify.OnProfileSwitched(IsHostedProfile ? _main.ActiveProfile?.Model : null);
         IsRemoteProfile = _main.ActiveProfile?.Model.IsRemote == true;
         _remoteGameVersion = null;
         _remoteOs = null;
         // удалённый доступ настраивают на компьютере с сервером — у удалённого профиля этой вкладки нет
         if (IsRemoteProfile && Tab == ServerTab.Remote) Tab = ServerTab.Console;
+        // у хостера видов два: «Обзор» (тот же Console) и «Оповещения» — остальных у него нет
+        if (IsHostedProfile && Tab is not (ServerTab.Console or ServerTab.Notify)) Tab = ServerTab.Console;
         var local = IsServerProfile && !IsRemoteProfile;
         Refresh();
         // сюда попадаем и при правке имени профиля: редактор сам разберётся, сменился ли файл

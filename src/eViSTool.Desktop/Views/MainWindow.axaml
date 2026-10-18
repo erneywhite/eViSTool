@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:eViSTool.Presentation.ViewModels"
         xmlns:local="using:eViSTool.Desktop"
+        xmlns:ctl="using:eViSTool.Desktop.Controls"
         xmlns:views="using:eViSTool.Desktop.Views"
         xmlns:conv="using:eViSTool.Desktop.Converters"
         x:Class="eViSTool.Desktop.Views.MainWindow"
@@ -164,9 +165,9 @@
                         </Border>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Vintage Story" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />
-                            <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap">
+                            <ctl:RunTextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap">
                                 <Run Text="{local:Tr shell.profileVersion}" /><Run Text=" · " /><Run Text="{Binding ActiveProfile.GameVersionText, Mode=OneWay}" />
-                            </TextBlock>
+                            </ctl:RunTextBlock>
                         </StackPanel>
                     </DockPanel>
                 </Border>
@@ -310,17 +311,17 @@
                                         <!-- сервер у хостера — облако перед именем -->
                                         <Path Classes="icon" Data="{StaticResource Icon.Cloud}" Width="13" Height="13" Margin="0,0,7,0" VerticalAlignment="Center"
                                               Stroke="{DynamicResource Forest.Accent}" IsVisible="{Binding IsHosted}" />
-                                        <TextBlock>
+                                        <ctl:RunTextBlock>
                                             <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding KindText, Mode=OneWay}" Foreground="{DynamicResource Forest.Muted}" />
-                                        </TextBlock>
+                                        </ctl:RunTextBlock>
                                     </StackPanel>
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
                     </StackPanel>
-                    <TextBlock VerticalAlignment="Center" FontSize="13" TextTrimming="CharacterEllipsis">
+                    <ctl:RunTextBlock VerticalAlignment="Center" FontSize="13" TextTrimming="CharacterEllipsis">
                         <Run Text="{local:Tr shell.workspaceCrumb}" Foreground="{DynamicResource Forest.Muted}" /><Run Text="   /   " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding PageTitle, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />
-                    </TextBlock>
+                    </ctl:RunTextBlock>
                 </DockPanel>
             </Border>
 

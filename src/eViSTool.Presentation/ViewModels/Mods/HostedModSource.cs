@@ -133,8 +133,7 @@ internal sealed class HostedModSource : IModSource
             _owner.Rebuild();
             _owner.NotifyLocalModsChanged();
             ShowWarnings(profile.Model.Id, resolved.Warnings);
-            if (first && _main.AutoCheckUpdates && resolved.GameVersion is not null && _owner.CheckCommand.CanExecute(null))
-                _owner.CheckCommand.Execute(null);
+            if (first) _owner.AutoCheck();
             return true;
         }
         catch (OperationCanceledException)
@@ -204,21 +203,6 @@ internal sealed class HostedModSource : IModSource
         foreach (var modId in files.Select(f => ModConfigs.MatchMod(f, mods)?.ModId).OfType<string>())
             counts[modId] = counts.GetValueOrDefault(modId) + 1;
         return counts;
-    }
-
-    /// <summary>
-    /// Мод только для чтения: мод самого хостера (папка gportal_mods) или распакованная папка — по FTP их можно
-    /// только показывать. Ответ — текст причины; null — менять можно.
-    /// </summary>
-    public static string? ReadOnlyReason(LocalMod mod)
-    {
-        if (HostedLayoutProbe.IsHosterDir(RemotePath.Parent(mod.Path))) return Loc.T("hosted.hosterMod");
-        // shortcut: папку-мод узнаём по отсутствию расширения архива или кода; переделать, если ядро начнёт отдавать признак папки
-        var ext = Path.GetExtension(mod.Path);
-        return ext.Equals(".zip", StringComparison.OrdinalIgnoreCase) || ext.Equals(".dll", StringComparison.OrdinalIgnoreCase)
-               || ext.Equals(".cs", StringComparison.OrdinalIgnoreCase)
-            ? null
-            : Loc.T("hosted.folderModReadOnly");
     }
 
     /// <summary>Предупреждения скана (довели прерванную установку, нет конфига…) — окном, но каждое по разу, пока не пропадёт.</summary>
