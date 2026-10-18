@@ -9,6 +9,9 @@ public enum HostedProtocol { Ftp, Sftp }
 /// <summary>Шифрование FTP: нет, «если сервер умеет», только явный TLS (AUTH TLS), неявный TLS (обычно порт 990).</summary>
 public enum FtpTls { None, Auto, Explicit, Implicit }
 
+/// <summary>Как часто окно само скачивает копию мира сервера у хостера на этот компьютер: никогда, раз в сутки, раз в неделю.</summary>
+public enum HostedBackupSchedule { Off, Daily, Weekly }
+
 /// <summary>
 /// Подключение к серверу у хостера (G-Portal и другие) — хранится в профиле (<see cref="Profiles.GameProfile.Hosted"/>).
 /// Пароль и пароль ключа SFTP лежат зашифрованными (<see cref="HostedSecret"/>). Пути — относительно <see cref="Root"/>,
@@ -98,6 +101,13 @@ public sealed class HostedConnection
 
     /// <summary>Сколько последних своих копий мира хранить; 0 — не удалять старые.</summary>
     public int BackupKeep { get; set; } = 7;
+
+    /// <summary>
+    /// Скачивать копию мира по расписанию, пока окно eViSTool открыто: последняя копия в папке старше суток или недели —
+    /// пора. Незнакомое значение (настройки из новой версии) читается как «выключено».
+    /// </summary>
+    [JsonConverter(typeof(TolerantEnumConverter))]
+    public HostedBackupSchedule BackupSchedule { get; set; } = HostedBackupSchedule.Off;
 
     /// <summary>Независимая копия: правка профиля посреди операции её не сдвинет.</summary>
     public HostedConnection Clone()

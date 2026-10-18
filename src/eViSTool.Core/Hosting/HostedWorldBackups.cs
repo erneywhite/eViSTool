@@ -536,6 +536,17 @@ public sealed partial class HostedWorldBackups
         DeleteFiles(backup.Path);
     }
 
+    /// <summary>
+    /// Убрать копию своим способом (окно — в Корзину): мир, затем архив и сведения, только те, что есть. Копия не из
+    /// этой папки — ArgumentException; сбой — как есть, а мир уходит первым, чтобы сбой не оставил копию без архива.
+    /// </summary>
+    public void Delete(HostedWorldBackup backup, Action<string> remove)
+    {
+        if (!PathRules.IsUnder(backup.Path, Dir)) throw new ArgumentException("not a copy of this profile", nameof(backup));
+        foreach (var file in new[] { backup.Path, ExtraFor(backup.Path), InfoFor(backup.Path) })
+            if (File.Exists(file)) remove(file);
+    }
+
     private static void DeleteFiles(string path)
     {
         File.Delete(path);
