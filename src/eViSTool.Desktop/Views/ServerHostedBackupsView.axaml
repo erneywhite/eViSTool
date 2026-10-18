@@ -1,0 +1,215 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:eViSTool.Presentation.ViewModels"
+             xmlns:local="using:eViSTool.Desktop"
+             xmlns:ctl="using:eViSTool.Desktop.Controls"
+             xmlns:conv="using:eViSTool.Desktop.Converters"
+             x:Class="eViSTool.Desktop.Views.ServerHostedBackupsView"
+             x:DataType="vm:HostedBackupsViewModel">
+    <UserControl.Styles>
+        <!-- карточки и строки — как во вкладке «Расписание» своего сервера -->
+        <Style Selector="Border.scheduleCard">
+            <Setter Property="Padding" Value="20,16,20,18" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+        <Style Selector="TextBlock.label">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBox.backupDir /template/ TextBlock#PART_Placeholder">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+        </Style>
+        <!-- метка у копии в списке: откуда скачана, настройки модов рядом, не своя -->
+        <Style Selector="Border.badge">
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="6,1" />
+            <Setter Property="Margin" Value="10,0,0,0" />
+            <Setter Property="Background" Value="{DynamicResource Forest.Raised}" />
+        </Style>
+        <Style Selector="Border.badge TextBlock">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+        </Style>
+    </UserControl.Styles>
+
+    <!--
+        Копии мира сервера у хостера на этом компьютере: кнопка «Скачать копию сейчас» с ходом и отменой, список копий
+        (показать, удалить, восстановить на сервер) и настройки — расписание, сколько хранить, папка.
+    -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
+        <StackPanel Margin="0,0,14,0">
+            <!-- ===== копии на этом компьютере ===== -->
+            <Border Classes="card scheduleCard" AutomationProperties.AutomationId="HostedBackupsCard">
+                <StackPanel>
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="16,0,0,0">
+                            <Button Command="{Binding OpenFolderCommand}" Padding="10,8" Margin="0,0,8,0" ToolTip.Tip="{local:Tr hostedbk.openFolder}"
+                                    AutomationProperties.AutomationId="HostedBackupsOpenFolder" AutomationProperties.Name="{local:Tr hostedbk.openFolder}">
+                                <Path Classes="icon" Data="{StaticResource Icon.Folder}" Width="16" Height="16" />
+                            </Button>
+                            <Button Classes="primary" Command="{Binding BackupNowCommand}" ToolTip.Tip="{local:Tr hostedbk.nowTip}" ToolTip.ShowOnDisabled="True"
+                                    AutomationProperties.AutomationId="HostedBackupNow">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Classes="icon" Data="{StaticResource Icon.Download}" Width="14" Height="14" Margin="0,0,8,0" />
+                                    <TextBlock Text="{local:Tr hostedbk.now}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr hostedbk.title}" Classes="cardTitle" />
+                            <TextBlock Text="{local:Tr hostedbk.hint}" Classes="hint" />
+                            <ctl:RunTextBlock Classes="hint" FontSize="12" Margin="0,6,0,0" AutomationProperties.AutomationId="HostedBackupsWhen">
+                                <Run Text="{Binding LastText, Mode=OneWay}" /><Run Text="   ·   " /><Run Text="{Binding NextText, Mode=OneWay}" />
+                            </ctl:RunTextBlock>
+                            <TextBlock Text="{Binding TotalText}" Classes="hint" FontSize="12"
+                                       IsVisible="{Binding TotalText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                       AutomationProperties.AutomationId="HostedBackupsTotal" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <!-- пароль подключения не прочитать на этой машине -->
+                    <TextBlock Text="{Binding ProblemText}" FontSize="12" Foreground="{DynamicResource Forest.Warn}" TextWrapping="Wrap" Margin="0,10,0,0"
+                               IsVisible="{Binding ProblemText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                               AutomationProperties.AutomationId="HostedBackupsProblem" />
+
+                    <!-- ход: что делается, сколько из скольких, полоса — как у «Обновить всё»; отмена рядом -->
+                    <DockPanel Margin="0,12,0,0" IsVisible="{Binding ShowWork}" AutomationProperties.AutomationId="HostedBackupWork">
+                        <Button DockPanel.Dock="Right" Classes="small" Content="{local:Tr common.cancel}" Command="{Binding CancelCommand}"
+                                Margin="16,0,0,0" VerticalAlignment="Center" IsVisible="{Binding IsWorking}"
+                                AutomationProperties.AutomationId="HostedBackupCancel" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding WorkText}" FontSize="12" Foreground="{DynamicResource Forest.Accent}" TextWrapping="Wrap"
+                                       AutomationProperties.AutomationId="HostedBackupWorkText" />
+                            <ProgressBar Theme="{StaticResource Forest.Progress}" Value="{Binding WorkProgress, Mode=OneWay}" Margin="0,8,0,0"
+                                         IsVisible="{Binding IsWorking}" AutomationProperties.AutomationId="HostedBackupProgress" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <!-- итог последней операции: удалась (или отменена), не вышла и почему; предупреждения — как есть -->
+                    <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{DynamicResource Forest.Accent}" TextWrapping="Wrap" Margin="0,10,0,0"
+                               IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                               AutomationProperties.AutomationId="HostedBackupStatus" />
+                    <TextBlock Text="{Binding ErrorText}" FontSize="12" Foreground="{DynamicResource Forest.Danger}" TextWrapping="Wrap" Margin="0,10,0,0"
+                               IsVisible="{Binding ErrorText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                               AutomationProperties.AutomationId="HostedBackupError" />
+                    <TextBlock Text="{Binding WarningsText}" FontSize="12" Foreground="{DynamicResource Forest.Warn}" TextWrapping="Wrap" Margin="0,6,0,0"
+                               IsVisible="{Binding WarningsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                               AutomationProperties.AutomationId="HostedBackupWarnings" />
+
+                    <TextBlock Text="{local:Tr hostedbk.empty}" Classes="hint" FontSize="12" Margin="0,14,0,0" IsVisible="{Binding !HasBackups}"
+                               AutomationProperties.AutomationId="HostedBackupsEmpty" />
+
+                    <ItemsControl ItemsSource="{Binding Backups}" Margin="0,6,0,0" Focusable="False" AutomationProperties.AutomationId="HostedBackupsList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:HostedBackupRowViewModel">
+                                <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="0,9" Margin="0,4,0,0">
+                                    <DockPanel>
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr hostedbk.restore}" Margin="0,0,14,0"
+                                                    ToolTip.Tip="{local:Tr hostedbk.restoreTip}" ToolTip.ShowOnDisabled="True"
+                                                    Command="{Binding $parent[UserControl].((vm:HostedBackupsViewModel)DataContext).RestoreCommand}"
+                                                    CommandParameter="{Binding}" AutomationProperties.AutomationId="HostedBackupRestore" />
+                                            <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr sched.show}" Margin="0,0,14,0"
+                                                    Command="{Binding $parent[UserControl].((vm:HostedBackupsViewModel)DataContext).ShowInFolderCommand}"
+                                                    CommandParameter="{Binding}" AutomationProperties.AutomationId="HostedBackupShow" />
+                                            <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr sched.delete}" Foreground="{DynamicResource Forest.Danger}"
+                                                    Command="{Binding $parent[UserControl].((vm:HostedBackupsViewModel)DataContext).DeleteCommand}"
+                                                    CommandParameter="{Binding}" AutomationProperties.AutomationId="HostedBackupDelete" />
+                                        </StackPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding SizeText}" FontSize="12" Foreground="{DynamicResource Forest.Muted}"
+                                                   VerticalAlignment="Center" Margin="16,0,24,0" MinWidth="70" TextAlignment="Right" />
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" FontSize="12" Foreground="{DynamicResource Forest.Text}"
+                                                   VerticalAlignment="Center" Margin="16,0,0,0" />
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" Classes="mono" FontSize="12" Foreground="{DynamicResource Forest.Text}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <!-- откуда скачана: мир или копия игры; путь на сервере — в подсказке -->
+                                            <Border Classes="badge" ToolTip.Tip="{Binding OriginTip}" AutomationProperties.AutomationId="HostedBackupOrigin">
+                                                <TextBlock Text="{Binding OriginText}" />
+                                            </Border>
+                                            <Border Classes="badge" ToolTip.Tip="{Binding ExtraTip}" IsVisible="{Binding HasExtra}">
+                                                <TextBlock Text="{local:Tr hostedbk.extra}" />
+                                            </Border>
+                                            <Border Classes="badge" ToolTip.Tip="{Binding ManualTip}" IsVisible="{Binding IsManual}">
+                                                <TextBlock Text="{Binding ManualText}" />
+                                            </Border>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- ===== расписание и хранение ===== -->
+            <Border Classes="card scheduleCard" AutomationProperties.AutomationId="HostedBackupsSettings">
+                <StackPanel>
+                    <TextBlock Text="{local:Tr hostedbk.settingsTitle}" Classes="cardTitle" />
+
+                    <Border Classes="row">
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr hostedbk.schedule}" Classes="label" />
+                            <TextBlock Text="{local:Tr hostedbk.scheduleHint}" Classes="hint" />
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <RadioButton Theme="{StaticResource Forest.Chip}" GroupName="HostedBackupSchedule" Content="{local:Tr hostedbk.scheduleOff}"
+                                             IsChecked="{Binding Schedule, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Off}"
+                                             AutomationProperties.AutomationId="HostedBackupScheduleOff" />
+                                <RadioButton Theme="{StaticResource Forest.Chip}" GroupName="HostedBackupSchedule" Content="{local:Tr hostedbk.scheduleDaily}"
+                                             IsChecked="{Binding Schedule, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Daily}"
+                                             AutomationProperties.AutomationId="HostedBackupScheduleDaily" />
+                                <RadioButton Theme="{StaticResource Forest.Chip}" GroupName="HostedBackupSchedule" Content="{local:Tr hostedbk.scheduleWeekly}"
+                                             IsChecked="{Binding Schedule, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Weekly}"
+                                             AutomationProperties.AutomationId="HostedBackupScheduleWeekly" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="row">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Right" Width="130">
+                                <TextBox Text="{Binding KeepText}" VerticalContentAlignment="Center"
+                                         AutomationProperties.AutomationId="HostedBackupKeep" AutomationProperties.Name="{local:Tr hostedbk.keep}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{local:Tr hostedbk.keep}" Classes="label" />
+                                <TextBlock Text="{local:Tr hostedbk.keepHint}" Classes="hint" />
+                                <TextBlock Text="{Binding KeepError}" Classes="error" FontSize="12"
+                                           IsVisible="{Binding KeepError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                           AutomationProperties.AutomationId="HostedBackupKeepError" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- папка для копий: своя (в том числе сетевая) или папка программы -->
+                    <Border Classes="row">
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr backupdir.title}" Classes="label" />
+                            <TextBlock Text="{local:Tr hostedbk.dirHint}" Classes="hint" />
+                            <DockPanel Margin="0,10,0,0">
+                                <Button DockPanel.Dock="Right" Content="{local:Tr backupdir.default}" Command="{Binding DefaultBackupDirCommand}" Margin="8,0,0,0"
+                                        Padding="12,6" AutomationProperties.AutomationId="HostedBackupDirDefault" />
+                                <Button DockPanel.Dock="Right" Content="{local:Tr common.browse}" Command="{Binding BrowseBackupDirCommand}" Margin="8,0,0,0"
+                                        Padding="12,6" AutomationProperties.AutomationId="HostedBackupDirBrowse" />
+                                <!-- применяется, когда поле отпустили (LostFocus) или нажали Enter; пусто — подсказкой видно, где копии по умолчанию -->
+                                <TextBox x:Name="BackupDirBox" Classes="backupDir" Text="{Binding BackupDirText, UpdateSourceTrigger=LostFocus}"
+                                         PlaceholderText="{Binding BackupDirDefault}" VerticalContentAlignment="Center" KeyDown="BackupDirBox_KeyDown"
+                                         AutomationProperties.AutomationId="HostedBackupDir" AutomationProperties.Name="{local:Tr backupdir.title}" />
+                            </DockPanel>
+                            <TextBlock Text="{local:Tr backupdir.checking}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" Margin="0,6,0,0"
+                                       IsVisible="{Binding BackupDirChecking}" />
+                            <TextBlock Text="{Binding BackupDirError}" FontSize="12" Foreground="{DynamicResource Forest.Danger}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                       IsVisible="{Binding BackupDirError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                       AutomationProperties.AutomationId="HostedBackupDirError" />
+                            <TextBlock Text="{Binding BackupDirOk}" FontSize="12" Foreground="{DynamicResource Forest.Accent}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                       IsVisible="{Binding BackupDirOk, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

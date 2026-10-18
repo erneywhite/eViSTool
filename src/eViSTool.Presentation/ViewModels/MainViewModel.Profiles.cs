@@ -159,6 +159,7 @@ public sealed partial class MainViewModel
         if (ActiveProfile == profile) ActiveProfile = Profiles[0];
         if (EditedProfile == profile) EditedProfile = ActiveProfile;
         if (model.IsHosted) HostedWatch?.Refresh(); // сторож оповещений его отпускает сразу (и замок), не дожидаясь прохода
+        if (model.IsHosted) HostedWorldJobs.Cancel(model.Id); // профиль убрали — его копию мира не доделываем
         ProfileActions.AfterRemoved(model); // соединение, кэш и оповещения хостового профиля — когда окно уже ушло с него
         foreach (var p in _settings.Profiles) p.LinkedProfiles.RemoveAll(id => id == model.Id); // связи с удалённым — не нужны
         RefreshLinks();

@@ -33,6 +33,8 @@
     <Compile Include="..\eViSTool.Core.Tests\Hosting\FolderRemoteFiles.cs" Link="Hosting\FolderRemoteFiles.cs" />
     <Compile Include="..\eViSTool.Core.Tests\Hosting\HostedFixture.cs" Link="Hosting\HostedFixture.cs" />
     <Compile Include="..\eViSTool.Core.Tests\Hosting\HostedLogSamples.cs" Link="Hosting\HostedLogSamples.cs" />
+    <!-- настоящие миры SQLite для копий мира у хостера -->
+    <Compile Include="..\eViSTool.Core.Tests\SqliteWorld.cs" Link="SqliteWorld.cs" />
   </ItemGroup>
 
   <ItemGroup>
