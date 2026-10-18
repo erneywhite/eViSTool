@@ -21,3 +21,7 @@ updates:
       nuget-minor:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+    ignore:
+      # Avalonia.Headless.XUnit 12 собран под xunit.v3 3.x: с 4.x тесты окна не находятся. Снять, когда Avalonia догонит
+      - dependency-name: "xunit.v3"
+        update-types: ["version-update:semver-major"]
