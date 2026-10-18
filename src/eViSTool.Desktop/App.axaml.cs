@@ -44,6 +44,9 @@ public partial class App : Application
             desktop.Exit += (_, _) => StartRestart();
             var main = new MainWindow { DataContext = new MainViewModel() };
             desktop.MainWindow = main;
+            // второй запуск из той же папки — показать это окно, а не открывать новое
+            if (Program.Instance is { } instance)
+                instance.ActivateRequested += () => Dispatcher.UIThread.Post(() => BringToFront(main));
             // ярлык в меню приложений Linux — после настроек: описание в нём на языке программы
             if (Snapshots.FromEnvironment() is null) LinuxDesktopEntry.Ensure();
             // снимок: экран → PNG → выход (см. Presentation.Snapshots)
@@ -57,6 +60,17 @@ public partial class App : Application
     /// Закрыть окно обычным путём (с вопросами про несохранённое) и после выхода запустить новую версию.
     /// Если закрытие отменили — перезапуска не будет.
     /// </summary>
+    /// <summary>Показать окно поверх остальных: развернуть из панели задач и сделать активным.</summary>
+    internal static void BringToFront(Window window)
+    {
+        if (window.WindowState == WindowState.Minimized) window.WindowState = WindowState.Normal;
+        window.Show();
+        window.Activate();
+        // поверх чужих окон Windows выводит неохотно — короткое «поверх всех» это обходит
+        window.Topmost = true;
+        window.Topmost = false;
+    }
+
     public static void RestartAfterClose(string exe)
     {
         _restartExe = exe;
