@@ -442,8 +442,8 @@ computer.
 
 A running server won't see new mods, so before a change eViSTool checks the log: if the server is stopped, it just
 goes ahead, otherwise it asks you to stop it in the host's panel. Starting and stopping the server and console
-commands stay in the host's panel. The password is stored encrypted and is never shown. SFTP works too: write the
-address as `sftp://host:port` and sign in with a password or with a private key file on your computer. You confirm the
+commands stay in the host's panel. The password is stored encrypted and is never shown. SFTP works too: pick it with the
+switch above the address (or write `sftp://host:port`) and sign in with a password or with a private key file on your computer. You confirm the
 server's key on the first connection, like an FTPS certificate; if the key changes later, eViSTool won't connect until
 you trust the new one.
 
@@ -515,7 +515,8 @@ and the release signature, and replaces the program. A running server is not int
 
 **Your data** — settings, saved versions of mods, downloads and logs — lives in the `data` folder next to `eViSTool.exe`.
 Move the program folder, and everything moves with it. (If eViSTool cannot write there, for example in `Program Files`,
-it uses `%LOCALAPPDATA%\eViSTool` instead.)
+it uses `%LOCALAPPDATA%\eViSTool` instead.) One window opens per data folder: starting eViSTool again brings the open
+window to the front. A copy of the program in another folder is a separate installation with its own data and runs alongside.
 
 **What eViSTool changes:** only mod folders, the game and server settings files (keeping a `.evistool.bak` copy of the previous state),
 backups in the `Backups` folder of server profiles (or in the chosen backup folder), and the data folders of profiles it created.
