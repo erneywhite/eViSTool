@@ -121,7 +121,7 @@ public sealed class HostedModsViewModelTests : IDisposable
     });
 
     [Fact]
-    public void Open_WithoutAnyVersionOnTheServer_ShowsTheVersionBannerAndOpensSettings() => Sta.Run(() =>
+    public void Open_WithoutAnyVersionOnTheServer_ShowsTheVersionBannerAndOpensProfiles() => Sta.Run(() =>
     {
         NoVersionOnTheServer();
 
@@ -132,7 +132,7 @@ public sealed class HostedModsViewModelTests : IDisposable
         Assert.False(mods.GameMissing);
         main.SelectedTab = AppTab.Mods;
         mods.OpenHostedSettingsCommand.Execute(null);
-        Assert.Equal(AppTab.Settings, main.SelectedTab);
+        Assert.Equal(AppTab.Profiles, main.SelectedTab); // версию игры сервера задают в карточке профиля
     });
 
     [Fact]
