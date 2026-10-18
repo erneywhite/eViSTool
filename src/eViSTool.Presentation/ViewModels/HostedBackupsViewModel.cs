@@ -358,7 +358,9 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
         try
         {
             state = await StateAsync(target, generation);
-            if (state is { } first && first != HostedServerState.Stopped)
+            // по логу работает (запускается, останавливается) — спрашивать «остановлен?» незачем, ниже сразу отказ с
+            // объяснением. Спрашиваем, только когда лог не уверен: упал (панель может тут же поднять его) или не понять
+            if (state is HostedServerState.Crashed or HostedServerState.Unknown)
             {
                 if (generation != _generation || !AskStopped(target)) return;
                 state = await StateAsync(target, generation);

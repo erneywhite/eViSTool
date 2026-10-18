@@ -399,7 +399,7 @@ public sealed class HostedBackupsViewModelTests : IDisposable
     });
 
     [Fact]
-    public void Restore_OnARunningServer_AsksToStopIt_AndRefusesWhenTheLogSaysItRuns() => Sta.Run(() =>
+    public void Restore_OnARunningServer_RefusesAtOnce_WithoutAskingWhetherItIsStopped() => Sta.Run(() =>
     {
         PutLog(HostedLogSamples.Stopped);
         PutWorld(World, "old");
@@ -408,21 +408,9 @@ public sealed class HostedBackupsViewModelTests : IDisposable
         var vm = Open();
         RestoreDialog(new HostedRestoreChoice(true), []);
 
-        // «Сервер остановлен?» — «Нет»: ничего, и без отказа в строке
-        using (var no = new ScriptedDialogs(Answer.No))
-        {
+        // по логу работает — вопрос «остановлен?» был бы пустым: «Да» всё равно упёрлось бы в лог
+        using (var dialogs = new ScriptedDialogs()) // любой вопрос уронил бы тест
             Sta.Wait(vm.RestoreCommand.ExecuteAsync(vm.Backups[0]));
-            Assert.Equal([Loc.T("hostedbk.stopAsk", _host.Profile.Name)], no.Asked);
-        }
-        Assert.Equal("", vm.ErrorText);
-        Assert.Empty(_host.Server.Writes);
-
-        // «Да», а лог говорит, что работает, — отказ с объяснением
-        using (var yes = new ScriptedDialogs(Answer.Yes))
-        {
-            Sta.Wait(vm.RestoreCommand.ExecuteAsync(vm.Backups[0]));
-            Assert.Equal([Loc.T("hostedbk.stopAsk", _host.Profile.Name)], yes.Asked);
-        }
 
         Assert.Equal(Loc.T("hostedbk.restoreRunning", Loc.T("hostedbk.stateRunning")), vm.ErrorText);
         Assert.False(vm.IsWorking);

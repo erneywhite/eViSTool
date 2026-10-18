@@ -1656,7 +1656,7 @@
   "hostedrst.extras": "Also mod settings, player data and mod data",
   "hostedrst.extrasHint": "ModConfig, Playerdata, ModData and mod data in Saves, as they were when the backup was made. serverconfig.json is left alone.",
   "hostedrst.noExtras": "This backup has no archive of mod settings and data, only the world will be restored.",
-  "hostedrst.stopHint": "Before uploading, the server log is checked. If it does not show the server as stopped, you will be asked first.",
+  "hostedrst.stopHint": "Before uploading, the server log is checked. If the server is running, nothing is uploaded until you stop it in the host’s panel. If the log is unclear, you will be asked first.",
   "hostedrst.go": "Restore",
   "report.attention": "Attention",
   "report.changedCount": "{0}: changes — {1}",
