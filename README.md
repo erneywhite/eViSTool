@@ -456,6 +456,14 @@ log once a minute and checks mod updates every 6 hours. It tells you when the se
 blame, if one is found), started or stopped, a player joined or left, the server can't keep up, mod updates are out or
 mods were updated. Once eViSTool is closed, nobody is watching the server.
 
+Keep the server's world on your own computer too: if you lose access to the host (the rental ends, the account is
+closed), the backup stays with you. On the Backups tab of the Server section, Download a backup now takes the world
+itself when the log says the server is stopped, and from a running server a fresh backup the game made with
+`/genbackup`. Mod settings and data are saved next to the world. Backups can also be downloaded on a schedule, daily
+or weekly, while eViSTool is open. If a scheduled backup fails, you get a notification (turn it on in the Notifications
+tab). How many backups to keep and which folder to use are set next to the schedule. A backup from the
+list can be put back on the server while the server is stopped; the previous world stays next to it as `.evistool.bak`.
+
 ## Server on Linux
 
 Dedicated Vintage Story servers often live on Linux. eViSTool goes there next to the server: an agent without a window
