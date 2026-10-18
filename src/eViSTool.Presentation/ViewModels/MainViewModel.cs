@@ -44,6 +44,7 @@ public sealed partial class MainViewModel : ObservableObject
         AppTab.Catalog => "nav.catalog",
         AppTab.ModConfig => "nav.modConfig",
         AppTab.Server => "nav.server",
+        AppTab.Profiles => "nav.profiles",
         AppTab.Settings => "nav.settings",
         AppTab.About => "nav.about",
         _ => "nav.mods",
@@ -69,7 +70,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (value == AppTab.ModConfig) _ = ModConfig.LoadAsync();    // конфиги — тоже, и свежие при каждом заходе
     }
 
-    /// <summary>Каналы оповещений этого компьютера — карточка в «Настройках».</summary>
+    /// <summary>Каналы оповещений этого компьютера — блок в «Настройках».</summary>
     public NotifyChannelsViewModel Notify { get; } = new();
 
     /// <summary>Проверки обновлений модов серверов у хостера: общие у сторожа оповещений и плашки «Обновить всё».</summary>
@@ -156,7 +157,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Окно о новой версии — раз за запуск программы и не поверх игры (условия — в <see cref="UpdatePrompt"/>).</summary>
     private void ShowUpdatePrompt() => _updatePrompt.Show();
 
-    /// <summary>Сделать профиль активным и открыть вкладку (0 — «Мои моды», 2 — «Сервер»).</summary>
+    /// <summary>Сделать профиль активным и открыть вкладку (номер из <see cref="AppTab"/>).</summary>
     public void SwitchTo(GameProfile profile, int tab)
     {
         if (Profiles.FirstOrDefault(p => p.Model.Id == profile.Id) is { } vm && ActiveProfile != vm) ActiveProfile = vm;
@@ -211,7 +212,7 @@ public sealed partial class MainViewModel : ObservableObject
         Server.OnProfileSwitched();
         Save(); // перенос настроек старого формата сразу на диск
         Mods.OnProfileSwitched(); // список модов виден сразу, без сети
-        Mods.SetActive(SelectedTab == 0); // и сам обновляется, если моды поменяли в другом окне
+        Mods.SetActive(SelectedTab == AppTab.Mods); // и сам обновляется, если моды поменяли в другом окне
         About.UpdateFound += () => ShowUpdatePrompt();
         _ = About.CheckQuietlyAsync(); // новая версия программы — окно «Вышла новая версия» и подсказка в боковой панели
 
@@ -273,8 +274,11 @@ public sealed partial class MainViewModel : ObservableObject
     public bool ConfirmExit() => Server.Config.ConfirmClose() && ModConfig.ConfirmLeave();
 }
 
-/// <summary>Номера вкладок — в порядке боковой панели (MainWindow.xaml).</summary>
+/// <summary>
+/// Номера вкладок — в порядке боковой панели и страниц (MainWindow.axaml). «Профили» — всё про конкретный профиль,
+/// «Настройки» — общее для всей программы.
+/// </summary>
 public static class AppTab
 {
-    public const int Mods = 0, Catalog = 1, ModConfig = 2, Server = 3, Settings = 4, About = 5;
+    public const int Mods = 0, Catalog = 1, ModConfig = 2, Server = 3, Profiles = 4, Settings = 5, About = 6;
 }

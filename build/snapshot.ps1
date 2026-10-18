@@ -9,11 +9,11 @@
     поэтому снимки повторяемы. Настоящие данные пользователя не трогаются: окно берёт папку data рядом с собой.
 
     Экраны и их имена — в src/eViSTool.Presentation/Snapshots.cs (mods, mods.card, mods.history, catalog, modconfig,
-    settings, about, server[.console|players|stats|announcements|config[.general|world|roles|advanced]|schedule|
+    profiles, settings, about, server[.console|players|stats|announcements|config[.general|world|roles|advanced]|schedule|
     remote|notify]).
 
 .EXAMPLE
-    pwsh build/snapshot.ps1 -Screens mods,mods.card,settings
+    pwsh build/snapshot.ps1 -Screens mods,mods.card,profiles,settings
     # → <Out>\mods.png, <Out>\mods.card.png, ... (папка Out печатается в конце)
 
 .EXAMPLE

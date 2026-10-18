@@ -13,7 +13,7 @@ public sealed record SnapshotRequest(string Screen, string OutPath, int Width, i
 /// EVISTOOL_SNAPSHOT, переходит на нужный экран, ждёт, сохраняет себя в PNG и закрывается. Данные и навигацию окно берёт отсюда — снимки воспроизводимы.
 /// Формат: <c>screen=server.config.world;out=C:\snap\a.png;size=1400x860;wait=5;profile=Сервер</c> (size, wait, profile —
 /// необязательно).
-/// Экраны: mods, mods.history, mods.card, catalog, catalog.card, modconfig[.&lt;modid&gt;], settings, about[.update], server[.console|players|stats|announcements|
+/// Экраны: mods, mods.history, mods.card, catalog, catalog.card, modconfig[.&lt;modid&gt;], profiles, settings, about[.update], server[.console|players|stats|announcements|
 /// config[.general|world|roles|advanced]|schedule|remote|notify|backups] (backups — у профиля у хостера).
 /// Окна: dialog.&lt;имя&gt; — окно открывает метод с атрибутом <see cref="SnapshotDialogAttribute"/> (по файлу на окно в папке
 /// SnapshotDialogs); снимается верхнее окно, а не главное.
@@ -62,6 +62,7 @@ public static class Snapshots
             "catalog" => AppTab.Catalog,
             "modconfig" => AppTab.ModConfig,
             "server" => AppTab.Server,
+            "profiles" => AppTab.Profiles,
             "settings" => AppTab.Settings,
             "about" => AppTab.About,
             _ => throw new ArgumentException($"Неизвестный экран для снимка: {screen}"),

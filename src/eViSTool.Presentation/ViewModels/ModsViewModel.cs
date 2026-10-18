@@ -285,9 +285,9 @@ public sealed partial class ModsViewModel : ObservableObject
 
     public string HostedVersionMissingText => Loc.T("hosted.versionMissing");
 
-    /// <summary>Перейти к настройкам профиля (подключение, версия игры сервера у хостера).</summary>
+    /// <summary>Перейти к настройкам профиля в «Профилях» (подключение, версия игры сервера у хостера).</summary>
     [RelayCommand]
-    private void OpenHostedSettings() => _main.SelectedTab = AppTab.Settings;
+    private void OpenHostedSettings() => _main.SelectedTab = AppTab.Profiles;
 
     /// <summary>
     /// Цель для действия, начатого сейчас: снимок активного профиля. Дальше операция работает только с ней —
