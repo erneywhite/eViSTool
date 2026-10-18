@@ -35,6 +35,9 @@ public sealed record AlsoInstallAnswer(IReadOnlyList<object> Chosen, bool Rememb
 /// <summary>Ответ окна «Сервер в избранном»: название, адрес (с портом или без) и пароль (null — без пароля).</summary>
 public sealed record FavoriteServerChoice(string Name, string Address, string? Password);
 
+/// <summary>Ответ окна «Восстановить мир на сервер»: вернуть ли вместе с миром настройки модов, игроков и данные модов.</summary>
+public sealed record HostedRestoreChoice(bool Extras);
+
 /// <summary>
 /// Окна программы, которые открывают модели. Модальные возвращают ответ (null — закрыли без выбора), остальные просто
 /// показываются. Реализация — у окна (<c>AvaloniaAppWindows</c>); модели знают только этот интерфейс.
@@ -84,6 +87,11 @@ public interface IAppWindows
     string? PickRemoteFolder(IServerData data, string? start, string heading);
     /// <summary>Все команды сервера с поиском; выбранная — для поля ввода консоли.</summary>
     ServerCommand? PickServerCommand(ServerViewModel server);
+    /// <summary>
+    /// Вопрос перед восстановлением копии мира на сервер у хостера: дата копии, что мир на сервере заменится, галочка
+    /// «и настройки модов, игроков и данные модов». null — отказались.
+    /// </summary>
+    HostedRestoreChoice? ConfirmHostedRestore(HostedWorldBackup backup, string serverName);
 
     // ---- немодальные
     void ShowModErrors(MainViewModel main, GameProfile profile, ModErrorReport report);

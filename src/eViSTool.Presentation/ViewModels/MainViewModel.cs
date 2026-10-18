@@ -77,6 +77,9 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Оповещения серверов у хостера: агента там нет, шлёт само окно, пока открыто.</summary>
     public HostedWatch HostedWatch { get; }
 
+    /// <summary>Копии мира серверов у хостера: скачивание и восстановление — общие у вкладки «Копии» и расписания сторожа.</summary>
+    public HostedWorldJobs HostedWorldJobs { get; } = new();
+
     // ---- наблюдение за запущенной игрой (сама работа — в GameWatcher)
 
     /// <summary>Игра этого профиля сейчас запущена (по последней проверке).</summary>
@@ -196,7 +199,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         // обновления модов у хостера — тем же путём, что «Проверить» в «Моих модах», с той же настройкой пре-релизов
         HostedUpdates = new HostedModUpdates((target, ct) => Core.Mods.ModUpdatesDue.CheckAsync(target, new Core.Mods.ModUpdateService(db), AllowUnstable, ct));
-        HostedWatch = new HostedWatch(Profiles, HostedUpdates);
+        HostedWatch = new HostedWatch(Profiles, HostedUpdates, jobs: HostedWorldJobs); // и копии мира по расписанию
         Mods = new ModsViewModel(this, db);
         Catalog = new CatalogViewModel(this, db);
         ModConfig = new ModConfigViewModel(this);
@@ -217,7 +220,7 @@ public sealed partial class MainViewModel : ObservableObject
         _diskUpdate.Start();
         LoadErrorReport();
         _serverCrashes.Start();
-        HostedWatch.Start(); // у хостера оповещения шлёт окно: лог раз в минуту, обновления модов раз в 6 часов
+        HostedWatch.Start(); // у хостера оповещения шлёт окно: лог раз в минуту, обновления модов раз в 6 часов, копии мира по расписанию
         _ = CheckGameAsync();
         _ = _remoteAgents.KeepAsync();
     }

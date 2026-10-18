@@ -348,13 +348,14 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
         _ => "",
     };
 
-    /// <summary>Подсказки у хостера: где событие узнаётся иначе, чем у агента (по логу, раз в 6 часов, окном), — свои.</summary>
+    /// <summary>Подсказки у хостера: где событие узнаётся иначе, чем у агента (по логу, раз в 6 часов, окном, копия на этот компьютер), — свои.</summary>
     private static string HostedHint(NotifyEvent e) => e switch
     {
         NotifyEvent.ServerCrashed => Loc.T("srvnotify.hostedCrashedHint"),
         NotifyEvent.ServerStopped => Loc.T("srvnotify.hostedStoppedHint"),
         NotifyEvent.ModUpdates => Loc.T("srvnotify.hostedModUpdatesHint"),
         NotifyEvent.ModsUpdated => Loc.T("srvnotify.hostedModsUpdatedHint"),
+        NotifyEvent.BackupFailed => Loc.T("srvnotify.hostedBackupFailedHint"),
         _ => Hint(e),
     };
 }

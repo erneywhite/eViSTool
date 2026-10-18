@@ -418,15 +418,19 @@ public sealed class HostedModConfigSource : IModConfigSource
     /// <summary>Отпечаток содержимого: по нему восстановление узнаёт, наш ли файл встал на место.</summary>
     private static string Fingerprint(byte[] content) => Convert.ToHexString(SHA256.HashData(content));
 
-    /// <summary>Отметка «файл сейчас лежит на сервере как bak». Подстраховка: не записалась — запись идёт и без неё.</summary>
-    private static void MarkSwap(string profileId, string path, byte[] content) =>
+    /// <summary>
+    /// Отметка «файл сейчас лежит на сервере как bak». Подстраховка: не записалась — запись идёт и без неё. Ею же
+    /// пользуется восстановление настроек и данных модов из копии мира (<see cref="HostedWorldBackups"/>): вернёт bak
+    /// <see cref="RecoverAsync"/> при следующем скане.
+    /// </summary>
+    internal static void MarkSwap(string profileId, string path, byte[] content) =>
         Quietly(() =>
         {
             Directory.CreateDirectory(SwapDir(profileId));
             File.WriteAllText(SwapFile(profileId, path), path + "\n" + Fingerprint(content));
         });
 
-    private static void ClearSwap(string profileId, string path) => Quietly(() => File.Delete(SwapFile(profileId, path)));
+    internal static void ClearSwap(string profileId, string path) => Quietly(() => File.Delete(SwapFile(profileId, path)));
 
     /// <summary>
     /// Отметки профиля: файл отметки, путь на сервере и отпечаток заливаемого (нет — null). Битая отметка — как нет (и

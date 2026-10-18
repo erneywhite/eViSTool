@@ -73,6 +73,19 @@ public sealed class MiniFtpOptions
         return this;
     }
 
+    /// <summary>
+    /// Передачи RETR, которые сервер сам обрывает посередине: файл (часть пути) и сколько байт отдать до обрыва; каждая
+    /// запись срабатывает один раз. С <see cref="MuteAfterAbort"/> (G-Portal) сервер закрывает после этого и управляющее
+    /// соединение, без него отвечает «426» и работает дальше (vsftpd).
+    /// </summary>
+    public List<(string PathPart, long After)> Cuts { get; } = [];
+
+    public MiniFtpOptions Cut(string pathPart, long after)
+    {
+        lock (Cuts) Cuts.Add((pathPart, after));
+        return this;
+    }
+
     public static MiniFtpOptions GPortal()
     {
         var o = new MiniFtpOptions
@@ -178,7 +191,7 @@ public sealed class MiniFtpServer : IAsyncDisposable
         private readonly MiniFtpOptions _o = server.Options;
         private Stream _stream = client.GetStream();
         private string _cwd = "/";
-        private bool _loggedIn, _protP, _mute, _binary = true;
+        private bool _loggedIn, _protP, _mute, _drop, _binary = true;
         private string? _user, _renameFrom;
         private long _restart;
         private TcpListener? _passive;
@@ -206,6 +219,7 @@ public sealed class MiniFtpServer : IAsyncDisposable
                     }
                     if (verb == "QUIT") { await ReplyAsync("221 Goodbye."); break; }
                     await HandleAsync(verb, arg, ct);
+                    if (_drop) break; // оборвали передачу — закрываем и управляющее соединение
                 }
             }
             catch (Exception) { /* клиент ушёл — сессии конец */ }
@@ -434,23 +448,45 @@ public sealed class MiniFtpServer : IAsyncDisposable
             var offset = _restart;
             _restart = 0;
             if (!File.Exists(local)) { await ReplyAsync(_o.NotFoundText); return; }
+            long? cut = null;
+            lock (_o.Cuts)
+            {
+                var i = _o.Cuts.FindIndex(c => path.Contains(c.PathPart, StringComparison.Ordinal));
+                if (i >= 0)
+                {
+                    cut = _o.Cuts[i].After;
+                    _o.Cuts.RemoveAt(i);
+                }
+            }
             await ReplyAsync("150 Opening BINARY mode data connection.");
             if (await OpenDataAsync(ct) is not { } d) return;
             var aborted = false;
+            var cutShort = false;
             using (d.Client)
             {
                 try
                 {
                     await using var file = new FileStream(local, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                     file.Position = Math.Min(offset, file.Length);
+                    var limit = cut is { } c ? file.Position + c : long.MaxValue;
                     var buffer = new byte[16 * 1024];
                     int n;
-                    while ((n = await file.ReadAsync(buffer, ct)) > 0) await d.Stream.WriteAsync(buffer.AsMemory(0, n), ct);
+                    while (file.Position < limit && (n = await file.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, limit - file.Position)), ct)) > 0)
+                        await d.Stream.WriteAsync(buffer.AsMemory(0, n), ct);
+                    // обрыв — только заданный: файл, который растёт во время передачи, отдаётся как обычно
+                    cutShort = cut is not null && file.Position < file.Length;
                     await d.Stream.FlushAsync(ct);
                     if (d.Stream is SslStream ssl) await ssl.ShutdownAsync();
                 }
                 catch (IOException) { aborted = true; }
                 try { await d.Stream.DisposeAsync(); } catch (IOException) { aborted = true; }
+            }
+            if (cutShort && !aborted)
+            {
+                // сервер сам оборвал передачу посреди файла: G-Portal после этого закрывает и управляющее соединение
+                if (_o.MuteAfterAbort) { _drop = true; return; }
+                await ReplyAsync("426 Connection closed; transfer aborted.");
+                return;
             }
             if (!aborted) { await ReplyAsync("226 Transfer complete."); return; }
             if (_o.MuteAfterAbort) { _mute = true; return; }

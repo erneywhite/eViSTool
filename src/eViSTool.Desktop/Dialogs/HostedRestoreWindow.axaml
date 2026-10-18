@@ -1,0 +1,39 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:local="using:eViSTool.Desktop"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      x:Class="eViSTool.Desktop.Dialogs.HostedRestoreWindow"
+                      x:DataType="vm:HostedRestoreViewModel"
+                      Title="{local:Tr hostedrst.title}" Width="520" SizeToContent="Height" CanResize="False">
+    <!-- ширина — содержимого окна, без рамки -->
+    <StackPanel Margin="24,20,24,22">
+        <TextBlock Classes="dialogTitle" Text="{Binding Heading}" AutomationProperties.AutomationId="HostedRestoreHeading" />
+        <!-- какая копия: дата, размер, откуда скачана -->
+        <TextBlock Classes="dialogLead" Text="{Binding CopyText}" AutomationProperties.AutomationId="HostedRestoreCopy" />
+
+        <!-- мир на сервере заменится, нынешний останется рядом как bak -->
+        <Border Classes="warning" Margin="0,14,0,0">
+            <StackPanel>
+                <TextBlock Text="{local:Tr hostedrst.warning}" TextWrapping="Wrap" FontSize="13" Foreground="{DynamicResource Forest.Warn}" />
+                <!-- копия не этого профиля: может быть миром другого сервера -->
+                <TextBlock Text="{Binding Foreign}" TextWrapping="Wrap" FontSize="13" Foreground="{DynamicResource Forest.Warn}" Margin="0,8,0,0"
+                           IsVisible="{Binding HasForeign}" AutomationProperties.AutomationId="HostedRestoreForeign" />
+            </StackPanel>
+        </Border>
+
+        <CheckBox Content="{local:Tr hostedrst.extras}" IsChecked="{Binding Extras}" IsEnabled="{Binding HasExtra}" Margin="0,16,0,0"
+                  AutomationProperties.AutomationId="HostedRestoreExtras" />
+        <TextBlock Classes="hint" Text="{Binding ExtrasHint}" Margin="28,2,0,0" AutomationProperties.AutomationId="HostedRestoreExtrasHint" />
+
+        <TextBlock Classes="hint" Text="{local:Tr hostedrst.stopHint}" Margin="0,14,0,0" />
+
+        <StackPanel Classes="dialogButtons" Margin="0,20,0,0">
+            <Button Classes="primary" Content="{local:Tr hostedrst.go}" Command="{Binding GoCommand}" Padding="18,8"
+                    AutomationProperties.AutomationId="HostedRestoreOk" />
+            <!-- по умолчанию (Enter) — «Отмена»: случайный Enter не должен менять мир на сервере -->
+            <Button Content="{local:Tr common.cancel}" IsDefault="True" Click="Cancel_Click" Margin="8,0,0,0" Padding="16,8"
+                    AutomationProperties.AutomationId="HostedRestoreCancel" />
+        </StackPanel>
+    </StackPanel>
+</dialogs:DialogWindow>

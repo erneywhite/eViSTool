@@ -13,7 +13,7 @@ using eViSTool.Core.Server.Remote;
 namespace eViSTool.Presentation.ViewModels;
 
 /// <summary>Виды раздела «Сервер».</summary>
-public enum ServerTab { Console, Players, Stats, Journal, Announcements, Config, Schedule, Remote, Notify }
+public enum ServerTab { Console, Players, Stats, Journal, Announcements, Config, Schedule, Remote, Notify, Backups }
 
 /// <summary>
 /// Вкладка «Сервер». Сервером владеет агент (отдельный процесс) — окно только показывает и командует,
@@ -69,6 +69,9 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     /// </summary>
     public ServerNotifyViewModel HostedNotify { get; }
 
+    /// <summary>Копии мира сервера у хостера на этом компьютере — третий вид его раздела.</summary>
+    public HostedBackupsViewModel HostedBackups { get; }
+
     /// <summary>Какой вид раздела открыт. Консоль продолжает получать строки при любом.</summary>
     [ObservableProperty] private ServerTab _tab;
 
@@ -81,6 +84,10 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     public bool IsConfigTab => Tab == ServerTab.Config;
     public bool IsScheduleTab => Tab == ServerTab.Schedule;
     public bool IsRemoteTab => Tab == ServerTab.Remote;
+    public bool IsBackupsTab => Tab == ServerTab.Backups;
+
+    /// <summary>У хостера открыт «Обзор»: любой вид, кроме «Оповещений» и «Копий».</summary>
+    public bool IsHostedOverviewTab => Tab is not (ServerTab.Notify or ServerTab.Backups);
 
     // состояние сервера профиля выяснено (первый проход слежения после смены профиля завершён)
     private bool _stateKnown;
@@ -181,6 +188,8 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         Notify = new ServerNotifyViewModel(this);
         Hosted = new HostedServerViewModel(main);
         HostedNotify = new ServerNotifyViewModel(this, hosted: true);
+        // операции с копиями мира — общие на окно (их делает и расписание); без главной модели (тесты раздела) — свои
+        HostedBackups = new HostedBackupsViewModel(main, main?.HostedWorldJobs ?? new HostedWorldJobs());
         // включили или выключили маршрут — сторож оповещений берёт профиль сразу, а не через минуту; не ушло — скажем на вкладке
         // (главной модели нет только в тестах раздела)
         HostedNotify.Saved += () => main?.HostedWatch?.Refresh();
@@ -195,6 +204,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     {
         if (open && IsHostedProfile) OnPropertyChanged(nameof(HeaderSubtitle)); // версию игры могло найти чтение модов
         Hosted.SetActive(open);
+        if (open && IsBackupsTab) HostedBackups.SetActive(true); // список копий — свежий при каждом заходе
     }
 
     partial void OnTabChanged(ServerTab value)
@@ -208,6 +218,8 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         OnPropertyChanged(nameof(IsConfigTab));
         OnPropertyChanged(nameof(IsScheduleTab));
         OnPropertyChanged(nameof(IsRemoteTab));
+        OnPropertyChanged(nameof(IsBackupsTab));
+        OnPropertyChanged(nameof(IsHostedOverviewTab));
         Config.SetActive(value == ServerTab.Config);
         Schedule.SetActive(value == ServerTab.Schedule);
         Players.SetActive(value == ServerTab.Players);
@@ -216,6 +228,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         Journal.SetActive(value == ServerTab.Journal);
         Notify.SetActive(value == ServerTab.Notify);
         HostedNotify.SetActive(value == ServerTab.Notify);
+        HostedBackups.SetActive(value == ServerTab.Backups);
         if (value != ServerTab.Remote) Remote.Hide(); // ушли с вкладки — код подключения снова закрыт
     }
 
@@ -274,6 +287,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         Notify.OnLanguageChanged();
         Hosted.OnLanguageChanged();
         HostedNotify.OnLanguageChanged();
+        HostedBackups.OnLanguageChanged();
     }
 
     /// <summary>Сменился профиль: отключиться от старого агента, подключиться к агенту нового (если он работает).</summary>
@@ -303,13 +317,15 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         IsServerProfile = _main.ActiveProfile?.Kind == ProfileKind.Server && !IsHostedProfile;
         Hosted.OnProfileSwitched(IsHostedProfile ? _main.ActiveProfile?.Model : null);
         HostedNotify.OnProfileSwitched(IsHostedProfile ? _main.ActiveProfile?.Model : null);
+        HostedBackups.OnProfileSwitched(IsHostedProfile ? _main.ActiveProfile : null);
         IsRemoteProfile = _main.ActiveProfile?.Model.IsRemote == true;
         _remoteGameVersion = null;
         _remoteOs = null;
         // удалённый доступ настраивают на компьютере с сервером — у удалённого профиля этой вкладки нет
         if (IsRemoteProfile && Tab == ServerTab.Remote) Tab = ServerTab.Console;
-        // у хостера видов два: «Обзор» (тот же Console) и «Оповещения» — остальных у него нет
-        if (IsHostedProfile && Tab is not (ServerTab.Console or ServerTab.Notify)) Tab = ServerTab.Console;
+        // у хостера видов три: «Обзор» (тот же Console), «Оповещения» и «Копии» — остальных у него нет; «Копий» нет у своего
+        if (IsHostedProfile && Tab is not (ServerTab.Console or ServerTab.Notify or ServerTab.Backups)) Tab = ServerTab.Console;
+        if (!IsHostedProfile && Tab == ServerTab.Backups) Tab = ServerTab.Console;
         var local = IsServerProfile && !IsRemoteProfile;
         Refresh();
         // сюда попадаем и при правке имени профиля: редактор сам разберётся, сменился ли файл

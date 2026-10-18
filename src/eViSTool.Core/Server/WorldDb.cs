@@ -9,6 +9,9 @@ namespace eViSTool.Core.Server;
 /// </summary>
 public static class WorldDb
 {
+    /// <summary>Временная папка рядом с назначением, где журнал сводится в копию: «&lt;назначение&gt;.evistool-db».</summary>
+    public const string WorkSuffix = ".evistool-db";
+
     /// <summary>Рядом с файлом мира непустой журнал SQLite.</summary>
     public static bool HasJournal(string file) => new FileInfo(file + "-wal") is { Exists: true, Length: > 0 };
 
@@ -26,7 +29,7 @@ public static class WorldDb
             return;
         }
 
-        var work = Directory.CreateDirectory(target + ".evistool-db").FullName;
+        var work = Directory.CreateDirectory(target + WorkSuffix).FullName;
         try
         {
             var db = Path.Combine(work, "world.vcdbs");

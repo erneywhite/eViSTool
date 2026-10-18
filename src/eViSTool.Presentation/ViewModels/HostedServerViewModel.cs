@@ -412,8 +412,9 @@ public sealed partial class HostedServerViewModel : ObservableObject
     /// <summary>
     /// Что случилось — законченным предложением: за ним в строке идёт «попробую снова…». Сертификату и ключу сервера
     /// здесь доверить нельзя (это делают в «Настройках»), поэтому совет «доверяй, только если…» не к месту — свой текст.
+    /// Так же говорят об ошибках копии мира (<see cref="HostedWorldText"/>).
     /// </summary>
-    private static string Describe(Exception ex)
+    internal static string Describe(Exception ex)
     {
         if (ex is RemoteFilesException { Kind: RemoteFailure.CertificateUntrusted, IsHostKey: true } hostKey)
             return hostKey.HostKeyChanged ? Loc.T("server.hostedHostKeyChanged") : Loc.T("server.hostedHostKeyUntrusted");

@@ -43,6 +43,21 @@ public sealed class FolderRemoteFiles(string root) : IRemoteFiles
     /// <summary>Следующая операция оборвёт соединение (<see cref="RemoteFailure.Connect"/>), потом нужно переподключиться.</summary>
     public bool DropNext { get; set; }
 
+    /// <summary>
+    /// Ответ потерялся: (операция, путь) → true — переименование выполняется, а потом соединение падает
+    /// (<see cref="RemoteFailure.Connect"/>), будто ответ сервера не дошёл. Путь — откуда.
+    /// </summary>
+    public Func<string, string, bool>? LoseReplyOn { get; set; }
+
+    /// <summary>
+    /// Передачи файла (скачивание и докачка), которые рвутся, отдав столько байт: соединение падает
+    /// (<see cref="RemoteFailure.Connect"/>), как у G-Portal после обрыва посреди файла. Каждая запись — один раз, по порядку.
+    /// </summary>
+    public List<(string Path, long After)> CutDownloads { get; } = [];
+
+    /// <summary>Какие файлы и с каких позиций качались: обычное скачивание — 0, докачка — позиция.</summary>
+    public List<(string Path, long Offset)> DownloadOffsets { get; } = [];
+
     public int Connects { get; private set; }
 
     /// <summary>Сколько раз выполнялась каждая операция.</summary>
@@ -122,8 +137,51 @@ public sealed class FolderRemoteFiles(string root) : IRemoteFiles
     public async Task DownloadAsync(string path, Stream destination, IProgress<long>? progress, CancellationToken ct)
     {
         Step("download", path);
+        lock (_gate) DownloadOffsets.Add((RemotePath.Normalize(path), 0));
         await using var s = System.IO.File.OpenRead(FileOf(path));
-        await s.CopyToAsync(destination, ct);
+        await SendAsync(path, s, destination, ct);
+    }
+
+    public async Task DownloadFromAsync(string path, long offset, Stream destination, IProgress<long>? progress, CancellationToken ct)
+    {
+        Step("download", path);
+        if (offset > 0 && NoRange) throw new RemoteFilesException(RemoteFailure.RangeUnsupported, "502 REST not implemented");
+        lock (_gate) DownloadOffsets.Add((RemotePath.Normalize(path), offset));
+        await using var s = System.IO.File.OpenRead(FileOf(path));
+        s.Position = Math.Min(offset, s.Length);
+        await SendAsync(path, s, destination, ct);
+    }
+
+    /// <summary>Передать файл до конца — или, если передача должна оборваться (<see cref="CutDownloads"/>), столько байт и обрыв.</summary>
+    private async Task SendAsync(string path, Stream source, Stream destination, CancellationToken ct)
+    {
+        long? cut = null;
+        var normalized = RemotePath.Normalize(path);
+        lock (_gate)
+        {
+            var i = CutDownloads.FindIndex(c => c.Path == normalized);
+            if (i >= 0)
+            {
+                cut = CutDownloads[i].After;
+                CutDownloads.RemoveAt(i);
+            }
+        }
+        if (cut is not { } left)
+        {
+            await source.CopyToAsync(destination, ct);
+            return;
+        }
+        var buffer = new byte[64 * 1024];
+        while (left > 0)
+        {
+            var n = await source.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, left)), ct);
+            if (n == 0) return; // файл кончился раньше обрыва
+            await destination.WriteAsync(buffer.AsMemory(0, n), ct);
+            left -= n;
+        }
+        if (source.Position >= source.Length) return;
+        IsConnected = false;
+        throw new RemoteFilesException(RemoteFailure.Connect, "426 connection lost mid-transfer");
     }
 
     public async Task UploadAsync(Stream source, string path, IProgress<long>? progress, CancellationToken ct)
@@ -137,6 +195,7 @@ public sealed class FolderRemoteFiles(string root) : IRemoteFiles
     public Task RenameAsync(string from, string to, CancellationToken ct)
     {
         Step("rename", from);
+        ct.ThrowIfCancellationRequested(); // отменили до команды — команда не уходит
         var src = Exact(from) ?? throw new RemoteFilesException(RemoteFailure.NotFound, $"550 {from}: no such file");
         var existing = Exact(to);
         if (existing is not null && NoRenameOverwrite) throw new RemoteFilesException(RemoteFailure.Exists, "550 path already exists");
@@ -144,6 +203,11 @@ public sealed class FolderRemoteFiles(string root) : IRemoteFiles
         if (Directory.Exists(src)) Directory.Move(src, dest);
         else System.IO.File.Move(src, dest, overwrite: true);
         lock (_gate) Writes.Add($"rename {RemotePath.Normalize(from)} → {RemotePath.Normalize(to)}");
+        if (LoseReplyOn?.Invoke("rename", RemotePath.Normalize(from)) == true)
+        {
+            IsConnected = false;
+            throw new RemoteFilesException(RemoteFailure.Connect, "421 connection lost");
+        }
         return Task.CompletedTask;
     }
 

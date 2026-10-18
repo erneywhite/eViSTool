@@ -1,0 +1,15 @@
+eViSTool 0.14.0 for Linux: copies of a hosted server's world on your own computer.
+
+- Hosted server → Server → Backups: back up the world now or on a schedule (daily or weekly, while eViSTool is running). A stopped server gives its world, a running one — the freshest complete copy the game made (/genbackup). Mod settings, player data, mod data and the mod list are kept next to it; the last N copies are kept (7 by default).
+- Downloads resume after a dropped connection; a copy is thrown away if the world changed during the download.
+- Restore to the server only when it is stopped by its log; the current world stays on the server as ….evistool.bak and comes back if anything fails halfway.
+- A failed scheduled copy sends a notification.
+
+---
+
+eViSTool 0.14.0 для Linux: копии мира сервера у хостера на твоём компьютере.
+
+- Сервер у хостера → «Сервер» → «Копии»: скачать копию мира сейчас или по расписанию (раз в сутки или в неделю, пока eViSTool запущен). У остановленного сервера скачивается сам мир, у работающего — свежая целая копия, которую сделала игра (/genbackup). Рядом сохраняются настройки модов, данные игроков, данные модов и список модов; хранятся последние N копий (по умолчанию 7).
+- Скачивание продолжается после обрыва связи; если мир поменялся во время скачивания, копия выбрасывается.
+- Восстановить на сервер можно, только когда он по логу остановлен; нынешний мир остаётся на сервере как ….evistool.bak и возвращается, если что-то оборвалось посередине.
+- Если копия по расписанию не получилась, придёт оповещение.

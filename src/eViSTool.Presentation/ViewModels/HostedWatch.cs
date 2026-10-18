@@ -17,16 +17,20 @@ namespace eViSTool.Presentation.ViewModels;
 /// (<see cref="HostedLogsPool"/>): пока раздел открыт и сам читает лог раз в 3 с, сторож своих запросов не шлёт и берёт
 /// события из тех же опросов (<see cref="HostedLogs.WatchAsync"/>) — ни одно не теряется и не приходит дважды. Событий
 /// немного (<see cref="Events"/>): упал (с виновником), запущен, остановлен, игрок зашёл и вышел, перегружен, вышли
-/// обновления модов, моды обновлены окном. Первый опрос после запуска окна или включения оповещений только запоминает,
-/// что есть: вылет вчера, игроки на сервере и текущее состояние — не новость. Окон на машине может быть несколько, а
-/// следит за профилем одно (<see cref="HostedWatchLease"/>). Всё, кроме отправки, — в потоке окна.
+/// обновления модов, моды обновлены окном, копия мира по расписанию не получилась. Первый опрос после запуска окна или
+/// включения оповещений только запоминает, что есть: вылет вчера, игроки на сервере и текущее состояние — не новость.
+/// Окон на машине может быть несколько, а следит за профилем одно (<see cref="HostedWatchLease"/>). Тот же таймер
+/// скачивает копии мира по расписанию (HostedWatch.Backups.cs) — у всех хостовых профилей, где оно включено, с
+/// маршрутами оповещений или без; пока копия профиля идёт, его лог и обновления модов сторож не читает. Всё, кроме
+/// отправки, — в потоке окна.
 /// </summary>
 /// <param name="profiles">Все профили окна (живой список: хостовые выбираются при каждом проходе).</param>
 /// <param name="updates">Проверки обновлений модов — общие с плашкой «Обновить всё».</param>
 /// <param name="time">Часы (тесты двигают их сами).</param>
 /// <param name="agentsDir">Где лежат настройки оповещений; null — папка агентов этой машины.</param>
-public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedModUpdates updates, TimeProvider? time = null,
-    string? agentsDir = null)
+/// <param name="jobs">Операции с копиями мира — общие с вкладкой «Копии»; null — копий по расписанию нет.</param>
+public sealed partial class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedModUpdates updates, TimeProvider? time = null,
+    string? agentsDir = null, HostedWorldJobs? jobs = null)
 {
     /// <summary>Как часто читать лог, когда раздел «Сервер» его не читает.</summary>
     public static readonly TimeSpan Interval = TimeSpan.FromMinutes(1);
@@ -46,13 +50,14 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
     public static readonly TimeSpan ModsRetry = TimeSpan.FromMinutes(30);
 
     /// <summary>
-    /// События сервера у хостера. Нет: копии мира, места на диске, скорого перезапуска, «не запустился» (этого не видно
-    /// по FTP) и чата в Discord (мост чата есть только у своего сервера).
+    /// События сервера у хостера. Копия мира — та, что окно скачивает по расписанию на этот компьютер. Нет: места на
+    /// диске, скорого перезапуска, «не запустился» (этого не видно по FTP) и чата в Discord (мост чата есть только у
+    /// своего сервера).
     /// </summary>
     public static readonly IReadOnlyList<NotifyEvent> Events =
     [
         NotifyEvent.ServerCrashed, NotifyEvent.ServerStarted, NotifyEvent.ServerStopped, NotifyEvent.PlayerJoined,
-        NotifyEvent.PlayerLeft, NotifyEvent.Overloaded, NotifyEvent.ModUpdates, NotifyEvent.ModsUpdated,
+        NotifyEvent.PlayerLeft, NotifyEvent.Overloaded, NotifyEvent.ModUpdates, NotifyEvent.ModsUpdated, NotifyEvent.BackupFailed,
     ];
 
     // ради этих событий лог читается раз в минуту
@@ -68,6 +73,10 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
     private readonly TimeProvider _time = time ?? TimeProvider.System;
     private readonly HostedModUpdates _updates = updates;
     private readonly string? _agentsDir = agentsDir;
+    private readonly HostedWorldJobs? _jobs = jobs;
+
+    /// <summary>Профили окна — для копий по расписанию (HostedWatch.Backups.cs).</summary>
+    private IEnumerable<ProfileViewModel> Profiles => profiles;
     private readonly Dictionary<string, ProfileWatch> _watches = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Task> _sending = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (GameProfile Profile, List<string> Done, List<string> Failed)> _changed = new(StringComparer.Ordinal);
@@ -119,8 +128,9 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
 
     /// <summary>
     /// Один проход: кого сторожить (хостовый профиль с включённым маршрутом), а кого отпустить (удалён, не у хостера,
-    /// маршруты выключены — без висящих подписок и замков); тем, кому пора, — опрос лога и проверка обновлений модов.
-    /// Пока предыдущий проход не кончился, новый по таймеру не начинается.
+    /// маршруты выключены — без висящих подписок и замков); тем, кому пора, — опрос лога и проверка обновлений модов;
+    /// затем — копия мира по расписанию, если её пора скачать. Пока предыдущий проход не кончился, новый по таймеру не
+    /// начинается.
     /// </summary>
     public async Task TickAsync()
     {
@@ -141,6 +151,7 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
                     if (!_watches.TryGetValue(id, out var watch)) _watches[id] = watch = new ProfileWatch(this, profile);
                     await watch.TickAsync(profile, settings);
                 }
+                await CheckBackupsAsync();
             }
             while (_again);
         }
@@ -307,11 +318,14 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
                 }
                 // подключение поправили (пароль, сертификат) — прежний отказ во входе уже не про него
                 if (_haltedOn is { } halted && halted != target.Hosted!.Endpoint) _haltedOn = null;
+                // копия мира этого сервера держит его соединение всю передачу: опрос ждал бы её конца и задержал бы весь
+                // проход, а с ним — остальные серверы. Лог и обновления модов — после неё
+                var busy = owner._jobs?.Running(Id) is not null;
                 if (LogEvents.Any(e => settings.ChannelsFor(e).Any()))
                 {
                     var logs = HostedLogsPool.For(target); // подключение поменяли — экземпляр новый: подписаться заново
-                    if (!ReferenceEquals(logs, Logs)) await AttachAsync(logs);
-                    var polled = Logs is { } attached && CanConnect && owner.UtcNow - _lastPoll >= Interval - Slack && await PollAsync(attached);
+                    if (!busy && !ReferenceEquals(logs, Logs)) await AttachAsync(logs); // подписка ждёт конца идущего опроса
+                    var polled = !busy && Logs is { } attached && CanConnect && owner.UtcNow - _lastPoll >= Interval - Slack && await PollAsync(attached);
                     // поиск вылета — в общей очереди с разбором опросов. Сорвался из-за сети — повтор с той же паузой, что у
                     // опроса. Вылет текущего запуска ещё не отдан — ищем только после своего опроса: пока лог читает раздел
                     // «Сервер», вылет ищет он сам, а поиск сразу за поиском не оставил бы логам времени подождать
@@ -321,7 +335,7 @@ public sealed class HostedWatch(IEnumerable<ProfileViewModel> profiles, HostedMo
                         Enqueue(null);
                 }
                 else Detach();
-                if (!_disposed && settings.ChannelsFor(NotifyEvent.ModUpdates).Any()) await CheckModsAsync(target);
+                if (!_disposed && !busy && settings.ChannelsFor(NotifyEvent.ModUpdates).Any()) await CheckModsAsync(target);
             }
             finally
             {

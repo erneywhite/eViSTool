@@ -52,7 +52,8 @@
                 </StackPanel>
             </DockPanel>
 
-            <!-- виды раздела у хостера: обзор (лог, состояние, игроки) и оповещения — те же вкладки, что у своего сервера -->
+            <!-- виды раздела у хостера: обзор (лог, состояние, игроки), оповещения — те же вкладки, что у своего сервера — и копии мира
+                 на этом компьютере -->
             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,16,0,0">
                 <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="HostedMode" FontSize="15" Content="{local:Tr server.hostedTabOverview}"
                              IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Console}"
@@ -60,13 +61,19 @@
                 <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="HostedMode" FontSize="15" Content="{local:Tr srvnotify.tab}"
                              IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Notify}"
                              AutomationProperties.AutomationId="HostedTabNotify" />
+                <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="HostedMode" FontSize="15" Content="{local:Tr server.hostedTabBackups}"
+                             IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Backups}"
+                             AutomationProperties.AutomationId="HostedTabBackups" />
             </StackPanel>
             <Panel>
-                <Panel IsVisible="{Binding !IsNotifyTab}">
+                <Panel IsVisible="{Binding IsHostedOverviewTab}">
                     <views:ServerHostedView DataContext="{Binding Hosted}" />
                 </Panel>
                 <Panel IsVisible="{Binding IsNotifyTab}">
                     <views:ServerNotifyTab DataContext="{Binding HostedNotify}" />
+                </Panel>
+                <Panel IsVisible="{Binding IsBackupsTab}">
+                    <views:ServerHostedBackupsView DataContext="{Binding HostedBackups}" />
                 </Panel>
             </Panel>
         </DockPanel>

@@ -74,6 +74,34 @@ public interface IRemoteFiles : IAsyncDisposable
 
     Task DownloadAsync(string path, Stream destination, IProgress<long>? progress, CancellationToken ct);
 
+    /// <summary>
+    /// Докачать файл: с позиции <paramref name="offset"/> до конца, одной передачей (у G-Portal передача, брошенная
+    /// посреди файла, роняет соединение, поэтому кусками не читаем). Пишется в <paramref name="destination"/> с его
+    /// текущего места. Сервер не читает с позиции — <see cref="RemoteFailure.RangeUnsupported"/>.
+    /// <para>
+    /// Свои реализации — у адаптеров FTP и SFTP; здесь — запасная для остальных (подделки в тестах): с нуля — обычное
+    /// скачивание, с позиции — чтение кусками через <see cref="ReadRangeAsync"/>.
+    /// </para>
+    /// </summary>
+    async Task DownloadFromAsync(string path, long offset, Stream destination, IProgress<long>? progress, CancellationToken ct)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        if (offset == 0)
+        {
+            await DownloadAsync(path, destination, progress, ct).ConfigureAwait(false);
+            return;
+        }
+        const int chunk = 1024 * 1024;
+        for (var at = offset; ; )
+        {
+            var bytes = await ReadRangeAsync(path, at, chunk, ct).ConfigureAwait(false);
+            await destination.WriteAsync(bytes, ct).ConfigureAwait(false);
+            at += bytes.Length;
+            progress?.Report(at - offset);
+            if (bytes.Length < chunk) return;
+        }
+    }
+
     /// <summary>Залить файл; существующий перезаписывается.</summary>
     Task UploadAsync(Stream source, string path, IProgress<long>? progress, CancellationToken ct);
 

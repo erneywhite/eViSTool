@@ -53,12 +53,21 @@ public sealed class LowDiskWatch
     {
         try
         {
+            return DiskOf(dir) is { } root ? new DriveInfo(root).AvailableFreeSpace : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return null; }
+    }
+
+    /// <summary>Диск, на котором лежит папка (её может ещё не быть): корень пути на Windows, точка монтирования на Linux; не узнать — null.</summary>
+    public static string? DiskOf(string dir)
+    {
+        try
+        {
             var full = Path.GetFullPath(dir);
             // на Linux корень пути всегда «/», а данные часто на своём разделе (/var, /home, отдельный диск)
-            var root = OperatingSystem.IsWindows()
+            return OperatingSystem.IsWindows()
                 ? Path.GetPathRoot(full)
                 : MountPointOf(full, DriveInfo.GetDrives().Select(d => d.RootDirectory.FullName));
-            return root is null ? null : new DriveInfo(root).AvailableFreeSpace;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return null; }
     }
