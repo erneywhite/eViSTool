@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <!-- клиент FTP/FTPS (MIT); на net10 берётся сборка net9.0, своих зависимостей нет -->
-    <PackageReference Include="FluentFTP" Version="55.0.0" />
+    <PackageReference Include="FluentFTP" Version="55.1.0" />
     <!-- клиент SFTP (MIT); тянет BouncyCastle.Cryptography (MIT, обмен ключами sntrup761/ML-KEM) и
          Microsoft.Extensions.Logging.Abstractions (журнал SSH.NET не задан — ничего не пишет) -->
     <PackageReference Include="SSH.NET" Version="2026.0.0" />
