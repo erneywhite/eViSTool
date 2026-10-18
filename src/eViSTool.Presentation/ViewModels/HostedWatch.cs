@@ -212,7 +212,12 @@ public sealed partial class HostedWatch(IEnumerable<ProfileViewModel> profiles, 
             _watches.Remove(id);
         }
         // профиль удалили, он не у хостера или маршруты выключены — его прежние ошибки отправки уже ни к чему
-        foreach (var id in _failures.Keys.Where(id => !wanted.ContainsKey(id)).ToList()) _failures.Remove(id);
+        // (открытая вкладка профиля узнаёт об этом и убирает их из строки ошибок)
+        foreach (var id in _failures.Keys.Where(id => !wanted.ContainsKey(id)).ToList())
+        {
+            _failures.Remove(id);
+            SendRecovered?.Invoke(id);
+        }
     }
 
     /// <summary>

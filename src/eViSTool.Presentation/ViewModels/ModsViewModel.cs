@@ -119,6 +119,7 @@ public sealed partial class ModsViewModel : ObservableObject
                      nameof(PinnedLabel), nameof(UnneededLabel), nameof(ShownText), nameof(UpdateAllText), nameof(DependencyText) })
             OnPropertyChanged(name);
         WorldJobText = _worldJob.Text;
+        RefreshSaidJob();
     }
 
     /// <summary>Ширина карточки (тянется разделителем, запоминается).</summary>
@@ -338,7 +339,7 @@ public sealed partial class ModsViewModel : ObservableObject
         _hosted.Reset();
         _worldJob.SetProfile(IsHosted ? _main.ActiveProfile?.Model.Id : null);
         WorldJobText = _worldJob.Text;
-        _worldJobSaid = null;
+        ForgetSaidJob();
         Locals = [];
         OnPropertyChanged(nameof(IsLocalProfile));
         OnPropertyChanged(nameof(IsHosted));
@@ -1030,6 +1031,9 @@ public sealed partial class ModsViewModel : ObservableObject
     /// <summary>Что сказала строка статуса, когда команду не начали из-за копии мира (кончится копия — строку убрать).</summary>
     private string? _worldJobSaid;
 
+    /// <summary>Чью копию назвала строка статуса: её ход строка повторяет, её конец строку убирает (профиль может быть и не открытый).</summary>
+    private HostedWorldJob? _saidJob;
+
     /// <summary>Идущая операция с копией мира у сервера у хостера этой цели; не у хостера или не идёт — null.</summary>
     private HostedWorldJob? WorldJob(ModTarget target) => target.IsHosted ? _main.HostedWorldJobs?.Running(target.ProfileId) : null;
 
@@ -1043,8 +1047,48 @@ public sealed partial class ModsViewModel : ObservableObject
     internal bool RejectWorldJob(ModTarget target)
     {
         if (WorldJob(target) is not { } job) return false;
-        StatusText = _worldJobSaid = HostedWorldBusy.Describe(job);
+        if (!ReferenceEquals(job, _saidJob))
+        {
+            ForgetSaidJob();
+            _saidJob = job;
+            job.PropertyChanged += OnSaidJobChanged;
+            _ = ClearWhenDoneAsync(job);
+        }
+        StatusText = _worldJobSaid = SaidText(job);
         return true;
+    }
+
+    // копия чужого профиля (пункт «Установить также в») — с именем сервера: вкладка «Копии» открытого профиля про неё не знает
+    private string SaidText(HostedWorldJob job) =>
+        IsHosted && job.ProfileId == _main.ActiveProfile?.Model.Id ? HostedWorldBusy.Describe(job) : HostedWorldBusy.Describe(job, job.Target.Name);
+
+    private void OnSaidJobChanged(object? sender, PropertyChangedEventArgs e) => RefreshSaidJob();
+
+    /// <summary>Строка статуса ещё говорит о копии — пересказать её ход на текущем языке.</summary>
+    private void RefreshSaidJob()
+    {
+        if (_saidJob is not { } job || _worldJobSaid is not { } said || StatusText != said) return;
+        StatusText = _worldJobSaid = SaidText(job);
+    }
+
+    private async Task ClearWhenDoneAsync(HostedWorldJob job)
+    {
+        await job.Completion; // исключений не бросает
+        if (ReferenceEquals(job, _saidJob)) ClearSaidJob();
+    }
+
+    /// <summary>Копия кончилась: строка статуса «идёт копия мира» уже неправда — убрать её.</summary>
+    private void ClearSaidJob()
+    {
+        if (_worldJobSaid is { } said && StatusText == said) StatusText = "";
+        ForgetSaidJob();
+    }
+
+    private void ForgetSaidJob()
+    {
+        if (_saidJob is { } old) old.PropertyChanged -= OnSaidJobChanged;
+        _saidJob = null;
+        _worldJobSaid = null;
     }
 
     /// <summary>Цель для изменения модов: как <see cref="CurrentTarget"/>, но пока у сервера у хостера идёт копия мира — null и причина в статусе.</summary>
@@ -1057,8 +1101,8 @@ public sealed partial class ModsViewModel : ObservableObject
     private void OnWorldJobBusyChanged()
     {
         if (_worldJob.IsBusy) return;
-        if (_worldJobSaid is { } said && StatusText == said) StatusText = "";
-        _worldJobSaid = null;
+        // копия открытого профиля кончилась — строку убрать сразу, не дожидаясь продолжения ClearWhenDoneAsync
+        if (_saidJob is null or { IsFinished: true }) ClearSaidJob();
         _hosted.Resume();
     }
 

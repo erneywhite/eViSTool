@@ -331,7 +331,7 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     {
         UpdateTexts();
         if (_backupDirOkKey is { } ok) BackupDirOk = Loc.T(ok);
-        if (_backupDirFailed is { } failed && _data is { } data) _ = ApplyBackupDirAsync(data, failed);
+        if (_backupDirFailed is { } failed && _data is { } data) _ = ApplyBackupDirAsync(data, failed, relabel: true);
     }
 
     partial void OnBackupEnabledChanged(bool value) => SaveSettings();
@@ -351,9 +351,12 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
     /// Годится — сохраняем, нет — оставляем прежнюю и говорим, что не так. Ответ проверки, которую уже обогнала новая
     /// (или возврат к сохранённой папке), не показывается.
     /// </summary>
-    private async Task ApplyBackupDirAsync(IServerData data, string dir)
+    /// <param name="relabel">Проверка лишь пересказывает ошибку на новом языке (сменили язык): папку она не сохраняет,
+    /// даже если та теперь подошла, — настройки от смены языка не пишутся.</param>
+    private async Task ApplyBackupDirAsync(IServerData data, string dir, bool relabel = false)
     {
         var check = ++_backupDirCheck;
+        var before = BackupDirError;
         BackupDirError = BackupDirOk = "";
         _backupDirOkKey = _backupDirFailed = null;
         if (string.Equals(dir, _saved.BackupDir ?? "", StringComparison.OrdinalIgnoreCase))
@@ -376,6 +379,14 @@ public sealed partial class ServerScheduleViewModel : ObservableObject
         if (error is not null)
         {
             BackupDirError = error;
+            _backupDirFailed = dir;
+            return;
+        }
+        if (relabel)
+        {
+            // shortcut: папка теперь подошла, но не сохранена — под полем остаётся прежняя ошибка (на прежнем языке), пока
+            // поле не применят снова; переделать, если понадобится отдельная строка «папка подошла, примени её»
+            BackupDirError = before;
             _backupDirFailed = dir;
             return;
         }

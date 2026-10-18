@@ -201,4 +201,23 @@ public sealed class HostedNotifyErrorsTests : IDisposable
         Assert.Equal("", vm.ErrorText);
         Assert.Empty(watch.SendFailures(_host.Profile.Id));
     });
+
+    // маршруты выключили в обход вкладки (другое окно, файл): сторож отпускает профиль, и строка ошибок открытой вкладки
+    // не держит забытые им ошибки
+    [Fact]
+    public void SendError_GoesAwayFromTheOpenTab_WhenTheWatchReleasesTheProfile() => Sta.Run(() =>
+    {
+        if (!CanRun) return;
+        var watch = Watch();
+        var vm = Tab(watch);
+        _send = _ => throw new NotifyException("Forbidden");
+        ModsUpdated(watch);
+        Assert.Equal(Loc.T("notify.sendFailed", "Telegram", "Forbidden"), vm.ErrorText);
+
+        new ServerNotifySettings { Channels = [Telegram] }.Save(_host.Profile.Id);
+        watch.Refresh();
+
+        Assert.Empty(watch.SendFailures(_host.Profile.Id));
+        Assert.Equal("", vm.ErrorText);
+    });
 }

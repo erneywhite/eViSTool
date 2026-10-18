@@ -219,4 +219,52 @@ public sealed class HostedWorldBusyTests : IDisposable
             main.HostedWatch.Stop();
         }
     });
+
+    // пункт другого сервера («Установить также в»): статус называет сервер, повторяет ход копии на текущем языке и
+    // уходит, когда та копия кончилась, хотя «Мои моды» следят за открытым профилем
+    [Fact]
+    public void MyMods_RejectedForAnotherServersCopy_NamesIt_FollowsIt_AndClearsAfterIt() => Sta.Run(() =>
+    {
+        using var other = new HostedFixture();
+        other.GPortalLayout(log: false);
+        var language = Loc.Instance.Language;
+        var main = new MainViewModel { AutoCheckUpdates = false };
+        Loc.Instance.SetLanguage(language);
+        try
+        {
+            main.Profiles.Clear();
+            var open = new ProfileViewModel(other.Profile, _ => { });
+            main.Profiles.Add(open);
+            main.Profiles.Add(new ProfileViewModel(_host.Profile, _ => { }));
+            main.ActiveProfile = open;
+            var mods = main.Mods;
+            Sta.WaitFor(() => mods.HostedSource.Resolved is not null && !mods.HostedSource.IsLoading);
+            mods.StatusText = "";
+
+            var job = StartCopy(main.HostedWorldJobs);
+            Assert.Equal("", mods.WorldJobText); // копия — не у открытого сервера
+            mods.Enqueue([new UpdateQueueItem(_host.Target, "alpha", "alpha", "1.0.0", "1.1.0", null, _host.Zip("alpha_1.1.0.zip", "alpha", "1.1.0"))],
+                ModHistorySource.Update);
+            Assert.Equal(HostedWorldBusy.Describe(job, _host.Profile.Name), mods.StatusText);
+            Assert.Contains(_host.Profile.Name, mods.StatusText);
+            Assert.Empty(mods.Queue);
+
+            var before = mods.StatusText;
+            Loc.Instance.SetLanguage(language == "ru" ? "en" : "ru");
+            mods.OnLanguageChanged();
+            Assert.Equal(HostedWorldBusy.Describe(job, _host.Profile.Name), mods.StatusText);
+            Assert.NotEqual(before, mods.StatusText);
+            Loc.Instance.SetLanguage(language);
+            mods.OnLanguageChanged();
+
+            FinishCopy(job);
+            Sta.WaitFor(() => mods.StatusText == "");
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(language);
+            _release.Set();
+            main.HostedWatch.Stop();
+        }
+    });
 }

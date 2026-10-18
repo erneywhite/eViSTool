@@ -44,6 +44,11 @@ internal sealed class HostedWorldBusy(Func<HostedWorldJobs?> jobs)
         ? Loc.T("hostedbk.busyRestoreHere", HostedWorldText.Progress(job))
         : Loc.T("hostedbk.busyHere", HostedWorldText.Progress(job));
 
+    /// <summary>То же для сервера, который сейчас не открыт: с его именем, чтобы было ясно, о чьей копии речь.</summary>
+    public static string Describe(HostedWorldJob job, string server) => job.Kind == HostedWorldJobKind.Restore
+        ? Loc.T("hostedbk.busyRestoreOn", server, HostedWorldText.Progress(job))
+        : Loc.T("hostedbk.busyOn", server, HostedWorldText.Progress(job));
+
     // операции окна могут смениться (тест ставит свои) — подписка идёт за ними
     private void Subscribe()
     {

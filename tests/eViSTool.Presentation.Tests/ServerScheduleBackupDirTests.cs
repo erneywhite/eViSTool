@@ -196,4 +196,33 @@ public sealed class ServerScheduleBackupDirTests : IDisposable
             Loc.Instance.SetLanguage(language);
         }
     });
+
+    // папка не подошла, а к смене языка её уже можно создать: повторная проверка её не сохраняет — настройки от смены
+    // языка не пишутся
+    [Fact]
+    public void LanguageSwitch_DoesNotSaveAFolderThatPassesNow() => WithSchedule(schedule =>
+    {
+        var language = Loc.Instance.Language;
+        try
+        {
+            var blocker = Path.Combine(_tmp, "blocker");
+            File.WriteAllText(blocker, "file, not a folder");
+            var dir = Path.Combine(blocker, "copies");
+            schedule.CommitBackupDir(dir);
+            Until(() => !schedule.BackupDirChecking && schedule.BackupDirError.Length > 0, "первой проверки");
+            File.Delete(blocker);
+
+            Loc.Instance.SetLanguage(language == "ru" ? "en" : "ru");
+            schedule.OnLanguageChanged();
+
+            Until(() => !schedule.BackupDirChecking && schedule.BackupDirError.Length > 0, "повторной проверки");
+            Sta.Wait(Task.Delay(200));
+            Assert.Equal("", schedule.BackupDirOk);
+            Assert.Null(ServerAutomation.Load(_profile.Id).BackupDir);
+        }
+        finally
+        {
+            Loc.Instance.SetLanguage(language);
+        }
+    });
 }
