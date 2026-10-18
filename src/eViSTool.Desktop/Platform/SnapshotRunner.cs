@@ -38,6 +38,11 @@ internal static class SnapshotRunner
         {
             CrashLog.Write(ex);
         }
-        desktop.Shutdown();
+        // с Avalonia 12.1.4 Shutdown изнутри вложенного цикла модального окна (dialog.*) программу не завершает, и снимок
+        // висел до принудительного снятия. Поэтому: закрыть окна поверх главного, выйти — из очереди, когда вложенный цикл
+        // уже закончился; не вышла и так за 5 с — завершить процесс (данные стенда одноразовые, сохранять нечего)
+        foreach (var other in desktop.Windows.Reverse().Where(w => w != desktop.MainWindow).ToList()) other.Close();
+        Dispatcher.UIThread.Post(() => desktop.Shutdown(), DispatcherPriority.Background);
+        _ = Task.Delay(TimeSpan.FromSeconds(5)).ContinueWith(_ => Environment.Exit(0), TaskScheduler.Default);
     }
 }
