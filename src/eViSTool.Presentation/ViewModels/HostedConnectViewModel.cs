@@ -44,6 +44,8 @@ public sealed partial class HostedConnectViewModel : ObservableObject
     private (string Host, int Port)? _trustedHostKeyFor;
     private bool _pendingIsHostKey;
     private HostedProtocol _protocol = HostedProtocol.Ftp;
+    // протокол сейчас выбран схемой в адресе (sftp://, ftp://), а не переключателем: убрали схему — протокол вернётся к FTP
+    private bool _schemeDriven;
     // поля заполняет сама модель (загрузка, разбор адреса, итог проверки): это не правка человека
     private bool _quiet;
     // поля, которые сейчас заполнены из ссылки в адресе: что в поле было до неё и что в него положила ссылка.
@@ -169,9 +171,56 @@ public sealed partial class HostedConnectViewModel : ObservableObject
 
     public FtpTls Tls => TlsOrder[Math.Clamp(TlsIndex, 0, TlsOrder.Length - 1)];
 
-    /// <summary>Адрес — ссылка sftp://: файлы по SSH. Шифрование всегда, полей TLS и активного режима у него нет, зато
+    /// <summary>Выбран SFTP (переключателем или ссылкой sftp:// в адресе): файлы по SSH. Шифрование всегда, полей TLS и активного режима у него нет, зато
     /// есть выбор входа (пароль или ключ).</summary>
-    public bool IsSftp => _protocol == HostedProtocol.Sftp;
+    public bool IsSftp
+    {
+        get => _protocol == HostedProtocol.Sftp;
+        set { if (value) ChangeProtocol(HostedProtocol.Sftp); }
+    }
+
+    /// <summary>Переключатель «Протокол», вариант FTP (парный к <see cref="IsSftp"/>). Схема в адресе (ftp://, sftp://) ставит их сама.</summary>
+    public bool IsFtp
+    {
+        get => !IsSftp;
+        set { if (value) ChangeProtocol(HostedProtocol.Ftp); }
+    }
+
+    /// <summary>
+    /// Человек выбрал протокол переключателем. Порт по умолчанию (21 ↔ 22) меняется, только если поле пустое или в нём порт
+    /// прежнего протокола по умолчанию: порт, который вписали сами или который пришёл из профиля, не трогаем. Схема в
+    /// адресе, если она есть, переписывается под выбор; нет схемы — SFTP живёт в переключателе, а поле дописывает
+    /// «sftp://» само, когда человек уходит из него (<see cref="CommitAddress"/>).
+    /// </summary>
+    private void ChangeProtocol(HostedProtocol protocol)
+    {
+        if (protocol == _protocol) return;
+        var old = _protocol;
+        _protocol = protocol;
+        _quiet = true; // порт и адрес правит сама модель: проверку и закрепление сбросит Edited ниже одним разом
+        try
+        {
+            var oldDefault = old == HostedProtocol.Sftp ? "22" : "21";
+            var text = PortText.Trim();
+            if (text.Length == 0 || text == oldDefault) PortText = protocol == HostedProtocol.Sftp ? "22" : "21";
+            // порт теперь принадлежит выбранному протоколу и больше не «из ссылки»
+            _fromLink.Remove(nameof(PortText));
+            _portIsSftp = protocol == HostedProtocol.Sftp;
+            if (Address.Contains("://") && ParseAddress(Address) is { } p)
+            {
+                var scheme = protocol == HostedProtocol.Sftp ? "sftp" : p.Scheme == "ftps" ? "ftps" : "ftp";
+                if (p.Scheme != scheme)
+                {
+                    var rest = Address.Trim()[(Address.Trim().IndexOf("://", StringComparison.Ordinal) + 3)..];
+                    // ftp:// в поле не нужен: протокол по умолчанию. ftps:// у SFTP быть не может
+                    Address = scheme == "ftp" ? rest : scheme + "://" + rest;
+                }
+            }
+        }
+        finally { _quiet = false; }
+        _schemeDriven = Address.Contains("://");
+        Edited(); // сбросить итог проверки и закреплённую раскладку, как при любой другой правке
+    }
 
     /// <summary>Вход по файлу ключа: адрес SFTP и в списке «Вход» выбран ключ.</summary>
     public bool IsKeyLogin => IsSftp && AuthIndex == 1;
@@ -265,7 +314,10 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         var parsed = ParseAddress(Address);
         var oldHost = Host;
         Host = parsed?.Host ?? "";
-        _protocol = parsed?.Protocol ?? HostedProtocol.Ftp;
+        // схема в адресе выбирает протокол; без схемы протокол остаётся выбранным переключателем, а если он был от схемы
+        // (её убрали) — возвращается к FTP
+        if (parsed is not null && Address.Contains("://")) (_protocol, _schemeDriven) = (parsed.Protocol, true);
+        else if (_schemeDriven) (_protocol, _schemeDriven) = (HostedProtocol.Ftp, false);
         if (parsed is { } p && !_quiet)
         {
             _quiet = true; // поля заполняются из ссылки: каждое из них не должно отдельно сбрасывать проверку
@@ -352,6 +404,7 @@ public sealed partial class HostedConnectViewModel : ObservableObject
         OnPropertyChanged(nameof(Port));
         OnPropertyChanged(nameof(Tls));
         OnPropertyChanged(nameof(IsSftp));
+        OnPropertyChanged(nameof(IsFtp));
         OnPropertyChanged(nameof(IsKeyLogin));
         OnPropertyChanged(nameof(ShowPasswordKeep));
         OnPropertyChanged(nameof(NormalizedRoot));

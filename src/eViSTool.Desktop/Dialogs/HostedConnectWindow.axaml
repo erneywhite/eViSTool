@@ -19,7 +19,16 @@
     <StackPanel Margin="24,20,24,22">
         <TextBlock Classes="dialogTitle" Text="{local:Tr hosted.title}" />
 
-        <TextBlock Classes="label" Text="{local:Tr hosted.host}" Margin="0,14,0,0" />
+        <!-- протокол: FTP или SFTP; схема в адресе (sftp://) переключает его сама -->
+        <TextBlock Classes="label" Text="{local:Tr hosted.protocol}" Margin="0,14,0,0" />
+        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+            <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="HostedProtocol" FontSize="14" Content="FTP"
+                         IsChecked="{Binding IsFtp, Mode=TwoWay}" AutomationProperties.AutomationId="HostedProtocolFtp" />
+            <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="HostedProtocol" FontSize="14" Content="SFTP"
+                         IsChecked="{Binding IsSftp, Mode=TwoWay}" AutomationProperties.AutomationId="HostedProtocolSftp" />
+        </StackPanel>
+
+        <TextBlock Classes="label" Text="{local:Tr hosted.host}" Margin="0,12,0,0" />
         <!-- адрес целиком (ftp://логин@host:порт/папка, sftp://…) раскладывается по полям; из поля ушли — остаётся один хост
              (у sftp:// — со схемой: по ней выбран протокол) -->
         <TextBox Classes="clearButton" Text="{Binding Address}" Margin="0,6,0,0" VerticalContentAlignment="Center"

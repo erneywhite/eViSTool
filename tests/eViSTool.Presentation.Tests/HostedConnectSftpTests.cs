@@ -54,6 +54,112 @@ public sealed class HostedConnectSftpTests : IDisposable
         return vm;
     }
 
+    // ===== переключатель «Протокол» =====
+
+    [Fact]
+    public void ProtocolSwitch_MovesTheDefaultPort_BackAndForth()
+    {
+        var vm = Model();
+        vm.Address = Host;
+        Assert.True(vm.IsFtp);
+        Assert.Equal("21", vm.PortText);
+
+        vm.IsSftp = true;
+        Assert.Equal("22", vm.PortText);
+        Assert.True(vm.IsSftp);
+        Assert.False(vm.IsFtp);
+
+        vm.IsFtp = true;
+        Assert.Equal("21", vm.PortText);
+
+        vm.PortText = "";
+        vm.IsSftp = true; // пустой порт — тоже «по умолчанию»
+        Assert.Equal("22", vm.PortText);
+    }
+
+    [Fact]
+    public void ProtocolSwitch_KeepsAPortTheUserTyped()
+    {
+        var vm = Model();
+        vm.Address = Host;
+        vm.PortText = "58021";
+        vm.IsSftp = true;
+        Assert.Equal("58021", vm.PortText);
+        vm.IsFtp = true;
+        Assert.Equal("58021", vm.PortText);
+
+        vm.PortText = "2022";
+        vm.IsSftp = true;
+        Assert.Equal("2022", vm.PortText);
+    }
+
+    [Fact]
+    public void ProtocolSwitch_WithoutScheme_IsSftp_AndSurvivesAddressEdits()
+    {
+        var vm = Model();
+        vm.IsSftp = true;
+        vm.Address = Host; // схемы нет, но выбран SFTP
+        Assert.True(vm.IsSftp);
+        Assert.Equal("22", vm.PortText);
+        Assert.False(vm.IsFtp);
+        vm.Address = Host + "x";
+        Assert.True(vm.IsSftp);
+
+        var result = vm.Accept()!;
+        Assert.Equal(HostedProtocol.Sftp, result.Protocol);
+        Assert.Equal(22, result.Port);
+    }
+
+    [Fact]
+    public void Scheme_SetsTheSwitch_AndSwitchRewritesTheScheme()
+    {
+        var vm = Model();
+        vm.Address = "sftp://u@" + Host + ":2022/srv";
+        Assert.True(vm.IsSftp);
+        Assert.Equal("2022", vm.PortText);
+
+        vm.IsFtp = true; // sftp:// из поля уходит, порт 2022 не трогаем: он вписан в ссылке
+        Assert.DoesNotContain("sftp://", vm.Address);
+        Assert.True(vm.IsFtp);
+        Assert.Equal("2022", vm.PortText);
+
+        vm.IsSftp = true; // схемы в поле нет: SFTP живёт в переключателе, а схему поле получает, когда из него ушли
+        Assert.True(vm.IsSftp);
+        vm.CommitAddress();
+        Assert.StartsWith("sftp://", vm.Address);
+        vm.IsFtp = true;
+        vm.IsSftp = true; // и ещё раз со схемой в поле
+        Assert.True(vm.IsSftp);
+        vm.Address = "ftp://" + Host;
+        Assert.True(vm.IsFtp);
+    }
+
+    [Fact]
+    public void ProtocolSwitch_ResetsTheCheckAndTheSavedLayout()
+    {
+        var vm = Model((_, _, _) => Task.FromResult(Found()));
+        vm.Address = Host;
+        vm.CheckCommand.Execute(null);
+        Assert.NotEqual("", vm.CheckText);
+
+        vm.IsSftp = true;
+        Assert.Equal("", vm.CheckText);
+        Assert.Null(vm.Accept()!.ConfigPath);
+    }
+
+    [Fact]
+    public void SavedSftpProfile_OpensWithTheSwitchOnSftp_AndItsOwnPort()
+    {
+        var vm = Model(existing: new HostedConnection { Protocol = HostedProtocol.Sftp, Host = Host, Port = 2022, User = "gp_user" });
+        Assert.True(vm.IsSftp);
+        Assert.Equal("2022", vm.PortText);
+        Assert.Equal(HostedProtocol.Sftp, vm.Accept()!.Protocol);
+
+        vm.IsFtp = true;
+        Assert.Equal("2022", vm.PortText); // своё значение не подменяем
+        Assert.Equal(HostedProtocol.Ftp, vm.Accept()!.Protocol);
+    }
+
     // ===== адрес, порт, поля FTP =====
 
     [Fact]
