@@ -1,0 +1,23 @@
+eViSTool 0.13.0 for Linux: notifications and "update all" for a hosted server, SFTP, one window per installation.
+
+- Hosted server: notifications to Telegram, Discord, ntfy or a webhook — crashed (with the mod to blame), started, stopped, player joined or left, overloaded, mod updates out, mods updated. eViSTool watches the log in the background while it is running.
+- Hosted server: with the server stopped and mod updates out, Server → Overview offers "Update all".
+- Hosted server over SFTP: FTP or SFTP above the address, sign-in with a password or a key file; the server's key is remembered on the first connection.
+- One window per installation: starting eViSTool again brings the open window to the front.
+- Labels made of several pieces no longer disappear after changing while their page is hidden (an Avalonia bug, worked around).
+- Settings changed in another eViSTool window are no longer silently overwritten; the "New version" window shows the changes even when GitHub limits requests; Stop right at an automatic restart keeps the server stopped.
+
+Update the agent with Update on the server in the window if you run a server.
+
+---
+
+eViSTool 0.13.0 для Linux: оповещения и «Обновить всё» для сервера у хостера, SFTP, одно окно на установку.
+
+- Сервер у хостера: оповещения в Telegram, Discord, ntfy или вебхук — упал (с виноватым модом), запустился, остановился, игрок зашёл или вышел, перегружен, вышли обновления модов, моды обновлены. eViSTool следит за логом в фоне, пока запущен.
+- Сервер у хостера: когда сервер остановлен и вышли обновления, в «Сервер» → «Обзор» есть «Обновить всё».
+- Сервер у хостера по SFTP: над адресом выбор FTP или SFTP, вход по паролю или по файлу ключа; ключ сервера запоминается при первом подключении.
+- Одно окно на установку: повторный запуск eViSTool выводит вперёд уже открытое окно.
+- Подписи из нескольких кусков больше не пропадают, если поменялись, пока страница была скрыта (ошибка Avalonia, обойдена).
+- Настройки из другого окна eViSTool больше не затираются молча; окно «Вышла новая версия» показывает изменения и при ограничении запросов GitHub; «Стоп» в момент автоперезапуска оставляет сервер остановленным.
+
+Если у тебя сервер, обнови агента кнопкой «Обновить на сервере» в окне.
