@@ -114,7 +114,7 @@
                 AutomationProperties.AutomationId="HostedVersionMissing">
             <DockPanel>
                 <Button DockPanel.Dock="Right" Classes="small" Padding="12,5" Margin="12,0,0,0" VerticalAlignment="Center"
-                        Content="{local:Tr nav.settings}" Command="{Binding OpenHostedSettingsCommand}" />
+                        Content="{local:Tr nav.profiles}" Command="{Binding OpenHostedSettingsCommand}" />
                 <Path Classes="icon" DockPanel.Dock="Left" Data="{StaticResource Icon.Warning}" Stroke="{DynamicResource Forest.Warn}"
                       VerticalAlignment="Center" Margin="0,0,12,0" />
                 <TextBlock Text="{Binding HostedVersionMissingText}" Foreground="{DynamicResource Forest.Warn}" FontSize="13" TextWrapping="Wrap"

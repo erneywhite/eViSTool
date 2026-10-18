@@ -273,4 +273,6 @@
     <StreamGeometry x:Key="Icon.Folder">M20 20 a2 2 0 0 0 2 -2 V8 a2 2 0 0 0 -2 -2 h-7.9 a2 2 0 0 1 -1.69 -.9 L9.6 3.9 A2 2 0 0 0 7.93 3 H4 a2 2 0 0 0 -2 2 v13 a2 2 0 0 0 2 2 Z</StreamGeometry>
     <StreamGeometry x:Key="Icon.Package">M11 21.73 a2 2 0 0 0 2 0 l7 -4 A2 2 0 0 0 21 16 V8 a2 2 0 0 0 -1 -1.73 l-7 -4 a2 2 0 0 0 -2 0 l-7 4 A2 2 0 0 0 3 8 v8 a2 2 0 0 0 1 1.73 z m1 .27 V12 M3.29 7 L12 12 l8.71 -5 M7.5 4.27 l9 5.15</StreamGeometry>
     <StreamGeometry x:Key="Icon.Close">M18 6 L6 18 M6 6 l12 12</StreamGeometry>
+    <!-- профили: двое людей -->
+    <StreamGeometry x:Key="Icon.Profiles">M16 21 v-2 a4 4 0 0 0 -4 -4 H6 a4 4 0 0 0 -4 4 v2 M5 7 A4 4 0 1 0 13 7 A4 4 0 1 0 5 7 Z M22 21 v-2 a4 4 0 0 0 -3 -3.87 M16 3.13 a4 4 0 0 1 0 7.75</StreamGeometry>
 </ResourceDictionary>

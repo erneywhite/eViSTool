@@ -96,7 +96,7 @@ change it later with `remote host <address>`.
 `remote code` prints the connection code. It holds the address, port, key and the server certificate's fingerprint, so
 treat it like a password. If the code leaks, `remote new-key` changes the key and the old code stops working.
 
-In the eViSTool window on Windows: "Settings" → "+ Server" → "Server on another computer?" → "Connect by code…",
+In the eViSTool window on Windows: "Profiles" → "+ Server" → "Server on another computer?" → "Connect by code…",
 paste the code, click "Check connection" and create the profile.
 
 ### 5. The remote access port

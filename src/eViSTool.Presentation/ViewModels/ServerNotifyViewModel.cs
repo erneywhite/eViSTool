@@ -319,11 +319,11 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
     }
 
     /// <summary>
-    /// «Открыть настройки» в подсказке «каналов ещё нет»: переход в «Настройки», где каналы добавляют. То же, что делает
-    /// одноимённая команда раздела «Сервер».
+    /// «Открыть настройки» в подсказке «каналов ещё нет»: переход в общие «Настройки», где каналы добавляют (не в
+    /// «Профили», куда ведут переходы раздела «Сервер» к самому профилю).
     /// </summary>
     [RelayCommand]
-    private void OpenSettings() => _server.OpenSettingsCommand.Execute(null);
+    private void OpenSettings() => _server.OpenAppSettings();
 
     private bool CanTest() => !IsTesting && _saved.Routes.Values.Any(v => v.Count > 0);
 

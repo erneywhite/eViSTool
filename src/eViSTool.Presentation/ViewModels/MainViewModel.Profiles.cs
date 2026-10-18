@@ -7,7 +7,7 @@ using eViSTool.Core.Profiles;
 namespace eViSTool.Presentation.ViewModels;
 
 /// <summary>
-/// Профили главного окна: список, активный (переключатель в шапке) и редактируемый в «Настройках», связи и копии
+/// Профили главного окна: список, активный (переключатель в шапке) и редактируемый в «Профилях», связи и копии
 /// миров редактируемого. Окна и файлы при добавлении, клонировании и удалении — в <see cref="ProfileActions"/>.
 /// </summary>
 public sealed partial class MainViewModel
@@ -36,7 +36,7 @@ public sealed partial class MainViewModel
         }
     }
 
-    /// <summary>Профиль, открытый в редакторе на вкладке «Настройки».</summary>
+    /// <summary>Профиль, открытый в редакторе на вкладке «Профили».</summary>
     [ObservableProperty] private ProfileViewModel? _editedProfile;
 
     /// <summary>Связи редактируемого профиля: в какие профили ставить моды заодно.</summary>
@@ -80,7 +80,7 @@ public sealed partial class MainViewModel
 
     private static bool CanCleanupDisk(ProfileViewModel? profile) => profile is { Model.IsLocal: true };
 
-    /// <summary>Сделаны новые копии миров — обновить список в настройках, если открыт этот профиль.</summary>
+    /// <summary>Сделаны новые копии миров — обновить список в «Профилях», если открыт этот профиль.</summary>
     public void RefreshWorldCopies(GameProfile profile)
     {
         if (EditedProfile?.Model == profile) WorldCopies?.Refresh();

@@ -227,8 +227,6 @@
 
             <!-- навигация: порядок пунктов = порядок разделов -->
             <StackPanel Margin="12,0,12,0">
-                <TextBlock Text="{local:Tr shell.workspace}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Muted}"
-                           Margin="8,0,0,8" />
                 <ListBox x:Name="Nav" SelectedIndex="{Binding SelectedTab}" Background="Transparent" BorderThickness="0" Padding="0"
                          ItemContainerTheme="{StaticResource Forest.NavItem}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListBoxItem AutomationProperties.AutomationId="NavMods">
@@ -258,7 +256,13 @@
                             <TextBlock Text="{local:Tr nav.server}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
                         </DockPanel>
                     </ListBoxItem>
-                    <ListBoxItem>
+                    <ListBoxItem AutomationProperties.AutomationId="NavProfiles">
+                        <DockPanel>
+                            <Path Classes="icon" Data="{StaticResource Icon.Profiles}" />
+                            <TextBlock Text="{local:Tr nav.profiles}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+                        </DockPanel>
+                    </ListBoxItem>
+                    <ListBoxItem AutomationProperties.AutomationId="NavSettings">
                         <DockPanel>
                             <Path Classes="icon" Data="{StaticResource Icon.Settings}" />
                             <TextBlock Text="{local:Tr nav.settings}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
@@ -367,9 +371,8 @@
                             </ComboBox.ItemTemplate>
                         </ComboBox>
                     </StackPanel>
-                    <TextBlock VerticalAlignment="Center" FontSize="13" TextTrimming="CharacterEllipsis">
-                        <Run Text="{local:Tr shell.workspaceCrumb}" Foreground="{DynamicResource Forest.Muted}" /><Run Text="   /   " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding PageTitle, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />
-                    </TextBlock>
+                    <TextBlock Text="{Binding PageTitle}" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}"
+                               TextTrimming="CharacterEllipsis" AutomationProperties.AutomationId="PageTitle" />
                 </DockPanel>
             </Border>
 
@@ -379,6 +382,7 @@
                 <views:CatalogView DataContext="{Binding Catalog}" IsVisible="False" />
                 <views:ModConfigView DataContext="{Binding ModConfig}" IsVisible="False" />
                 <views:ServerView DataContext="{Binding Server}" IsVisible="False" />
+                <views:ProfilesView IsVisible="False" />
                 <views:SettingsView IsVisible="False" />
                 <views:AboutView DataContext="{Binding About}" IsVisible="False" />
             </Panel>

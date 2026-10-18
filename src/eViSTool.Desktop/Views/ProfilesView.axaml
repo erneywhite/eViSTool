@@ -1,0 +1,294 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:eViSTool.Presentation.ViewModels"
+             xmlns:local="using:eViSTool.Desktop"
+             xmlns:ctl="using:eViSTool.Desktop.Controls"
+             x:Class="eViSTool.Desktop.Views.ProfilesView"
+             x:DataType="vm:MainViewModel">
+    <UserControl.Styles>
+        <!-- пояснение под заголовком и полем: здесь с отступом снизу -->
+        <Style Selector="TextBlock.hint">
+            <Setter Property="Margin" Value="0,2,0,6" />
+        </Style>
+        <!-- карточка раздела справа -->
+        <Style Selector="Border.profileCard">
+            <Setter Property="Padding" Value="20,16,20,20" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+        <!-- «ключ — значение» в блоке «что прочитано из файлов игры» -->
+        <Style Selector="TextBlock.infoKey">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+            <Setter Property="Margin" Value="0,0,14,6" />
+        </Style>
+        <Style Selector="TextBlock.infoValue">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+        <!-- значок типа профиля: клиент — монитор, сервер — стойка -->
+        <Style Selector="Path.profileKind">
+            <Setter Property="Data" Value="{StaticResource Icon.Client}" />
+        </Style>
+        <Style Selector="Path.profileKind.server">
+            <Setter Property="Data" Value="{StaticResource Icon.Server}" />
+        </Style>
+        <!-- сервер у хостера — облако (после .server: хостовый профиль серверный, оба класса стоят) -->
+        <Style Selector="Path.profileKind.hosted">
+            <Setter Property="Data" Value="{StaticResource Icon.Cloud}" />
+        </Style>
+    </UserControl.Styles>
+
+    <DockPanel Margin="10,4,10,0">
+        <!-- ===== заголовок ===== -->
+        <StackPanel DockPanel.Dock="Top">
+            <TextBlock Text="{local:Tr nav.profiles}" Classes="pageTitle" />
+            <TextBlock Text="{local:Tr settings.profilesSubtitle}" Foreground="{DynamicResource Forest.Accent}" FontSize="12" Margin="0,4,0,0" />
+        </StackPanel>
+        <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1" Margin="0,14,0,14" />
+
+        <Grid ColumnDefinitions="280,18,*">
+
+            <!-- ===== список профилей и действия с ними ===== -->
+            <Border Classes="card" Padding="12" Margin="0,0,0,14">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Margin="6,2,6,10">
+                        <TextBlock Text="{local:Tr settings.profiles}" Classes="cardTitle" />
+                        <TextBlock Text="{local:Tr settings.profilesHint}" Classes="hint" />
+                    </StackPanel>
+                    <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                        <UniformGrid Columns="2" Margin="0,0,0,8">
+                            <Button Command="{Binding AddClientProfileCommand}" Margin="0,0,4,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Classes="icon" Data="{StaticResource Icon.Plus}" Width="11" Height="11" Margin="0,0,7,0" />
+                                    <TextBlock Text="{local:Tr settings.kindClient}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding AddServerProfileCommand}" Margin="4,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Classes="icon" Data="{StaticResource Icon.Plus}" Width="11" Height="11" Margin="0,0,7,0" />
+                                    <TextBlock Text="{local:Tr tab.server}" />
+                                </StackPanel>
+                            </Button>
+                        </UniformGrid>
+                        <Button Command="{Binding CloneProfileCommand}" CommandParameter="{Binding EditedProfile}" HorizontalAlignment="Stretch"
+                                Margin="0,0,0,8" ToolTip.Tip="{local:Tr settings.cloneTip}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Classes="icon" Data="{StaticResource Icon.Copy}" Width="13" Height="13" Margin="0,0,8,0" />
+                                <TextBlock Text="{local:Tr settings.clone}" />
+                            </StackPanel>
+                        </Button>
+                        <!-- что копят игра и eViSTool в этом профиле — убрать в корзину -->
+                        <Button Command="{Binding CleanupDiskCommand}" CommandParameter="{Binding EditedProfile}" HorizontalAlignment="Stretch"
+                                Margin="0,0,0,8" ToolTip.Tip="{local:Tr clean.buttonTip}" ToolTip.ShowOnDisabled="True"
+                                AutomationProperties.AutomationId="CleanupDisk">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Classes="icon" Data="{StaticResource Icon.Folder}" Width="13" Height="13" Margin="0,0,8,0" />
+                                <TextBlock Text="{local:Tr clean.button}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="danger" Content="{local:Tr settings.removeProfile}" Command="{Binding RemoveProfileCommand}"
+                                CommandParameter="{Binding EditedProfile}" HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                    <ListBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding EditedProfile}" Background="Transparent" BorderThickness="0"
+                             ItemContainerTheme="{StaticResource Forest.NavItem}" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             AutomationProperties.AutomationId="ProfileList">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ProfileViewModel">
+                                <DockPanel>
+                                    <Path Classes="icon profileKind" Classes.server="{Binding IsServer}" Classes.hosted="{Binding IsHosted}" DockPanel.Dock="Left" VerticalAlignment="Center"
+                                          Margin="0,0,12,0" />
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextTrimming="CharacterEllipsis">
+                                            <Run Text="{Binding KindText, Mode=OneWay}" /><Run Text="{local:Tr settings.gameShort}" /><Run Text="{Binding GameVersionText, Mode=OneWay}" />
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- ===== выбранный профиль ===== -->
+            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="0,0,14,0">
+                    <!-- название, тип, подключение или папки, сервер по умолчанию, что прочитано из файлов игры -->
+                    <ContentControl Content="{Binding EditedProfile}" HorizontalContentAlignment="Stretch">
+                        <ContentControl.ContentTemplate>
+                            <DataTemplate x:DataType="vm:ProfileViewModel">
+                                <Border Classes="card profileCard">
+                                    <StackPanel>
+                                        <TextBlock Text="{local:Tr settings.profileCard}" Classes="cardTitle" />
+                                        <TextBlock Text="{local:Tr settings.profileCardHint}" Classes="hint" />
+
+                                        <TextBlock Text="{local:Tr settings.name}" Classes="label" />
+                                        <!-- имя применяется, когда уходишь из поля: на каждую букву профиль пересохранялся бы и переподключался -->
+                                        <TextBox Text="{Binding Name, UpdateSourceTrigger=LostFocus}" Margin="0,6,0,0" MaxLength="60" />
+
+                                        <TextBlock Text="{local:Tr settings.type}" Classes="label" />
+                                        <!-- тип задаётся при создании профиля и не меняется: у клиента и сервера разные папки и файлы -->
+                                        <TextBlock Text="{Binding KindText}" FontSize="13" Foreground="{DynamicResource Forest.Text}" Margin="0,6,0,0"
+                                                   AutomationProperties.AutomationId="ProfileKind" />
+
+                                        <!-- удалённый сервер: вместо папок — куда подключаемся; сам код не показываем -->
+                                        <StackPanel IsVisible="{Binding IsRemote}">
+                                            <TextBlock Text="{local:Tr settings.remoteTarget}" Classes="label" />
+                                            <TextBlock Classes="hint" Text="{local:Tr settings.remoteTargetHint}" />
+                                            <DockPanel Margin="0,6,0,0">
+                                                <Button DockPanel.Dock="Right" Content="{local:Tr settings.remoteReplace}" Command="{Binding ReplaceCodeCommand}" Margin="8,0,0,0" />
+                                                <TextBox Classes="mono" Text="{Binding RemoteTarget, Mode=OneWay}" IsReadOnly="True" VerticalContentAlignment="Center" />
+                                            </DockPanel>
+                                        </StackPanel>
+
+                                        <!-- сервер у хостера: вместо папок — куда подключаемся по FTP (пароль не показываем), версия игры сервера, напоминание -->
+                                        <StackPanel IsVisible="{Binding IsHosted}">
+                                            <TextBlock Text="{local:Tr settings.hostedTarget}" Classes="label" />
+                                            <TextBlock Classes="hint" Text="{local:Tr settings.hostedTargetHint}" />
+                                            <DockPanel Margin="0,6,0,0">
+                                                <Button DockPanel.Dock="Right" Content="{local:Tr settings.hostedEdit}" Command="{Binding EditConnectionCommand}" Margin="8,0,0,0"
+                                                        AutomationProperties.AutomationId="HostedEdit" />
+                                                <TextBox Classes="mono" Text="{Binding HostedTarget, Mode=OneWay}" IsReadOnly="True" VerticalContentAlignment="Center"
+                                                         AutomationProperties.AutomationId="HostedTarget" />
+                                            </DockPanel>
+
+                                            <TextBlock Text="{local:Tr settings.hostedGameVersion}" Classes="label" />
+                                            <TextBlock Classes="hint" Text="{Binding HostedGameVersionHint}" />
+                                            <TextBox Classes="mono" Text="{Binding ManualGameVersion, UpdateSourceTrigger=LostFocus}" Margin="0,6,0,0"
+                                                     MaxLength="32" VerticalContentAlignment="Center" AutomationProperties.AutomationId="HostedGameVersion"
+                                                     AutomationProperties.Name="{local:Tr settings.hostedGameVersion}" />
+
+                                            <CheckBox IsChecked="{Binding RemindStopServer}" Margin="0,16,0,0" AutomationProperties.AutomationId="HostedRemindStop">
+                                                <TextBlock Text="{local:Tr settings.hostedRemindStop}" FontSize="13" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap" />
+                                            </CheckBox>
+                                        </StackPanel>
+
+                                        <!-- папки и то, что прочитано из файлов игры, — только у профиля на этой машине -->
+                                        <StackPanel IsVisible="{Binding IsLocal}">
+                                            <TextBlock Text="{local:Tr settings.gameDir}" Classes="label" />
+                                            <TextBlock Classes="hint" Text="{local:Tr settings.gameDirHint}" />
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Right" Content="{local:Tr common.browse}" Command="{Binding BrowseGameDirCommand}" Margin="8,0,0,0" />
+                                                <TextBox Text="{Binding GameDir, UpdateSourceTrigger=LostFocus}" VerticalContentAlignment="Center" />
+                                            </DockPanel>
+
+                                            <TextBlock Text="{local:Tr settings.dataDir}" Classes="label" />
+                                            <TextBlock Classes="hint" Text="{local:Tr settings.dataDirHint}" />
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Right" Command="{Binding OpenDataDirCommand}" Margin="8,0,0,0" Padding="10,8" ToolTip.Tip="{local:Tr common.open}">
+                                                    <Path Classes="icon" Data="{StaticResource Icon.Folder}" Width="16" Height="16" />
+                                                </Button>
+                                                <Button DockPanel.Dock="Right" Content="{local:Tr common.browse}" Command="{Binding BrowseDataDirCommand}" Margin="8,0,0,0" />
+                                                <TextBox Text="{Binding DataDir, UpdateSourceTrigger=LostFocus}" VerticalContentAlignment="Center" />
+                                            </DockPanel>
+
+                                            <!-- клиент: к какому серверу подключаться по кнопке «Играть» -->
+                                            <StackPanel IsVisible="{Binding !IsServer}">
+                                                <TextBlock Text="{local:Tr play.defaultServer}" Classes="label" />
+                                                <TextBlock Classes="hint" Text="{local:Tr play.defaultServerHint}" />
+                                                <ComboBox Margin="0,6,0,0" HorizontalAlignment="Stretch" ctl:WheelToParent.IsEnabled="True"
+                                                          DisplayMemberBinding="{Binding Title, DataType=vm:MainViewModel+DefaultServerOption}"
+                                                          SelectedValueBinding="{Binding Key, DataType=vm:MainViewModel+DefaultServerOption}"
+                                                          ItemsSource="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).EditedDefaultServerOptions}"
+                                                          SelectedValue="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).EditedDefaultServer}"
+                                                          DropDownOpened="DefaultServer_DropDownOpened"
+                                                          AutomationProperties.AutomationId="DefaultServer" AutomationProperties.Name="{local:Tr play.defaultServer}" />
+                                            </StackPanel>
+
+                                            <!-- что удалось прочитать из файлов игры -->
+                                            <Border Margin="0,18,0,0" Padding="14,12" CornerRadius="6" Background="{DynamicResource Forest.Base}"
+                                                    BorderBrush="{DynamicResource Forest.Line}" BorderThickness="1">
+                                                <DockPanel>
+                                                    <Button DockPanel.Dock="Right" Command="{Binding RereadCommand}" VerticalAlignment="Top" Margin="12,0,0,0"
+                                                            Padding="10,6" MinHeight="0" ToolTip.Tip="{local:Tr settings.reread}">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Path Classes="icon" Data="{StaticResource Icon.Refresh}" Width="13" Height="13" Margin="0,0,7,0" />
+                                                            <TextBlock Text="{local:Tr settings.reread}" FontSize="12" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                                                        <TextBlock Text="{local:Tr settings.gameVersion}" Classes="infoKey" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding GameVersionText}" Classes="infoValue" FontWeight="SemiBold" />
+                                                        <TextBlock Grid.Row="1" Text="{local:Tr settings.configFile}" Classes="infoKey" />
+                                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ConfigText}" Classes="infoValue" />
+                                                        <TextBlock Grid.Row="2" Text="{local:Tr settings.modDirs}" Classes="infoKey" />
+                                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ModDirsText}" Classes="infoValue" />
+                                                        <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="{Binding WarningsText}" Foreground="{DynamicResource Forest.Warn}" FontSize="12"
+                                                                   TextWrapping="Wrap" IsVisible="{Binding HasWarnings}" />
+                                                    </Grid>
+                                                </DockPanel>
+                                            </Border>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ContentControl.ContentTemplate>
+                    </ContentControl>
+
+                    <!-- связанные профили редактируемого: моды ставить заодно -->
+                    <Border Classes="card profileCard" IsVisible="{Binding HasLinkChoices}">
+                        <StackPanel>
+                            <TextBlock Text="{local:Tr settings.links}" Classes="cardTitle" />
+                            <TextBlock Text="{local:Tr settings.linksHint}" Classes="hint" />
+                            <ItemsControl ItemsSource="{Binding LinkChoices}" Margin="0,8,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:LinkChoice">
+                                        <CheckBox IsChecked="{Binding IsLinked}" Margin="0,6,0,0" AutomationProperties.Name="{Binding Name}">
+                                            <TextBlock FontSize="13" Foreground="{DynamicResource Forest.Text}">
+                                                <Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding KindText, Mode=OneWay}" Foreground="{DynamicResource Forest.Muted}" />
+                                            </TextBlock>
+                                        </CheckBox>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- копии одиночных миров игрового профиля: снимаются перед изменением модов, здесь — вернуть -->
+                    <ContentControl Content="{Binding WorldCopies}" HorizontalContentAlignment="Stretch">
+                        <ContentControl.ContentTemplate>
+                            <DataTemplate x:DataType="vm:WorldCopiesViewModel">
+                                <Border Classes="card profileCard">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" Content="{local:Tr wcopy.openFolder}" Command="{Binding OpenFolderCommand}"
+                                                    Padding="12,5" MinHeight="0" VerticalAlignment="Top" IsVisible="{Binding !IsEmpty}" />
+                                            <TextBlock Text="{local:Tr wcopy.title}" Classes="cardTitle" />
+                                        </DockPanel>
+                                        <TextBlock Text="{local:Tr wcopy.hint}" Classes="hint" />
+                                        <TextBlock Text="{local:Tr wcopy.none}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap"
+                                                   Margin="0,10,0,0" IsVisible="{Binding IsEmpty}" />
+                                        <ItemsControl ItemsSource="{Binding Rows}" Margin="0,6,0,0">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:WorldCopyRow">
+                                                    <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1" Padding="0,8">
+                                                        <DockPanel>
+                                                            <Button DockPanel.Dock="Right" Content="{local:Tr wcopy.restore}" Padding="12,5" MinHeight="0"
+                                                                    VerticalAlignment="Center" CommandParameter="{Binding}"
+                                                                    Command="{Binding $parent[ItemsControl].((vm:WorldCopiesViewModel)DataContext).RestoreCommand}"
+                                                                    AutomationProperties.Name="{Binding Name}" />
+                                                            <StackPanel Margin="0,0,12,0">
+                                                                <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap" />
+                                                                <TextBlock Text="{Binding Details}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                        </DockPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Text="{Binding Summary}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" Margin="0,8,0,0"
+                                                   IsVisible="{Binding Summary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource Forest.Accent}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                                   IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ContentControl.ContentTemplate>
+                    </ContentControl>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </DockPanel>
+</UserControl>

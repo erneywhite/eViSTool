@@ -328,7 +328,7 @@ public sealed partial class HostedWatch(IEnumerable<ProfileViewModel> profiles, 
 
     private DateTime UtcNow => _time.GetUtcNow().UtcDateTime;
 
-    /// <summary>Ошибка, которую повтор не вылечит: неверный пароль, недоверенный сертификат — правят в «Настройках».</summary>
+    /// <summary>Ошибка, которую повтор не вылечит: неверный пароль, недоверенный сертификат — правят в «Профилях».</summary>
     private static bool IsHopeless(Exception ex) => HostedServerViewModel.IsHopeless(ex);
 
     private static bool IsExpected(Exception ex) =>
@@ -382,7 +382,7 @@ public sealed partial class HostedWatch(IEnumerable<ProfileViewModel> profiles, 
                 _profile = current; // имя могли поменять — оно в заголовках
                 _lease ??= HostedWatchLease.TryTake(Id, owner._agentsDir);
                 if (_lease is null) return; // за этим сервером уже следит другое окно eViSTool на этой машине
-                // пароль не прочитать на этой машине — нечем входить; правят в «Настройках», проверим на следующем проходе
+                // пароль не прочитать на этой машине — нечем входить; правят в «Профилях», проверим на следующем проходе
                 if (ModTarget.For(_profile) is not { IsHosted: true } target)
                 {
                     Detach();

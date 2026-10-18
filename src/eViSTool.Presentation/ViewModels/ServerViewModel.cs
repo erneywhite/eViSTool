@@ -146,8 +146,13 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     [RelayCommand]
     private void OpenServerMods() => _main.SelectedTab = AppTab.Mods;
 
+    /// <summary>«Открыть профили» у клиентского профиля и «Подключение…» у сервера у хостера: профиль правят в «Профилях».</summary>
     [RelayCommand]
-    private void OpenSettings() => _main.SelectedTab = AppTab.Settings;
+    private void OpenProfiles() => _main.SelectedTab = AppTab.Profiles;
+
+    /// <summary>Общие «Настройки»: там каналы оповещений (переход из вкладки «Оповещения»).</summary>
+    internal void OpenAppSettings() => _main.SelectedTab = AppTab.Settings;
+
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _errorText = "";
 

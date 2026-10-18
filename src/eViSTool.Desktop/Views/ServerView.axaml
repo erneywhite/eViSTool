@@ -28,7 +28,7 @@
             </Border>
             <TextBlock Text="{local:Tr server.notServerTitle}" FontSize="18" FontWeight="SemiBold" TextAlignment="Center" Foreground="{DynamicResource Forest.Text}" />
             <TextBlock Text="{local:Tr server.notServerHint}" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,0" />
-            <Button Content="{local:Tr server.openSettings}" Command="{Binding OpenSettingsCommand}" HorizontalAlignment="Center" Margin="0,16,0,0" />
+            <Button Content="{local:Tr server.openProfiles}" Command="{Binding OpenProfilesCommand}" HorizontalAlignment="Center" Margin="0,16,0,0" />
         </StackPanel>
 
         <!-- ===== сервер у хостера: запускают его в панели хостера, здесь — лог, состояние и игроки по FTP и переход к модам ===== -->
@@ -42,7 +42,7 @@
                             <TextBlock Text="{local:Tr server.hostedOpenMods}" />
                         </StackPanel>
                     </Button>
-                    <Button Content="{local:Tr server.hostedSettings}" Command="{Binding OpenSettingsCommand}" Margin="8,0,0,0" Padding="16,8"
+                    <Button Content="{local:Tr server.hostedSettings}" Command="{Binding OpenProfilesCommand}" Margin="8,0,0,0" Padding="16,8"
                             AutomationProperties.AutomationId="ServerHostedSettings" />
                 </StackPanel>
                 <StackPanel>
