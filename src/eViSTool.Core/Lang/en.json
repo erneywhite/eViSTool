@@ -1635,6 +1635,8 @@
   "hostedbk.failed": "Could not make the backup: {0}",
   "hostedbk.scheduled": "Scheduled: {0}",
   "hostedbk.busy": "Another backup operation for this server is already running. Wait for it to finish.",
+  "hostedbk.busyHere": "A world backup is in progress ({0}). Wait for it or cancel it on the Backups tab.",
+  "hostedbk.busyRestoreHere": "A world restore is in progress ({0}). Wait for it or cancel it on the Backups tab.",
   "hostedbk.stopAsk": "Before restoring the world, stop the server “{0}” in the host's panel. A running server writes its own world over the restored one when it stops.\n\nIs the server stopped?",
   "hostedbk.stateRunning": "running",
   "hostedbk.stateStarting": "starting",

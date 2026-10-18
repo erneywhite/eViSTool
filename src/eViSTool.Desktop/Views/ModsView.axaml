@@ -122,6 +122,17 @@
             </DockPanel>
         </Border>
 
+        <!-- ===== сервер у хостера: копия мира держит соединение — чтение и изменения модов ждут её конца ===== -->
+        <Border DockPanel.Dock="Top" Classes="warning" Margin="0,14,0,0" AutomationProperties.AutomationId="HostedWorldJob"
+                IsVisible="{Binding WorldJobText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <DockPanel>
+                <Path Classes="icon" DockPanel.Dock="Left" Data="{StaticResource Icon.Warning}" Stroke="{DynamicResource Forest.Warn}"
+                      VerticalAlignment="Center" Margin="0,0,12,0" />
+                <TextBlock Text="{Binding WorldJobText}" Foreground="{DynamicResource Forest.Warn}" FontSize="13" TextWrapping="Wrap"
+                           VerticalAlignment="Center" />
+            </DockPanel>
+        </Border>
+
         <!-- ===== зависимости ===== -->
         <Border DockPanel.Dock="Top" Classes="warning" Margin="0,14,0,0" IsVisible="{Binding HasDependencyIssues}">
             <DockPanel>

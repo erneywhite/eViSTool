@@ -31,7 +31,7 @@ internal sealed class ModInstallActions(ModsViewModel owner, ModInstallService i
             return;
         }
 
-        if (owner.CurrentTarget() is not { } target) return;
+        if (owner.ChangeTarget() is not { } target) return;
 
         var installed = new List<string>();
         var problems = new List<string>();
@@ -73,7 +73,7 @@ internal sealed class ModInstallActions(ModsViewModel owner, ModInstallService i
     /// <summary>Докачать недостающие и устаревшие зависимости открытого профиля и включить выключенные — после вопроса.</summary>
     public async Task FixDependenciesAsync()
     {
-        if (owner.Profile is not { } start || owner.IsBusy || owner.DependencyIssues.Count == 0 || owner.CurrentTarget() is not { } target) return;
+        if (owner.Profile is not { } start || owner.IsBusy || owner.DependencyIssues.Count == 0 || owner.ChangeTarget() is not { } target) return;
         if (start.GameVersion is not { } game)
         {
             Error(Loc.T("mods.noGameVersion"));
@@ -116,7 +116,7 @@ internal sealed class ModInstallActions(ModsViewModel owner, ModInstallService i
     public async Task<bool> InstallFromCatalogAsync(string modId, string name, ModDbRelease release,
         IReadOnlyList<(ModTarget Target, ModDbRelease Release)>? also)
     {
-        if (owner.Profile is not { } profile || owner.IsBusy || owner.CurrentTarget() is not { } target) return false;
+        if (owner.Profile is not { } profile || owner.IsBusy || owner.ChangeTarget() is not { } target) return false;
         // занято до первого await: второй щелчок, пока идёт проверка сервера у хостера, не начнёт вторую установку
         owner.IsBusy = true;
         List<(ModTarget Target, ModDbRelease Release)>? extra = null;
