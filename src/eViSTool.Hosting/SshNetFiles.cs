@@ -337,6 +337,35 @@ public sealed partial class SshNetFiles(HostedEndpoint endpoint) : IRemoteFiles
         }
     }
 
+    /// <summary>Докачка с позиции: у SFTP смещение — в каждом запросе чтения, так что это обычное чтение до конца.</summary>
+    public async Task DownloadFromAsync(string path, long offset, Stream destination, IProgress<long>? progress, CancellationToken ct)
+    {
+        path = CheckPath(path);
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        try
+        {
+            var client = await ReadyAsync(ct).ConfigureAwait(false);
+            var stream = await client.OpenAsync(path, FileMode.Open, FileAccess.Read, ct).ConfigureAwait(false);
+            await using (stream.ConfigureAwait(false))
+            {
+                if (offset > 0) stream.Seek(offset, SeekOrigin.Begin);
+                var buffer = new byte[256 * 1024];
+                long done = 0;
+                int n;
+                while ((n = await stream.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+                {
+                    await destination.WriteAsync(buffer.AsMemory(0, n), ct).ConfigureAwait(false);
+                    done += n;
+                    progress?.Report(done);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            throw Translate(ex, "download", path);
+        }
+    }
+
     // ---------- запись
 
     /// <summary>Залить файл; существующий перезаписывается (открытие с усечением).</summary>

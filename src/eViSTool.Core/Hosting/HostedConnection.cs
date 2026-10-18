@@ -89,6 +89,16 @@ public sealed class HostedConnection
     /// <summary>Не спрашивать «останови сервер в панели хостера» перед изменением модов.</summary>
     public bool SkipStopReminder { get; set; }
 
+    /// <summary>
+    /// Куда складывать копии мира на этом компьютере (в том числе сетевая папка); null — папка данных программы,
+    /// HostedBackups/&lt;профиль&gt; (<see cref="HostedWorldBackups.DefaultDir"/>). Проверка — <see cref="HostedWorldBackups.CheckDir"/>.
+    /// </summary>
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public string? BackupDir { get; set; }
+
+    /// <summary>Сколько последних своих копий мира хранить; 0 — не удалять старые.</summary>
+    public int BackupKeep { get; set; } = 7;
+
     /// <summary>Независимая копия: правка профиля посреди операции её не сдвинет.</summary>
     public HostedConnection Clone()
     {

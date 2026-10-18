@@ -336,6 +336,54 @@ public sealed partial class FluentFtpFiles(HostedEndpoint endpoint) : IRemoteFil
         }
     }
 
+    /// <summary>
+    /// Докачка: REST с позиции и одна передача до конца файла. Отказ в REST — <see cref="RemoteFailure.RangeUnsupported"/>
+    /// (дальше чтения с позиции не пробуем). Передача, оборванная сервером посередине, — <see cref="RemoteFailure.Connect"/>:
+    /// у G-Portal управляющее соединение после этого мёртвое, следующая операция подключится заново.
+    /// </summary>
+    public async Task DownloadFromAsync(string path, long offset, Stream destination, IProgress<long>? progress, CancellationToken ct)
+    {
+        path = CheckPath(path);
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        if (offset > 0 && !_rangeReads) throw new RemoteFilesException(RemoteFailure.RangeUnsupported, $"download {path}: server cannot resume (REST)");
+        var start = destination.CanSeek ? destination.Position : 0;
+        try
+        {
+            await WithDataRetryAsync(async () =>
+            {
+                var client = await ReadyAsync(ct).ConfigureAwait(false);
+                if (destination.CanSeek) { destination.Position = start; destination.SetLength(start); }
+                bool done;
+                try
+                {
+                    done = await client.DownloadStream(destination, path, offset, Bytes(progress), ct).ConfigureAwait(false);
+                }
+                catch (FluentFTP.Exceptions.FtpException ex) when (offset > 0
+                    && (ex is FluentFTP.Exceptions.FtpCommandException || ex.InnerException is FluentFTP.Exceptions.FtpCommandException))
+                {
+                    // отказ команды при докачке — из-за REST? Проверяем отдельной командой
+                    if (!await RestRefusedAsync(client, ct).ConfigureAwait(false)) throw;
+                    _rangeReads = false;
+                    throw new RemoteFilesException(RemoteFailure.RangeUnsupported, $"download {path}: server cannot resume (REST)");
+                }
+                // сервер ответил отказом на уже начатую передачу (vsftpd после обрыва — «426»): по коду ответа — обрыв это или нет
+                if (!done)
+                    throw client.LastReplies?.FirstOrDefault() is { Code: { Length: > 0 } code } last
+                        ? FromCode(code, $"download {path}: {code} {last.Message}", null)
+                        : new RemoteFilesException(RemoteFailure.Protocol, $"download {path}: transfer failed");
+                return true;
+            }, ct, canRetry: destination.CanSeek).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            if (ex is RemoteFilesException { Kind: RemoteFailure.RangeUnsupported }) throw;
+            // ответа на оборванную передачу можно не дождаться: соединение больше не годится
+            var error = await RefineAsync(Translate(ex, "download", path), path, ct).ConfigureAwait(false);
+            if (error.Kind is RemoteFailure.Connect or RemoteFailure.Timeout) _broken = true;
+            throw error;
+        }
+    }
+
     // ---------- запись
 
     public async Task UploadAsync(Stream source, string path, IProgress<long>? progress, CancellationToken ct)
