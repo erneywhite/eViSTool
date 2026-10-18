@@ -1,0 +1,27 @@
+eViSTool 0.14.1: going back to the previous version after an update, and fixes for hosted servers.
+
+New
+- After an update the previous version stays next to the program until the new one has started twice and a day has passed since its first start. Until then About has "Go back to the previous version": it puts the previous version back and restarts eViSTool. A running server keeps running. The first time this works is when you update from 0.14.1 to the next release: the update to 0.14.1 is installed by the old code, which does not keep anything.
+- If the mod file downloaded from ModDB says a different version inside than the ModDB release (the author forgot to bump it in the archive), the mod is installed anyway and eViSTool warns about it: in My mods, under the queue item, on the hosted server's update plate and in the "Mods updated" notification. Such a mod is no longer offered the same release as an "update" again and again.
+
+Fixes
+- While a world backup of a hosted server is downloading or restoring, Overview and My mods show its progress instead of waiting silently for the connection. Changing mods on that server is refused at once with a message saying why.
+- Hosted server notifications: a send error stays under its channel until a message goes through, instead of disappearing when you reopen the tab.
+- Own server → Schedule: "Checking the folder…" no longer gets stuck, and the lines under the backup folder follow the language switch. Schedule settings could be saved into another profile when switching profiles quickly; fixed.
+
+Update from About.
+
+---
+
+eViSTool 0.14.1: возврат на прежнюю версию после обновления и исправления для сервера у хостера.
+
+Новое
+- После обновления прежняя версия хранится рядом с программой, пока новая не запустится дважды и с её первого запуска не пройдут сутки. До тех пор в «О программе» есть кнопка «Вернуться на прежнюю версию»: она ставит прежнюю версию на место и перезапускает eViSTool. Запущенный сервер продолжает работать. Впервые это сработает при обновлении с 0.14.1 на следующий выпуск: обновление до 0.14.1 ставит старый код, а он ничего не хранит.
+- Если в скачанном с ModDB файле мода версия не та, что у релиза (автор забыл поднять её в архиве), мод всё равно ставится, а eViSTool об этом предупреждает: в «Моих модах», под пунктом очереди, на плашке обновлений сервера у хостера и в оповещении «Обновлены моды». Тот же релиз такому моду больше не предлагается как обновление раз за разом.
+
+Исправления
+- Пока копия мира сервера у хостера скачивается или восстанавливается, «Обзор» и «Мои моды» показывают её ход, а не ждут соединение молча. Менять моды этого сервера в это время нельзя, и окно сразу говорит почему.
+- Оповещения сервера у хостера: ошибка отправки держится под каналом, пока сообщение не уйдёт, и не пропадает при повторном открытии вкладки.
+- Свой сервер → «Расписание»: «Проверяю папку…» больше не зависает, строки под папкой копий переводятся при смене языка. При быстрой смене профиля настройки расписания могли записаться в чужой профиль, исправлено.
+
+Обнови из «О программе».
