@@ -1,0 +1,21 @@
+# Обновления зависимостей: Dependabot открывает запросы на слияние, CI их проверяет, сливает человек.
+version: 2
+updates:
+  # действия CI закреплены по хешу коммита — Dependabot сам поднимает хеш и пометку версии рядом
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # пакеты NuGet — раз в месяц и одним запросом, чтобы не засыпать мелочью; Avalonia и SSH.NET проверяются глазами
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      nuget:
+        patterns: ["*"]
