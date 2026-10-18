@@ -26,6 +26,10 @@ public sealed class TestApp : Application
 
     public override void Initialize()
     {
+        // тесты подключают тему окна (avares://eViSTool/Themes/…) в конструкторах, а xunit v3 идёт в случайном порядке:
+        // если сборку окна до того не загрузил ни один тест, Avalonia не находит её скомпилированный XAML
+        // («No precompiled XAML found»), и падает добрая половина набора. Загружаем её здесь, до любого теста
+        _ = typeof(eViSTool.Desktop.App).Assembly;
         Styles.Add(new FluentTheme());
         Styles.Add(new StyleInclude(new Uri("avares://eViSTool.Desktop.Tests"))
         {
