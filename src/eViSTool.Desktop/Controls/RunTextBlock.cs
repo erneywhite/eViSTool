@@ -17,7 +17,8 @@ namespace eViSTool.Desktop.Controls;
 /// измерение собирает куски заново, но кэш отдаёт ту пустую строку — ширина 0, на экране ничего. Обычный TextBlock
 /// с Text этим не болеет: его текст есть и без измерения. Здесь, пока кусков нет, кадр получает пустую раскладку мимо
 /// кэша, а ближайшее измерение её выбрасывает. Стили и тема — как у TextBlock.
-/// shortcut: обход ошибки Avalonia, убрать, когда RunInlinesTests.PlainTextBlock_… покажет, что её починили.
+/// shortcut: обход ошибки Avalonia. В 12.1.4 её починили (RunInlinesTests.PlainTextBlock_DrawsPiecesChangedWhileThePageIsHidden);
+/// убрать и вернуть TextBlock после проверки вживую на Windows и Linux (Xwayland).
 /// </remarks>
 public class RunTextBlock : TextBlock
 {

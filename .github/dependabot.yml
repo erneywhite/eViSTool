@@ -10,12 +10,14 @@ updates:
       actions:
         patterns: ["*"]
 
-  # пакеты NuGet — раз в месяц и одним запросом, чтобы не засыпать мелочью; Avalonia и SSH.NET проверяются глазами
+  # пакеты NuGet — раз в месяц; мелкие обновления одним запросом, мажорные — каждое своим: поломка одного (xunit 4 и
+  # т. п.) не держит остальные. Avalonia и SSH.NET проверяются глазами
   - package-ecosystem: nuget
     directory: /
     schedule:
       interval: monthly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 5
     groups:
-      nuget:
+      nuget-minor:
         patterns: ["*"]
+        update-types: ["minor", "patch"]

@@ -200,11 +200,11 @@ public sealed class RunInlinesTests : IDisposable
     }
 
     /// <summary>
-    /// Канарейка: обычный TextBlock с Run всё ещё теряет текст, сменившийся на скрытой странице. Упал этот тест —
-    /// в Avalonia ошибку починили, и RunTextBlock (Controls/RunTextBlock.cs) можно вернуть обратно в TextBlock.
+    /// С Avalonia 12.1.4 обычный TextBlock с Run рисует текст, сменившийся на скрытой странице: ошибку, ради которой
+    /// есть RunTextBlock (Controls/RunTextBlock.cs), починили. Обход ещё стоит — его убирают после проверки вживую.
     /// </summary>
     [AvaloniaFact]
-    public void PlainTextBlock_StillLosesPiecesChangedWhileThePageIsHidden()
+    public void PlainTextBlock_DrawsPiecesChangedWhileThePageIsHidden()
     {
         var page = Open();
         ShowPage(page, visible: false);
@@ -213,11 +213,10 @@ public sealed class RunInlinesTests : IDisposable
         ShowPage(page, visible: true);
         var frame = Capture(page.Window);
 
-        const string fixedUpstream = "обычный TextBlock нарисовал куски — ошибку Avalonia починили, RunTextBlock больше не нужен";
         foreach (var t in Cells(page, "plain").Prepend(Named(page, "PlainCounter")))
         {
-            Assert.True(t.DesiredSize.Width == 0, fixedUpstream);
-            Assert.True(Ink(frame, page.Window, t) == 0, fixedUpstream);
+            Assert.True(t.DesiredSize.Width > 0, $"«{Expected(t)}»: ширина 0");
+            Assert.True(Ink(frame, page.Window, t) > 20, $"«{Expected(t)}» не нарисована");
         }
         page.Window.Close();
     }
