@@ -41,9 +41,9 @@
                                 <StackPanel DockPanel.Dock="Right" Width="260">
                                     <ComboBox IsEditable="True" ItemsSource="{Binding Addresses}" Text="{Binding Host}" HorizontalAlignment="Stretch"
                                               AutomationProperties.AutomationId="RemoteHost" AutomationProperties.Name="{local:Tr remote.host}" />
-                                    <ctl:RunTextBlock Classes="hint" Margin="2,6,0,0">
+                                    <TextBlock Classes="hint" Margin="2,6,0,0">
                                         <Run Text="{local:Tr remote.port}" /><Run Text=" " /><Run Text="{Binding Port, Mode=OneWay}" FontWeight="SemiBold" />
-                                    </ctl:RunTextBlock>
+                                    </TextBlock>
                                 </StackPanel>
                                 <StackPanel Margin="0,0,16,0">
                                     <TextBlock Text="{local:Tr remote.host}" Classes="label" />

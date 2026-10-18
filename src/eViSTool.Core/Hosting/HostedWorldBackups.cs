@@ -103,7 +103,7 @@ public sealed partial class HostedWorldBackups
         Prefix = BackupStore.Slug(target.Name);
         var chosen = Hosted.Settings.BackupDir?.Trim();
         // своя папка — только полным путём (окно проверяет её CheckDir); мусор в настройках не уводит копии в текущую папку
-        Dir = !string.IsNullOrEmpty(chosen) && Path.IsPathFullyQualified(chosen) ? chosen : DefaultDir(target.ProfileId);
+        Dir = !string.IsNullOrEmpty(chosen) && Path.IsPathFullyQualified(chosen) ? chosen : DefaultDir(target.ProfileId, Hosted.Settings.BackupFolder);
     }
 
     public ModTarget Target { get; }
@@ -125,12 +125,18 @@ public sealed partial class HostedWorldBackups
     private string Root => HostedLayoutProbe.Root(Hosted.Settings);
 
     /// <summary>
-    /// Папка копий по умолчанию: папка данных программы, HostedBackups/&lt;id профиля&gt;. По id, а не по имени: имена
-    /// профилей повторяются (новый получает «Сервер N», номер освобождается при удалении) и меняются, а два профиля в одной
-    /// папке удаляли бы ротацией копии друг друга. Имя профиля — в именах самих копий.
+    /// Папка копий по умолчанию: папка данных программы, HostedBackups/&lt;<paramref name="backupFolder"/>&gt;. Папка названа
+    /// по имени профиля, чтобы человек понимал, что это, но имя назначается один раз (<see cref="HostedBackupFolders.Assign"/>)
+    /// и хранится в настройках профиля: переименование профиля папку не двигает, иначе копии «потерялись» бы. Совпадения
+    /// исключает то же назначение («Имя», «Имя (2)»…, без учёта регистра, с учётом папок, уже лежащих на диске, и клонов, что
+    /// унаследовали папку): два профиля в одной папке удаляли бы ротацией копии друг друга. Не назначена (профиль ещё не
+    /// прошёл назначение) или не годится в имя папки — прежнее место HostedBackups/&lt;id профиля&gt;; id уникален всегда.
     /// </summary>
-    public static string DefaultDir(string profileId) =>
-        PathRules.FileIn(Path.Combine(AppPaths.Root, "HostedBackups"), profileId) ?? throw new ArgumentException("bad profile id", nameof(profileId));
+    public static string DefaultDir(string profileId, string? backupFolder = null)
+    {
+        var root = Path.Combine(AppPaths.Root, "HostedBackups");
+        return PathRules.FileIn(root, backupFolder) ?? PathRules.FileIn(root, profileId) ?? throw new ArgumentException("bad profile id", nameof(profileId));
+    }
 
     /// <summary>Можно ли складывать копии в эту папку (как у копий своего сервера); null — можно, иначе — что не так.</summary>
     public static string? CheckDir(string? dir) => BackupStore.CheckDir(dir);

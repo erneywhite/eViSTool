@@ -681,6 +681,9 @@ public sealed class HostedBackupsViewModelTests : IDisposable
         Assert.Null(_host.Settings.BackupDir);
         Assert.Equal(Loc.T("hostedbk.dirSavedDefault"), vm.BackupDirOk);
         Assert.Equal(HostedWorldBackups.DefaultDir(_host.Profile.Id), vm.BackupDirDefault);
+        _host.Settings.BackupFolder = "Named"; // назначенная папка по имени профиля
+        Assert.Equal(HostedWorldBackups.DefaultDir(_host.Profile.Id, "Named"), vm.BackupDirDefault);
+        Assert.EndsWith("Named", vm.BackupDirDefault);
         Assert.Equal(0, _edited); // моды не перечитывались
     });
 

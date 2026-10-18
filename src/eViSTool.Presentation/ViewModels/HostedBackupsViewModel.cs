@@ -126,8 +126,8 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
     [ObservableProperty] private string _backupDirOk = "";
     [ObservableProperty] private bool _backupDirChecking;
 
-    /// <summary>Где копии лежат, если своя папка не выбрана: папка программы, HostedBackups/&lt;id профиля&gt;.</summary>
-    public string BackupDirDefault => _profile is { } p ? HostedWorldBackups.DefaultDir(p.Model.Id) : "";
+    /// <summary>Где копии лежат, если своя папка не выбрана: папка программы, HostedBackups/&lt;имя папки профиля&gt;.</summary>
+    public string BackupDirDefault => _profile is { } p ? HostedWorldBackups.DefaultDir(p.Model.Id, p.Model.Hosted?.BackupFolder) : "";
 
     /// <summary>Открыт профиль у хостера.</summary>
     public bool HasProfile => _profile is not null;
@@ -481,7 +481,7 @@ public sealed partial class HostedBackupsViewModel : ObservableObject
     private void OpenFolder()
     {
         if (_profile is not { } p) return;
-        var dir = p.BackupDir is { Length: > 0 } own && Path.IsPathFullyQualified(own) ? own : HostedWorldBackups.DefaultDir(p.Model.Id);
+        var dir = p.BackupDir is { Length: > 0 } own && Path.IsPathFullyQualified(own) ? own : BackupDirDefault;
         try
         {
             Directory.CreateDirectory(dir);

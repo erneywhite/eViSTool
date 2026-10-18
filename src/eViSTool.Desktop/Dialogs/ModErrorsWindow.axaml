@@ -47,7 +47,7 @@
                                             CommandParameter="{Binding}" AutomationProperties.AutomationId="ErrsCatalog" />
                                 </StackPanel>
                                 <StackPanel>
-                                    <ctl:RunTextBlock FontSize="13" TextWrapping="Wrap"><Run Text="{Binding Line.Name}" FontWeight="SemiBold" /><Run Text=" " /><Run Text="{Binding Line.Version}" Foreground="{DynamicResource Forest.Muted}" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding CountText}" Foreground="{DynamicResource Forest.Warn}" /></ctl:RunTextBlock>
+                                    <TextBlock FontSize="13" TextWrapping="Wrap"><Run Text="{Binding Line.Name}" FontWeight="SemiBold" /><Run Text=" " /><Run Text="{Binding Line.Version}" Foreground="{DynamicResource Forest.Muted}" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding CountText}" Foreground="{DynamicResource Forest.Warn}" /></TextBlock>
                                     <TextBlock Classes="mono" Text="{Binding Line.Example}" FontSize="11" Foreground="{DynamicResource Forest.Muted}"
                                                TextWrapping="Wrap" Margin="0,4,0,0" />
                                 </StackPanel>

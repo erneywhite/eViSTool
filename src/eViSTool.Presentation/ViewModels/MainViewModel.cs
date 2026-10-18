@@ -1,6 +1,7 @@
 ﻿using eViSTool.Presentation;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using eViSTool.Core.Hosting;
 using eViSTool.Core.ModDb;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Settings;
@@ -183,14 +184,8 @@ public sealed partial class MainViewModel : ObservableObject
         {
             _settings.SkippedAppVersion = version;
             Save();
-        }, () => IsGameRunning || IsLaunching || _game.IsWatching, () => _settings.RolledBackAppVersion);
-        // вернулись на прежнюю версию: ту, с которой ушли, больше не предлагать — она пропущена, даже рекомендуемая
-        About.RolledBack = version =>
-        {
-            _settings.SkippedAppVersion = version;
-            _settings.RolledBackAppVersion = version;
-            Save();
-        };
+        }, () => IsGameRunning || IsLaunching || _game.IsWatching);
+        HostedBackupFolders.Assign(_settings.Profiles, HostedBackupsRoot); // папки копий мира у хостера; на диск уйдёт с Save() ниже
         Loc.Instance.SetLanguage(_settings.Language); // до того, как VM начнут собирать тексты
         foreach (var p in _settings.Profiles) Profiles.Add(new ProfileViewModel(p, OnProfileChanged, _ => Save()));
 

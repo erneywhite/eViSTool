@@ -53,9 +53,9 @@ public sealed class RunPageModel : ObservableObject
 
 /// <summary>
 /// Подписи из нескольких Run при смене языка и данных на лету — та ошибка, из-за которой в «Моих модах» на Linux
-/// пропадали счётчики и строка modid. Причина — в Avalonia 12 (подробно — <see cref="RunTextBlock"/>): кусок поменялся,
-/// пока страница скрыта, кадр нарисовал подпись без раскладки и запомнил пустую строку в кэше строк; после показа
-/// подпись пустая. Смена языка лишь самый частый повод: язык меняют на «Настройках», остальные страницы в это время
+/// пропадали счётчики и строка modid. Причина была в Avalonia 12 до 12.1.4: кусок поменялся, пока страница скрыта, кадр
+/// нарисовал подпись без раскладки и запомнил пустую строку в кэше строк; после показа подпись пустая. До 12.1.4 её
+/// обходил свой RunTextBlock, теперь подписи — обычные TextBlock, а эти тесты следят, чтобы ошибка не вернулась. Смена языка лишь самый частый повод: язык меняют на «Настройках», остальные страницы в это время
 /// скрыты. Перевод {local:Tr} тут ни при чём — он меняет Run.Text так же, как {Binding}.
 /// </summary>
 public sealed class RunInlinesTests : IDisposable
@@ -185,7 +185,7 @@ public sealed class RunInlinesTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void PiecesChangedOnAVisiblePage_AreDrawn_ByBothTextBlocks()
+    public void PiecesChangedOnAVisiblePage_AreDrawn()
     {
         var page = Open();
         Change(page.Model, replaceRows: true);
@@ -199,34 +199,12 @@ public sealed class RunInlinesTests : IDisposable
         page.Window.Close();
     }
 
-    /// <summary>
-    /// С Avalonia 12.1.4 обычный TextBlock с Run рисует текст, сменившийся на скрытой странице: ошибку, ради которой
-    /// есть RunTextBlock (Controls/RunTextBlock.cs), починили. Обход ещё стоит — его убирают после проверки вживую.
-    /// </summary>
     [AvaloniaFact]
-    public void PlainTextBlock_DrawsPiecesChangedWhileThePageIsHidden()
-    {
-        var page = Open();
-        ShowPage(page, visible: false);
-        Change(page.Model, replaceRows: false);
-        Frame();
-        ShowPage(page, visible: true);
-        var frame = Capture(page.Window);
-
-        foreach (var t in Cells(page, "plain").Prepend(Named(page, "PlainCounter")))
-        {
-            Assert.True(t.DesiredSize.Width > 0, $"«{Expected(t)}»: ширина 0");
-            Assert.True(Ink(frame, page.Window, t) > 20, $"«{Expected(t)}» не нарисована");
-        }
-        page.Window.Close();
-    }
-
-    [AvaloniaFact]
-    public void RunTextBlock_MeasuredInTheSamePlaceAfterAFrameWithoutLayout_GetsItsRealWidth()
+    public void MeasuredInTheSamePlaceAfterAFrameWithoutLayout_GetsItsRealWidth()
     {
         // место измерения совпало с местом раскладки — раскладка, собранная кадром без кусков, сама не сбросится
         var run = new Run("коротко");
-        var text = new RunTextBlock { Inlines = [run, new Run(" и ясно")] };
+        var text = new TextBlock { Inlines = [run, new Run(" и ясно")] };
         var place = new Size(300, 20);
         text.Measure(place);
         text.Arrange(new Rect(place));
@@ -237,22 +215,5 @@ public sealed class RunInlinesTests : IDisposable
         text.Measure(place);
 
         Assert.True(text.DesiredSize.Width > before, $"ширина {text.DesiredSize.Width}, была {before}");
-    }
-
-    [AvaloniaFact]
-    public void RunTextBlock_TakesTextBlockStyles()
-    {
-        // подписи в окне оформлены стилями «TextBlock.hint» и т. п. — у обхода они те же
-        var text = new RunTextBlock { Classes = { "hint" }, Inlines = [new Run("a"), new Run("b")] };
-        var window = new Window
-        {
-            Styles = { new Style(x => x.OfType<TextBlock>().Class("hint")) { Setters = { new Setter(TextBlock.FontSizeProperty, 31.0) } } },
-            Content = text,
-        };
-        window.Show();
-        Frame();
-
-        Assert.Equal(31.0, text.FontSize);
-        window.Close();
     }
 }

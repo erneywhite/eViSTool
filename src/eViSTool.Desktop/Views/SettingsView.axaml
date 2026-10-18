@@ -107,9 +107,9 @@
                                           Margin="0,0,12,0" />
                                     <StackPanel>
                                         <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                        <ctl:RunTextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextTrimming="CharacterEllipsis">
+                                        <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextTrimming="CharacterEllipsis">
                                             <Run Text="{Binding KindText, Mode=OneWay}" /><Run Text="{local:Tr settings.gameShort}" /><Run Text="{Binding GameVersionText, Mode=OneWay}" />
-                                        </ctl:RunTextBlock>
+                                        </TextBlock>
                                     </StackPanel>
                                 </DockPanel>
                             </DataTemplate>
@@ -242,9 +242,9 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:LinkChoice">
                                         <CheckBox IsChecked="{Binding IsLinked}" Margin="0,6,0,0" AutomationProperties.Name="{Binding Name}">
-                                            <ctl:RunTextBlock FontSize="13" Foreground="{DynamicResource Forest.Text}">
+                                            <TextBlock FontSize="13" Foreground="{DynamicResource Forest.Text}">
                                                 <Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding KindText, Mode=OneWay}" Foreground="{DynamicResource Forest.Muted}" />
-                                            </ctl:RunTextBlock>
+                                            </TextBlock>
                                         </CheckBox>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

@@ -75,7 +75,7 @@
                                   AutomationProperties.Name="{local:Tr roles.defaultRole}">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate x:DataType="vm:RoleItemViewModel">
-                                    <ctl:RunTextBlock TextTrimming="CharacterEllipsis"><Run Text="{Binding DisplayName, Mode=OneWay}" /><Run Text="  " /><Run Text="{Binding Code, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" Foreground="{DynamicResource Forest.Muted}" /></ctl:RunTextBlock>
+                                    <TextBlock TextTrimming="CharacterEllipsis"><Run Text="{Binding DisplayName, Mode=OneWay}" /><Run Text="  " /><Run Text="{Binding Code, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" Foreground="{DynamicResource Forest.Muted}" /></TextBlock>
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
@@ -112,7 +112,7 @@
                                              IsVisible="{Binding IsChanged}" />
                                     <StackPanel>
                                         <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                        <ctl:RunTextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextTrimming="CharacterEllipsis"><Run Text="{Binding Code, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" /><Run Text="  ·  " /><Run Text="{Binding LevelText, Mode=OneWay}" /></ctl:RunTextBlock>
+                                        <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextTrimming="CharacterEllipsis"><Run Text="{Binding Code, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" /><Run Text="  ·  " /><Run Text="{Binding LevelText, Mode=OneWay}" /></TextBlock>
                                         <TextBlock Text="{local:Tr roles.defaultBadge}" FontSize="11" Foreground="{DynamicResource Forest.Accent}"
                                                    IsVisible="{Binding IsDefault}" />
                                     </StackPanel>
