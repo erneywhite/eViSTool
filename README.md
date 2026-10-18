@@ -62,7 +62,7 @@ It is portable: unzip it anywhere and run. Nothing is installed into the system 
 2. Unzip it into any folder you like (not into the game folder) and run `eViSTool.exe` (on Linux, `eViSTool`).
    On Linux the first start also adds eViSTool to the applications menu.
 3. eViSTool finds the game and your mods by itself and opens **My mods**.
-   If the game is installed somewhere unusual, set its folder in **Settings**.
+   If the game is installed somewhere unusual, set its folder in **Profiles**.
 
 **Requirements:** Windows 10 or 11 (x64) and [.NET 10](https://dotnet.microsoft.com/download/dotnet/10.0).
 The game client needs it too, so it is already there if you play Vintage Story.
@@ -91,7 +91,7 @@ The active profile is chosen at the top of the window, and every page works with
 **Play straight on a server.** The arrow next to **Play** opens a menu: No server, your servers from eViSTool
 (on this computer or in a VM, with their state: running, how many online) and the game's favorites. A menu item starts the game
 and connects to the server right away, skipping the game's menu. The pin makes a server the default: the button then says, say,
-**Play · home**, and one click takes you straight there. The same is set in **Settings** for a client profile — **Server for the Play button**.
+**Play · home**, and one click takes you straight there. The same is set in **Profiles** for a client profile — **Server for the Play button**.
 
 ![Play menu](docs/screenshots/play-menu.png)
 
@@ -103,7 +103,7 @@ or add the server to the game's favorites. The **Favorites** tab has all of them
 
 ![Find a server](docs/screenshots/find-server.png)
 
-Profiles are created in **Settings** with **+ Client** and **+ Server**, or copied from an existing one with **Clone…**.
+Profiles are created on the **Profiles** page with **+ Client** and **+ Server**, or copied from an existing one with **Clone…**.
 Client profiles show the icon of your installed game.
 
 ![New client profile](docs/screenshots/profile.png)
@@ -174,7 +174,7 @@ and asks first, updates included — the ModDB marks releases only by branch (1.
 
 **World copies.** Before the mods of a game profile change, eViSTool copies the single-player worlds you played since the last copy —
 one copy per world, kept next to the worlds in the profile's data folder (`eViSTool-world-copies`). If an update breaks a world,
-open **Settings → the profile → World copies** and press **Put back**. The world it replaces is set aside in the same list,
+open **Profiles → the profile → World copies** and press **Put back**. The world it replaces is set aside in the same list,
 so this can be undone too. It is on by default (**Copy single-player worlds before changing mods** in **Settings**).
 Data that mods keep next to the worlds (for example `Saves/XLeveling`) is shared by all worlds and is not part of these copies.
 
@@ -386,7 +386,7 @@ carries everything needed: address, port, key and the server's certificate. Ther
    (like `192.168.1.20`); from outside — your external IP or domain.
 4. Press **Allow in Windows Firewall** (Windows asks for administrator rights), then **Copy** the code.
 
-**On your computer:** **Settings → + Server → Server on another computer? → Connect by code…**, paste the code,
+**On your computer:** **Profiles → + Server → Server on another computer? → Connect by code…**, paste the code,
 press **Check connection** and create the profile. Pick it at the top of the window — **Server** and **My mods**
 now work with the remote server.
 
@@ -484,7 +484,7 @@ sudo -u vintagestory ./eViSTool.Agent remote code                    # connectio
 sudo ./eViSTool.Agent service install                                # systemd service
 ```
 
-Paste the code in the window: **Settings → + Server → Server on another computer? → Connect by code…**.
+Paste the code in the window: **Profiles → + Server → Server on another computer? → Connect by code…**.
 The archive also contains the window (`eViSTool`); a server without a desktop doesn't need it, it just lies there.
 
 Good to know:
@@ -503,7 +503,7 @@ Which files the agent keeps and what's in them: [Configuration files](docs/confi
 ## Disk cleanup
 
 Over time the game piles up gigabytes: every mod version it ever unpacked, mods downloaded from servers you no longer play on,
-maps of old worlds. **Settings → the profile → Disk cleanup…** shows what the game and eViSTool keep for that profile, grouped,
+maps of old worlds. **Profiles → the profile → Disk cleanup…** shows what the game and eViSTool keep for that profile, grouped,
 with sizes and dates:
 
 - **safe** — the game or eViSTool recreate it when needed: unpacked mods (`Cache\unpack`), mods downloaded from servers,
@@ -534,7 +534,7 @@ Deleted mods, backups and profile folders go to the Recycle Bin.
 
 ## Troubleshooting
 
-**The game or its version is not found.** Settings → the profile → **Game folder**: the folder with `Vintagestory.exe`
+**The game or its version is not found.** Profiles → the profile → **Game folder**: the folder with `Vintagestory.exe`
 (or `VintagestoryServer.exe` for a server).
 
 **A mod is "Not on ModDB".** It was installed by hand, or its `modid` differs from the one on the ModDB. It works as usual,
