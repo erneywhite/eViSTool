@@ -8,7 +8,7 @@ using Newtonsoft.Json;
 //
 //   eViSTool.Agent.exe --profile <id> --exe <VintagestoryServer.exe> --data <папка данных> [--arg <доп. аргумент>]…
 //   eViSTool.Agent [--game <папка игры>] [--data <папка данных>] [--profile <id>] [--start|--no-start]   — без окна (Linux)
-//   eViSTool.Agent <команда> …   — setup, remote, status, start, stop, restart, command, service (см. Cli/Commands.cs)
+//   eViSTool.Agent <команда> …   — setup, remote, status, start, stop, restart, command, service, rollback (см. Cli/Commands.cs)
 //
 // Без окна пути не передаёт никто: каждое значение — из ключа, без ключа — из data/agent.json (его пишет setup), а папки
 // сервера, которых нет и там, ищет ServerLocator (рядом, в соседних папках, по server.sh); профиль по умолчанию — «server».
@@ -135,11 +135,11 @@ var stateFile = AgentProtocol.StateFile(opts.ProfileId, opts.AgentsDir);
 Directory.CreateDirectory(Path.GetDirectoryName(stateFile)!);
 File.WriteAllText(stateFile, JsonConvert.SerializeObject(new AgentEndpoint(Environment.ProcessId, port, DateTime.Now, version)));
 Console.WriteLine($"eViSTool.Agent {version}: profile {opts.ProfileId}, http://127.0.0.1:{port}");
+// агент поднялся и слушает — запуск этой версии удался. Прежние exe и dll, переименованные при установке в «*.old»,
+// хранятся, пока новая версия не проработала (на них можно вернуться: eViSTool.Agent rollback), потом убираются
+eViSTool.Core.AppUpdate.AppRollback.NoteStart(AppContext.BaseDirectory, eViSTool.Core.AppUpdate.AppProgram.Agent, version);
 if (opts.AfterUpdate)
-{
-    eViSTool.Core.AppUpdate.AppUpdater.CleanupOld(AppContext.BaseDirectory); // прежние exe и dll, переименованные при установке
     host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("selfupd.done", version));
-}
 
 await remote.ApplyAsync();
 
@@ -147,7 +147,6 @@ await remote.ApplyAsync();
 var startServer = opts.StartServer;
 if (AgentProtocol.TakeAfterUpdate(opts.ProfileId, opts.AgentsDir) is { } wasRunning)
 {
-    eViSTool.Core.AppUpdate.AppUpdater.CleanupOld(AppContext.BaseDirectory);
     host.Console.Add(ConsoleLineKind.System, eViSTool.Core.Localization.Loc.T("selfupd.done", version));
     startServer = wasRunning;
 }

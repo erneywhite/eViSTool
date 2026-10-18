@@ -114,6 +114,22 @@ public sealed class AgentCliTests : IAsyncLifetime
         Assert.Contains("new-key", help.Out);
     }
 
+    // рядом со сборкой агента прежней версии нет — «rollback» говорит это словами и ничего не трогает; лишние слова — код 2
+    [Fact]
+    public async Task Rollback_WithoutAPreviousVersion_SaysSo()
+    {
+        // запись о прежней версии рядом со сборкой значила бы, что откат переставит её файлы, — такого быть не должно
+        Assert.False(File.Exists(Path.Combine(Path.GetDirectoryName(AgentExe)!, eViSTool.Core.AppUpdate.AppRollback.FileName)));
+
+        var r = await Cli("rollback");
+        Assert.True(r.Code == 1, r.Out + r.Err);
+        Assert.Contains("nothing to go back to", r.Err);
+
+        var extra = await Cli("rollback", "now");
+        Assert.True(extra.Code == 2, extra.Out + extra.Err);
+        Assert.Contains("rollback", (await Cli("help")).Out);
+    }
+
     [Fact]
     public async Task Remote_EnableHostCodeNewKeyDisable_WithoutAnAgent()
     {

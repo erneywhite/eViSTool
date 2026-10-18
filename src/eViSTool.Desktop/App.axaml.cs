@@ -32,7 +32,6 @@ public partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += (_, a) => CrashLog.Write(a.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, a) => { CrashLog.Write(a.Exception); a.SetObserved(); };
         Core.AppPaths.MigrateLegacy(); // до первого чтения настроек
-        Core.AppUpdate.AppUpdater.CleanupOld(AppContext.BaseDirectory); // хвосты прошлого обновления
         PreloadForRestart();
 
         Ui.Platform = new AvaloniaUiPlatform(); // модели спрашивают, открывают файлы и ставят таймеры через него
@@ -42,8 +41,17 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.Exit += (_, _) => StartRestart();
-            var main = new MainWindow { DataContext = new MainViewModel() };
+            var vm = new MainViewModel();
+            var main = new MainWindow { DataContext = vm };
             desktop.MainWindow = main;
+            // окно открылось — запуск этой версии удался: засчитать его, а проработавшей версии прежнюю («*.old») убрать
+            void Started(object? sender, EventArgs e)
+            {
+                main.Opened -= Started;
+                Core.AppUpdate.AppRollback.NoteStart(AppContext.BaseDirectory, Core.AppUpdate.AppProgram.Window, vm.About.AppVersion);
+                vm.About.RefreshRollback();
+            }
+            main.Opened += Started;
             // второй запуск из той же папки — показать это окно, а не открывать новое
             if (Program.Instance is { } instance)
                 instance.ActivateRequested += () => Dispatcher.UIThread.Post(() => BringToFront(main));
