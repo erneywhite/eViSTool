@@ -79,6 +79,13 @@ public sealed partial class ModsViewModel : ObservableObject
     /// <summary>Таблицу строят заново (<see cref="Rebuild"/>): выбор, который таблица меняет сама, карточку не трогает.</summary>
     private bool _rebuilding;
 
+    /// <summary>
+    /// Файлы модов, чей переключатель щёлкнули (<see cref="ToggleEnabledAsync"/>): при ближайшей перестройке их строки —
+    /// новые, даже если мод не поменялся. Щелчок сам перекидывает переключатель, а привязка к прежней строке значение не
+    /// повторяет: отказались, запись не удалась — переключатель так и показывал бы несделанное.
+    /// </summary>
+    private readonly HashSet<string> _renew = new(StringComparer.Ordinal);
+
     // счётчики над таблицей и на чипах
     [ObservableProperty] private int _updatesAvailable;
     [ObservableProperty] private int _problemCount;
@@ -545,7 +552,9 @@ public sealed partial class ModsViewModel : ObservableObject
         // меняет в таблице одну строку. Вид таблицы обновляется один раз, в конце, и новые строки встают на места
         // прежних: опустей он между Clear и Add, таблица прокрутилась бы к началу — список прыгал бы вверх
         var previous = new Dictionary<string, ModRowViewModel>(StringComparer.Ordinal);
-        foreach (var row in Rows) previous.TryAdd(row.FilePath, row);
+        foreach (var row in Rows)
+            if (!_renew.Contains(row.FilePath)) previous.TryAdd(row.FilePath, row);
+        _renew.Clear();
         _rebuilding = true;
         try
         {
@@ -574,19 +583,22 @@ public sealed partial class ModsViewModel : ObservableObject
         if (UnneededCount == 0 && Filter == ModFilter.Unneeded) Filter = ModFilter.All; // таких модов не осталось — показываем всё
         OnPropertyChanged(nameof(ShownText));
 
-        if (keep is not null)
+        // выбор — на том же моде или снят. Таблица, у которой выбранную строку заменили или убрали, сама выбирает соседнюю,
+        // а её карточку выше не строили: соседняя осталась бы выделенной при сводке справа, и щелчок по ней ничего бы не дал
+        var same = keep is null ? null
+            : Rows.FirstOrDefault(r => r.FilePath == keep.FilePath) ?? Rows.FirstOrDefault(r => r.ModId.Length > 0 && r.ModId == keep.ModId);
+        if (same is null)
         {
-            var same = Rows.FirstOrDefault(r => r.FilePath == keep.FilePath)
-                       ?? Rows.FirstOrDefault(r => r.ModId.Length > 0 && r.ModId == keep.ModId);
-            if (same is null) Card = null; // мод удалили
-            else
-            {
-                // строка та же — карточку всё равно строим заново (числа конфигов, версия игры могли поменяться; что она
-                // уже узнала, новая берёт у прежней). Строка новая — карточку построит выбор
-                var refresh = same == Selected || ReferenceEquals(same, Card?.Row);
-                if (same != Selected) Selected = same;
-                if (refresh) ShowCard(same);
-            }
+            Selected = null;
+            Card = null; // мод удалили
+        }
+        else
+        {
+            // строка та же — карточку всё равно строим заново (числа конфигов, версия игры могли поменяться; что она
+            // уже узнала, новая берёт у прежней). Строка новая — карточку построит выбор
+            var refresh = same == Selected || ReferenceEquals(same, Card?.Row);
+            if (same != Selected) Selected = same;
+            if (refresh) ShowCard(same);
         }
         if (IsHistory) _ = LoadHistoryAsync(); // моды поменялись — в истории появилось новое
     }
@@ -649,6 +661,7 @@ public sealed partial class ModsViewModel : ObservableObject
         {
             if (row is not null && !Rows.Contains(row))
                 row = Rows.FirstOrDefault(r => r.FilePath == row.FilePath); // таблицу построили заново; мода нет — нечего переключать
+            if (row is not null) _renew.Add(row.FilePath);
             await ToggleOneAsync(row);
         }
         finally
@@ -659,7 +672,12 @@ public sealed partial class ModsViewModel : ObservableObject
 
     private async Task ToggleOneAsync(ModRowViewModel? row)
     {
-        if (row?.Local.Info is null || CurrentTarget() is not { } target) return;
+        if (row?.Local.Info is null || CurrentTarget() is not { } target)
+        {
+            // мод без modinfo переключить нечем (игра узнаёт мод по modid), профиль не читается — вернуть галочку как было
+            if (row is not null) Rebuild();
+            return;
+        }
 
         if (target.IsHosted)
         {
