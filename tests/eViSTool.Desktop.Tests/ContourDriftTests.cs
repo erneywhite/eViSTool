@@ -17,10 +17,11 @@ using GlyphPath = Avalonia.Controls.Shapes.Path;
 namespace eViSTool.Desktop.Tests;
 
 /// <summary>
-/// «Горизонтали» заглушки под боковой панелью плывут (docs/design.md, раздел 5): по таймеру, на 1 px за шаг, а не на
-/// каждом кадре; только пока окно на экране, в фокусе и не свёрнуто, линии видны и движение не выключено — иначе таймер
-/// стоит. Через период узора сдвиг возвращается к нулю, а узор при этом тот же: скачка нет. Сдвиг перерисовывает только
-/// боковую панель. Стенд повторяет главное окно: слева панель 210 px с ClipToBounds, в ней линии.
+/// «Горизонтали» заглушки под боковой панелью плывут (docs/design.md, раздел 5): по таймеру 20 раз в секунду, сдвиг по
+/// часам и дробный — плавно, без шагов по целому пикселю; только пока окно на экране, в фокусе и не свёрнуто, линии
+/// видны и движение не выключено — иначе таймер стоит, а после остановки линии продолжают с того же места. Через период
+/// узора сдвиг возвращается к нулю, а узор при этом тот же: скачка нет. Сдвиг перерисовывает только боковую панель.
+/// Стенд повторяет главное окно: слева панель 210 px с ClipToBounds, в ней линии.
 /// </summary>
 public sealed class ContourDriftTests
 {
@@ -58,7 +59,7 @@ public sealed class ContourDriftTests
     private static TranslateTransform Shift(GlyphPath lines) => Assert.IsType<TranslateTransform>(lines.RenderTransform);
 
     [AvaloniaFact]
-    public async Task Lines_shift_by_timer_one_pixel_a_step_without_layout()
+    public async Task Lines_drift_left_smoothly_by_fractions_of_a_pixel_without_layout()
     {
         var (window, lines, drift) = Stand();
         Assert.False(drift.IsMoving); // окно ещё не показано
@@ -66,37 +67,50 @@ public sealed class ContourDriftTests
         Assert.True(window.IsActive);
         Assert.True(drift.IsMoving);
 
-        var steps = new List<double>();
-        Shift(lines).Changed += (_, _) => steps.Add(drift.Offset);
+        var steps = new List<(double Offset, long At)>();
+        Shift(lines).Changed += (_, _) => steps.Add((drift.Offset, Stopwatch.GetTimestamp()));
         var layouts = 0;
         window.LayoutUpdated += (_, _) => layouts++;
         var watch = Stopwatch.StartNew();
-        // кадры тикают часто (~раз в 10 мс), а сдвиг — только по таймеру
+        // кадры тикают чаще (~раз в 10 мс), а сдвиг меняется только по таймеру, не чаще 20 раз в секунду
         await Wait.Frames(1100);
-        var most = (int)(watch.ElapsedMilliseconds / ContourDrift.Interval.TotalMilliseconds) + 1;
+        var most = (int)(watch.ElapsedMilliseconds * ContourDrift.Rate / 1000.0) + 2;
 
-        Assert.InRange(steps.Count, 3, most);
-        for (var i = 0; i < steps.Count; i++) Assert.Equal(-(i + 1), steps[i]); // по 1 px влево
+        Assert.InRange(steps.Count, 5, most);
+        var moves = steps.Zip(steps.Skip(1), (a, b) => a.Offset - b.Offset).ToList();
+        Assert.All(moves, move => Assert.True(move > 0, $"шаг {move}: линии идут только влево"));
+        // плавно: обычный шаг — доля пикселя (5 px/с × 1/20 с = 0,25 px, на Windows около 0,3), сдвиг не круглый
+        var median = moves.Order().ElementAt(moves.Count / 2);
+        Assert.InRange(median, 0.01, 0.5);
+        Assert.Contains(steps, s => s.Offset != Math.Round(s.Offset));
+        // скорость — по часам: пройдено столько, сколько прошло времени
+        var seconds = Stopwatch.GetElapsedTime(steps[0].At, steps[^1].At).TotalSeconds;
+        Assert.InRange(steps[0].Offset - steps[^1].Offset, seconds * ContourDrift.Speed * 0.7, seconds * ContourDrift.Speed * 1.3 + 0.2);
         Assert.Equal(0, layouts); // двигается только RenderTransform: раскладка не пересчитывается
         window.Close();
         Assert.False(drift.IsMoving);
     }
 
     [AvaloniaFact]
-    public async Task Timer_stops_when_inactive_minimized_lines_hidden_or_motion_off()
+    public async Task Timer_stops_when_inactive_minimized_lines_hidden_or_motion_off_and_resumes_in_place()
     {
         var (window, lines, drift) = Stand();
         Show(window);
         Assert.True(drift.IsMoving);
+        await Wait.Frames(200);
 
         Deactivate(window);
         Assert.False(drift.IsMoving);
         var offset = drift.Offset;
-        await Wait.Idle(500); // стоит по-настоящему: таймер не тикает
+        Assert.True(offset < 0, $"сдвиг {offset}: до остановки линии успели поплыть");
+        await Wait.Idle(500); // стоит по-настоящему: таймер не тикает, часы сдвига не идут
         Assert.Equal(offset, drift.Offset);
         window.Activate();
         Dispatcher.UIThread.RunJobs();
         Assert.True(drift.IsMoving);
+        // продолжает с того же места, а не с нуля и не скачком на простоявшие полсекунды
+        await Wait.Frames(100);
+        Assert.InRange(drift.Offset, offset - 1.5, offset);
 
         window.WindowState = WindowState.Minimized;
         Assert.False(drift.IsMoving);
@@ -117,24 +131,22 @@ public sealed class ContourDriftTests
         Assert.False(drift.IsMoving);
     }
 
-    [AvaloniaFact]
-    public void After_a_period_offset_returns_to_zero_one_pixel_further()
+    [Fact]
+    public void After_a_period_offset_returns_to_zero_and_goes_on()
     {
-        var (_, _, drift) = Stand();
-        for (var i = 1; i < ContourLines.Period; i++)
-        {
-            drift.Advance();
-            Assert.Equal(-i, drift.Offset);
-        }
-        // последний шаг периода: −Period — это тот же узор, что и 0 (см. Pattern_repeats_after_a_period)
-        drift.Advance();
-        Assert.Equal(0, drift.Offset);
-        drift.Advance();
-        Assert.Equal(-1, drift.Offset);
+        var second = TimeSpan.FromSeconds(1);
+        Assert.Equal(ContourDrift.Speed, ContourDrift.PhaseAfter(0, second), 6);
+        Assert.Equal(10 + ContourDrift.Speed / 2, ContourDrift.PhaseAfter(10, second / 2), 6);
+        // у конца круга: −Period — это тот же узор, что и 0 (см. Pattern_repeats_after_a_period), дальше — от нуля
+        Assert.Equal(1, ContourDrift.PhaseAfter(ContourLines.Period - 1, second * (2 / ContourDrift.Speed)), 6);
+        Assert.Equal(0, ContourDrift.PhaseAfter(0, second * (ContourLines.Period / ContourDrift.Speed)), 6);
+        // сколько ни плыви — сдвиг в пределах одного периода: узора на панель хватает всегда
+        for (var minutes = 0; minutes < 60 * 24; minutes += 7)
+            Assert.InRange(ContourDrift.PhaseAfter(123.4, TimeSpan.FromMinutes(minutes)), 0, ContourLines.Period);
     }
 
     [AvaloniaFact]
-    public void Pattern_repeats_after_a_period()
+    public void Pattern_repeats_after_a_period_and_moves_by_fractions()
     {
         // узора хватает на панель при любом сдвиге
         var bounds = ContourLines.Geometry.Bounds;
@@ -155,6 +167,10 @@ public sealed class ContourDriftTests
         Assert.NotEqual(start, At(-1)); // сдвиг правда виден на кадре
         Assert.Equal(start, At(-ContourLines.Period));
         Assert.Equal(At(-37), At(-37 - ContourLines.Period));
+        // полпикселя — свой кадр, между целыми: отрисовка не прилипает к пикселям, движение плавное
+        var half = At(-36.5);
+        Assert.NotEqual(At(-36), half);
+        Assert.NotEqual(At(-37), half);
         window.Close();
     }
 
@@ -174,9 +190,9 @@ public sealed class ContourDriftTests
         // y = 200 — между группами линий: без отметки там чёрный фон. Цвет отметки случайный и может выйти почти
         // чёрным — внутри панели хватит того, что отмечено хотя бы в одном из двух кадров
         var marked = 0;
-        for (var i = 0; i < 2; i++)
+        for (var i = 1; i <= 2; i++)
         {
-            drift.Advance();
+            drift.Seek(i * 0.2);
             Dispatcher.UIThread.RunJobs();
             var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("кадр не отрисовался");
             if (Pixel(frame, 100, 200) != Colors.Black && Pixel(frame, Side - 5, 200) != Colors.Black) marked++;

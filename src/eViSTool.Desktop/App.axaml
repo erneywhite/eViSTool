@@ -40,5 +40,7 @@
         </FluentTheme>
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
         <StyleInclude Source="avares://eViSTool/Themes/Forest.axaml" />
+        <!-- выпадающие меню и списки проявляются при открытии (Controls/PopupMotion) -->
+        <StyleInclude Source="avares://eViSTool/Themes/ForestPopups.axaml" />
     </Application.Styles>
 </Application>

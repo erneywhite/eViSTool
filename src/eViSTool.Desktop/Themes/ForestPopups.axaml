@@ -1,0 +1,17 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctl="using:eViSTool.Desktop.Controls">
+    <!--
+        Выпадающие меню и списки (docs/design.md, раздел 3): при открытии содержимое проявляется — прозрачность 0 → 1 и
+        сдвиг на 4 px сверху вниз (раскрывшееся вверх — снизу вверх), 160 мс, «торможение»; закрывается сразу. Движение
+        делает Controls/PopupMotion по событию Opened, здесь — у каких Popup оно есть.
+        Popup есть у всех выпадающих: список ComboBox (профиль сверху, сортировка, язык и др.), MenuFlyout и Flyout
+        («Модпак ▾», меню правки поля), ContextMenu (строки модов, консоль), подменю MenuItem и свои Popup окон (меню
+        «Играть ▾», подсказки команд консоли — они над полем и поднимаются снизу). Всплывающих подсказок (ToolTip) это не
+        касается: они открываются без Popup.
+        Системное «без анимаций» (Motion.Enabled = False от Themes/ForestStill.axaml) — меню сразу на месте.
+    -->
+    <Style Selector="Popup">
+        <Setter Property="ctl:PopupMotion.Reveal" Value="True" />
+    </Style>
+</Styles>

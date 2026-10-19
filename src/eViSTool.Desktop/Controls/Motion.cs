@@ -110,8 +110,8 @@ public static class Motion
     }
 
     // своего аниматора для RenderTransform у анимаций Avalonia нет (переходам он есть — TransformOperationsTransition):
-    // кадр сдвига задаём со своим, который смешивает TransformOperations
-    private static Setter Shift(TransformOperations value)
+    // кадр сдвига задаём со своим, который смешивает TransformOperations (им же пользуется PopupMotion)
+    internal static Setter Shift(TransformOperations value)
     {
         var setter = new Setter(Visual.RenderTransformProperty, value);
         Animation.SetAnimator(setter, new TransformOperationsAnimator());
