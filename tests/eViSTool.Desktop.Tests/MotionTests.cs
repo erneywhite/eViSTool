@@ -520,9 +520,28 @@ public sealed class MotionTests
     }
 
     /// <summary>
+    /// «Окно живое» (Motion.Live) ставит само окно: свёрнутое — нет, развернули — снова по фокусу. Наследуется вниз, так что
+    /// анимации по кругу с условием [(ctl|Motion.Live)=True] в свёрнутом окне стоят.
+    /// </summary>
+    [AvaloniaFact]
+    public void Minimized_window_is_not_live()
+    {
+        var inner = new Border();
+        var window = new Window { Content = inner, Width = 200, Height = 100 };
+        window.Show();
+        window.WindowState = WindowState.Minimized;
+        Assert.False(Motion.GetLive(window));
+        Assert.False(Motion.GetLive(inner));
+        window.WindowState = WindowState.Normal;
+        Assert.Equal(window.IsActive, Motion.GetLive(inner));
+        window.Close();
+    }
+
+    /// <summary>
     /// Анимация по кругу (IterationCount="Infinite": дыхание точки, блик заглушек, бегущая полоска) — только в стиле с
-    /// условием [(ctl|Motion.Enabled)=True]: иначе при выключенных в системе анимациях она так и крутится. Пакеты,
-    /// писавшие такие стили параллельно, условие забывали — этот тест не даст забыть снова.
+    /// условием [(ctl|Motion.Live)=True] (в нём и Motion.Enabled): иначе при выключенных в системе анимациях она так и
+    /// крутится, а в окне под игрой без фокуса — перерисовывает его на каждом кадре экрана. Пакеты, писавшие такие стили
+    /// параллельно, условие забывали — этот тест не даст забыть снова.
     /// </summary>
     [Fact]
     public void Endless_animations_run_only_while_motion_is_enabled()
@@ -539,7 +558,7 @@ public sealed class MotionTests
             {
                 var selector = (string?)animation.Ancestors().FirstOrDefault(e => e.Name.LocalName == "Style")?.Attribute("Selector") ?? "";
                 endless.Add($"{relative}: {selector}");
-                if (!selector.Contains("(ctl|Motion.Enabled)=True]", StringComparison.Ordinal)) missing.Add($"{relative}: {selector}");
+                if (!selector.Contains("(ctl|Motion.Live)=True]", StringComparison.Ordinal)) missing.Add($"{relative}: {selector}");
             }
         }
         Assert.NotEmpty(endless); // сами анимации нашлись — иначе тест ничего не проверяет

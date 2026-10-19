@@ -17,7 +17,8 @@
         ctl:PremulBrushTransition, не BrushTransition из Avalonia: та смешивает без учёта прозрачности, и переход от
         Transparent (белый с нулевой альфой) вспыхивает белым (Controls/PremulBrushTransition). В системе выключены анимации —
         переходы обнуляет Themes/ForestStill.axaml; анимации по кругу пишутся только в стиле с условием
-        [(ctl|Motion.Enabled)=True], иначе они не остановятся.
+        [(ctl|Motion.Live)=True] (в нём и Motion.Enabled), иначе они не остановятся ни при выключенных в системе
+        анимациях, ни в окне без фокуса.
         Кольцо фокуса клавиатуры — отдельная рамка шаблона FocusRing: 2 px песка снаружи, с зазором 2 px (поле −4),
         скругление — на 4 больше, чем у элемента; появляется сразу, без перехода.
         Ресурсы из ForestResources — только через DynamicResource: тесты подключают этот файл отдельно, и StaticResource
@@ -559,10 +560,10 @@
         </Style>
         <!-- бежит, только пока движение не выключено (Controls/Motion); в системе выключены анимации — отрезок стоит
              посередине -->
-        <Style Selector="^:indeterminate /template/ Border#Runner[(ctl|Motion.Enabled)=False]">
+        <Style Selector="^:indeterminate /template/ Border#Runner[(ctl|Motion.Live)=False]">
             <Setter Property="HorizontalAlignment" Value="Center" />
         </Style>
-        <Style Selector="^:indeterminate /template/ Border#Runner[(ctl|Motion.Enabled)=True]">
+        <Style Selector="^:indeterminate /template/ Border#Runner[(ctl|Motion.Live)=True]">
             <Style.Animations>
                 <Animation Duration="0:0:1" IterationCount="Infinite">
                     <KeyFrame Cue="0%">

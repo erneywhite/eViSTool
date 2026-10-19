@@ -61,10 +61,11 @@
 
         <Grid x:Name="Split" Margin="0,14,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="360" />
+                <ColumnDefinition Width="*" MinWidth="300" />
                 <ColumnDefinition Width="14" />
-                <!-- ширина карточки — из настроек (CatalogViewModel.DetailsWidth), её ставит и сохраняет код окна -->
-                <ColumnDefinition Width="760" MinWidth="340" />
+                <!-- ширина карточки — из настроек (CatalogViewModel.DetailsWidth), её ставит и сохраняет код окна; в узком окне
+                     код ужимает её до того, что помещается (FitDetails). Минимумы 300 + 14 + 280 помещаются в самое узкое окно -->
+                <ColumnDefinition Width="760" MinWidth="280" />
             </Grid.ColumnDefinitions>
 
             <!-- разделитель: тяни, чтобы сделать карточку шире/уже (ширина запоминается) -->
@@ -82,7 +83,8 @@
                 </TextBox>
 
                 <!-- фильтры ровной сеткой: три в ряд -->
-                <UniformGrid DockPanel.Dock="Top" Columns="3" Margin="0,12,-8,4">
+                <!-- три в ряд, в узком списке — по два (код окна): иначе подписи обрезались на полуслове -->
+                <UniformGrid x:Name="Filters" DockPanel.Dock="Top" Columns="3" Margin="0,12,-8,4">
                     <ComboBox Classes="filter" ItemsSource="{Binding Branches}" SelectedItem="{Binding SelectedBranch}"
                               ToolTip.Tip="{local:Tr catalog.branchTip}" />
                     <ComboBox Classes="filter" ItemsSource="{Binding Tags}" SelectedItem="{Binding SelectedTag}" />

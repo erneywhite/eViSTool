@@ -21,7 +21,8 @@
                 <!-- значок внутри карточки — фон на ступень светлее, без своей рамки (карточку в карточку не кладём) -->
                 <Border DockPanel.Dock="Left" Width="38" Height="38" CornerRadius="9" Background="{DynamicResource Forest.Raised}"
                         VerticalAlignment="Center">
-                    <Path Classes="icon" Data="{StaticResource Icon.Cloud}" Stroke="{DynamicResource Forest.Accent}" Width="18" Height="18" />
+                    <Path Classes="icon" Data="{StaticResource Icon.Cloud}" Stroke="{DynamicResource Forest.Accent}" Width="18" Height="NaN"
+                          VerticalAlignment="Center" /> <!-- облако шире, чем выше: по центру плашки -->
                 </Border>
                 <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
                     <TextBlock Text="{local:Tr server.hostedTitle}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" />

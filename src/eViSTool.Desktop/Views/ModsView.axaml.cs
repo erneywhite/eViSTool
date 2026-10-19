@@ -92,14 +92,20 @@ public partial class ModsView : UserControl
     /// минимума), расширили окно — вернулась к своей ширине. Сохранённую ширину меняет только разделитель.
     /// </summary>
     internal const double TableRoom = 520; // таблица с колонкой названия не уже её минимума
+    internal const double TableMin = 300; // самое узкое окно (860): 300 + 14 + 280 помещаются в 598 px страницы
 
     private void FitCard()
     {
         if (_vm is null) return;
-        var room = Split.Bounds.Width - TableRoom - Split.ColumnDefinitions[1].Width.Value;
+        var gap = Split.ColumnDefinitions[1].Width.Value;
+        var room = Split.Bounds.Width - TableRoom - gap;
         var width = room > 0 ? Math.Min(_vm.CardWidth, room) : _vm.CardWidth;
         width = Math.Max(width, CardColumn.MinWidth);
         if (Math.Abs(CardColumn.Width.Value - width) > 0.5) CardColumn.Width = new GridLength(width);
+        // и разделитель не пускает таблицу уже TableRoom (пока окно это позволяет): иначе оставленная им ширина держалась
+        // бы только до первого изменения размера окна, а потом карточка сама сузилась бы
+        if (Split.Bounds.Width > 0)
+            Split.ColumnDefinitions[0].MinWidth = Math.Max(TableMin, Math.Min(TableRoom, Split.Bounds.Width - gap - CardColumn.MinWidth));
     }
 
     private void Splitter_DragCompleted(object? sender, VectorEventArgs e)

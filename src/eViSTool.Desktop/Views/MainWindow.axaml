@@ -21,7 +21,13 @@
             <Setter Property="Template">
                 <ControlTemplate>
                     <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="5" Padding="{TemplateBinding Padding}">
-                        <Path x:Name="Ic" Classes="icon" Data="{StaticResource Icon.Pin}" Width="14" Height="14" />
+                        <!-- булавка выше, чем шире: Uniform в поле 14×14 прижал бы её влево — поле квадратное, контур в нём по
+                             центру. Без класса icon: стиль с классом сильнее значений шаблона (сделал бы поле 18×18) и цветов
+                             темы ниже (приглушённая, светлая при наведении, песочная у выбранной) -->
+                        <Panel Width="14" Height="14">
+                            <Path x:Name="Ic" Data="{StaticResource Icon.Pin}" Stretch="Uniform" StrokeThickness="1.6" StrokeLineCap="Round"
+                                  StrokeJoin="Round" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Panel>
                     </Border>
                 </ControlTemplate>
             </Setter>
@@ -68,9 +74,12 @@
                             AutomationProperties.Name="{Binding Name}">
                         <DockPanel>
                             <!-- значок по виду: см. стили Path.kind в Window.Styles -->
-                            <Path Classes="icon kind" Classes.none="{Binding IsNone}" Classes.own="{Binding IsOwn}"
-                                  Classes.pwd="{Binding HasPassword}" Classes.def="{Binding IsDefault}"
-                                  DockPanel.Dock="Left" Width="16" Height="16" Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <!-- коробка 16×16, контур в ней по центру: галочка шире, замок выше — Uniform в поле фиксированного
+                                 размера прижал бы их к левому верхнему углу -->
+                            <Panel DockPanel.Dock="Left" Width="16" Height="16" Margin="0,0,12,0" VerticalAlignment="Center">
+                                <Path Classes="icon kind" Classes.none="{Binding IsNone}" Classes.own="{Binding IsOwn}"
+                                      Classes.pwd="{Binding HasPassword}" Classes.def="{Binding IsDefault}" Width="NaN" Height="NaN" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Panel>
                             <StackPanel>
                                 <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}"
                                            TextTrimming="CharacterEllipsis" />
@@ -248,7 +257,9 @@
                     </ListBoxItem>
                     <ListBoxItem>
                         <DockPanel>
-                            <Path Classes="icon" Data="{StaticResource Icon.ModConfig}" />
+                            <Panel Width="18" Height="18"> <!-- лист выше, чем шире: по центру, как остальные значки меню -->
+                                <Path Classes="icon" Data="{StaticResource Icon.ModConfig}" Width="NaN" Height="NaN" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Panel>
                             <TextBlock Text="{local:Tr nav.modConfig}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
                         </DockPanel>
                     </ListBoxItem>
@@ -299,7 +310,7 @@
                         <!-- слева — тонкий разделитель между «Играть» и стрелкой -->
                         <Panel Width="33" Height="34">
                             <Rectangle Width="1" HorizontalAlignment="Left" Margin="0,7" Fill="{DynamicResource Forest.AccentInk}" Opacity="0.25" />
-                            <Path Classes="icon" Data="{StaticResource Icon.ChevronDown}" Width="12" Height="12" />
+                            <Path Classes="icon" Data="{StaticResource Icon.ChevronDown}" Width="12" Height="NaN" VerticalAlignment="Center" /> <!-- 12×6 по центру -->
                         </Panel>
                     </Button>
                     <Popup x:Name="PlayMenu" DockPanel.Dock="Right" PlacementTarget="{Binding #PlayMenuButton}" Placement="BottomEdgeAlignedRight"
@@ -348,7 +359,7 @@
                             IsVisible="{Binding CanPlay}" AutomationProperties.AutomationId="PlayButton">
                         <StackPanel Orientation="Horizontal">
                             <Path Classes="icon" Data="{StaticResource Icon.Play}" Width="13" Height="13" Margin="0,0,8,0" />
-                            <TextBlock Text="{Binding PlayText}" MaxWidth="260" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="PlayLabel" Text="{Binding PlayText}" MaxWidth="260" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                     </Button>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
@@ -360,18 +371,20 @@
                         </Button>
                         <TextBlock x:Name="ActiveProfileLabel" Text="{local:Tr shell.activeProfile}" VerticalAlignment="Center" Margin="0,0,10,0"
                                    Foreground="{DynamicResource Forest.Muted}" FontSize="12" />
-                        <ComboBox x:Name="ProfileCombo" ItemsSource="{Binding Profiles}" SelectedItem="{Binding ActiveProfile}" MinWidth="240"
+                        <!-- ширина ограничена (длинное имя — многоточием), в узком окне её ещё ужимает код окна: полоса прижата
+                             вправо и не сжимается сама — иначе список наехал бы на «Играть» -->
+                        <ComboBox x:Name="ProfileCombo" ItemsSource="{Binding Profiles}" SelectedItem="{Binding ActiveProfile}" MinWidth="240" MaxWidth="340"
                                   AutomationProperties.AutomationId="ProfileCombo" WindowDecorationProperties.ElementRole="User">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ProfileViewModel">
-                                    <StackPanel Orientation="Horizontal">
+                                    <DockPanel>
                                         <!-- значок профиля: цвет и знак, без своего — знак вида (клиент, сервер, облако у хостера) -->
-                                        <ctl:ProfileBadge Color="{Binding IconColor}" Glyph="{Binding BadgeGlyph}" Width="20" Height="20" Margin="0,0,8,0"
-                                                          VerticalAlignment="Center" />
-                                        <TextBlock>
+                                        <ctl:ProfileBadge DockPanel.Dock="Left" Color="{Binding IconColor}" Glyph="{Binding BadgeGlyph}" Width="20" Height="20"
+                                                          Margin="0,0,8,0" VerticalAlignment="Center" />
+                                        <TextBlock TextTrimming="CharacterEllipsis" VerticalAlignment="Center">
                                             <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding KindText, Mode=OneWay}" Foreground="{DynamicResource Forest.Muted}" />
                                         </TextBlock>
-                                    </StackPanel>
+                                    </DockPanel>
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>

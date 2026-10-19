@@ -36,8 +36,14 @@ public partial class MainWindow : Window
         SizeChanged += (_, _) =>
         {
             if (WindowState == WindowState.Normal) _normalSize = ClientSize;
-            // узкое окно: подпись «Активный профиль» уступает место разделу и кнопкам окна
-            ActiveProfileLabel.IsVisible = ClientSize.Width >= 1100;
+            // узкое окно: подпись «Активный профиль» уступает место разделу и кнопкам окна, а «Играть · <сервер>» и список
+            // профилей — уже: полоса прижата вправо и сжиматься не умеет, список наехал бы на «Играть» (окно 860 —
+            // 606 px на всё: место под кнопки окна 130, стрелка 34, «Играть» до ~170, список до 240)
+            var width = ClientSize.Width;
+            ActiveProfileLabel.IsVisible = width >= 1100;
+            PlayLabel.MaxWidth = width >= 1100 ? 260 : 110;
+            ProfileCombo.MinWidth = width >= 1000 ? 240 : 160;
+            ProfileCombo.MaxWidth = width >= 1000 ? 340 : 240;
         };
         SetupChrome();
     }

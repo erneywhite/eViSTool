@@ -3,6 +3,7 @@
              xmlns:vm="using:eViSTool.Presentation.ViewModels"
              xmlns:local="using:eViSTool.Desktop"
              xmlns:ctl="using:eViSTool.Desktop.Controls"
+             xmlns:conv="using:eViSTool.Desktop.Converters"
              x:Class="eViSTool.Desktop.Views.ProfilesView"
              x:DataType="vm:MainViewModel">
     <UserControl.Styles>
@@ -41,6 +42,8 @@
                 <ControlTheme TargetType="ListBoxItem">
                     <Setter Property="Margin" Value="0,0,6,6" />
                     <Setter Property="Cursor" Value="Hand" />
+                    <!-- диктор читает «мох», «меч», а не внутренний ключ образца -->
+                    <Setter Property="AutomationProperties.Name" Value="{Binding Converter={x:Static conv:IconChoiceName.Instance}}" />
                     <Setter Property="Template">
                         <ControlTemplate>
                             <Border x:Name="Ring" Padding="3" CornerRadius="11" BorderThickness="2" BorderBrush="Transparent">
@@ -165,8 +168,8 @@
                                             <ctl:ProfileBadge DockPanel.Dock="Left" Color="{Binding IconColor}" Glyph="{Binding BadgeGlyph}" Width="56" Height="56"
                                                               VerticalAlignment="Center" Margin="0,0,18,6" />
                                             <StackPanel>
-                                                <ListBox Classes="iconChoices" ItemsSource="{x:Static vm:ProfileViewModel.IconColorOptions}" SelectedItem="{Binding IconColor}"
-                                                         AutomationProperties.AutomationId="ProfileIconColor" AutomationProperties.Name="{local:Tr settings.icon}">
+                                                <ListBox Classes="iconChoices" ItemsSource="{x:Static vm:ProfileViewModel.IconColorOptions}" SelectedItem="{Binding ColorChoice}"
+                                                         AutomationProperties.AutomationId="ProfileIconColor" AutomationProperties.Name="{local:Tr settings.iconColor}">
                                                     <ListBox.ItemTemplate>
                                                         <DataTemplate x:DataType="x:String">
                                                             <ctl:ProfileBadge Color="{Binding}" Glyph="" Width="22" Height="22" />
@@ -174,7 +177,7 @@
                                                     </ListBox.ItemTemplate>
                                                 </ListBox>
                                                 <ListBox Classes="iconChoices" ItemsSource="{x:Static vm:ProfileViewModel.IconGlyphOptions}" SelectedItem="{Binding GlyphChoice}"
-                                                         AutomationProperties.AutomationId="ProfileIconGlyph" AutomationProperties.Name="{local:Tr settings.icon}">
+                                                         AutomationProperties.AutomationId="ProfileIconGlyph" AutomationProperties.Name="{local:Tr settings.iconGlyph}">
                                                     <ListBox.ItemTemplate>
                                                         <DataTemplate x:DataType="x:String">
                                                             <ctl:ProfileBadge Color="{Binding $parent[ListBox].((vm:ProfileViewModel)DataContext).IconColor}" Glyph="{Binding}"
@@ -253,8 +256,10 @@
                                                  светлее, без своей рамки (карточку в карточку не кладём) -->
                                             <Border Margin="0,18,0,0" Padding="14,12" CornerRadius="8" Background="{DynamicResource Forest.Raised}"
                                                     AutomationProperties.AutomationId="ProfileGameInfo">
+                                                <!-- «Перечитать» — под сведениями, а не справа: справа кнопка отнимала у колонки значений
+                                                     ~120 px, и в узком окне пути рвались по букве в строку -->
                                                 <DockPanel>
-                                                    <Button DockPanel.Dock="Right" Command="{Binding RereadCommand}" VerticalAlignment="Top" Margin="12,0,0,0"
+                                                    <Button DockPanel.Dock="Bottom" HorizontalAlignment="Left" Command="{Binding RereadCommand}" Margin="0,10,0,0"
                                                             Padding="10,6" MinHeight="0" ToolTip.Tip="{local:Tr settings.reread}">
                                                         <StackPanel Orientation="Horizontal">
                                                             <Path Classes="icon" Data="{StaticResource Icon.Refresh}" Width="13" Height="13" Margin="0,0,7,0" />

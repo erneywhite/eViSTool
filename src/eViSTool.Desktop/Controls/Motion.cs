@@ -20,12 +20,21 @@ namespace eViSTool.Desktop.Controls;
 /// <para><c>Motion.Enabled</c> — наследуемое «можно двигаться». В системе выключены анимации — Themes/ForestStill.axaml
 /// ставит окнам False: переходы темы мгновенные, проявление — сразу, без движения. Анимации по кругу в стилях
 /// (Style.Animations) включаются только условием <c>[(ctl|Motion.Enabled)=True]</c> — тогда и они стоят.</para>
+/// <para><c>Motion.Live</c> — наследуемое «двигаться можно сейчас»: движение не выключено (Enabled), окно показано, в
+/// фокусе и не свёрнуто. Ставит его само окно (обработчики ниже). Анимации по кругу пишутся с условием
+/// <c>[(ctl|Motion.Live)=True]</c>: окно, которое лежит под игрой без фокуса, иначе перерисовывалось бы на каждом кадре
+/// экрана, пока, например, работает сервер (кольцо «дышит» часами). Avalonia сама ставит на паузу только анимации
+/// невидимых элементов, а окно без фокуса для неё видимо. Одно свойство, а не два условия: двух условий на прикреплённые
+/// свойства подряд разбор селекторов Avalonia не понимает.</para>
 /// Двигаются только прозрачность и RenderTransform: раскладка на каждом кадре не пересчитывается.
 /// </summary>
 public static class Motion
 {
     public static readonly AttachedProperty<bool> EnabledProperty =
         AvaloniaProperty.RegisterAttached<Visual, bool>("Enabled", typeof(Motion), defaultValue: true, inherits: true);
+
+    public static readonly AttachedProperty<bool> LiveProperty =
+        AvaloniaProperty.RegisterAttached<Visual, bool>("Live", typeof(Motion), defaultValue: true, inherits: true);
 
     public static readonly AttachedProperty<bool> RevealChildrenProperty =
         AvaloniaProperty.RegisterAttached<Panel, bool>("RevealChildren", typeof(Motion));
@@ -47,7 +56,18 @@ public static class Motion
         {
             if (e.GetNewValue<bool>() && control.GetVisualParent() is Panel panel && GetRevealChildren(panel)) Reveal(control);
         });
+        // «двигаться можно сейчас» — у каждого окна, по смене фокуса, свёрнутости и Enabled (его ставит окнам
+        // Themes/ForestStill.axaml); видимость окна меняет и фокус
+        WindowBase.IsActiveProperty.Changed.AddClassHandler<Window>((window, _) => UpdateLive(window));
+        Window.WindowStateProperty.Changed.AddClassHandler<Window>((window, _) => UpdateLive(window));
+        EnabledProperty.Changed.AddClassHandler<Window>((window, _) => UpdateLive(window));
     }
+
+    private static void UpdateLive(Window window) =>
+        window.SetValue(LiveProperty, GetEnabled(window) && window.IsVisible && window.IsActive && window.WindowState != WindowState.Minimized);
+
+    public static bool GetLive(Visual visual) => visual.GetValue(LiveProperty);
+    public static void SetLive(Visual visual, bool value) => visual.SetValue(LiveProperty, value);
 
     public static bool GetEnabled(Visual visual) => visual.GetValue(EnabledProperty);
     public static void SetEnabled(Visual visual, bool value) => visual.SetValue(EnabledProperty, value);
