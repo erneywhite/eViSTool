@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
@@ -55,10 +56,10 @@ public sealed class ServerHostedViewTests : IDisposable
     }
 
     /// <summary>Вид в окне с лесной темой (на уровне окна, чтобы не менять приложение тестов для остальных проверок).</summary>
-    private static Window Show(HostedServerViewModel model)
+    private static Window Show(HostedServerViewModel model, double width = 1200)
     {
         var baseUri = new Uri("avares://eViSTool.Desktop.Tests");
-        var window = new Window { Width = 1200, Height = 760, RequestedThemeVariant = ThemeVariant.Dark, Content = new ServerHostedView { DataContext = model } };
+        var window = new Window { Width = width, Height = 760, RequestedThemeVariant = ThemeVariant.Dark, Content = new ServerHostedView { DataContext = model } };
         window.Resources.MergedDictionaries.Add(new ResourceInclude(baseUri) { Source = new Uri("avares://eViSTool/Themes/ForestResources.axaml") });
         window.Resources.MergedDictionaries.Add(new ResourceInclude(baseUri) { Source = new Uri("avares://eViSTool/Themes/ForestControls.axaml") });
         window.Styles.Add(new StyleInclude(baseUri) { Source = new Uri("avares://eViSTool/Themes/Forest.axaml") });
@@ -109,6 +110,27 @@ public sealed class ServerHostedViewTests : IDisposable
             Assert.Contains("idle", tile.Classes);
             Assert.DoesNotContain(tile.GetVisualDescendants().OfType<TextBlock>(), t => t.IsEffectivelyVisible && t.Text?.Contains('—') == true);
         }
+        window.Close();
+    }
+
+    /// <summary>
+    /// Длинное состояние в узкой плитке — с многоточием и внутри своей плитки. В StackPanel рядом с точкой текст получал
+    /// сколько попросит, не обрезался и заходил на соседнюю плитку.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Long_state_is_trimmed_inside_a_narrow_tile()
+    {
+        // остановку начали только что: лог ещё растёт (давно не менявшийся лог с началом остановки — уже «Остановлен»)
+        File.SetLastWriteTimeUtc(_host.Server.Put(Main, HostedLogSamples.Bytes(HostedLogSamples.Stopping)), DateTime.UtcNow);
+        var model = await PolledAsync();
+        var window = Show(model, width: 700);
+
+        var text = Named<TextBlock>(window, "HostedStateText");
+        Assert.Equal(Loc.T("server.stateStopping"), text.Text);
+        var tile = Named<Border>(window, "HostedState");
+        var right = text.TranslatePoint(new Point(text.Bounds.Width, 0), tile)!.Value.X;
+        Assert.True(right <= tile.Bounds.Width - tile.Padding.Right + 0.5, $"текст до {right}, плитка {tile.Bounds.Width}");
+        Assert.True(text.TextLayout.TextLines[0].HasCollapsed, "текст влез целиком — плитка шире, чем нужно для проверки");
         window.Close();
     }
 

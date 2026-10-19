@@ -37,10 +37,11 @@
             <Border Classes="card tile" AutomationProperties.AutomationId="HostedState">
                 <StackPanel>
                     <TextBlock Classes="tileLabel" Text="{local:Tr server.tileState}" />
-                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                        <Ellipse Classes="tone stateDot" ctl:EnumClass.Value="{Binding StateTone}" />
+                    <!-- не StackPanel: тот даёт тексту сколько попросит, и длинное состояние вылезало из плитки без многоточия -->
+                    <DockPanel Margin="0,4,0,0">
+                        <Ellipse DockPanel.Dock="Left" Classes="tone stateDot" ctl:EnumClass.Value="{Binding StateTone}" />
                         <TextBlock Classes="tileValue" Text="{Binding StateText}" Margin="0" AutomationProperties.AutomationId="HostedStateText" />
-                    </StackPanel>
+                    </DockPanel>
                     <!-- откуда знаем и когда последний раз прочитали лог -->
                     <TextBlock Text="{Binding StateNote}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0"
                                TextTrimming="CharacterEllipsis" AutomationProperties.AutomationId="HostedStateNote"
@@ -81,7 +82,8 @@
                 AutomationProperties.AutomationId="HostedUpdates">
             <DockPanel>
                 <Button DockPanel.Dock="Right" Classes="primary" Command="{Binding UpdateAllCommand}" Padding="16,8" Margin="16,0,0,0"
-                        VerticalAlignment="Center" ToolTip.Tip="{local:Tr mods.updateAllTip}" AutomationProperties.AutomationId="HostedUpdateAll">
+                        VerticalAlignment="Center" ToolTip.Tip="{local:Tr mods.updateAllTip}" AutomationProperties.AutomationId="HostedUpdateAll"
+                        AutomationProperties.Name="{local:Tr server.hostedUpdateAll}">
                     <StackPanel Orientation="Horizontal">
                         <Path Classes="icon" Data="{StaticResource Icon.Download}" Width="14" Height="14" Margin="0,0,8,0" />
                         <TextBlock Text="{local:Tr server.hostedUpdateAll}" />
