@@ -213,9 +213,7 @@ public sealed partial class CatalogViewModel : ObservableObject
         {
             await _catalog.LoadAsync(force);
             await _catalog.LoadBranchesAsync(force);
-            _branchSeen = ProfileBranch;
-            _profileCompat = ProfileBranch is { } mine && _catalog.Branches.Contains(mine)
-                ? await _catalog.CompatibleAssetsAsync(mine, force) : null;
+            await LoadProfileCompatAsync(force); // сменили профиль, пока ждали, — пометки ставит вызов для новой ветки
 
             var keepBranch = SelectedBranch?.Value ?? (_loaded ? null : ProfileBranch);
             BuildChoices();
@@ -235,17 +233,32 @@ public sealed partial class CatalogViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Моды с релизом для ветки игры активного профиля — для пометок «нет версии для …». Пока модбаза отвечала, профиль
+    /// могли сменить ещё раз: тогда пометки ставит более новый вызов, а этот ответ — про чужую ветку, и он отбрасывается
+    /// (false). Ошибка модбазы — наружу.
+    /// </summary>
+    private async Task<bool> LoadProfileCompatAsync(bool force = false)
+    {
+        var mine = ProfileBranch;
+        _branchSeen = mine;
+        var compat = mine is not null && _catalog.Branches.Contains(mine) ? await _catalog.CompatibleAssetsAsync(mine, force) : null;
+        if (_branchSeen != mine) return false;
+        _profileCompat = compat;
+        return true;
+    }
+
     /// <summary>Сменилась ветка игры активного профиля: пометки «нет версии для …» и подписи фильтра — под новую.</summary>
     private async Task OnBranchChangedAsync()
     {
-        _branchSeen = ProfileBranch;
+        var mine = ProfileBranch;
         try
         {
-            _profileCompat = ProfileBranch is { } mine && _catalog.Branches.Contains(mine)
-                ? await _catalog.CompatibleAssetsAsync(mine) : null;
+            if (!await LoadProfileCompatAsync()) return; // всё перестроил вызов для ветки, выбранной позже
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
+            if (_branchSeen != mine) return;
             _profileCompat = null; // пометок не будет — лучше, чем пометки от чужой версии
         }
         var branch = SelectedBranch?.Value;
@@ -276,6 +289,7 @@ public sealed partial class CatalogViewModel : ObservableObject
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
+                if (generation != _searchGeneration) return; // фильтр уже другой — статус и список у нового поиска
                 StatusText = Loc.T("catalog.branchFailed", branch, ex.Message);
                 return;
             }
@@ -501,6 +515,8 @@ public sealed partial class ModDetailsViewModel : ObservableObject
     public void RefreshInstalled(IReadOnlyDictionary<string, string> installed)
     {
         InstalledVersion = ModId is not null && installed.TryGetValue(ModId, out var v) ? v : null;
+        // от установленной версии зависит лучший релиз: стоит пре-релиз — предлагаем и пре-релизы (сменили профиль, поставили другую)
+        if (Mod is { } mod) Evaluate(mod);
         UpdateInstallText();
         BuildVersions();
     }
