@@ -70,14 +70,16 @@ internal static class SystemMotion
                 if (process is null) return null;
                 var output = process.StandardOutput.ReadToEndAsync();
                 _ = process.StandardError.ReadToEndAsync(); // читать и ошибки: иначе полный канал не даст ему выйти
-                // окно ждёт ответа при запуске: зависший gsettings не должен его задерживать
-                if (!process.WaitForExit(2000))
+                // окно ждёт ответа при запуске: обычно gsettings отвечает за десятки миллисекунд, а зависший (нет сеанса
+                // D-Bus и т. п.) задержит окно не больше чем на секунду с небольшим
+                if (!process.WaitForExit(1000))
                 {
                     try { process.Kill(); }
                     catch (InvalidOperationException) { } // успел выйти сам
                     return null;
                 }
-                return process.ExitCode == 0 && output.Wait(1000) ? output.Result : null;
+                // процесс вышел — его вывод дочитывается сразу, долго ждать тут нечего
+                return process.ExitCode == 0 && output.Wait(200) ? output.Result : null;
             }
             catch (Win32Exception)
             {

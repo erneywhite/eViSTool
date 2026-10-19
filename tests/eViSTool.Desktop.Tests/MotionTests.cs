@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Xml.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
@@ -302,6 +303,39 @@ public sealed class MotionTests
         {
             foreach (var include in theme) app.Resources.MergedDictionaries.Remove(include);
         }
+    }
+
+    /// <summary>
+    /// В панели с Motion.RevealChildren — только то, что переключается: страницы или вкладки, у каждой своя видимость.
+    /// Без IsVisible может быть одна — видная по умолчанию (её прячет код, как «Мои моды» в главном окне). Заголовок,
+    /// полоса вкладок и прочие постоянные строки — снаружи: иначе плашка с условной видимостью, добавленная к ним,
+    /// начнёт проявляться при каждом переключении.
+    /// </summary>
+    [Fact]
+    public void Markup_reveal_panels_hold_only_switched_children()
+    {
+        var src = System.IO.Path.Combine(ThemeTests.RepoRoot(), "src", "eViSTool.Desktop");
+        var reveal = XName.Get("Motion.RevealChildren", "using:eViSTool.Desktop.Controls");
+        var panels = 0;
+        var found = new List<string>();
+        foreach (var file in Directory.EnumerateFiles(src, "*.axaml", SearchOption.AllDirectories))
+        {
+            var relative = System.IO.Path.GetRelativePath(src, file).Replace('\\', '/');
+            if (relative.StartsWith("bin/") || relative.StartsWith("obj/")) continue;
+            foreach (var panel in XDocument.Load(file).Descendants().Where(e => (string?)e.Attribute(reveal) == "True"))
+            {
+                panels++;
+                // свойства-элементы (<Panel.Styles> и т. п.) — не дети; видимость бывает и свойством-элементом
+                var children = panel.Elements().Where(e => !e.Name.LocalName.Contains('.')).ToList();
+                var steady = children
+                    .Where(e => e.Attribute("IsVisible") is null && e.Element(e.Name + ".IsVisible") is null)
+                    .Select(e => e.Name.LocalName).ToList();
+                if (children.Count < 2 || steady.Count > 1)
+                    found.Add($"{relative}: {panel.Name.LocalName}, детей {children.Count}, без IsVisible: {string.Join(", ", steady)}");
+            }
+        }
+        Assert.NotEqual(0, panels); // пространство имён ctl совпало: проверка что-то видит
+        Assert.Empty(found);
     }
 
     // ---------- «без анимаций» в теме
