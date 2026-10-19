@@ -38,7 +38,15 @@ public sealed partial class ModCardViewModel : ObservableObject
     partial void OnHistoryLinesChanged(IReadOnlyList<string> value) => OnPropertyChanged(nameof(HasHistory));
     private bool _versionsLoaded;
 
-    public ModCardViewModel(ModRowViewModel row, ModsViewModel owner, ModVersion? game, string profileName)
+    /// <summary>Страница мода, которую карточка загрузила с модбазы сама (<see cref="LoadAsync"/>): мод ещё не сверяли.</summary>
+    private ModDbMod? _page;
+
+    /// <param name="previous">
+    /// Прежняя карточка: таблицу построили заново после операции (мод включили, закрепили, обновили), и выбран тот же мод.
+    /// То, что она уже узнала, остаётся на месте: страница с модбазы не запрашивается снова, иконка шапки и списки не
+    /// пересоздаются. Иначе шапка, описание и скриншоты пропадали до ответа модбазы — карточка мигала целиком.
+    /// </param>
+    public ModCardViewModel(ModRowViewModel row, ModsViewModel owner, ModVersion? game, string profileName, ModCardViewModel? previous = null)
     {
         Row = row;
         Owner = owner;
@@ -49,8 +57,24 @@ public sealed partial class ModCardViewModel : ObservableObject
         // мод хостера без modinfo (исходник .cs) работает только на сервере хостера
         _side = SideText(row.IsHosterMod && info is null ? "server" : info?.Side);
         _compatibility = CompatibilityText(row, game);
+        var same = previous is not null && row.ModId.Length > 0
+                   && string.Equals(previous.Row.ModId, row.ModId, StringComparison.OrdinalIgnoreCase) ? previous : null;
         if (row.Result.Remote is { } remote) Apply(remote);
-        IconWaitsForLogo = Logo is not null;
+        else if (same?._page is { } page)
+        {
+            _page = page;
+            Apply(page);
+        }
+        // шапка того же мода решает про иконку из файла так же, как раньше: иначе логотип, узнанный проверкой, спрятал бы
+        // уже показанную иконку до своей загрузки — мигнули бы буквы
+        IconWaitsForLogo = same?.IconWaitsForLogo ?? Logo is not null;
+        if (same is null) return;
+        // те же скриншоты — тот же список: ItemsControl не пересоздаёт картинки. Вкладка «Версии» до перечитывания
+        // показывает прежний список, а не «Загрузка…»
+        if (Screenshots.SequenceEqual(same.Screenshots)) _screenshots = same.Screenshots;
+        _versions = same.Versions;
+        _historyLines = same.HistoryLines;
+        _versionsStatus = same.VersionsStatus;
     }
 
     public string Name => Row.Name;
@@ -118,11 +142,12 @@ public sealed partial class ModCardViewModel : ObservableObject
     /// <summary>Мод ещё не сверяли с модбазой — подгрузить страницу мода только для карточки.</summary>
     public async Task LoadAsync(ModDbClient db, CancellationToken ct)
     {
-        if (Row.Result.Remote is not null || Row.ModId.Length == 0) return;
+        if (Row.Result.Remote is not null || _page is not null || Row.ModId.Length == 0) return;
         try
         {
             if (await db.GetModAsync(Row.ModId, ct) is { } mod && !ct.IsCancellationRequested)
             {
+                _page = mod;
                 Apply(mod);
                 // строка таблицы до проверки знает только иконку из файла — логотип шапки ей тоже
                 if (Logo is { } logo) Owner.LogoLearned(Row.ModId, logo);
@@ -159,7 +184,8 @@ public sealed partial class ModCardViewModel : ObservableObject
     {
         if (!value || _versionsLoaded) return;
         _versionsLoaded = true;
-        VersionsStatus = Loc.T("mcard.versionsLoading");
+        // список, оставшийся от прежней карточки того же мода, стоит со своей подписью до нового
+        if (VersionsStatus.Length == 0) VersionsStatus = Loc.T("mcard.versionsLoading");
         HistoryLines = await Owner.ModHistoryLinesAsync(Row.ModId);
         var options = await Owner.LoadVersionOptionsAsync(Row);
         Versions = options.Select(o => new VersionRowViewModel(o, Row.Installed)).ToList();

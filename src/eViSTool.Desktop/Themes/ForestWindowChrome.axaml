@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ctl="using:eViSTool.Desktop.Controls">
     <!--
         Своя шапка главного окна (ExtendClientAreaToDecorationsHint): шапкой служит верхняя полоса окна (раздел, профиль,
         «Играть»), здесь — только то, что рисует сама Avalonia поверх и под ней: кнопки окна, а на Linux ещё рамка и тень.
@@ -28,7 +29,7 @@
         <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
         </Style>
@@ -62,7 +63,7 @@
         <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
         </Style>

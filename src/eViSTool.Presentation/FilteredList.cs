@@ -73,17 +73,19 @@ public sealed class FilteredList<T> where T : class
             ? wanted.Select((item, index) => (item, index)).OrderBy(x => x, new Stable(sort)).Select(x => x.item).ToList()
             : wanted.ToList();
 
-        // лишние — вон; оставшиеся — сдвигом на свои места, недостающие — вставкой
+        // оставшиеся — сдвигом на свои места; недостающий встаёт на место лишнего (замена), а нет такого — вставкой;
+        // остальные лишние — вон в конце. Лишние не убираются заранее: исходную коллекцию построили заново (таблица
+        // модов после операции — все строки новые), и вид, опустев хоть на миг, сбросил бы прокрутку таблицы к началу
         var keep = new HashSet<T>(desired, ReferenceEqualityComparer.Instance);
-        for (var i = _items.Count - 1; i >= 0; i--)
-            if (!keep.Contains(_items[i])) _items.RemoveAt(i);
         for (var i = 0; i < desired.Count; i++)
         {
             if (i < _items.Count && ReferenceEquals(_items[i], desired[i])) continue;
             var at = IndexOf(desired[i], i + 1);
             if (at >= 0) _items.Move(at, i);
+            else if (i < _items.Count && !keep.Contains(_items[i])) _items[i] = desired[i];
             else _items.Insert(i, desired[i]);
         }
+        for (var i = _items.Count - 1; i >= desired.Count; i--) _items.RemoveAt(i);
     }
 
     private int IndexOf(T item, int from)

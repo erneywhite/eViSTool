@@ -13,7 +13,9 @@
         Движение (docs/design.md, раздел 3): наведение и смена цвета — 180 мс, нажатие — 60 мс, отпускание — 100 мс,
         кривая «торможение» 0.2,0.7,0.2,1. Анимируются только цвет, прозрачность и RenderTransform. Наведение делает
         элемент ярче, а не тусклее: прозрачность на наведении не используется. Переходы висят на частях шаблона, а не на
-        самом элементе: свойство Transitions элемента остаётся свободным для разметки. В системе выключены анимации —
+        самом элементе: свойство Transitions элемента остаётся свободным для разметки. Цвет — только
+        ctl:PremulBrushTransition, не BrushTransition из Avalonia: та смешивает без учёта прозрачности, и переход от
+        Transparent (белый с нулевой альфой) вспыхивает белым (Controls/PremulBrushTransition). В системе выключены анимации —
         переходы обнуляет Themes/ForestStill.axaml; анимации по кругу пишутся только в стиле с условием
         [(ctl|Motion.Enabled)=True], иначе они не остановятся.
         Кольцо фокуса клавиатуры — отдельная рамка шаблона FocusRing: 2 px песка снаружи, с зазором 2 px (поле −4),
@@ -62,8 +64,8 @@
             <Setter Property="BoxShadow" Value="{DynamicResource Forest.EdgeShadow}" />
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
-                    <BrushTransition Property="BorderBrush" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="BorderBrush" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
                     <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.1" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
@@ -77,8 +79,8 @@
         <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.06" Easing="0.2,0.7,0.2,1" />
-                    <BrushTransition Property="BorderBrush" Duration="0:0:0.06" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="Background" Duration="0:0:0.06" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="BorderBrush" Duration="0:0:0.06" Easing="0.2,0.7,0.2,1" />
                     <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.06" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
@@ -172,7 +174,7 @@
         <Style Selector="^ /template/ TextBlock#T">
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
         </Style>
@@ -215,7 +217,7 @@
         <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
         </Style>
@@ -251,8 +253,8 @@
         <Style Selector="^ /template/ Border#Track">
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
-                    <BrushTransition Property="BorderBrush" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="BorderBrush" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
         </Style>
@@ -260,7 +262,7 @@
             <Setter Property="Transitions">
                 <Transitions>
                     <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
-                    <BrushTransition Property="Fill" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="Fill" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
             <Setter Property="RenderTransform" Value="translateX(0px)" />
@@ -313,15 +315,15 @@
         <Style Selector="^ /template/ Border#Bd">
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
-                    <BrushTransition Property="BorderBrush" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="BorderBrush" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
         </Style>
         <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
         </Style>
@@ -367,7 +369,7 @@
         <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
         </Style>
@@ -418,7 +420,7 @@
         <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
         </Style>
@@ -469,8 +471,8 @@
             <Setter Property="BoxShadow" Value="{DynamicResource Forest.EdgeShadow}" />
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
-                    <BrushTransition Property="BorderBrush" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="BorderBrush" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
         </Style>
@@ -502,14 +504,14 @@
         <Style Selector="^ /template/ Border#Bd">
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="Background" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
         </Style>
         <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
         </Style>
@@ -595,7 +597,7 @@
         <Style Selector="^ /template/ StackPanel#Row">
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="TextElement.Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                    <ctl:PremulBrushTransition Property="TextElement.Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
         </Style>

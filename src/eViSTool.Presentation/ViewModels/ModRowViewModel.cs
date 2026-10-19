@@ -153,6 +153,36 @@ public sealed class ModRowViewModel : ObservableObject
         if (Icon.Logo is null && ModDbLogo.Usable(logo) is { } usable) Icon = Icon with { Logo = usable };
     }
 
+    /// <summary>
+    /// Та же строка, что <paramref name="other"/>: тот же файл мода с тем же содержимым, тот же ответ модбазы (те же объекты
+    /// страницы и релизов) и тот же вид — состояние, пометки, значок, закрепление. Тогда таблица, построенная заново после
+    /// операции, оставляет прежнюю строку: окно её не пересобирает, и переключение одного мода меняет в таблице одну
+    /// строку (замена всех сбивала таблице прокрутку). Тексты сравниваются готовыми — смена языка тоже даёт новую строку.
+    /// </summary>
+    public bool SameAs(ModRowViewModel other) =>
+        FilePath == other.FilePath && SameLocal(Local, other.Local)
+        && Kind == other.Kind && IsDuplicate == other.IsDuplicate && Result.Message == other.Result.Message
+        && ReferenceEquals(Result.Remote, other.Result.Remote)
+        && ReferenceEquals(Result.LatestCompatible, other.Result.LatestCompatible)
+        && ReferenceEquals(Result.LatestAny, other.Result.LatestAny)
+        && IsPinned == other.IsPinned && Icon == other.Icon && Equals(NeedsGame, other.NeedsGame)
+        && IsProblem == other.IsProblem && IsUnneeded == other.IsUnneeded
+        && StatusText == other.StatusText && Tone == other.Tone && SubState == other.SubState && Note == other.Note
+        && SideText == other.SideText && SideNote == other.SideNote;
+
+    private static bool SameLocal(LocalMod a, LocalMod b) =>
+        a.Path == b.Path && a.Error == b.Error && a.IsDisabled == b.IsDisabled && a.IsHosterMod == b.IsHosterMod
+        && a.Release == b.Release && a.Stamp == b.Stamp && SameInfo(a.Info, b.Info);
+
+    // ModInfo — запись, но списки в ней сравниваются по ссылке, а при каждом чтении папки они новые: списки — по
+    // содержимому, остальное — сравнением записей с подставленными списками другой
+    private static bool SameInfo(ModInfo? a, ModInfo? b) =>
+        ReferenceEquals(a, b) || (a is not null && b is not null
+            && a with { Authors = b.Authors, Dependencies = b.Dependencies } == b
+            && a.Authors.SequenceEqual(b.Authors)
+            && a.Dependencies.Count == b.Dependencies.Count
+            && a.Dependencies.All(d => b.Dependencies.TryGetValue(d.Key, out var v) && v == d.Value));
+
     /// <summary>Значок с буквами вместо иконки и логотипа: «Carry On» → «CO».</summary>
     public string Initials { get; }
 

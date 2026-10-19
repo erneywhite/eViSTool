@@ -29,7 +29,8 @@ namespace eViSTool.Desktop.Tests;
 /// <summary>
 /// «Мои моды» с настоящей главной моделью (docs/design.md, разделы 3 и 7): справа, пока мод не выбран, — сводка профиля;
 /// у выбранной строки песочная метка слева; значки модов — иконка из файла мода или буквы цветом мода; пока идёт проверка
-/// обновлений, в колонке статуса — заглушки с бегущим бликом, и только тогда. Модбаза поддельная: ответ ждёт, пока тест
+/// обновлений, в колонке статуса — заглушки с бегущим бликом, и только тогда; переключение мода не гасит переключатели, не
+/// сбивает таблице прокрутку и порядок и не сбрасывает карточку (раздел 9). Модбаза поддельная: ответ ждёт, пока тест
 /// не отменит проверку. Профиль — свой клиентский во временной папке (игра — поддельный сервер 1.22.7, моды alpha с
 /// иконкой и выключенный beta без неё);
 /// настройки программы — в папке data рядом с тестами, после теста прежний файл возвращается. Данные пользователя
@@ -116,14 +117,22 @@ public sealed class ModsViewTests : IDisposable
     {
         public Dictionary<string, string> Logos { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        /// <summary>Сколько раз модбазу спросили.</summary>
+        public int Asked;
+
+        /// <summary>Модбаза «задумалась»: ответ ждёт, пока запрос не отменят.</summary>
+        public bool Silent { get; set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
+            Interlocked.Increment(ref Asked);
+            if (Silent) await Task.Delay(Timeout.Infinite, ct);
             var path = request.RequestUri!.AbsolutePath;
             var id = path.StartsWith("/api/mod/", StringComparison.Ordinal) ? Uri.UnescapeDataString(path["/api/mod/".Length..]) : null;
             if (id is null || !Logos.TryGetValue(id, out var logo))
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
             var json = $$"""{ "statuscode": "200", "mod": { "modid": 1, "assetid": 1, "name": "{{id}}", "logofile": "{{logo}}" } }""";
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") });
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
         }
     }
 
@@ -182,11 +191,24 @@ public sealed class ModsViewTests : IDisposable
         return stream.ToArray();
     }
 
-    /// <summary>Главная модель над своими настройками: один клиентский профиль, без автопроверки, модбаза — <paramref name="db"/>.</summary>
-    private MainViewModel Main(HttpMessageHandler db)
+    /// <summary>Сообщения окна — без окон: запоминаются; на вопросы — «Нет».</summary>
+    private sealed class QuietUi : AvaloniaUiPlatform
+    {
+        public List<string> Notices { get; } = [];
+
+        public override void Notify(string text, NoticeKind kind) => Notices.Add(text);
+
+        public override Answer Ask(string text, AskButtons buttons, Answer? byDefault = null, bool warning = false) => Answer.No;
+    }
+
+    /// <summary>
+    /// Главная модель над своими настройками: один клиентский профиль, без автопроверки, модбаза — <paramref name="db"/>;
+    /// <paramref name="ui"/> — свои сообщения и вопросы окна вместо настоящих.
+    /// </summary>
+    private MainViewModel Main(HttpMessageHandler db, int extra = 0, AvaloniaUiPlatform? ui = null)
     {
         Assert.SkipUnless(AppPaths.IsPortable, "данные рядом с тестами недоступны для записи — настоящие данные пользователя не трогаем");
-        _timers = CleanupWindowTests.TimerSpy.Wrap(new AvaloniaUiPlatform());
+        _timers = CleanupWindowTests.TimerSpy.Wrap(ui ?? new AvaloniaUiPlatform());
         Ui.Platform = (IUiPlatform)(object)_timers;
         _settings = (true, File.Exists(AppPaths.SettingsFile) ? File.ReadAllText(AppPaths.SettingsFile) : null);
 
@@ -196,6 +218,7 @@ public sealed class ModsViewTests : IDisposable
         var mods = Directory.CreateDirectory(Path.Combine(data, "Mods")).FullName;
         File.WriteAllBytes(Path.Combine(mods, "alpha_1.0.0.zip"), Zip("alpha", Png(128))); // у alpha своя иконка, у beta нет
         File.WriteAllBytes(Path.Combine(mods, "beta_1.0.0.zip"), Zip("beta"));
+        for (var i = 0; i < extra; i++) File.WriteAllBytes(Path.Combine(mods, $"mod{i:00}_1.0.0.zip"), Zip($"mod{i:00}"));
         File.WriteAllText(Path.Combine(data, "clientsettings.json"), """{ "stringListSettings": { "disabledMods": ["beta"] } }""");
         var profile = new GameProfile { Id = "mods-view-test", Name = "Игрок", Kind = ProfileKind.Client, GameDir = game, DataDir = data };
         new SettingsStore().Save(new AppSettings
@@ -361,10 +384,15 @@ public sealed class ModsViewTests : IDisposable
         Dispatcher.UIThread.RunJobs();
         Assert.False(LettersOf(RowOf(window, "beta"), beta).IsEffectivelyVisible);
 
-        // таблицу построили заново (моды перечитаны с диска) — у новой строки логотип сразу
+        // моды перечитаны с диска, ничего не поменялось — строка та же, с логотипом
         await mods.ReloadAsync();
+        Assert.Same(beta, mods.Rows.Single(r => r.ModId == "beta"));
+
+        // мод включили — строку построили заново: у новой строки логотип сразу
+        await mods.ToggleEnabledCommand.ExecuteAsync(beta);
         var rebuilt = mods.Rows.Single(r => r.ModId == "beta");
         Assert.NotSame(beta, rebuilt);
+        Assert.True(rebuilt.IsEnabled);
         Assert.Equal(logo, rebuilt.Icon.Logo);
     }
 
@@ -454,6 +482,289 @@ public sealed class ModsViewTests : IDisposable
         Assert.Equal(2, tabs.Children.Count);
         Assert.Equal([true, false], tabs.Children.Select(c => c.IsVisible));
         Assert.Empty(tabs.GetVisualDescendants().OfType<RadioButton>());
+    }
+
+    /// <summary>
+    /// Что менялось у элементов окна, пока шло действие: перемены свойств, а не кадры. Тихое перечитывание папки модов в
+    /// тесте укладывается между двумя кадрами, а у игрока сотня архивов читается секунду-другую — всё, что за это время
+    /// переменилось и вернулось, он видит как моргание.
+    /// </summary>
+    private sealed class Changes : IDisposable
+    {
+        private readonly List<IDisposable> _subscriptions = [];
+
+        public List<(Visual Who, AvaloniaProperty What, object? From, object? To)> Seen { get; } = [];
+
+        public Changes(Window window, params AvaloniaProperty[] properties)
+        {
+            foreach (var property in properties)
+                _subscriptions.Add(property.Changed.Subscribe(new Avalonia.Reactive.AnonymousObserver<AvaloniaPropertyChangedEventArgs>(e =>
+                {
+                    if (e.Sender is Visual who && TopLevel.GetTopLevel(who) == window) Seen.Add((who, property, e.OldValue, e.NewValue));
+                })));
+        }
+
+        public void Dispose()
+        {
+            foreach (var subscription in _subscriptions) subscription.Dispose();
+        }
+    }
+
+    private static CheckBox SwitchOf(Visual row) => row.GetVisualDescendants().OfType<CheckBox>().Single();
+
+    /// <summary>
+    /// Переключили мод в строке — «моргала половина окна». Пока идёт запись и перечитывание папки модов, ни один
+    /// переключатель не выключается: прежде команда была занята, и все переключатели таблицы и карточки гасли до 40 %. Карточка
+    /// того же мода, построенная заново с таблицей, не теряет того, что узнала с модбазы: логотип в шапке не пропадает и за
+    /// страницей мода она второй раз не ходит, а картинки окна вообще не перезапрашиваются.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Toggling_a_mod_does_not_blink_the_switches_or_the_card()
+    {
+        const string logo = "https://img.test/alpha.png";
+        var db = new AnsweringModDb { Logos = { ["alpha"] = logo } };
+        UseImages(new() { [logo] = Png(200) });
+        var (window, mods) = await ShowAsync(Main(db));
+        mods.Selected = mods.Rows.Single(r => r.ModId == "alpha");
+        await Wait.Until(() => HeaderLogo(window)?.Source is not null);
+        await Run(300);
+        var asked = db.Asked;
+        db.Silent = true; // сходи карточка за страницей снова — до ответа шапка осталась бы без логотипа
+
+        using (var changes = new Changes(window, Avalonia.Input.InputElement.IsEffectivelyEnabledProperty, Image.SourceProperty))
+        {
+            Mouse.Click(window, SwitchOf(RowOf(window, "alpha")));
+            await Wait.Until(() => !mods.ToggleEnabledCommand.IsRunning && mods.Rows.Single(r => r.ModId == "alpha") is { IsEnabled: false });
+            await Run(250);
+
+            Assert.Empty(changes.Seen.Where(c => c.What == Avalonia.Input.InputElement.IsEffectivelyEnabledProperty && c.Who is CheckBox)
+                .Select(c => $"переключатель {(c.Who as Control)?.DataContext}: {c.From} → {c.To}"));
+            Assert.Empty(changes.Seen.Where(c => c.What == Image.SourceProperty).Select(c => $"{(c.Who as Control)?.Name}: {c.From} → {c.To}"));
+        }
+        Assert.Equal(logo, mods.Card!.Logo);
+        Assert.NotNull(HeaderLogo(window)!.Source);
+        Assert.Equal(asked, db.Asked);
+        Assert.True(SwitchOf(RowOf(window, "beta")).IsEffectivelyEnabled);
+        Assert.False(SwitchOf(RowOf(window, "alpha")).IsChecked);
+    }
+
+    /// <summary>
+    /// Открыта вкладка «Версии», мод переключили в таблице: карточка, построенная заново, сразу на той же вкладке — она не
+    /// прячется и не проявляется ещё раз (прежде на миг вставал «Обзор», и «Версии» заново поднимались из прозрачности).
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Rebuilt_card_stays_on_the_versions_tab_without_revealing_it_again()
+    {
+        var (window, mods) = await ShowAsync(Main(new HangingModDb()));
+        mods.Selected = mods.Rows.Single(r => r.ModId == "alpha");
+        mods.Card!.IsVersionsTab = true;
+        await Run(400);
+        var tabs = window.GetVisualDescendants().OfType<Panel>().Single(Motion.GetRevealChildren);
+        var versions = tabs.Children[1];
+        Assert.True(versions.IsVisible);
+
+        using (var changes = new Changes(window, Visual.IsVisibleProperty, Visual.OpacityProperty))
+        {
+            Mouse.Click(window, SwitchOf(RowOf(window, "alpha")));
+            await Wait.Until(() => !mods.ToggleEnabledCommand.IsRunning && mods.Rows.Single(r => r.ModId == "alpha") is { IsEnabled: false });
+            await Run(300);
+            Assert.Empty(changes.Seen.Where(c => c.Who is Control tab && tabs.Children.Contains(tab)).Select(c => $"{c.What.Name}: {c.From} → {c.To}"));
+        }
+        Assert.True(mods.Card!.IsVersionsTab);
+        Assert.Equal(1, versions.Opacity);
+    }
+
+    /// <summary>
+    /// Щелчки, пока первое переключение ещё идёт: команда не занята (переключатели не гаснут), а сами переключения идут по
+    /// одному, и следующее берёт мод из уже перечитанной таблицы. Два щелчка по одному переключателю возвращают мод как
+    /// было — прежде оба выключали его по устаревшей строке.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Toggles_clicked_during_a_toggle_run_after_it_on_the_fresh_row()
+    {
+        var (_, mods) = await ShowAsync(Main(new HangingModDb()));
+        var alpha = mods.Rows.Single(r => r.ModId == "alpha");
+        var beta = mods.Rows.Single(r => r.ModId == "beta");
+
+        var first = mods.ToggleEnabledCommand.ExecuteAsync(alpha);
+        Assert.True(mods.ToggleEnabledCommand.IsRunning); // папка модов перечитывается в фоне — переключение ещё идёт
+        Assert.True(mods.ToggleEnabledCommand.CanExecute(beta));
+        var again = mods.ToggleEnabledCommand.ExecuteAsync(alpha);
+        var other = mods.ToggleEnabledCommand.ExecuteAsync(beta);
+        await Wait.Until(() => first.IsCompleted && again.IsCompleted && other.IsCompleted);
+        await first;
+
+        Assert.True(mods.Rows.Single(r => r.ModId == "alpha").IsEnabled);
+        Assert.True(mods.Rows.Single(r => r.ModId == "beta").IsEnabled);
+    }
+
+    /// <summary>
+    /// Длинный список, прокрученный вниз: переключили мод — таблица стоит где стояла, на экране те же строки. Прежде строки
+    /// строились заново, вид таблицы на миг пустел, и она прыгала к началу; переключение меняет теперь одну строку.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Toggling_a_mod_far_down_the_list_keeps_the_table_in_place()
+    {
+        var mods = Main(new HangingModDb(), extra: 40).Mods;
+        _window = new Window { Width = 1400, Height = 860, Content = new ModsView { DataContext = mods } };
+        _window.Show();
+        var window = _window;
+        await Wait.Until(() => mods.Rows.Count == 42);
+        mods.SortIndex = 1; // по имени: выключенный мод остаётся на своём месте, а не уходит к выключенным
+        await Run(200);
+        var grid = (DataGrid)Named(window, "ModsGrid");
+        var target = mods.View.Items[30];
+        grid.ScrollIntoView(target, null);
+        await Run(200);
+        mods.Selected = target;
+        await Run(300);
+        var bar = grid.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.ScrollBar>().Single(s => s.Orientation == Avalonia.Layout.Orientation.Vertical);
+        List<(string? Id, double Y)> Shown() =>
+            [.. Rows(window).Select(r => ((r.DataContext as ModRowViewModel)?.ModId, r.TranslatePoint(default, grid)!.Value.Y)).OrderBy(x => x.Item2)];
+        var before = Shown();
+        var offset = bar.Value;
+        Assert.True(offset > 500, $"таблица прокручена: {offset}");
+        var others = mods.Rows.Where(r => r != target).ToList();
+
+        using (var changes = new Changes(window, Avalonia.Controls.Primitives.RangeBase.ValueProperty))
+        {
+            Mouse.Click(window, SwitchOf(RowOf(window, target.ModId)));
+            await Wait.Until(() => !mods.ToggleEnabledCommand.IsRunning && mods.Rows.Single(r => r.ModId == target.ModId) is { IsEnabled: false });
+            await Run(300);
+            Assert.Empty(changes.Seen.Select(c => $"{c.Who.GetType().Name}: {c.From} → {c.To}"));
+        }
+        Assert.Equal(offset, bar.Value);
+        Assert.True(before.SequenceEqual(Shown()), $"до: {string.Join(", ", before)}\nпосле: {string.Join(", ", Shown())}\nвид: {string.Join(", ", mods.View.Items.Skip(25).Take(10).Select(r => r.ModId))}\nтаблица: {string.Join(", ", grid.CollectionView!.Cast<ModRowViewModel>().Select(r => r.ModId))}");
+        Assert.Equal(target.ModId, mods.Selected?.ModId);
+        Assert.Equal(others, mods.Rows.Where(r => r.ModId != target.ModId)); // остальные строки — те же объекты
+    }
+    private static List<string> GridOrderOf(DataGrid grid) => [.. grid.CollectionView!.Cast<ModRowViewModel>().Select(r => r.ModId)];
+
+    /// <summary>
+    /// Таблица показывает строки в порядке списка, хотя её вид сдвигов не понимает (GridOrder): смена порядка «Сначала
+    /// важное» → «По имени» переставляет строки, выбранный мод остаётся выбранным, а карточка — той же.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Changing_the_order_reorders_the_table_and_keeps_the_selection()
+    {
+        var mods = Main(new HangingModDb(), extra: 3).Mods;
+        _window = new Window { Width = 1400, Height = 860, Content = new ModsView { DataContext = mods } };
+        _window.Show();
+        await Wait.Until(() => mods.Rows.Count == 5 && Rows(_window).Count == 5);
+        var grid = (DataGrid)Named(_window, "ModsGrid");
+        Assert.Equal(["alpha", "mod00", "mod01", "mod02", "beta"], GridOrderOf(grid)); // выключенный beta — в конце
+        mods.Selected = mods.Rows.Single(r => r.ModId == "mod01");
+        await Run(200);
+        var card = mods.Card;
+
+        mods.SortIndex = 1; // по имени
+        await Run(200);
+        Assert.Equal(["alpha", "beta", "mod00", "mod01", "mod02"], GridOrderOf(grid));
+        Assert.Equal(mods.View.Items.Select(r => r.ModId), GridOrderOf(grid));
+        Assert.Same(mods.Selected, grid.SelectedItem);
+        Assert.Equal("mod01", mods.Selected?.ModId);
+        Assert.Same(card, mods.Card);
+    }
+
+    /// <summary>
+    /// «Сначала важное»: выключенный мод уезжает к выключенным — в таблице тоже, без потерянных и лишних строк; включённый
+    /// обратно возвращается на место.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Toggled_mod_moves_to_its_place_in_the_table()
+    {
+        var mods = Main(new HangingModDb(), extra: 3).Mods;
+        _window = new Window { Width = 1400, Height = 860, Content = new ModsView { DataContext = mods } };
+        _window.Show();
+        await Wait.Until(() => mods.Rows.Count == 5 && Rows(_window).Count == 5);
+        var grid = (DataGrid)Named(_window, "ModsGrid");
+
+        Mouse.Click(_window, SwitchOf(RowOf(_window, "mod00")));
+        await Wait.Until(() => !mods.ToggleEnabledCommand.IsRunning && mods.Rows.Single(r => r.ModId == "mod00") is { IsEnabled: false });
+        await Run(200);
+        Assert.Equal(["alpha", "mod01", "mod02", "beta", "mod00"], GridOrderOf(grid));
+        Assert.Equal(mods.View.Items.Select(r => r.ModId), GridOrderOf(grid));
+        Assert.Equal(5, Rows(_window).Count);
+
+        Mouse.Click(_window, SwitchOf(RowOf(_window, "mod00")));
+        await Wait.Until(() => !mods.ToggleEnabledCommand.IsRunning && mods.Rows.Single(r => r.ModId == "mod00") is { IsEnabled: true });
+        await Run(200);
+        Assert.Equal(["alpha", "mod00", "mod01", "mod02", "beta"], GridOrderOf(grid));
+        Assert.Equal(5, Rows(_window).Count);
+    }
+
+    /// <summary>Переключатель «Включён в профиле» в карточке мода.</summary>
+    private static CheckBox CardSwitch(Visual root, ModsViewModel mods) =>
+        root.GetVisualDescendants().OfType<CheckBox>().Single(c => c.DataContext is ModCardViewModel && c.Command == mods.ToggleEnabledCommand);
+
+    /// <summary>
+    /// Переключить мод не удалось (настройки игры не записались): переключатели в строке и в карточке встают как было.
+    /// Щелчок сам перекидывает переключатель, а привязка к прежней строке (мод не поменялся) его не вернула бы — строку
+    /// щёлкнутого мода таблица строит заново, остальные остаются прежними.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Failed_toggle_puts_the_switches_back()
+    {
+        var ui = new QuietUi();
+        var main = Main(new HangingModDb(), ui: ui);
+        // на месте временного файла настроек игры — папка: запись настроек не удастся
+        Directory.CreateDirectory(Path.Combine(_dir, "data", "clientsettings.json.evistool.tmp"));
+        var (window, mods) = await ShowAsync(main);
+        mods.Selected = mods.Rows.Single(r => r.ModId == "alpha");
+        await Run(200);
+
+        var beta = mods.Rows.Single(r => r.ModId == "beta");
+
+        foreach (var switchOf in new Func<CheckBox>[] { () => SwitchOf(RowOf(window, "alpha")), () => CardSwitch(window, mods) })
+        {
+            var notices = ui.Notices.Count;
+            var before = mods.Rows.Single(r => r.ModId == "alpha");
+            Mouse.Click(window, switchOf());
+            await Wait.Until(() => ui.Notices.Count > notices && !mods.ToggleEnabledCommand.IsRunning);
+            await Run(200);
+
+            var alpha = mods.Rows.Single(r => r.ModId == "alpha");
+            Assert.True(alpha.IsEnabled);
+            Assert.NotSame(before, alpha); // строку щёлкнутого мода построили заново, хоть он и не поменялся
+            Assert.True(SwitchOf(RowOf(window, "alpha")).IsChecked);
+            Assert.True(CardSwitch(window, mods).IsChecked);
+            Assert.Same(alpha, mods.Card?.Row);
+            Assert.Same(beta, mods.Rows.Single(r => r.ModId == "beta")); // остальные строки — прежние
+        }
+    }
+
+    /// <summary>
+    /// Выбранный мод удалили (файла не стало, папку перечитали): выбор снят вместе с карточкой — справа сводка, в таблице
+    /// ничего не выделено. Таблица, у которой выбранную строку заменили, сама выбирает соседнюю — та не должна остаться
+    /// выбранной без карточки.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Deleting_the_selected_mod_clears_the_selection()
+    {
+        var mods = Main(new HangingModDb(), extra: 3).Mods;
+        _window = new Window { Width = 1400, Height = 860, Content = new ModsView { DataContext = mods } };
+        _window.Show();
+        await Wait.Until(() => mods.Rows.Count == 5 && Rows(_window).Count == 5);
+        var grid = (DataGrid)Named(_window, "ModsGrid");
+        mods.Selected = mods.Rows.Single(r => r.ModId == "mod01");
+        await Run(200);
+        Assert.Same(mods.Selected, grid.SelectedItem);
+
+        File.Delete(Path.Combine(_dir, "data", "Mods", "mod01_1.0.0.zip"));
+        await mods.ReloadAsync();
+        await Run(200);
+
+        Assert.Equal(4, mods.Rows.Count);
+        Assert.Null(mods.Card);
+        Assert.Null(mods.Selected);
+        Assert.Null(grid.SelectedItem);
+        Assert.True(Named(_window, "ModsSummary").IsEffectivelyVisible);
+
+        // выбрать соседнюю строку после этого — её карточка
+        var mod02 = mods.Rows.Single(r => r.ModId == "mod02");
+        grid.SelectedItem = mod02;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(mod02, mods.Card?.Row);
     }
 
     [AvaloniaFact]

@@ -15,6 +15,7 @@ using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using eViSTool.Desktop.Controls;
 using eViSTool.Desktop.Platform;
 
 namespace eViSTool.Desktop.Tests;
@@ -185,7 +186,7 @@ public sealed class ThemeTests
         await Run(300); // первое значение фона тоже идёт переходом (от пустого) — дождаться
 
         // кривая — «торможение» 0.2, 0.7, 0.2, 1, наведение — 180 мс
-        var hover = Assert.Single(presenter.Transitions!.OfType<BrushTransition>(), t => t.Property == ContentPresenter.BackgroundProperty);
+        var hover = Assert.Single(presenter.Transitions!.OfType<PremulBrushTransition>(), t => t.Property == ContentPresenter.BackgroundProperty);
         Assert.Equal(TimeSpan.FromMilliseconds(180), hover.Duration);
         var easing = Assert.IsType<SplineEasing>(hover.Easing);
         Assert.Equal((0.2, 0.7, 0.2, 1.0), (easing.X1, easing.Y1, easing.X2, easing.Y2));
@@ -350,6 +351,205 @@ public sealed class ThemeTests
         }
         Assert.True(seen.Count > 3, $"положения отрезка: {string.Join(", ", seen)}");
         window.Close();
+    }
+
+    // ---------- вспышки: переход цвета не светлее обоих концов
+
+    /// <summary>Цвет, который видит глаз: кисть поверх подложки. Смешение — в sRGB, как у Skia; кисти нет — подложка.</summary>
+    private static Color Over(IBrush? brush, Color backdrop)
+    {
+        if (brush is not ISolidColorBrush solid) return backdrop;
+        var a = solid.Color.A / 255.0 * solid.Opacity;
+        byte Mix(byte top, byte under) => (byte)Math.Round(top * a + under * (1 - a));
+        return Color.FromRgb(Mix(solid.Color.R, backdrop.R), Mix(solid.Color.G, backdrop.G), Mix(solid.Color.B, backdrop.B));
+    }
+
+    /// <summary>
+    /// Снять кисть <paramref name="read"/> поверх <paramref name="backdrop"/> до перемены, на каждом кадре перехода и в
+    /// конце. Кадр — тик отрисовки примерно раз в 5 мс: вспышка при кривой «торможение» приходится на первые десятки мс.
+    /// </summary>
+    private static async Task<List<Color>> Frames(Func<IBrush?> read, Color backdrop, Action change, int ms = 300)
+    {
+        var seen = new List<Color> { Over(read(), backdrop) };
+        change();
+        var watch = Stopwatch.StartNew();
+        do
+        {
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            Dispatcher.UIThread.RunJobs();
+            seen.Add(Over(read(), backdrop));
+            await Task.Delay(5, TestContext.Current.CancellationToken);
+        } while (watch.ElapsedMilliseconds < ms);
+        return seen;
+    }
+
+    /// <summary>
+    /// Ни один кадр не светлее обоих концов перехода (запас 3 — округление каналов). У Avalonia Transparent — белый с
+    /// нулевой альфой, и без предумножения переход от него к тёмному токену проходил через светлые полупрозрачные цвета.
+    /// </summary>
+    private static void AssertNoFlash(List<Color> frames, string what)
+    {
+        var limit = Math.Max(Lightness(frames[0]), Lightness(frames[^1])) + 3;
+        var worst = frames.MaxBy(Lightness);
+        Assert.True(Lightness(worst) <= limit,
+            $"{what}: кадр {worst} светлее концов {frames[0]} → {frames[^1]} ({string.Join(", ", frames.Select(c => c.ToString()[3..]))})");
+    }
+
+    /// <summary>Пункт бокового меню при наведении: прозрачный фон → вуаль наведения — без вспышки белым.</summary>
+    [AvaloniaFact]
+    public async Task NavItem_Hover_DoesNotFlashWhite()
+    {
+        var nav = new ListBox { Items = { "Мои моды", "Каталог модов" }, BorderThickness = new Thickness(0), Width = 220 };
+        var window = Show(nav);
+        var side = Token(window, "Forest.Side");
+        window.Background = new SolidColorBrush(side);
+        nav.Background = Brushes.Transparent;
+        nav.ItemContainerTheme = (ControlTheme)window.FindResource("Forest.NavItem")!;
+        await Run(300);
+        var item = nav.GetVisualDescendants().OfType<ListBoxItem>().Last();
+        var bd = Part<Border>(item, "Bd");
+
+        var hover = await Frames(() => bd.Background, side, () => window.MouseMove(Mouse.Center(window, item)));
+        Assert.Equal(Over(window.FindResource("Forest.NavHoverVeil") as IBrush, side), hover[^1]);
+        AssertNoFlash(hover, "наведение на пункт меню");
+
+        // и обратно: увёл мышь — вуаль тает без вспышки
+        var leave = await Frames(() => bd.Background, side, () => window.MouseMove(new Point(390, 290)));
+        Assert.Equal(side, leave[^1]);
+        AssertNoFlash(leave, "уход с пункта меню");
+        window.Close();
+    }
+
+    /// <summary>
+    /// Кнопка, которая включилась (выключенная — без фона и рамки): фон и рамка проявляются без вспышки белым — «Пропустить»
+    /// в карточке мода при переходе на мод с обновлением. Подложка — карточка (Surface).
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Button_TurningEnabled_DoesNotFlashWhite()
+    {
+        var button = new Button { Content = "Пропустить", IsEnabled = false };
+        var window = Show(new Border { Classes = { "card" }, Padding = new Thickness(14), Child = button });
+        var surface = Token(window, "Forest.Surface");
+        await Run(300);
+        var presenter = Part<ContentPresenter>(button, "PART_ContentPresenter");
+
+        var fill = await Frames(() => presenter.Background, surface, () => button.IsEnabled = true);
+        AssertNoFlash(fill, "фон включившейся кнопки");
+        button.IsEnabled = false;
+        await Run(300);
+        var border = await Frames(() => presenter.BorderBrush, surface, () => button.IsEnabled = true);
+        Assert.Equal(Token(window, "Forest.Line"), border[^1]);
+        AssertNoFlash(border, "рамка включившейся кнопки");
+        window.Close();
+    }
+
+    /// <summary>Плоская кнопка («Дополнительно ▾») и чип-фильтр при наведении: от прозрачного фона — без вспышки белым.</summary>
+    [AvaloniaFact]
+    public async Task FlatButtonAndChip_Hover_DoNotFlashWhite()
+    {
+        var flat = new Button { Content = "Дополнительно", Classes = { "flat" } };
+        var chip = new RadioButton { Content = "Все" };
+        var window = Show(new StackPanel { Spacing = 20, Children = { flat, chip } });
+        chip.Theme = (ControlTheme)window.FindResource("Forest.Chip")!;
+        var page = Token(window, "Forest.Base");
+        window.Background = new SolidColorBrush(page);
+        await Run(300);
+
+        var presenter = Part<ContentPresenter>(flat, "PART_ContentPresenter");
+        AssertNoFlash(await Frames(() => presenter.Background, page, () => window.MouseMove(Mouse.Center(window, flat))),
+            "наведение на плоскую кнопку");
+        var bd = Part<Border>(chip, "Bd");
+        AssertNoFlash(await Frames(() => bd.Background, page, () => window.MouseMove(Mouse.Center(window, chip))), "наведение на чип");
+        window.Close();
+    }
+
+    /// <summary>
+    /// Переходы цвета в разметке и коде окна — только ctl:PremulBrushTransition. BrushTransition из Avalonia смешивает без
+    /// учёта прозрачности: конец Transparent (белый с нулевой альфой) или любая кисть с альфой 0 другого цвета даёт вспышку
+    /// белым. Прозрачные фоны без переходов проверка не трогает: её предмет — сам переход.
+    /// </summary>
+    [Fact]
+    public void Markup_ColorTransitionsArePremultiplied()
+    {
+        var src = System.IO.Path.Combine(RepoRoot(), "src", "eViSTool.Desktop");
+        var found = new List<string>();
+        var premultiplied = 0;
+        foreach (var file in Directory.EnumerateFiles(src, "*.*", SearchOption.AllDirectories))
+        {
+            var relative = System.IO.Path.GetRelativePath(src, file).Replace('\\', '/');
+            if (relative.StartsWith("bin/") || relative.StartsWith("obj/")) continue;
+            string text;
+            if (file.EndsWith(".axaml")) text = Regex.Replace(File.ReadAllText(file), "<!--.*?-->", "", RegexOptions.Singleline);
+            else if (file.EndsWith(".cs")) text = Regex.Replace(File.ReadAllText(file), @"//.*?$|/\*.*?\*/", "", RegexOptions.Multiline | RegexOptions.Singleline);
+            else continue;
+            premultiplied += Regex.Matches(text, @"\bPremulBrushTransition\b").Count;
+            found.AddRange(Regex.Matches(text, @"(?<![\w.:])BrushTransition\b|Avalonia\.Animation\.BrushTransition\b")
+                .Select(m => $"{relative}: …{text.Substring(Math.Max(0, m.Index - 20), Math.Min(60, text.Length - Math.Max(0, m.Index - 20)))}…"));
+        }
+        Assert.Empty(found);
+        Assert.True(premultiplied >= 20, $"переходов цвета в теме найдено: {premultiplied}"); // проверка видит тему, а не пустоту
+    }
+
+    /// <summary>
+    /// Смешение кистей перехода: от прозрачного конца по пути меняется только прозрачность, цвет — другого конца (у
+    /// Transparent своего цвета нет); два непрозрачных цвета — как у Avalonia, в линейном свете; концы — сами кисти.
+    /// </summary>
+    [Fact]
+    public void BrushMix_FromTransparent_KeepsTheOtherColor()
+    {
+        var veil = Color.Parse("#99283128");
+        var lastAlpha = -1;
+        for (var t = 0.05; t < 1; t += 0.05)
+        {
+            var mixed = BrushMix.Mix(t, Colors.Transparent, veil);
+            Assert.Equal((veil.R, veil.G, veil.B), (mixed.R, mixed.G, mixed.B));
+            Assert.True(mixed.A > lastAlpha, $"прозрачность не растёт на {t}: {mixed}");
+            lastAlpha = mixed.A;
+            Assert.Equal((veil.R, veil.G, veil.B), BrushMix.Mix(t, veil, Colors.Transparent) is var back ? (back.R, back.G, back.B) : default);
+        }
+
+        // непрозрачные: середина — как у Avalonia (линейный свет: светлее простого среднего каналов)
+        var surface = Color.Parse("#252E26");
+        var raised = Color.Parse("#323C33");
+        var avalonia = typeof(Animation).Assembly.GetType("Avalonia.Animation.Animators.ColorAnimator")
+            ?.GetMethod("InterpolateCore", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        Assert.SkipWhen(avalonia is null, "у этой версии Avalonia смешение цветов устроено иначе — сравнить не с чем");
+        foreach (var t in new[] { 0.1, 0.5, 0.9 })
+            Assert.Equal(avalonia.Invoke(null, [t, surface, raised]), BrushMix.Mix(t, surface, raised));
+
+        // кисти: концы — те же объекты, null — сразу новое значение, без перехода
+        var from = new SolidColorBrush(surface);
+        var to = new SolidColorBrush(raised);
+        Assert.Same(from, BrushMix.Mix(0, from, to));
+        Assert.Same(to, BrushMix.Mix(1, from, to));
+        Assert.Same(to, BrushMix.Mix(0.2, null, to));
+        Assert.Null(BrushMix.Mix(0.2, from, null));
+    }
+
+    /// <summary>
+    /// Главная кнопка: градиент ↔ сплошной цвет смешиваются по остановкам; выключенная (без фона) → включённая проявляется
+    /// цветом самого градиента, без белёсого пути.
+    /// </summary>
+    [Fact]
+    public void BrushMix_GradientAndSolid_MixByStops()
+    {
+        var top = Color.Parse("#E9D6A3");
+        var bottom = Color.Parse("#D2BC86");
+        var gradient = new LinearGradientBrush
+        {
+            StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
+            GradientStops = { new GradientStop(top, 0), new GradientStop(bottom, 1) },
+        };
+        var hover = Color.Parse("#E0CC98");
+
+        var half = Assert.IsAssignableFrom<ILinearGradientBrush>(BrushMix.Mix(0.5, gradient, new SolidColorBrush(hover)));
+        Assert.Equal([0.0, 1.0], half.GradientStops.Select(s => s.Offset));
+        Assert.Equal([BrushMix.Mix(0.5, top, hover), BrushMix.Mix(0.5, bottom, hover)], half.GradientStops.Select(s => s.Color));
+        Assert.Equal(gradient.EndPoint, half.EndPoint);
+
+        var appearing = Assert.IsAssignableFrom<ILinearGradientBrush>(BrushMix.Mix(0.3, Brushes.Transparent, gradient));
+        Assert.Equal([(top.R, top.G, top.B), (bottom.R, bottom.G, bottom.B)], appearing.GradientStops.Select(s => (s.Color.R, s.Color.G, s.Color.B)));
+        Assert.All(appearing.GradientStops, s => Assert.InRange(s.Color.A, (byte)1, (byte)254));
     }
 
     [Fact]
