@@ -255,6 +255,30 @@ public sealed class ModsSummaryTests : IDisposable
         Assert.False(command.CanExecute(null));
     });
 
+    // «проверены сегодня, 23:40» пересчитывается в полночь: таймер окна меряет настоящее время, а в ночь перевода часов
+    // до полуночи не 24 часа. Зона — как в Риге: в последнее воскресенье марта 03:00 → 04:00, октября 04:00 → 03:00
+    [Theory]
+    [InlineData("2026-03-28T22:00:01Z", "22:59:59")] // вс 29 марта 00:00:01 по Риге: до полуночи понедельника 23 часа
+    [InlineData("2026-10-24T21:00:01Z", "1.00:59:59")] // вс 25 октября 00:00:01: 25 часов
+    [InlineData("2026-10-19T20:30:00Z", "00:30:00")] // обычный вечер, 23:30
+    public void Midnight_IsCountedInRealTime_OverAClockChange(string utcNow, string expected)
+    {
+        var rule = TimeZoneInfo.AdjustmentRule.CreateAdjustmentRule(DateTime.MinValue.Date, DateTime.MaxValue.Date, TimeSpan.FromHours(1),
+            TimeZoneInfo.TransitionTime.CreateFloatingDateRule(new DateTime(1, 1, 1, 3, 0, 0), 3, 5, DayOfWeek.Sunday),
+            TimeZoneInfo.TransitionTime.CreateFloatingDateRule(new DateTime(1, 1, 1, 4, 0, 0), 10, 5, DayOfWeek.Sunday));
+        var riga = TimeZoneInfo.CreateCustomTimeZone("test-riga", TimeSpan.FromHours(2), "test-riga", "EET", "EEST", [rule]);
+        var now = DateTimeOffset.Parse(utcNow, System.Globalization.CultureInfo.InvariantCulture);
+
+        Assert.Equal(TimeSpan.Parse(expected, System.Globalization.CultureInfo.InvariantCulture),
+            ModsViewModel.UntilMidnight(new Clock(now, riga)));
+    }
+
+    private sealed class Clock(DateTimeOffset utc, TimeZoneInfo zone) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utc;
+        public override TimeZoneInfo LocalTimeZone => zone;
+    }
+
     [Fact]
     public void SummaryTexts_FollowTheLanguage() => Sta.Run(() =>
     {

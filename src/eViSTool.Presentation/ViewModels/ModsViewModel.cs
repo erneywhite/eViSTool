@@ -325,12 +325,27 @@ public sealed partial class ModsViewModel : ObservableObject
             _midnight.Tick += (_, _) =>
             {
                 OnPropertyChanged(nameof(SummaryCheckedText));
-                ArmMidnight(); // при переводе часов сработает на час раньше или позже — тогда просто ещё раз до полуночи
+                ArmMidnight(); // сработал раньше полуночи (часы компьютера поправили) — заведётся ещё раз до неё же
             };
         }
         _midnight.Stop();
-        _midnight.Interval = DateTime.Today.AddDays(1) - DateTime.Now + TimeSpan.FromSeconds(1);
+        _midnight.Interval = UntilMidnight(TimeProvider.System) + TimeSpan.FromSeconds(1);
         _midnight.Start();
+    }
+
+    /// <summary>
+    /// Сколько настоящего времени до ближайшей местной полуночи. Таймер окна меряет настоящее время, а не стенные часы:
+    /// в ночь перевода на летнее время до полуночи 23 часа, на зимнее — 25, поэтому разница считается в UTC.
+    /// </summary>
+    internal static TimeSpan UntilMidnight(TimeProvider time)
+    {
+        var now = time.GetUtcNow().UtcDateTime;
+        var zone = time.LocalTimeZone;
+        // без пометки Local: ConvertTimeToUtc принял бы её только вместе с TimeZoneInfo.Local
+        var midnight = DateTime.SpecifyKind(TimeZoneInfo.ConvertTimeFromUtc(now, zone).Date.AddDays(1), DateTimeKind.Unspecified);
+        // где часы переводят ровно в полночь, её в этот день нет: новый день начинается часом позже
+        if (zone.IsInvalidTime(midnight)) midnight = midnight.AddHours(1);
+        return TimeZoneInfo.ConvertTimeToUtc(midnight, zone) - now;
     }
 
     /// <summary>Сторож оповещений серверов у хостера: ему — что окно поставило на сервер («Обновлены моды»).</summary>

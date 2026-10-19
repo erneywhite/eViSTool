@@ -62,6 +62,9 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
     private GameProfile? _profile;
     private bool _active;
     private bool _loading;
+    private bool _saving;    // запись идёт (SaveAsync): новые щелчки только просят записать ещё раз
+    private bool _saveAgain;
+    private bool _saveLoud;  // среди этих просьб был щелчок, а не тихое обновление копий каналов при открытии
     private int _generation;
     private DateTime? _seenChange;
     private ServerNotifySettings _saved = new();
@@ -132,6 +135,7 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
         _generation++;
         _seenChange = null;
         _saved = new();
+        _saveAgain = _saveLoud = false; // просили записать таблицу прежнего профиля — её больше нет
         Loaded = false;
         StatusText = "";
         ErrorText = SendErrors(); // у хостера — ошибки отправки этого профиля, если не ушло, пока смотрели другой
@@ -228,6 +232,8 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
             }
             else return;
             if (generation != _generation) return;
+            // в таблице щелчки, которые ждут записи: прочитанное старше их, а пересобранная по нему таблица ушла бы в эту запись
+            if (_saveAgain) return;
             _saved = settings;
             Build(settings);
             Loaded = true;
@@ -291,9 +297,47 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
         };
     }
 
+    /// <summary>
+    /// Записать таблицу. Записи идут по одному: щелчок, пока прежняя запись не кончилась, только просит записать ещё раз
+    /// (<see cref="_saveAgain"/>), и следующая запись снимает таблицу заново — с этим щелчком и всеми до него. Иначе
+    /// два PUT агенту могли бы прийти в обратном порядке, а два потока — писать один файл .tmp своего сервера.
+    /// </summary>
     private async Task SaveAsync(bool quiet)
     {
+        if (_saving)
+        {
+            _saveAgain = true;
+            _saveLoud |= !quiet;
+            return;
+        }
+        _saving = true;
+        try
+        {
+            await WriteAsync(quiet);
+            // просьба всегда про профиль, открытый сейчас: просьбы прежнего снимает OnProfileSwitched, а пока таблица
+            // нового не прочитана (Loaded), писать её нельзя
+            while (_saveAgain && Loaded)
+            {
+                quiet = !_saveLoud;
+                _saveAgain = _saveLoud = false;
+                await WriteAsync(quiet);
+            }
+        }
+        finally
+        {
+            _saving = false;
+            _saveAgain = _saveLoud = false;
+        }
+    }
+
+    /// <summary>
+    /// Одна запись. Пока она шла, могли сменить профиль: тогда вкладка уже показывает другой сервер, и ни его
+    /// настройки (по ним CanTest и пересборка при смене языка), ни строку ошибки чужой итог не трогает.
+    /// </summary>
+    private async Task WriteAsync(bool quiet)
+    {
         if (_profile is not { } profile) return;
+        var id = profile.Id;
         var settings = Collect();
         try
         {
@@ -302,20 +346,21 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
                 if (_server.Client is not { } client) throw new InvalidOperationException(Loc.T("server.stateOffline"));
                 await client.SaveNotifyAsync(settings.ToUpload());
             }
-            else
+            else await Task.Run(() => settings.Save(id));
+            if (_profile?.Id == id)
             {
-                await Task.Run(() => settings.Save(profile.Id));
-                _seenChange = ServerNotifySettings.ChangedAt(profile.Id);
+                if (!profile.IsRemote) _seenChange = ServerNotifySettings.ChangedAt(id);
+                _saved = settings;
+                TestCommand.NotifyCanExecuteChanged(); // включили первый маршрут или выключили последний — кнопка проверочного
+                ErrorText = SendErrors(); // канал выключили у сервера или поправили — его ошибка отправки уходит
+                if (!quiet) StatusText = "";
             }
-            _saved = settings;
-            ErrorText = SendErrors(); // канал выключили у сервера или поправили — его ошибка отправки уходит
-            if (!quiet) StatusText = "";
-            Saved?.Invoke();
+            Saved?.Invoke(); // запись прошла — сторож хостера перечитывает с диска сам, какой профиль ни открыт
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or IOException or TaskCanceledException
                                        or UnauthorizedAccessException)
         {
-            ErrorText = Loc.T("srvnotify.saveFailed", profile.IsRemote ? RemoteSecret.Describe(ex) : ex.Message);
+            if (_profile?.Id == id) ErrorText = Loc.T("srvnotify.saveFailed", profile.IsRemote ? RemoteSecret.Describe(ex) : ex.Message);
         }
     }
 
