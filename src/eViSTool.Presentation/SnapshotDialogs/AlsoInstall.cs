@@ -16,11 +16,11 @@ internal static class AlsoInstallSnapshot
         var willInstall = Loc.T("also.willInstall", Loc.T("also.game", "1.21.3"), "2.1.0");
         AlsoChoice[] others =
         [
-            new(Profile("Сервер друзей", ProfileKind.Server), "server", willInstall, CanInstall: true, AlreadyThere: false, Linked: true),
-            new(Profile("Сборка 1.19", ProfileKind.Client), "client", Loc.T("also.noRelease", Loc.T("also.game", "1.19.8"), "1.19.x"),
+            new(Profile(Sample.Text("Сервер друзей", "Friends server"), ProfileKind.Server), "server", willInstall, CanInstall: true, AlreadyThere: false, Linked: true),
+            new(Profile(Sample.Text("Сборка 1.19", "Pack 1.19"), ProfileKind.Client), "client", Loc.T("also.noRelease", Loc.T("also.game", "1.19.8"), "1.19.x"),
                 CanInstall: false, AlreadyThere: false, Linked: false),
         ];
-        AppWindows.Current.AskAlsoInstall(Loc.T("also.hint", "Primitive Survival"), "Основной", Loc.T("profile.kindClient"),
+        AppWindows.Current.AskAlsoInstall(Loc.T("also.hint", "Primitive Survival"), Sample.Text("Основной", "Main"), Loc.T("profile.kindClient"),
             Loc.T("also.thisProfile") + " · " + willInstall, others);
     }
 
@@ -32,14 +32,14 @@ internal static class AlsoInstallSnapshot
         var files = string.Join(", ", new[] { "Primitive Survival 3.8.2", "Carry On 1.8.4", "Expanded Foods 2.3.0", "Wildcraft Tree 1.3.11", "Rivers 1.1.5" });
         AlsoChoice[] others =
         [
-            new(Profile("Сервер друзей на выходные", ProfileKind.Server), "server", Loc.T("also.files", game, files) + " " + Loc.T("also.filesSome", 2),
+            new(Profile(Sample.Text("Сервер друзей на выходные", "Weekend friends server"), ProfileKind.Server), "server", Loc.T("also.files", game, files) + " " + Loc.T("also.filesSome", 2),
                 CanInstall: true, AlreadyThere: false, Linked: true),
-            new(Profile("Сервер в облаке", ProfileKind.Server), "remote", Loc.T("also.unavailable", "агент не отвечает: превышено время ожидания ответа от сервера"),
+            new(Profile(Sample.Text("Сервер в облаке", "Cloud server"), ProfileKind.Server), "remote", Loc.T("also.unavailable", Sample.Text("агент не отвечает: превышено время ожидания ответа от сервера", "the agent does not answer: timed out")),
                 CanInstall: false, AlreadyThere: false, Linked: true),
-            new(Profile("Сборка 1.19", ProfileKind.Client), "client", Loc.T("also.allThere", Loc.T("also.game", "1.19.8")),
+            new(Profile(Sample.Text("Сборка 1.19", "Pack 1.19"), ProfileKind.Client), "client", Loc.T("also.allThere", Loc.T("also.game", "1.19.8")),
                 CanInstall: true, AlreadyThere: true, Linked: false),
         ];
         AppWindows.Current.AskAlsoInstall(Loc.T("also.hintFiles", "Primitive Survival, Carry On, Expanded Foods, Wildcraft Tree, Rivers"),
-            "Основной", Loc.T("profile.kindClient"), Loc.T("also.thisProfile") + " · " + Loc.T("also.game", "1.21.3"), others);
+            Sample.Text("Основной", "Main"), Loc.T("profile.kindClient"), Loc.T("also.thisProfile") + " · " + Loc.T("also.game", "1.21.3"), others);
     }
 }

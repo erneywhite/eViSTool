@@ -63,7 +63,9 @@ internal static class Program
 #pragma warning disable AVALONIA_X11_CSD
             // своя шапка главного окна на Linux: без этого X11 не рисует кнопки и рамку сам и ExtendClientArea не действует
             // (у Avalonia 12 опция помечена экспериментальной; на крайний случай — «Системная рамка» в настройках)
-            .With(new X11PlatformOptions { EnableDrawnDecorations = true })
+            .With(new X11PlatformOptions { EnableDrawnDecorations = true, OverlayPopups = Presentation.Snapshots.FromEnvironment() is not null })
 #pragma warning restore AVALONIA_X11_CSD
+            // в режиме снимка попапы (меню «Играть») рисуются внутри окна: снимок окна видит только его самого
+            .With(new Win32PlatformOptions { OverlayPopups = Presentation.Snapshots.FromEnvironment() is not null })
             .LogToTrace();
 }

@@ -23,7 +23,7 @@ internal static class NotifyChannelDialog
     private static void Discord(MainViewModel main) =>
         AppWindows.Current.EditNotifyChannel(new NotifyChannel
         {
-            Kind = NotifyKind.Discord, Name = "Discord сервера", SecretProtected = MadeUpSecret,
+            Kind = NotifyKind.Discord, Name = Sample.Text("Discord сервера", "Server Discord"), SecretProtected = MadeUpSecret,
         }, isNew: false);
 
     /// <summary>Сохранённый вебхук в Home Assistant: его шаблон тела запроса.</summary>
@@ -31,7 +31,7 @@ internal static class NotifyChannelDialog
     private static void Webhook(MainViewModel main) =>
         AppWindows.Current.EditNotifyChannel(new NotifyChannel
         {
-            Kind = NotifyKind.Webhook, Name = "Умный дом", SecretProtected = MadeUpSecret, ChatTitle = "ha.example.org",
+            Kind = NotifyKind.Webhook, Name = Sample.Text("Умный дом", "Smart home"), SecretProtected = MadeUpSecret, ChatTitle = "ha.example.org",
             Template = WebhookTemplates.HomeAssistant,
         }, isNew: false);
 
@@ -50,7 +50,7 @@ internal static class NotifyChannelDialog
     private static void Telegram(MainViewModel main) =>
         AppWindows.Current.EditNotifyChannel(new NotifyChannel
         {
-            Kind = NotifyKind.Telegram, Name = "Наш сервер", SecretProtected = MadeUpSecret, ChatId = "-1001234567890",
-            ChatTitle = "Наш сервер › Анонсы", TopicId = 42,
+            Kind = NotifyKind.Telegram, Name = Sample.Text("Наш сервер", "Our server"), SecretProtected = MadeUpSecret, ChatId = "-1001234567890",
+            ChatTitle = Sample.Text("Наш сервер › Анонсы", "Our server › Announcements"), TopicId = 42,
         }, isNew: false);
 }

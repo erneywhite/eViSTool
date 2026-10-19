@@ -25,6 +25,9 @@ internal static class SnapshotRunner
             // окно программы (dialog.*) модальное: Navigate не вернётся, пока его не закроют, — поэтому переход отдельно,
             // а снимок — по таймеру (вложенный цикл диспетчера его выполнит)
             Dispatcher.UIThread.Post(() => Snapshots.Navigate(main, request));
+            // открытое меню «Играть» (mods.playmenu): попап рисуется в самом окне (OverlayPopups в режиме снимка, Program)
+            if (request.Screen.EndsWith(".playmenu", StringComparison.Ordinal) && window is Views.MainWindow shell)
+                Dispatcher.UIThread.Post(shell.OpenPlayMenu, DispatcherPriority.Background);
             await Task.Delay(request.Wait);
             var target = Snapshots.IsDialog(request) ? desktop.Windows.LastOrDefault(w => w.IsVisible && w != window) ?? window : window;
             var size = target == window ? new PixelSize(request.Width, request.Height)

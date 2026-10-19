@@ -34,8 +34,7 @@ On a Linux server eViSTool runs as a service without a window, and you control i
 
 It is portable: unzip it anywhere and run. Nothing is installed into the system — no services, no autostart.
 
-> **Early version (0.x).** Everything described below works and is in daily use. Found a bug or have an idea?
-> Tell about it in [Issues](https://github.com/erneywhite/eViSTool/issues) — it really helps.
+Found a bug or have an idea? Tell about it in [Issues](https://github.com/erneywhite/eViSTool/issues) — it really helps.
 
 ## Contents
 
@@ -75,6 +74,8 @@ The window draws its own title bar there; if you prefer the frame of your deskto
 > The source code is open, and every release comes with a SHA-256 checksum and a signature that eViSTool checks before updating itself.
 
 The interface is in English or Russian. It follows the system language, and you can switch it in **Settings**.
+Behind the side panel is a blurred picture from the game's main menu, taken from your game folder. It changes every week
+and turns festive at Halloween and Christmas; **Settings → Background from the game** turns it off.
 
 ## Profiles
 
@@ -104,7 +105,8 @@ or add the server to the game's favorites. The **Favorites** tab has all of them
 ![Find a server](docs/screenshots/find-server.png)
 
 Profiles are created on the **Profiles** page with **+ Client** and **+ Server**, or copied from an existing one with **Clone…**.
-Client profiles show the icon of your installed game.
+Each profile has an icon: by default the sign of its kind (client, server, hosted server). In **Profiles** you can give
+it a colour and a sign of your own; the icon shows in the profile list and in the profile picker at the top of the window.
 
 ![New client profile](docs/screenshots/profile.png)
 

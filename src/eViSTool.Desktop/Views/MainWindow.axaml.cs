@@ -262,7 +262,10 @@ public partial class MainWindow : Window
 
     // ---------- меню «Играть ▾»: собирается заново при каждом открытии (серверы могли запустить, избранное — поменять)
 
-    private void PlayMenu_Click(object? sender, RoutedEventArgs e)
+    private void PlayMenu_Click(object? sender, RoutedEventArgs e) => OpenPlayMenu();
+
+    /// <summary>Открыть меню «Играть» (и для снимка mods.playmenu).</summary>
+    internal void OpenPlayMenu()
     {
         Vm.RefreshPlayMenu();
         PlayMenu.IsOpen = true;
