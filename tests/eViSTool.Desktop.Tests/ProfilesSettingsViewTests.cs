@@ -206,4 +206,38 @@ public sealed class ProfilesSettingsViewTests : IDisposable
         Assert.False(pages.Children[AppTab.Profiles].IsVisible);
         Assert.Equal(Loc.T("nav.settings"), ((TextBlock)Named(_window, "PageTitle")).Text);
     }
+
+    /// <summary>
+    /// Два главных окна подряд в одном процессе: первое показали и закрыли, второе работает. Раньше второе зависало на
+    /// первом же разборе очереди (процесс ел ядро): радиокнопка вне дерева окна попадает в общую на весь процесс группу
+    /// по GroupName, и чипы «Форма / Текст» «Настроек модов» двух окон перещёлкивали друг друга, а сверка с моделью
+    /// (ModConfigView.SyncViewChips) каждый раз ставила задачу заново. Вернётся ошибка — этот тест повиснет, и прогон
+    /// упадёт по --blame-hang-timeout с его именем.
+    /// </summary>
+    [AvaloniaFact]
+    public void Two_main_windows_one_after_another_both_work()
+    {
+        var main = Main();
+        var first = new MainWindow { DataContext = main, Width = 1400, Height = 860 };
+        first.Show();
+        Dispatcher.UIThread.RunJobs();
+        first.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        _window = new MainWindow { DataContext = main, Width = 1400, Height = 860 };
+        _window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var pages = _window.FindControl<Panel>("Pages")!;
+
+        Mouse.Click(_window, Named(_window, "NavProfiles"));
+        Assert.Equal(AppTab.Profiles, main.SelectedTab);
+        Assert.True(pages.Children[AppTab.Profiles].IsVisible);
+
+        // «Настройки модов» с теми самыми чипами — и обратно
+        main.SelectedTab = AppTab.ModConfig;
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(pages.Children[AppTab.ModConfig].IsVisible);
+        Mouse.Click(_window, Named(_window, "NavMods"));
+        Assert.Equal(AppTab.Mods, main.SelectedTab);
+    }
 }
