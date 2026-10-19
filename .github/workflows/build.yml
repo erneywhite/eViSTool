@@ -39,14 +39,16 @@ jobs:
       - name: Build
         run: dotnet build -c Debug
 
+      # --blame-hang-timeout: зависший тест (например, бесконечный разбор очереди окна) роняет прогон с его именем через
+      # 10 минут, а не держит задачу до общего предела GitHub в 6 часов
       - name: Test
-        run: dotnet test tests/eViSTool.Core.Tests --no-build -c Debug --logger "console;verbosity=normal"
+        run: dotnet test tests/eViSTool.Core.Tests --no-build -c Debug --logger "console;verbosity=normal" --blame-hang-timeout 10m --blame-hang-dump-type none
 
       - name: Test the window models
-        run: dotnet test tests/eViSTool.Presentation.Tests --no-build -c Debug --logger "console;verbosity=normal"
+        run: dotnet test tests/eViSTool.Presentation.Tests --no-build -c Debug --logger "console;verbosity=normal" --blame-hang-timeout 10m --blame-hang-dump-type none
 
       - name: Test the Avalonia window
-        run: dotnet test tests/eViSTool.Desktop.Tests --no-build -c Debug --logger "console;verbosity=normal"
+        run: dotnet test tests/eViSTool.Desktop.Tests --no-build -c Debug --logger "console;verbosity=normal" --blame-hang-timeout 10m --blame-hang-dump-type none
 
       - name: Release build
         shell: pwsh
@@ -89,13 +91,13 @@ jobs:
           dotnet build tests/eViSTool.Presentation.Tests -c Debug
 
       - name: Test
-        run: dotnet test tests/eViSTool.Core.Tests --no-build -c Debug --logger "console;verbosity=normal"
+        run: dotnet test tests/eViSTool.Core.Tests --no-build -c Debug --logger "console;verbosity=normal" --blame-hang-timeout 10m --blame-hang-dump-type none
 
       - name: Test the window models
-        run: dotnet test tests/eViSTool.Presentation.Tests --no-build -c Debug --logger "console;verbosity=normal"
+        run: dotnet test tests/eViSTool.Presentation.Tests --no-build -c Debug --logger "console;verbosity=normal" --blame-hang-timeout 10m --blame-hang-dump-type none
 
       - name: Test the Avalonia window
-        run: dotnet test tests/eViSTool.Desktop.Tests --no-build -c Debug --logger "console;verbosity=normal"
+        run: dotnet test tests/eViSTool.Desktop.Tests --no-build -c Debug --logger "console;verbosity=normal" --blame-hang-timeout 10m --blame-hang-dump-type none
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
