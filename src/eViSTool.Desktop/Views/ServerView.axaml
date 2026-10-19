@@ -65,7 +65,7 @@
                              IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Backups}"
                              AutomationProperties.AutomationId="HostedTabBackups" />
             </StackPanel>
-            <Panel>
+            <Panel ctl:Motion.RevealChildren="True">
                 <Panel IsVisible="{Binding IsHostedOverviewTab}">
                     <views:ServerHostedView DataContext="{Binding Hosted}" />
                 </Panel>
@@ -223,7 +223,7 @@
             </DockPanel>
 
             <!-- остаток места: консоль или вкладка раздела; все живут всё время, видна одна — по Tab -->
-            <Panel>
+            <Panel ctl:Motion.RevealChildren="True">
                 <!-- ===== конфигурация (вместо плиток и консоли) ===== -->
                 <Panel IsVisible="{Binding IsConfigTab}">
                     <views:ServerConfigView DataContext="{Binding Config}" />

@@ -29,7 +29,7 @@ public sealed class ThemeTests
 {
     private static readonly Uri Host = new("avares://eViSTool.Desktop.Tests");
 
-    private static string RepoRoot()
+    internal static string RepoRoot()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
             if (File.Exists(System.IO.Path.Combine(dir.FullName, "eViSTool.slnx"))) return dir.FullName;

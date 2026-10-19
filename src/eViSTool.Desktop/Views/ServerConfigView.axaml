@@ -388,8 +388,10 @@
                 </StackPanel>
             </StackPanel>
 
-            <!-- ===== редактор: подвкладки живут всё время (прокрутка не сбрасывается), видна одна — по Tab ===== -->
-            <Panel IsVisible="{Binding State, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Loaded}">
+            <!-- ===== редактор: подвкладки живут всё время (прокрутка не сбрасывается), видна одна — по Tab; показанная
+                 проявляется ===== -->
+            <Panel IsVisible="{Binding State, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Loaded}"
+                   ctl:Motion.RevealChildren="True">
                 <!-- «Основное» -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False"
                               IsVisible="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=General}">

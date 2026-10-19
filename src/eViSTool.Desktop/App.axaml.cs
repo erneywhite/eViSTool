@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Threading;
 using eViSTool.Core.Localization;
 using eViSTool.Desktop.Platform;
@@ -38,6 +39,10 @@ public partial class App : Application
         Ui.Platform = new AvaloniaUiPlatform(); // модели спрашивают, открывают файлы и ставят таймеры через него
         AppWindows.Current = new AvaloniaAppWindows(); // и открывают окна программы
         Hosting.HostedTransports.Register(); // FTP и SFTP для серверов у хостера
+        // в системе выключены анимации — переходы мгновенные, проявление сразу, бегущее стоит (docs/design.md, раздел 3);
+        // до первого окна: стили берутся, когда элементы входят в окно
+        if (!SystemMotion.Read())
+            Styles.Add(new StyleInclude(new Uri("avares://eViSTool/App.axaml")) { Source = new Uri("avares://eViSTool/Themes/ForestStill.axaml") });
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
