@@ -11,6 +11,20 @@ internal static class Program
     /// <summary>Моноширинный (консоль, версии, пути) — вшитый Cascadia Mono.</summary>
     public const string MonoFont = "avares://eViSTool/Assets/Fonts#Cascadia Mono";
 
+    /// <summary>
+    /// Шрифты окна: по умолчанию Noto Sans, а знаки, которых в нём нет (стрелки → ← ↑ ↓, треугольники ▾ ▲ ▼ ▸, галочка ✓,
+    /// ♥ ◆ ● …), — из вшитого же Cascadia Mono, первым запасным, раньше системных шрифтов. Иначе Avalonia ищет такой знак
+    /// в системе: на другой машине он другой, а у знаков с вариантом-эмодзи бывает цветной квадрат Segoe UI Emoji, если
+    /// тот шрифт уже подгружен (окно показало эмодзи из названия мода). Обычный текст не меняется: запасной шрифт
+    /// спрашивают только о знаках, которых нет в основном. Что все знаки текстов окна есть в одном из двух шрифтов,
+    /// проверяет FontCoverageTests.
+    /// </summary>
+    public static FontManagerOptions FontOptions => new()
+    {
+        DefaultFamilyName = UiFont,
+        FontFallbacks = [new FontFallback { FontFamily = new FontFamily(MonoFont) }],
+    };
+
     /// <summary>Замок «одно окно на папку данных»; null — режим снимка (стенду замок не нужен).</summary>
     public static Platform.SingleInstance? Instance { get; private set; }
 
@@ -37,7 +51,7 @@ internal static class Program
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>()
             .UsePlatformDetect()
-            .With(new FontManagerOptions { DefaultFamilyName = UiFont })
+            .With(FontOptions)
 #pragma warning disable AVALONIA_X11_CSD
             // своя шапка главного окна на Linux: без этого X11 не рисует кнопки и рамку сам и ExtendClientArea не действует
             // (у Avalonia 12 опция помечена экспериментальной; на крайний случай — «Системная рамка» в настройках)

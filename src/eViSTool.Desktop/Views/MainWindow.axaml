@@ -148,13 +148,17 @@
 
     <Grid x:Name="Root" ColumnDefinitions="210,*" Background="{DynamicResource Forest.Base}">
 
-        <!-- фон из игры: размытая заставка на всё окно, ниже всего; видна только под боковой панелью — правую часть
-             закрывает непрозрачный фон страниц. Картинку выбирает и грузит MainWindow.UpdateBackdrop -->
+        <!-- фон из игры: размытая заставка на всё окно, ниже всего; видна под боковой панелью, правую часть закрывает
+             непрозрачный фон страниц. Сквозь карточку с логотипом в «О программе» тот же Bitmap показывает
+             Controls/BackdropWindow («Окно в подложку», docs/design.md, раздел 5). Картинку выбирает и грузит
+             MainWindow.UpdateBackdrop -->
         <Image x:Name="Backdrop" Grid.ColumnSpan="2" Stretch="UniformToFill" IsHitTestVisible="False"
                RenderOptions.BitmapInterpolationMode="HighQuality" />
         <!-- подложка боковой панели: над картинкой — вуаль, без картинки — цвет Side и «горизонтали». Линии медленно
              плывут (Controls/ContourDrift, его ставит MainWindow): двигается их RenderTransform, а ClipToBounds рамки
-             держит перерисовку в границах боковой панели -->
+             держит перерисовку в границах боковой панели. Пока открыта «О программе» без картинки, тот же сдвиг двигает
+             и линии в её карточке (Controls/BackdropWindow), и перерисовывается прямоугольник от панели до правого края
+             карточки на всю высоту окна (docs/design.md, раздел 5, «Окно в подложку») -->
         <Border x:Name="SideUnderlay" ClipToBounds="True" IsHitTestVisible="False">
             <Path x:Name="Contours" Data="{x:Static ctl:ContourLines.Geometry}" Stroke="{DynamicResource Forest.Accent}" StrokeThickness="1"
                   Opacity="0.07" Stretch="None" HorizontalAlignment="Left" VerticalAlignment="Top" />
@@ -276,7 +280,8 @@
             </StackPanel>
         </DockPanel>
 
-        <!-- ===== основная часть ===== (фон непрозрачный: картинка фона из игры видна только под боковой панелью) -->
+        <!-- ===== основная часть ===== (фон непрозрачный: картинка фона из игры видна под боковой панелью, а здесь —
+             только сквозь карточку «О программе», Controls/BackdropWindow) -->
         <DockPanel Grid.Column="1" Background="{DynamicResource Forest.Base}">
             <!-- полоса: активный профиль и «Играть» справа; название раздела не повторяем — оно крупно на самой странице. Полоса
                  же — шапка окна: тащится за пустое место и подписи, кнопки окна — справа (место под них — CaptionSpace); кнопки

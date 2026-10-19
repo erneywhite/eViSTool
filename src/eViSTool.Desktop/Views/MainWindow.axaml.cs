@@ -30,6 +30,9 @@ public partial class MainWindow : Window
         Closed += (_, _) => _backdropClock.Stop();
         // «горизонтали» заглушки плывут, пока окно на экране и в фокусе, а их видно (фона из игры нет)
         Drift = new ContourDrift(this, Contours);
+        // «окна» в подложку панели на страницах («О программе», карточка с логотипом) берут картинку и линии отсюда
+        BackdropWindow.SetPicture(Root, Backdrop);
+        BackdropWindow.SetLines(Root, Contours);
         SizeChanged += (_, _) =>
         {
             if (WindowState == WindowState.Normal) _normalSize = ClientSize;
