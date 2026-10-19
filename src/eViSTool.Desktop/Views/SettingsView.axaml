@@ -144,7 +144,7 @@
                                 <StackPanel>
                                     <DockPanel>
                                         <Button DockPanel.Dock="Right" Command="{Binding AddChannelCommand}" VerticalAlignment="Top" Margin="16,0,0,0"
-                                                AutomationProperties.AutomationId="NotifyAddChannel">
+                                                AutomationProperties.AutomationId="NotifyAddChannel" AutomationProperties.Name="{local:Tr notify.add}">
                                             <StackPanel Orientation="Horizontal">
                                                 <Path Classes="icon" Data="{StaticResource Icon.Plus}" Width="12" Height="12" Margin="0,0,7,0" />
                                                 <TextBlock Text="{local:Tr notify.add}" />
@@ -197,7 +197,8 @@
                 <!-- ===== данные программы: где лежат ===== -->
                 <Border Classes="card settingsCard">
                     <DockPanel>
-                        <Button DockPanel.Dock="Right" Command="{Binding OpenDataFolderCommand}" VerticalAlignment="Center" Margin="16,0,0,0">
+                        <Button DockPanel.Dock="Right" Command="{Binding OpenDataFolderCommand}" VerticalAlignment="Center" Margin="16,0,0,0"
+                                AutomationProperties.Name="{local:Tr common.open}">
                             <StackPanel Orientation="Horizontal">
                                 <Path Classes="icon" Data="{StaticResource Icon.Folder}" Width="14" Height="14" Margin="0,0,8,0" />
                                 <TextBlock Text="{local:Tr common.open}" />

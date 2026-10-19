@@ -80,7 +80,8 @@
                             <!-- общий список: «В избранное» (или выключенная «В избранном»); у избранного её нет — там «Изменить» и «Убрать» -->
                             <Button Padding="11,5" MinHeight="0" Margin="0,0,8,0" IsVisible="{Binding !IsFavoriteRow}" IsEnabled="{Binding !InFavorites}"
                                     Command="{Binding $parent[Window].((vm:FindServerViewModel)DataContext).AddToFavoritesCommand}"
-                                    CommandParameter="{Binding}">
+                                    CommandParameter="{Binding}" AutomationProperties.Name="{local:Tr browse.addFavorite}">
+                                <!-- имя для экранного диктора — действие: уже в избранном — та же кнопка, только выключенная -->
                                 <Panel>
                                     <TextBlock Text="{local:Tr browse.addFavorite}" IsVisible="{Binding !InFavorites}" />
                                     <TextBlock Text="{local:Tr browse.inFavorites}" IsVisible="{Binding InFavorites}" />
@@ -208,7 +209,7 @@
                 <StackPanel>
                     <DockPanel Margin="0,10,0,8">
                         <Button DockPanel.Dock="Right" Command="{Binding AddManualCommand}" Padding="12,6" VerticalAlignment="Center" Margin="16,0,0,0"
-                                AutomationProperties.AutomationId="BrowseAddManual">
+                                AutomationProperties.AutomationId="BrowseAddManual" AutomationProperties.Name="{local:Tr browse.favAddButton}">
                             <StackPanel Orientation="Horizontal">
                                 <Path Classes="icon" Data="{StaticResource Icon.Plus}" Width="12" Height="12" Margin="0,0,7,0" />
                                 <TextBlock Text="{local:Tr browse.favAddButton}" />

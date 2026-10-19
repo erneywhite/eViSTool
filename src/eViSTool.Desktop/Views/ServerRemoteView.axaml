@@ -61,7 +61,8 @@
                                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="8,0,0,0">
                                         <Button Content="{Binding RevealText}" Command="{Binding ToggleRevealCommand}" Margin="0,0,8,0"
                                                 AutomationProperties.AutomationId="RemoteReveal" />
-                                        <Button Classes="primary" Command="{Binding CopyCodeCommand}" AutomationProperties.AutomationId="RemoteCopy">
+                                        <Button Classes="primary" Command="{Binding CopyCodeCommand}" AutomationProperties.AutomationId="RemoteCopy"
+                                                AutomationProperties.Name="{local:Tr remote.copy}">
                                             <StackPanel Orientation="Horizontal">
                                                 <Path Classes="icon" Data="{StaticResource Icon.Copy}" Width="13" Height="13" Margin="0,0,8,0" />
                                                 <TextBlock Text="{local:Tr remote.copy}" />

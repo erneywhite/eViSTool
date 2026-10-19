@@ -286,14 +286,14 @@
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,8">
                     <Button Command="{Binding ShowFileCommand}" Padding="11,5" MinHeight="0" ToolTip.Tip="{Binding FilePath}"
-                            IsVisible="{Binding !IsRemote}" AutomationProperties.AutomationId="CfgShowFile">
+                            IsVisible="{Binding !IsRemote}" AutomationProperties.AutomationId="CfgShowFile" AutomationProperties.Name="{local:Tr srvcfg.showFile}">
                         <StackPanel Orientation="Horizontal">
                             <Path Classes="icon" Data="{StaticResource Icon.Folder}" Width="13" Height="13" Margin="0,0,7,0" />
                             <TextBlock Text="{local:Tr srvcfg.showFile}" FontSize="12" />
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding ReloadCommand}" Padding="11,5" MinHeight="0" Margin="8,0,0,0" ToolTip.Tip="{local:Tr srvcfg.reloadTip}"
-                            AutomationProperties.AutomationId="CfgReload">
+                            AutomationProperties.AutomationId="CfgReload" AutomationProperties.Name="{local:Tr srvcfg.reload}">
                         <StackPanel Orientation="Horizontal">
                             <Path Classes="icon" Data="{StaticResource Icon.Refresh}" Width="13" Height="13" Margin="0,0,7,0" />
                             <TextBlock Text="{local:Tr srvcfg.reload}" FontSize="12" />
@@ -351,7 +351,7 @@
                 <TextBlock Classes="jsonName" Text="{Binding FilePath}" FontSize="11" TextAlignment="Center" Margin="0,10,0,0" />
                 <!-- сервер сам запишет конфиг по умолчанию (ключ setconfig) и выйдет: мир не создаётся -->
                 <Button Classes="primary" Command="{Binding GenerateCommand}" HorizontalAlignment="Center"
-                        Margin="0,18,0,0" Padding="22,8" AutomationProperties.AutomationId="CfgGenerate">
+                        Margin="0,18,0,0" Padding="22,8" AutomationProperties.AutomationId="CfgGenerate" AutomationProperties.Name="{local:Tr srvcfg.generate}">
                     <StackPanel Orientation="Horizontal">
                         <Path Classes="icon" Data="{StaticResource Icon.Plus}" Width="12" Height="12" Margin="0,0,8,0" />
                         <TextBlock Text="{local:Tr srvcfg.generate}" />
@@ -419,7 +419,7 @@
                             <StackPanel>
                                 <DockPanel Margin="0,0,0,12">
                                     <Button DockPanel.Dock="Right" Command="{Binding AddWorldSettingCommand}" VerticalAlignment="Top" Padding="12,5" MinHeight="0"
-                                            Margin="16,0,0,0" AutomationProperties.AutomationId="CfgAddWorldSetting">
+                                            Margin="16,0,0,0" AutomationProperties.AutomationId="CfgAddWorldSetting" AutomationProperties.Name="{local:Tr srvcfg.wsAdd}">
                                         <StackPanel Orientation="Horizontal">
                                             <Path Classes="icon" Data="{StaticResource Icon.Plus}" Width="11" Height="11" Margin="0,0,7,0" />
                                             <TextBlock Text="{local:Tr srvcfg.wsAdd}" FontSize="12" />

@@ -229,11 +229,11 @@
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
                             <Button Command="{Binding OpenFolderCommand}" Padding="10,8" Margin="0,0,8,0" ToolTip.Tip="{local:Tr sched.openFolder}"
-                                    IsVisible="{Binding IsLocal}">
+                                    AutomationProperties.Name="{local:Tr sched.openFolder}" IsVisible="{Binding IsLocal}">
                                 <Path Classes="icon" Data="{StaticResource Icon.Folder}" Width="16" Height="16" />
                             </Button>
                             <Button Classes="primary" Command="{Binding BackupNowCommand}" ToolTip.Tip="{local:Tr sched.nowTip}"
-                                    ToolTip.ShowOnDisabled="True" AutomationProperties.AutomationId="SchedBackupNow">
+                                    ToolTip.ShowOnDisabled="True" AutomationProperties.AutomationId="SchedBackupNow" AutomationProperties.Name="{local:Tr sched.now}">
                                 <StackPanel Orientation="Horizontal">
                                     <Path Classes="icon" Data="{StaticResource Icon.Download}" Width="14" Height="14" Margin="0,0,8,0" />
                                     <TextBlock Text="{local:Tr sched.now}" />
