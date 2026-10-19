@@ -152,7 +152,7 @@
                                         <TextBlock Text="{Binding KindText}" FontSize="13" Foreground="{DynamicResource Forest.Text}" Margin="0,6,0,0"
                                                    AutomationProperties.AutomationId="ProfileKind" />
 
-                                        <!-- значок: цвет плашки и знак; первый вариант в каждом ряду — как было (нейтральная плашка, знак вида) -->
+                                        <!-- значок: цвет плашки (первый — нейтральная, как было) и знак (пока свой не выбран — знак вида профиля) -->
                                         <DockPanel>
                                             <Button DockPanel.Dock="Right" Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr settings.iconReset}"
                                                     Command="{Binding ResetIconCommand}" IsVisible="{Binding HasCustomIcon}" VerticalAlignment="Bottom"
@@ -161,8 +161,9 @@
                                         </DockPanel>
                                         <TextBlock Classes="hint" Text="{local:Tr settings.iconHint}" />
                                         <DockPanel Margin="0,10,0,0">
+                                            <!-- по центру двух рядов: снизу у рядов свой отступ 6, сверху его нет — поднимаем на 3 -->
                                             <ctl:ProfileBadge DockPanel.Dock="Left" Color="{Binding IconColor}" Glyph="{Binding BadgeGlyph}" Width="56" Height="56"
-                                                              VerticalAlignment="Top" Margin="0,3,18,0" />
+                                                              VerticalAlignment="Center" Margin="0,0,18,6" />
                                             <StackPanel>
                                                 <ListBox Classes="iconChoices" ItemsSource="{x:Static vm:ProfileViewModel.IconColorOptions}" SelectedItem="{Binding IconColor}"
                                                          AutomationProperties.AutomationId="ProfileIconColor" AutomationProperties.Name="{local:Tr settings.icon}">
@@ -172,12 +173,11 @@
                                                         </DataTemplate>
                                                     </ListBox.ItemTemplate>
                                                 </ListBox>
-                                                <ListBox Classes="iconChoices" ItemsSource="{Binding IconGlyphOptions}" SelectedValueBinding="{Binding Value, DataType=vm:IconChoice}"
-                                                         SelectedValue="{Binding IconGlyph}" AutomationProperties.AutomationId="ProfileIconGlyph"
-                                                         AutomationProperties.Name="{local:Tr settings.icon}">
+                                                <ListBox Classes="iconChoices" ItemsSource="{x:Static vm:ProfileViewModel.IconGlyphOptions}" SelectedItem="{Binding GlyphChoice}"
+                                                         AutomationProperties.AutomationId="ProfileIconGlyph" AutomationProperties.Name="{local:Tr settings.icon}">
                                                     <ListBox.ItemTemplate>
-                                                        <DataTemplate x:DataType="vm:IconChoice">
-                                                            <ctl:ProfileBadge Color="{Binding $parent[ListBox].((vm:ProfileViewModel)DataContext).IconColor}" Glyph="{Binding Glyph}"
+                                                        <DataTemplate x:DataType="x:String">
+                                                            <ctl:ProfileBadge Color="{Binding $parent[ListBox].((vm:ProfileViewModel)DataContext).IconColor}" Glyph="{Binding}"
                                                                               Width="30" Height="30" />
                                                         </DataTemplate>
                                                     </ListBox.ItemTemplate>

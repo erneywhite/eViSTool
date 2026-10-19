@@ -15,7 +15,7 @@ public sealed class ProfileIconTests
         Assert.Null(ProfileIcon.Color("Rust"));
         Assert.Null(ProfileIcon.Color(""));
         Assert.Null(ProfileIcon.Glyph(null));
-        Assert.Null(ProfileIcon.Glyph("client")); // знаки вида — не выбор, их подставляет окно
+        Assert.Equal("server", ProfileIcon.Glyph("server")); // знак вида можно выбрать и профилю другого вида
     }
 
     [Fact]

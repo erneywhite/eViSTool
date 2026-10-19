@@ -46,8 +46,22 @@ public sealed partial class ProfileViewModel : ObservableObject
     /// <summary>Варианты цвета в карточке профиля: первым — «не выбран».</summary>
     public static IReadOnlyList<string> IconColorOptions { get; } = ["", .. ProfileIcon.Colors];
 
-    /// <summary>Варианты знака: первым — «не выбран», он рисуется знаком вида профиля.</summary>
-    public IReadOnlyList<IconChoice> IconGlyphOptions => [new("", KindGlyph), .. ProfileIcon.Glyphs.Select(g => new IconChoice(g, g))];
+    /// <summary>Варианты знака: знаки видов профиля и остальные.</summary>
+    public static IReadOnlyList<string> IconGlyphOptions => ProfileIcon.Glyphs;
+
+    /// <summary>
+    /// Знак, выбранный в карточке: пока свой не выбран — знак вида профиля. Выбрать знак своего вида — то же, что
+    /// «не выбран»: в профиль ничего не пишется, и при смене вида (клонирование в сервер) знак сменится сам.
+    /// </summary>
+    public string GlyphChoice
+    {
+        get => BadgeGlyph;
+        set
+        {
+            if (value is null) return; // ListBox сбрасывает выбор при пересоздании списка
+            IconGlyph = value == KindGlyph ? "" : value;
+        }
+    }
 
     /// <summary>Знак на значке: выбранный или по виду профиля — client, server, cloud (у хостера).</summary>
     public string BadgeGlyph => IconGlyph is { Length: > 0 } g ? g : KindGlyph;
@@ -77,6 +91,7 @@ public sealed partial class ProfileViewModel : ObservableObject
     {
         Model.IconGlyph = ProfileIcon.Glyph(value);
         OnPropertyChanged(nameof(BadgeGlyph));
+        OnPropertyChanged(nameof(GlyphChoice));
         OnPropertyChanged(nameof(HasCustomIcon));
         (_remembered ?? _changed)(this);
     }
@@ -216,6 +231,7 @@ public sealed partial class ProfileViewModel : ObservableObject
         OnPropertyChanged(nameof(KindText));
         OnPropertyChanged(nameof(KindGlyph));
         OnPropertyChanged(nameof(BadgeGlyph));
+        OnPropertyChanged(nameof(GlyphChoice));
         Refresh();
     }
     partial void OnGameDirChanged(string? value) { Model.GameDir = value; Refresh(); }
@@ -267,6 +283,3 @@ public sealed partial class ProfileViewModel : ObservableObject
         if (Directory.Exists(DataDir)) Ui.OpenFolder(DataDir);
     }
 }
-
-/// <summary>Вариант знака в выборе: что сохранить (<see cref="Value"/>, "" — не выбран) и что нарисовать.</summary>
-public sealed record IconChoice(string Value, string Glyph);

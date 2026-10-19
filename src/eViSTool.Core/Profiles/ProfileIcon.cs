@@ -8,8 +8,10 @@ public static class ProfileIcon
 {
     public static readonly IReadOnlyList<string> Colors = ["moss", "pine", "teal", "sky", "plum", "rust", "amber", "stone"];
 
+    /// <summary>Знаки; первые три — знаки видов профиля: клиентскому можно поставить знак сервера и наоборот
+    /// (свой сервер, к которому клиент подключается по localhost).</summary>
     public static readonly IReadOnlyList<string> Glyphs =
-        ["sword", "pickaxe", "shield", "castle", "tree", "mountain", "flame", "house", "anchor", "skull", "gem", "flask"];
+        ["client", "server", "cloud", "sword", "pickaxe", "shield", "castle", "tree", "mountain", "flame", "house", "anchor", "skull", "gem", "flask"];
 
     /// <summary>Цвет из списка или null.</summary>
     public static string? Color(string? name) => name is not null && Colors.Contains(name) ? name : null;
