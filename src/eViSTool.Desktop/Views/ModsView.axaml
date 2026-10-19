@@ -609,11 +609,13 @@
                                                 </Panel>
                                                 <!-- логотипа нет — на его месте иконка из файла мода: плитка 120 px по центру, под ней она же,
                                                      размытая во всю ширину и прижатая к верху, как у логотипа ниже. Размытая — та же маленькая
-                                                     иконка, что в строке таблицы: файл второй раз не читается, а растянутая мелкая и так мягкая -->
+                                                     иконка, что в строке таблицы: файл второй раз не читается, а растянутая мелкая и так мягкая.
+                                                     Логотип известен с открытия карточки — иконку не просим вовсе (CardHeaderIcon): спрятанная
+                                                     картинка всё равно читала бы архив. Не загрузился логотип — встаёт иконка -->
                                                 <Panel IsVisible="{Binding #Logo1.Source, Converter={x:Static ObjectConverters.IsNull}}">
                                                     <StackPanel>
-                                                        <Image ctl:ModIconImage.Source="{Binding FileIcon}" Stretch="UniformToFill" Opacity="0.35"
-                                                               RenderOptions.BitmapInterpolationMode="HighQuality">
+                                                        <Image ctl:ModIconImage.Source="{Binding #FileIcon1.(ctl:ModIconImage.Source)}" Stretch="UniformToFill"
+                                                               Opacity="0.35" RenderOptions.BitmapInterpolationMode="HighQuality">
                                                             <Image.Effect>
                                                                 <BlurEffect Radius="24" />
                                                             </Image.Effect>
@@ -621,8 +623,16 @@
                                                     </StackPanel>
                                                     <Border Width="120" Height="120" CornerRadius="12" ClipToBounds="True"
                                                             HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                        <Image x:Name="FileIcon1" ctl:ModIconImage.Source="{Binding FileIcon}" ctl:ModIconImage.DecodeWidth="256"
-                                                               Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                                        <Image x:Name="FileIcon1" ctl:ModIconImage.DecodeWidth="256"
+                                                               Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality">
+                                                            <ctl:ModIconImage.Source>
+                                                                <MultiBinding Converter="{x:Static conv:CardHeaderIcon.FileUnlessLogo}">
+                                                                    <Binding Path="FileIcon" />
+                                                                    <Binding Path="IconWaitsForLogo" />
+                                                                    <Binding ElementName="Logo1" Path="(ctl:RemoteImage.Failed)" />
+                                                                </MultiBinding>
+                                                            </ctl:ModIconImage.Source>
+                                                        </Image>
                                                     </Border>
                                                 </Panel>
                                                 <!-- логотип целиком, по краям — он же, размытый. Размытый — во всю ширину и прижат к верху,

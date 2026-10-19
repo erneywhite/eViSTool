@@ -50,15 +50,24 @@ public sealed partial class ModCardViewModel : ObservableObject
         _side = SideText(row.IsHosterMod && info is null ? "server" : info?.Side);
         _compatibility = CompatibilityText(row, game);
         if (row.Result.Remote is { } remote) Apply(remote);
+        IconWaitsForLogo = Logo is not null;
     }
 
     public string Name => Row.Name;
 
     /// <summary>
     /// Иконка из файла мода для шапки — без запасного логотипа: логотип у шапки свой (<see cref="Logo"/>) и важнее, а
-    /// иконка встаёт на его место, только когда его нет.
+    /// иконка встаёт на его место, когда его нет или он не загрузился.
     /// </summary>
     public ModIconSource FileIcon => new(Row.Icon.File, null);
+
+    /// <summary>
+    /// Логотип известен уже при открытии карточки (ответ проверки обновлений): иконку из файла шапка не просит, пока он не
+    /// подведёт, — спрятанная под логотипом, она читала бы архив зря. Логотип, пришедший позже (<see cref="LoadAsync"/>),
+    /// иконку не отменяет: она уже прочитана и видна, а убрать её до появления логотипа значило бы мигнуть буквами.
+    /// Не загрузился ли логотип, знает только окно — решает оно (Desktop: CardHeaderIcon).
+    /// </summary>
+    public bool IconWaitsForLogo { get; }
 
     /// <summary>«Настройки мода (2)» — у мода есть файлы в ModConfig; ссылка ведёт на вкладку «Настройки модов».</summary>
     public int ConfigCount => Owner.ConfigCount(Row.ModId);
@@ -112,7 +121,12 @@ public sealed partial class ModCardViewModel : ObservableObject
         if (Row.Result.Remote is not null || Row.ModId.Length == 0) return;
         try
         {
-            if (await db.GetModAsync(Row.ModId, ct) is { } mod && !ct.IsCancellationRequested) Apply(mod);
+            if (await db.GetModAsync(Row.ModId, ct) is { } mod && !ct.IsCancellationRequested)
+            {
+                Apply(mod);
+                // строка таблицы до проверки знает только иконку из файла — логотип шапки ей тоже
+                if (Logo is { } logo) Owner.LogoLearned(Row.ModId, logo);
+            }
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {

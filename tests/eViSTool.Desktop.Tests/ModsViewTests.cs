@@ -54,6 +54,7 @@ public sealed class ModsViewTests : IDisposable
     private CleanupWindowTests.TimerSpy? _timers;
     private (bool Saved, string? Text) _settings;
     private Window? _window;
+    private string? _imageCache;
 
     /// <summary>Лесная тема окна — до разметки страницы: та берёт из неё переключатель, кисти и иконки.</summary>
     public ModsViewTests()
@@ -66,6 +67,14 @@ public sealed class ModsViewTests : IDisposable
     public void Dispose()
     {
         _window?.Close();
+        if (_imageCache is not null)
+        {
+            RemoteImage.HandlerForTests = null;
+            RemoteImage.CacheDir = _imageCache;
+            RemoteImage.ClearMemory();
+            ModIconImage.ReaderForTests = null;
+            ModIconImage.ClearMemory();
+        }
         // до возврата настроек: опрос, оставшийся с этого теста, мог бы записать их поверх
         foreach (var timer in _timers?.Timers ?? []) timer.Stop();
         if (_timers is not null) Ui.Platform = _oldPlatform ?? new AvaloniaUiPlatform();
@@ -96,6 +105,57 @@ public sealed class ModsViewTests : IDisposable
             Interlocked.Increment(ref Asked);
             await Task.Delay(Timeout.Infinite, ct);
             return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }
+    }
+
+    /// <summary>
+    /// Модбаза, которая знает моды из <see cref="Logos"/> (modid → адрес логотипа): страница мода — для проверки обновлений и
+    /// для карточки; остальных модов на ней нет.
+    /// </summary>
+    private sealed class AnsweringModDb : HttpMessageHandler
+    {
+        public Dictionary<string, string> Logos { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            var id = path.StartsWith("/api/mod/", StringComparison.Ordinal) ? Uri.UnescapeDataString(path["/api/mod/".Length..]) : null;
+            if (id is null || !Logos.TryGetValue(id, out var logo))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+            var json = $$"""{ "statuscode": "200", "mod": { "modid": 1, "assetid": 1, "name": "{{id}}", "logofile": "{{logo}}" } }""";
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") });
+        }
+    }
+
+    /// <summary>
+    /// Картинки по адресу (остальные — 404) и свой кэш картинок на тест; иконки из файлов — со счётчиком чтений.
+    /// <paramref name="gate"/> — ответ ждёт, пока задача не завершится (логотип «грузится»).
+    /// </summary>
+    private Dictionary<string, int> UseImages(Dictionary<string, byte[]> images, Task? gate = null)
+    {
+        _imageCache = RemoteImage.CacheDir;
+        RemoteImage.CacheDir = Path.Combine(_dir, "images");
+        RemoteImage.HandlerForTests = new ImageServer(images, gate ?? Task.CompletedTask);
+        RemoteImage.ClearMemory();
+        ModIconImage.ClearMemory();
+        var reads = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        ModIconImage.ReaderForTests = path =>
+        {
+            var name = Path.GetFileName(path);
+            lock (reads) reads[name] = reads.GetValueOrDefault(name) + 1;
+            return Core.Mods.ModIcon.Read(path);
+        };
+        return reads;
+    }
+
+    private sealed class ImageServer(Dictionary<string, byte[]> images, Task gate) : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            await gate.WaitAsync(ct);
+            return images.TryGetValue(request.RequestUri!.ToString(), out var body)
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(body) }
+                : new HttpResponseMessage(HttpStatusCode.NotFound);
         }
     }
 
@@ -276,6 +336,110 @@ public sealed class ModsViewTests : IDisposable
         // у beta — буквы
         mods.Selected = beta;
         await Wait.Until(() => Header().Source is null && Big().IsEffectivelyVisible && Big().Text == beta.Initials);
+    }
+
+    // шапка карточки появляется не сразу после выбора мода, а с разметкой: до тех пор null
+    private static Image? HeaderIcon(Visual root) => root.GetVisualDescendants().OfType<Image>().SingleOrDefault(i => i.Name == "FileIcon1");
+    private static Image? HeaderLogo(Visual root) => root.GetVisualDescendants().OfType<Image>().SingleOrDefault(i => i.Name == "Logo1");
+
+    [AvaloniaFact]
+    public async Task Logo_the_card_found_shows_in_the_row_too()
+    {
+        const string logo = "https://img.test/beta.png";
+        var db = new AnsweringModDb { Logos = { ["beta"] = logo } };
+        UseImages(new() { [logo] = Png(200) });
+        var (window, mods) = await ShowAsync(Main(db));
+        var beta = mods.Rows.Single(r => r.ModId == "beta");
+        Assert.Null(beta.Icon.Logo); // обновления не проверяли — логотипа строка не знает, у beta буквы
+
+        // карточка сама сходила на модбазу — логотип в шапке и тот же в строке, вместо букв
+        mods.Selected = beta;
+        var icon = IconOf(RowOf(window, "beta"));
+        await Wait.Until(() => icon.Source is not null && HeaderLogo(window)?.Source is not null);
+        Assert.Equal(logo, RemoteImage.GetSource(icon));
+        Assert.False(ModIconImage.GetFromFile(icon));
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(LettersOf(RowOf(window, "beta"), beta).IsEffectivelyVisible);
+
+        // таблицу построили заново (моды перечитаны с диска) — у новой строки логотип сразу
+        await mods.ReloadAsync();
+        var rebuilt = mods.Rows.Single(r => r.ModId == "beta");
+        Assert.NotSame(beta, rebuilt);
+        Assert.Equal(logo, rebuilt.Icon.Logo);
+    }
+
+    [AvaloniaFact]
+    public async Task Card_header_does_not_read_the_file_icon_while_a_logo_is_known()
+    {
+        const string logo = "https://img.test/alpha.png";
+        var db = new AnsweringModDb { Logos = { ["alpha"] = logo, ["beta"] = "https://img.test/beta.png" } };
+        var reads = UseImages(new() { [logo] = Png(200) });
+        var (window, mods) = await ShowAsync(Main(db));
+
+        // проверка обновлений: модбаза ответила, логотип alpha известен ещё до карточки
+        mods.CheckCommand.Execute(null);
+        await Wait.Until(() => mods.CheckedAt is not null);
+        var alpha = mods.Rows.Single(r => r.ModId == "alpha");
+        Assert.Equal(logo, alpha.Icon.Logo);
+        var icon = IconOf(RowOf(window, "alpha"));
+        await Wait.Until(() => icon.Source is not null);
+        Assert.True(ModIconImage.GetFromFile(icon)); // в строке иконка из файла важнее логотипа
+
+        // в шапке — логотип; иконку из файла шапка не просит: архив прочитан один раз, для строки, 256 px не декодировались
+        mods.Selected = alpha;
+        await Wait.Until(() => HeaderLogo(window)?.Source is not null);
+        await Wait.Idle(100);
+        Assert.Null(ModIconImage.GetSource(HeaderIcon(window)!));
+        Assert.Null(HeaderIcon(window)!.Source);
+        lock (reads) Assert.Equal(1, reads["alpha_1.0.0.zip"]);
+    }
+
+    [AvaloniaFact]
+    public async Task Card_header_shows_the_file_icon_when_the_logo_does_not_load()
+    {
+        var db = new AnsweringModDb { Logos = { ["alpha"] = "https://img.test/gone.png" } }; // картинки по этому адресу нет
+        UseImages(new());
+        var (window, mods) = await ShowAsync(Main(db));
+
+        // логотип известен с открытия карточки (проверка ответила), но не загрузился — на его месте иконка из файла
+        mods.CheckCommand.Execute(null);
+        await Wait.Until(() => mods.CheckedAt is not null);
+        mods.Selected = mods.Rows.Single(r => r.ModId == "alpha");
+        Assert.True(mods.Card!.IconWaitsForLogo);
+        await Wait.Until(() => HeaderLogo(window) is { } logo && RemoteImage.GetFailed(logo));
+        var header = HeaderIcon(window)!;
+        await Wait.Until(() => header.Source is not null && header.IsEffectivelyVisible);
+        Assert.True(ModIconImage.GetFromFile(header));
+        Assert.Equal(128, ((Bitmap)header.Source!).PixelSize.Width); // иконка 128 px — как есть: до 256 не растянута
+        Assert.False(window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.FontSize == 40).IsEffectivelyVisible);
+    }
+
+    [AvaloniaFact]
+    public async Task Logo_found_by_the_card_does_not_blink_the_letters_while_it_loads()
+    {
+        const string logo = "https://img.test/alpha.png";
+        var db = new AnsweringModDb { Logos = { ["alpha"] = logo } };
+        var loaded = new TaskCompletionSource();
+        UseImages(new() { [logo] = Png(200) }, loaded.Task);
+        var (window, mods) = await ShowAsync(Main(db));
+
+        // проверки не было: в шапке сначала иконка из файла, потом карточка узнаёт логотип, и он качается
+        mods.Selected = mods.Rows.Single(r => r.ModId == "alpha");
+        await Wait.Until(() => mods.Card?.Logo is not null && HeaderLogo(window) is { } l && RemoteImage.GetIsLoading(l));
+        Assert.False(mods.Card!.IconWaitsForLogo);
+        var header = HeaderIcon(window)!;
+        TextBlock Big() => window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.FontSize == 40);
+
+        // пока логотип не пришёл, иконка остаётся на месте — буквами шапка не мигает
+        await Wait.Until(() => header.Source is not null);
+        await Wait.Idle(100);
+        Assert.True(header.IsEffectivelyVisible);
+        Assert.False(Big().IsEffectivelyVisible);
+
+        // логотип пришёл — он поверх, иконка спрятана
+        loaded.SetResult();
+        await Wait.Until(() => HeaderLogo(window)!.Source is not null && !header.IsEffectivelyVisible);
+        Assert.False(Big().IsEffectivelyVisible);
     }
 
     [AvaloniaFact]

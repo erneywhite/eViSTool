@@ -174,6 +174,24 @@ public sealed class ModIconImageTests : IDisposable
         Assert.Equal(new PixelSize(96, 64), SizeOf(image)); // плитка обрежет до квадрата 64 × 64 — без мыла
     }
 
+    /// <summary>
+    /// Шапка карточки не просит иконку из файла, когда логотип известен с открытия карточки, — пока он не подведёт; пока
+    /// привязки не дошли до значений — не просит ничего.
+    /// </summary>
+    [AvaloniaFact]
+    public void Card_header_asks_for_the_file_icon_only_when_no_logo_is_waited_for()
+    {
+        var file = new ModIconSource(new ModFileStamp("/mods/alpha.zip", DateTime.UnixEpoch, 1), null);
+        object? Convert(params object?[] values) =>
+            Converters.CardHeaderIcon.FileUnlessLogo.Convert(values, typeof(ModIconSource), null, System.Globalization.CultureInfo.InvariantCulture);
+
+        Assert.Same(file, Convert(file, false, false)); // логотипа нет или он пришёл позже иконки
+        Assert.Null(Convert(file, true, false)); // логотип известен — архив не трогаем
+        Assert.Same(file, Convert(file, true, true)); // логотип не загрузился — иконка встаёт на его место
+        Assert.Null(Convert(file, AvaloniaProperty.UnsetValue, false));
+        Assert.Null(Convert(file, false, AvaloniaProperty.UnsetValue));
+    }
+
     /// <summary>Таблица переработала строку под другой мод: иконка прежнего, прочитанная позже, картинку не подменила.</summary>
     [AvaloniaFact]
     public async Task Late_icon_of_the_previous_mod_does_not_win()
