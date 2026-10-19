@@ -76,6 +76,7 @@ public static class GameInstall
         // на Linux Program Files нет (пустая строка) — без проверки вышла бы папка относительно текущей;
         // Flatpak — последним: архив, поставленный рядом, человек скорее всего и выбрал основным
         return candidates.Where(c => c.Root.Length > 0).Select(c => Path.Combine(c.Root, c.Name))
+            .Concat(RegistryInstallDirs())
             .Concat(LinuxArchiveDirs())
             .Concat(FlatpakGameDirs())
             .FirstOrDefault(d => DetectVersion(d) is not null);
@@ -109,6 +110,69 @@ public static class GameInstall
         yield return "/opt/vintagestory";
     }
 
+    /// <summary>
+    /// Где игра по записи установщика в реестре Windows (список «Установка и удаление программ»): установщик Vintage Story
+    /// пишет туда InstallLocation, а ставят игру куда угодно — на другой диск, в свою папку. Записи смотрим у пользователя
+    /// и у всей системы (64- и 32-битная ветка); на других системах — пусто.
+    /// </summary>
+    public static IEnumerable<string> RegistryInstallDirs() =>
+        OperatingSystem.IsWindows() ? GameDirsFromUninstallEntries(ReadUninstallEntries()) : [];
+
+    /// <summary>
+    /// Папки игры из записей «Установка и удаление программ»: только «Vintage Story…»; папка — InstallLocation, а без
+    /// неё — папка значка (DisplayIcon вида «"S:\Games\Vintagestory\VintageStory.exe",0»). Без повторов.
+    /// </summary>
+    public static IEnumerable<string> GameDirsFromUninstallEntries(IEnumerable<UninstallEntry> entries) => entries
+        .Where(e => e.Name?.TrimStart().StartsWith("Vintage Story", StringComparison.OrdinalIgnoreCase) == true)
+        .Select(e => !string.IsNullOrWhiteSpace(e.Location) ? e.Location.Trim().Trim('"') : DirOfIcon(e.Icon))
+        .Where(d => !string.IsNullOrWhiteSpace(d))
+        .Select(d => d!.TrimEnd('\\', '/'))
+        .Where(d => d.Length > 0)
+        .Distinct(StringComparer.OrdinalIgnoreCase);
+
+    private static string? DirOfIcon(string? icon)
+    {
+        if (string.IsNullOrWhiteSpace(icon)) return null;
+        var path = icon.Trim();
+        if (path.StartsWith('"') && path.IndexOf('"', 1) is var end and > 0) path = path[1..end];
+        else if (path.LastIndexOf(',') is var comma and > 0) path = path[..comma]; // «…\VintageStory.exe,0»
+        // путь из реестра Windows — разделитель «\»; Path.GetDirectoryName на других системах его не видит (а разбор
+        // проверяется тестами и там), поэтому папка — всё до последнего разделителя
+        var cut = path.LastIndexOfAny(['\\', '/']);
+        return cut > 0 ? path[..cut] : null;
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private static List<UninstallEntry> ReadUninstallEntries()
+    {
+        const string uninstall = @"Software\Microsoft\Windows\CurrentVersion\Uninstall";
+        var entries = new List<UninstallEntry>();
+        (Microsoft.Win32.RegistryHive Hive, Microsoft.Win32.RegistryView View)[] roots =
+        [
+            (Microsoft.Win32.RegistryHive.CurrentUser, Microsoft.Win32.RegistryView.Default),
+            (Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry64),
+            (Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry32),
+        ];
+        foreach (var (hive, view) in roots)
+        {
+            try
+            {
+                using var root = Microsoft.Win32.RegistryKey.OpenBaseKey(hive, view);
+                using var list = root.OpenSubKey(uninstall);
+                if (list is null) continue;
+                foreach (var name in list.GetSubKeyNames())
+                {
+                    using var app = list.OpenSubKey(name);
+                    if (app?.GetValue("DisplayName") is not string display) continue;
+                    entries.Add(new UninstallEntry(display, app.GetValue("InstallLocation") as string, app.GetValue("DisplayIcon") as string));
+                }
+            }
+            // реестр недоступен или ветки нет (32-битная на чистой системе) — просто без неё
+            catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException) { }
+        }
+        return entries;
+    }
+
     /// <summary>Папка игры из ярлыка install.sh: строка Path= в разделе [Desktop Entry]; нет её — null.</summary>
     public static string? GameDirFromShortcut(string desktopEntry)
     {
@@ -123,3 +187,6 @@ public static class GameInstall
         return null;
     }
 }
+
+/// <summary>Запись из списка «Установка и удаление программ» Windows: имя, папка установки, значок.</summary>
+public sealed record UninstallEntry(string? Name, string? Location, string? Icon);
