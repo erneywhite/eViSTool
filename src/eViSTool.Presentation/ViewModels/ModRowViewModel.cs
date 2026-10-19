@@ -29,6 +29,7 @@ public sealed class ModRowViewModel
         Latest = r.LatestCompatible?.ModVersion ?? "";
         PageUrl = r.Remote?.PageUrl;
         Initials = MakeInitials(Name);
+        Hue = ModTint.Hue(ModId.Length > 0 ? ModId : FileName);
         CanUpdate = r.Status == ModStatus.UpdateAvailable && r.LatestCompatible?.MainFile is not null;
         LatestArrow = r.Status == ModStatus.UpdateAvailable && Latest.Length > 0 ? "→ " + Latest : "";
 
@@ -124,6 +125,9 @@ public sealed class ModRowViewModel
 
     /// <summary>Значок с буквами вместо логотипа: «Carry On» → «CO».</summary>
     public string Initials { get; }
+
+    /// <summary>Оттенок значка с буквами (<see cref="ModTint"/>): по modid, у мода без modinfo — по имени файла.</summary>
+    public int Hue { get; }
 
     /// <summary>«→ 1.8.1» под установленной версией, если есть обновление.</summary>
     public string LatestArrow { get; }

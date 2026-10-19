@@ -108,6 +108,33 @@ public sealed partial class ModsViewModel : ObservableObject
 
     public IReadOnlyList<string> SortModes { get; } = [Loc.T("mods.sortImportant"), Loc.T("mods.sortName")];
 
+    // ---------- сводка профиля: правая панель, пока мод не выбран ----------
+
+    /// <summary>Когда обновления этого профиля сверяли с модбазой; null — после открытия профиля ещё не сверяли.</summary>
+    [ObservableProperty] private DateTime? _checkedAt;
+
+    /// <summary>Идёт проверка обновлений: в колонке статуса — мерцающие заглушки вместо статусов.</summary>
+    public bool IsChecking => CheckCommand.IsRunning;
+
+    /// <summary>Есть что обновить: главная кнопка страницы — «Обновить всё», а не «Проверить обновления» в сводке.</summary>
+    public bool HasUpdates => UpdateCount > 0;
+
+    /// <summary>Заголовок сводки: «Стенд · сервер».</summary>
+    public string SummaryTitle => _main.ActiveProfile is { } p ? $"{p.Name} · {p.KindText}" : Loc.T("mods.noProfile");
+
+    /// <summary>«3 из 4» — сколько модов включено из всех (числа те же, что на вкладках-счётчиках).</summary>
+    public string SummaryEnabledText => ModCount == 0 ? Loc.T("mods.summaryNoMods") : Loc.T("mods.summaryOf", ModCount - DisabledCount, ModCount);
+
+    /// <summary>Число модов с проблемами (как на вкладке «проблем») или «нет».</summary>
+    public string SummaryProblemsText => ProblemCount == 0 ? Loc.T("mods.summaryNone") : ProblemCount.ToString(Loc.Culture);
+
+    public bool HasProblems => ProblemCount > 0;
+
+    /// <summary>«проверены сегодня, 14:05» или «ещё не проверялись».</summary>
+    public string SummaryCheckedText => CheckedAt is { } at ? Loc.T("mods.summaryCheckedAt", Dates.Relative(at)) : Loc.T("mods.summaryNotChecked");
+
+    partial void OnCheckedAtChanged(DateTime? value) => OnPropertyChanged(nameof(SummaryCheckedText));
+
     /// <summary>Сменился язык: подписи счётчиков сами пересчитываются только при смене числа.</summary>
     public void OnLanguageChanged()
     {
@@ -116,7 +143,8 @@ public sealed partial class ModsViewModel : ObservableObject
         SortIndex = -1;
         SortIndex = sort;
         foreach (var name in new[] { nameof(InstalledLabel), nameof(UpdatesLabel), nameof(ProblemsLabel), nameof(DisabledLabel),
-                     nameof(PinnedLabel), nameof(UnneededLabel), nameof(ShownText), nameof(UpdateAllText), nameof(DependencyText) })
+                     nameof(PinnedLabel), nameof(UnneededLabel), nameof(ShownText), nameof(UpdateAllText), nameof(DependencyText),
+                     nameof(SummaryTitle), nameof(SummaryEnabledText), nameof(SummaryProblemsText), nameof(SummaryCheckedText) })
             OnPropertyChanged(name);
         WorldJobText = _worldJob.Text;
         RefreshSaidJob();
@@ -131,10 +159,27 @@ public sealed partial class ModsViewModel : ObservableObject
 
     public void SaveLayout() => _main.SaveSettings();
 
-    partial void OnModCountChanged(int value) => OnPropertyChanged(nameof(InstalledLabel));
+    partial void OnModCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(InstalledLabel));
+        OnPropertyChanged(nameof(SummaryEnabledText));
+    }
+
     partial void OnUpdatesAvailableChanged(int value) => OnPropertyChanged(nameof(UpdatesLabel));
-    partial void OnProblemCountChanged(int value) => OnPropertyChanged(nameof(ProblemsLabel));
-    partial void OnDisabledCountChanged(int value) => OnPropertyChanged(nameof(DisabledLabel));
+
+    partial void OnProblemCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(ProblemsLabel));
+        OnPropertyChanged(nameof(SummaryProblemsText));
+        OnPropertyChanged(nameof(HasProblems));
+    }
+
+    partial void OnDisabledCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(DisabledLabel));
+        OnPropertyChanged(nameof(SummaryEnabledText));
+    }
+
     partial void OnPinnedCountChanged(int value) => OnPropertyChanged(nameof(PinnedLabel));
 
     partial void OnSelectedChanged(ModRowViewModel? value)
@@ -160,7 +205,11 @@ public sealed partial class ModsViewModel : ObservableObject
         OnPropertyChanged(nameof(DependencyText));
     }
 
-    partial void OnUpdateCountChanged(int value) => OnPropertyChanged(nameof(UpdateAllText));
+    partial void OnUpdateCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(UpdateAllText));
+        OnPropertyChanged(nameof(HasUpdates));
+    }
 
     public ModsViewModel(MainViewModel main, ModDbClient db)
     {
@@ -186,6 +235,10 @@ public sealed partial class ModsViewModel : ObservableObject
         View = new FilteredList<ModRowViewModel>(Rows);
         View.Filter = r => ModListRules.Matches(r, Filter, Search);
         ApplySort();
+        CheckCommand.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(IAsyncRelayCommand.IsRunning)) OnPropertyChanged(nameof(IsChecking));
+        };
     }
 
     /// <summary>Вкладка «Мои моды» открыта — следим за папками модов (закрыта — не тратим на это время).</summary>
@@ -335,6 +388,7 @@ public sealed partial class ModsViewModel : ObservableObject
     {
         if (CheckCommand.IsRunning) CheckCancelCommand.Execute(null); // проверка прежнего профиля новому не нужна
         ModDbAnswers = new(StringComparer.OrdinalIgnoreCase);
+        CheckedAt = null; // ответ модбазы сброшен — для сводки обновления снова «ещё не проверялись»
         _agent.Reset();
         _hosted.Reset();
         _worldJob.SetProfile(IsHosted ? _main.ActiveProfile?.Model.Id : null);
@@ -348,6 +402,7 @@ public sealed partial class ModsViewModel : ObservableObject
         OnPropertyChanged(nameof(HeaderSubtitle));
         OnPropertyChanged(nameof(GameMissing));
         OnPropertyChanged(nameof(GameMissingText));
+        OnPropertyChanged(nameof(SummaryTitle));
         Selected = null;
         Card = null;
         if (IsRemote)
@@ -498,7 +553,8 @@ public sealed partial class ModsViewModel : ObservableObject
             if (_main.ActiveProfile != owner) return;
             ModDbAnswers = remote;
             Rebuild();
-            StatusText = Loc.T("mods.checkedAt", Dates.ClockSeconds(DateTime.Now), game);
+            CheckedAt = DateTime.Now;
+            StatusText = Loc.T("mods.checkedAt", Dates.ClockSeconds(CheckedAt.Value), game);
         }
         // отменили сменой профиля (или упала проверка прежнего) — строка состояния уже про новый профиль, не перебиваем её
         catch (OperationCanceledException) when (_main.ActiveProfile == owner)
