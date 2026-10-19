@@ -89,6 +89,26 @@ public sealed class ServerHostedViewTests : IDisposable
         Assert.False(Named<TextBlock>(window, "HostedPlayersEmpty").IsEffectivelyVisible);
         Assert.True(Named<ComboBox>(window, "HostedRuns").IsEffectivelyVisible);
         Assert.False(Named<TextBlock>(window, "HostedStatus").IsEffectivelyVisible);
+        // плитки со значениями — не приглушены
+        Assert.DoesNotContain("idle", Named<Border>(window, "HostedUptime").Classes);
+        Assert.DoesNotContain("idle", Named<Border>(window, "HostedPlayersTile").Classes);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task Stopped_server_tiles_are_faint_and_empty_instead_of_dashes()
+    {
+        PutLog(HostedLogSamples.Stopped);
+        var model = await PolledAsync();
+        var window = Show(model);
+
+        Assert.Equal(Loc.T("server.stateStopped"), Named<TextBlock>(window, "HostedStateText").Text);
+        foreach (var id in new[] { "HostedUptime", "HostedPlayersTile" })
+        {
+            var tile = Named<Border>(window, id);
+            Assert.Contains("idle", tile.Classes);
+            Assert.DoesNotContain(tile.GetVisualDescendants().OfType<TextBlock>(), t => t.IsEffectivelyVisible && t.Text?.Contains('—') == true);
+        }
         window.Close();
     }
 

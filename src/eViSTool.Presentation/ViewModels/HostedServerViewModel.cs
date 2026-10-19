@@ -121,8 +121,9 @@ public sealed partial class HostedServerViewModel : ObservableObject
     /// <summary>Под состоянием: «по логу сервера · 13:31:42» — откуда знаем и когда последний раз прочитали.</summary>
     [ObservableProperty] private string _stateNote = "";
 
-    [ObservableProperty] private string _uptimeText = "—";
-    [ObservableProperty] private string _playersText = "—";
+    // плитки: пока сервер по логу не запущен, значений нет — пусто, а не прочерк (вид приглушает такую плитку)
+    [ObservableProperty] private string _uptimeText = "";
+    [ObservableProperty] private string _playersText = "";
     [ObservableProperty] private string _playerNames = "";
 
     /// <summary>Лог не читается (нет связи, пароль не прочитать): что случилось и что дальше. Пусто — всё в порядке.</summary>
@@ -415,8 +416,8 @@ public sealed partial class HostedServerViewModel : ObservableObject
             : "";
 
         var up = State is HostedServerState.Starting or HostedServerState.Running or HostedServerState.Stopping;
-        UptimeText = up && _logs?.RunStarted is { } started ? Dates.Uptime(DateTime.Now - _logs.ToLocal(started)) : "—";
-        PlayersText = up ? _online.Count.ToString() : "—";
+        UptimeText = up && _logs?.RunStarted is { } started ? Dates.Uptime(DateTime.Now - _logs.ToLocal(started)) : "";
+        PlayersText = up ? _online.Count.ToString() : "";
         PlayerNames = !up ? "" : _online.Count == 0 ? Loc.T("server.playersNone") : string.Join(" · ", _online.Select(p => p.Name));
         PlayersEmptyText = up ? Loc.T("server.playersNone")
             : State is HostedServerState.Stopped or HostedServerState.Crashed ? Loc.T("server.hostedPlayersDown")

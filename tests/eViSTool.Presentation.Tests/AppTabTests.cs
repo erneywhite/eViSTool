@@ -46,19 +46,6 @@ public sealed class AppTabTests
         Assert.Equal(AppTab.Profiles, main.SelectedTab);
     });
 
-    [Fact]
-    public void PageTitle_NamesProfilesAndSettingsApart() => WithMain(main =>
-    {
-        main.SelectedTab = AppTab.Profiles;
-        Assert.Equal(Loc.T("nav.profiles"), main.PageTitle);
-
-        main.SelectedTab = AppTab.Settings;
-        Assert.Equal(Loc.T("nav.settings"), main.PageTitle);
-
-        main.SelectedTab = AppTab.About;
-        Assert.Equal(Loc.T("nav.about"), main.PageTitle);
-    });
-
     [Theory]
     [InlineData("profiles", AppTab.Profiles)]
     [InlineData("settings", AppTab.Settings)]

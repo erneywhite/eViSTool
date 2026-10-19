@@ -68,7 +68,6 @@ public sealed partial class MainViewModel
 
         // подписи в разметке обновились сами; тексты, собранные в коде, пересобираем
         OnPropertyChanged(nameof(DataLocationText));
-        OnPropertyChanged(nameof(PageTitle));
         foreach (var p in Profiles) p.NotifyLanguageChanged();
         NotifyPlay();
         Mods.OnProfileSwitched();

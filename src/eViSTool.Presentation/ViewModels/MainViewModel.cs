@@ -38,18 +38,6 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Открытая вкладка — номер из <see cref="AppTab"/> (порядок как в боковой панели).</summary>
     [ObservableProperty] private int _selectedTab;
 
-    /// <summary>Название открытого раздела — в полосе сверху.</summary>
-    public string PageTitle => Loc.T(SelectedTab switch
-    {
-        AppTab.Catalog => "nav.catalog",
-        AppTab.ModConfig => "nav.modConfig",
-        AppTab.Server => "nav.server",
-        AppTab.Profiles => "nav.profiles",
-        AppTab.Settings => "nav.settings",
-        AppTab.About => "nav.about",
-        _ => "nav.mods",
-    });
-
     /// <summary>Вкладка «Настройки модов»: конфиги модов активного профиля.</summary>
     public ModConfigViewModel ModConfig { get; }
 
@@ -63,7 +51,6 @@ public sealed partial class MainViewModel : ObservableObject
 
     partial void OnSelectedTabChanged(int value)
     {
-        OnPropertyChanged(nameof(PageTitle));
         Mods.SetActive(value == AppTab.Mods);
         Server.SetSectionActive(value == AppTab.Server); // лог сервера у хостера читается, только пока раздел открыт
         if (value == AppTab.Catalog) _ = Catalog.EnsureLoadedAsync(); // каталог грузим только когда он нужен

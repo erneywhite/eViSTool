@@ -165,24 +165,29 @@
                                    IsVisible="{Binding StateNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     </StackPanel>
                 </Border>
-                <Border Grid.Column="1" Classes="card tile">
+                <!-- пока сервер не запущен, у плиток ниже значения нет: пустые и приглушённые (класс idle), без прочерков -->
+                <Border Grid.Column="1" Classes="card tile" Classes.idle="{Binding UptimeText, Converter={x:Static StringConverters.IsNullOrEmpty}}"
+                        AutomationProperties.AutomationId="SrvUptime">
                     <StackPanel>
                         <TextBlock Classes="tileLabel" Text="{local:Tr server.tileUptime}" />
                         <TextBlock Classes="tileValue" Text="{Binding UptimeText}" />
                     </StackPanel>
                 </Border>
-                <Border Grid.Column="2" Classes="card tile">
+                <Border Grid.Column="2" Classes="card tile" Classes.idle="{Binding MemoryText, Converter={x:Static StringConverters.IsNullOrEmpty}}"
+                        AutomationProperties.AutomationId="SrvMemory">
                     <StackPanel>
                         <TextBlock Classes="tileLabel" Text="{local:Tr server.tileMemory}" />
                         <TextBlock Classes="tileValue" Text="{Binding MemoryText}" />
-                        <!-- номер процесса сервера — мелко: нужен редко (диспетчер задач) -->
-                        <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0">
+                        <!-- номер процесса сервера — мелко: нужен редко (диспетчер задач); сервера нет — и строки нет -->
+                        <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0"
+                                   IsVisible="{Binding PidText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" AutomationProperties.AutomationId="SrvPid">
                             <Run Text="PID" /><Run Text=" " /><Run Text="{Binding PidText, Mode=OneWay}" />
                         </TextBlock>
                     </StackPanel>
                 </Border>
                 <!-- кто на сервере: число, имена; подсказка — кто с какого времени -->
-                <Border Grid.Column="3" Classes="card tile" ToolTip.Tip="{Binding PlayersTip}" AutomationProperties.AutomationId="SrvPlayers">
+                <Border Grid.Column="3" Classes="card tile" Classes.idle="{Binding PlayersText, Converter={x:Static StringConverters.IsNullOrEmpty}}"
+                        ToolTip.Tip="{Binding PlayersTip}" AutomationProperties.AutomationId="SrvPlayers">
                     <StackPanel>
                         <TextBlock Classes="tileLabel" Text="{local:Tr server.tilePlayers}" />
                         <TextBlock Classes="tileValue" Text="{Binding PlayersText}" />
@@ -329,23 +334,45 @@
                         </Border>
 
                         <Border Background="{DynamicResource Forest.Side}" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Padding="6,4">
-                            <!-- строки — виртуализированный список с переносом; выделение — несколько строк (Ctrl, Shift) -->
-                            <ListBox x:Name="ConsoleList" Classes="console" ItemsSource="{Binding Lines}" Background="Transparent" BorderThickness="0"
-                                     FontFamily="{DynamicResource Forest.Mono}" FontSize="12.5" SelectionMode="Multiple"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                                <ListBox.ContextMenu>
-                                    <ContextMenu>
-                                        <MenuItem Header="{local:Tr server.copy}" Command="{Binding CopyLinesCommand}"
-                                                  CommandParameter="{Binding #ConsoleList.SelectedItems}" />
-                                    </ContextMenu>
-                                </ListBox.ContextMenu>
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:ConsoleLineViewModel">
-                                        <TextBlock Classes="line" ctl:EnumClass.Value="{Binding Tint}" Text="{Binding Text}" TextWrapping="Wrap"
-                                                   Opacity="{Binding Opacity}" />
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
+                            <Panel>
+                                <!-- строки — виртуализированный список с переносом; выделение — несколько строк (Ctrl, Shift) -->
+                                <ListBox x:Name="ConsoleList" Classes="console" ItemsSource="{Binding Lines}" Background="Transparent" BorderThickness="0"
+                                         FontFamily="{DynamicResource Forest.Mono}" FontSize="12.5" SelectionMode="Multiple"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.AutomationId="SrvConsole">
+                                    <ListBox.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="{local:Tr server.copy}" Command="{Binding CopyLinesCommand}"
+                                                      CommandParameter="{Binding #ConsoleList.SelectedItems}" />
+                                        </ContextMenu>
+                                    </ListBox.ContextMenu>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ConsoleLineViewModel">
+                                            <TextBlock Classes="line" ctl:EnumClass.Value="{Binding Tint}" Text="{Binding Text}" TextWrapping="Wrap"
+                                                       Opacity="{Binding Opacity}" />
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+
+                                <!-- строк нет и сервер не запущен: по центру — что с сервером и «Запустить» (та же команда, что
+                                     сверху). Запустить нельзя (нет связи, идёт восстановление мира) — вместо кнопки причина -->
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="420" Margin="16"
+                                            IsVisible="{Binding ShowConsoleEmpty}" AutomationProperties.AutomationId="SrvConsoleEmpty">
+                                    <Path Classes="icon" Data="{StaticResource Icon.Server}" Stroke="{DynamicResource Forest.Faint}" Width="26" Height="26"
+                                          HorizontalAlignment="Center" />
+                                    <TextBlock Text="{Binding ConsoleEmptyTitle}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Muted}"
+                                               TextAlignment="Center" TextWrapping="Wrap" Margin="0,12,0,0" AutomationProperties.AutomationId="SrvConsoleEmptyTitle" />
+                                    <TextBlock Text="{Binding ConsoleEmptyNote}" FontSize="12" Foreground="{DynamicResource Forest.Faint}" TextAlignment="Center"
+                                               TextWrapping="Wrap" Margin="0,6,0,0" IsVisible="{Binding !ShowConsoleEmptyStart}"
+                                               AutomationProperties.AutomationId="SrvConsoleEmptyNote" />
+                                    <Button Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}" IsVisible="{Binding ShowConsoleEmptyStart}"
+                                            HorizontalAlignment="Center" Margin="0,16,0,0" Padding="16,8" AutomationProperties.AutomationId="SrvConsoleEmptyStart">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Classes="icon" Data="{StaticResource Icon.Play}" Width="12" Height="12" Margin="0,0,8,0" />
+                                            <TextBlock Text="{local:Tr server.start}" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Panel>
                         </Border>
                     </DockPanel>
                 </Border></Border>

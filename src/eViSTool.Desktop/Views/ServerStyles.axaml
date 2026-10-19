@@ -20,6 +20,11 @@
         <Setter Property="Margin" Value="0,4,0,0" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
+    <!-- плитка без значения (сервер не запущен, класс idle): подпись тусклая, значение пустое — без прочерков. После
+         tileLabel: из двух подходящих стилей побеждает последний -->
+    <Style Selector="Border.tile.idle TextBlock.tileLabel">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Faint}" />
+    </Style>
     <!-- точка состояния сервера: цвет — от тона (Ellipse.tone в теме), размер крупнее -->
     <Style Selector="Ellipse.tone.stateDot">
         <Setter Property="Width" Value="9" />

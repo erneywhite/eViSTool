@@ -138,7 +138,7 @@ public sealed class HostedServerViewModelTests : IDisposable
         Assert.DoesNotContain("203.0.113.7", player.SinceText); // адрес игрока не показываем
         Assert.Equal("1", vm.PlayersText);
         Assert.Equal("Erney", vm.PlayerNames);
-        Assert.NotEqual("—", vm.UptimeText);
+        Assert.NotEqual("", vm.UptimeText);
         Assert.Equal(Loc.T("server.hostedRunCurrent"), Assert.Single(vm.Runs).Text); // архива нет — только текущий
     });
 
@@ -161,8 +161,8 @@ public sealed class HostedServerViewModelTests : IDisposable
         Assert.Empty(vm.Players);
         Assert.False(vm.HasPlayers);
         Assert.Equal(Loc.T("server.hostedPlayersDown"), vm.PlayersEmptyText);
-        Assert.Equal("—", vm.PlayersText);
-        Assert.Equal("—", vm.UptimeText);
+        Assert.Equal("", vm.PlayersText); // не запущен — плитки пустые, без прочерков
+        Assert.Equal("", vm.UptimeText);
 
         // новый запуск: прошлый лог уехал в архив, новый короче
         _host.Server.Put("/Logs/Archive/2026-10-17_13_27_08/server-main.log", HostedLogSamples.Bytes(HostedLogSamples.Stopped));

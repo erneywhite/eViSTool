@@ -194,16 +194,19 @@ public sealed class ProfilesSettingsViewTests : IDisposable
         Assert.IsType<SettingsView>(pages.Children[AppTab.Settings]);
         Assert.IsType<AboutView>(pages.Children[AppTab.About]);
 
-        // пункт меню «Профили» открывает свою страницу, название — в верхней полосе, без «Рабочего пространства»
+        // пункт меню «Профили» открывает свою страницу; название — крупно на ней самой, верхняя полоса его не повторяет
+        var topBar = Named(_window, "TopBar");
         Mouse.Click(_window, Named(_window, "NavProfiles"));
         Assert.Equal(AppTab.Profiles, main.SelectedTab);
         Assert.Equal([AppTab.Profiles], pages.Children.Select((p, i) => (p, i)).Where(x => x.p.IsVisible).Select(x => x.i));
-        Assert.Equal(Loc.T("nav.profiles"), ((TextBlock)Named(_window, "PageTitle")).Text);
+        Assert.True(HasText(pages.Children[AppTab.Profiles], Loc.T("nav.profiles")));
+        Assert.False(HasText(topBar, Loc.T("nav.profiles")));
 
         Mouse.Click(_window, Named(_window, "NavSettings"));
         Assert.Equal(AppTab.Settings, main.SelectedTab);
         Assert.True(pages.Children[AppTab.Settings].IsVisible);
         Assert.False(pages.Children[AppTab.Profiles].IsVisible);
-        Assert.Equal(Loc.T("nav.settings"), ((TextBlock)Named(_window, "PageTitle")).Text);
+        Assert.True(HasText(pages.Children[AppTab.Settings], Loc.T("nav.settings")));
+        Assert.False(HasText(topBar, Loc.T("nav.settings")));
     }
 }
