@@ -44,7 +44,9 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
             if (!options.BundleFiles && owner.ModDbAnswers.Count == 0)
             {
                 owner.StatusText = Loc.T("check.querying", 0, owner.Locals.Count);
-                owner.ModDbAnswers = await service.FetchRemoteAsync(owner.Locals, new Progress<string>(s => owner.StatusText = s));
+                var asking = new StatusProgress(s => owner.StatusText = s);
+                try { owner.ModDbAnswers = await service.FetchRemoteAsync(owner.Locals, asking); }
+                finally { asking.Close(); }
             }
             var onModDb = owner.ModDbAnswers.Where(r => r.Value.Mod is not null).Select(r => r.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -108,7 +110,7 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
             {
                 await installer.CopyWorldsAsync(target, copyProblems);
                 var importer = new PackImporter(db, updater) { KeepInstalledIn = keep };
-                var progress = new Progress<string>(s => owner.StatusText = s);
+                var progress = new StatusProgress(s => owner.StatusText = s);
                 var (mirror, applyConfig) = (packChoice.Mirror, packChoice.ApplyConfig);
                 // в фоне: иначе при паке «всё внутри» импорт идёт синхронно, окно подвисает,
                 // а сообщения прогресса приходят уже после итога и затирают его
@@ -124,6 +126,7 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
                     ? importer.ApplyAsync(pack, plan, profile, mirror, applyConfig,
                         ModBackupStore.ForProfile(profile.Profile), progress, confirmChanged: AskChanged)
                     : importer.ApplyToTargetAsync(pack, plan, target, mirror, applyConfig, progress, confirmChanged: AskChanged));
+                progress.Close(); // отчёты, ещё не дошедшие из очереди, не затрут итог
                 // поставленное на сервер у хостера — в оповещение «Обновлены моды» (уйдёт с итогом операции)
                 owner.HostedWatch?.ModsChanged(target, result.Done, []);
 

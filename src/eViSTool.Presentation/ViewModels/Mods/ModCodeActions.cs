@@ -37,8 +37,13 @@ internal sealed class ModCodeActions(ModsViewModel owner, ModPackActions packs, 
             if (unknown.Count > 0)
             {
                 owner.StatusText = Loc.T("check.querying", 0, unknown.Count);
-                foreach (var (id, r) in await service.FetchRemoteAsync(unknown, new Progress<string>(s => owner.StatusText = s)))
-                    owner.ModDbAnswers[id] = r;
+                var progress = new StatusProgress(s => owner.StatusText = s);
+                try
+                {
+                    foreach (var (id, r) in await service.FetchRemoteAsync(unknown, progress))
+                        owner.ModDbAnswers[id] = r;
+                }
+                finally { progress.Close(); }
             }
             var entries = new List<ModCodeEntry>();
             var missing = new List<string>();

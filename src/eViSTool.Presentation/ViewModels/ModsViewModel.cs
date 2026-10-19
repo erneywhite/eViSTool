@@ -679,8 +679,10 @@ public sealed partial class ModsViewModel : ObservableObject
                 StatusText = Loc.T("mods.noGameVersion");
                 return;
             }
-            var progress = new Progress<string>(s => { if (_main.ActiveProfile == owner) StatusText = s; });
-            var remote = await _service.FetchRemoteAsync(Locals, progress, ct);
+            var progress = new StatusProgress(s => StatusText = s, () => _main.ActiveProfile == owner);
+            Dictionary<string, ModDbResult> remote;
+            try { remote = await _service.FetchRemoteAsync(Locals, progress, ct); }
+            finally { progress.Close(); } // «16/16» из очереди не затрёт «Проверено в …»
             // ответ модбазы — про моды того профиля, с которого начали; на другом он показал бы чужие обновления
             if (_main.ActiveProfile != owner) return;
             ModDbAnswers = remote;
