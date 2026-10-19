@@ -59,6 +59,40 @@ public sealed class FilteredListTests
         Assert.Equal(["aaa", "Bbb", "Carry On", "Ccc"], list.Items.Select(m => m.Name));
     }
 
+    /// <summary>
+    /// Исходную коллекцию построили заново новыми объектами (таблица модов после операции): вид не пустеет ни на миг —
+    /// новые встают на места прежних заменой, лишние уходят в конце. Опустей он, таблица сбросила бы прокрутку к началу.
+    /// </summary>
+    [Fact]
+    public void RebuiltSource_ReplacesInPlace_WithoutEmptying()
+    {
+        var source = Source();
+        var list = new FilteredList<Mod>(source, null, (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+        var kept = list.Items[0];
+        var counts = new List<int>();
+        var actions = new List<NotifyCollectionChangedAction>();
+        ((INotifyCollectionChanged)list.Items).CollectionChanged += (_, e) =>
+        {
+            actions.Add(e.Action);
+            counts.Add(list.Items.Count);
+        };
+
+        using (list.DeferRefresh())
+        {
+            source.Clear();
+            source.Add(kept); // эта строка не изменилась — тот же объект
+            source.Add(new Mod("Bbb", 1));
+            source.Add(new Mod("Ccc", 0));
+        }
+
+        Assert.Equal(["aaa", "Bbb", "Ccc"], list.Items.Select(m => m.Name));
+        Assert.Same(kept, list.Items[0]);
+        Assert.All(counts, c => Assert.True(c >= 3, $"вид опустел до {c}"));
+        Assert.DoesNotContain(NotifyCollectionChangedAction.Reset, actions);
+        Assert.Contains(NotifyCollectionChangedAction.Replace, actions);
+        Assert.Equal(NotifyCollectionChangedAction.Remove, actions[^1]); // лишний («Carry On») — в конце
+    }
+
     [Fact]
     public void DeferRefresh_OneUpdateAtTheEnd()
     {

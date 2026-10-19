@@ -76,6 +76,9 @@ public sealed partial class ModsViewModel : ObservableObject
     [ObservableProperty] private ModCardViewModel? _card;
     private CancellationTokenSource? _cardLoad;
 
+    /// <summary>Таблицу строят заново (<see cref="Rebuild"/>): выбор, который таблица меняет сама, карточку не трогает.</summary>
+    private bool _rebuilding;
+
     // счётчики над таблицей и на чипах
     [ObservableProperty] private int _updatesAvailable;
     [ObservableProperty] private int _problemCount;
@@ -193,15 +196,26 @@ public sealed partial class ModsViewModel : ObservableObject
     partial void OnSelectedChanged(ModRowViewModel? value)
     {
         // null приходит и когда таблицу перестраивают после операции — тогда карточку не трогаем,
-        // её заменит та же строка из новой таблицы
-        if (value is null) return;
+        // её заменит та же строка из новой таблицы. Пока строки встают на места, таблица может на миг выбрать соседнюю
+        // (выбранную строку заменили) — её карточку не строим: выбор вернёт Rebuild. Таблица вернула выбор той же строке
+        // (перечитала свой вид, GridOrder) — карточка и так её
+        if (value is null || _rebuilding || ReferenceEquals(value, Card?.Row)) return;
+        ShowCard(value);
+    }
+
+    /// <summary>Карточка мода справа — новая, для строки <paramref name="value"/>.</summary>
+    private void ShowCard(ModRowViewModel value)
+    {
         _cardLoad?.Cancel();
         _cardLoad = new CancellationTokenSource();
-        // тот же мод после операции — остаёмся на той же вкладке карточки
+        // тот же мод после операции — остаёмся на той же вкладке карточки, и новая карточка берёт у прежней то, что та
+        // уже узнала (страницу с модбазы, списки): иначе карточка мигала бы после каждого переключения. Вкладка — до того,
+        // как карточку увидит окно: иначе на миг вставал бы «Обзор», и «Версии» проявлялись бы заново
         var keepTab = Card is { IsVersionsTab: true } old && old.Row.ModId == value.ModId;
-        Card = new ModCardViewModel(value, this, Profile?.GameVersion, _main.ActiveProfile?.Name ?? "");
-        if (keepTab) Card.IsVersionsTab = true;
-        _ = Card.LoadAsync(_db, _cardLoad.Token);
+        var card = new ModCardViewModel(value, this, Profile?.GameVersion, _main.ActiveProfile?.Name ?? "", Card);
+        if (keepTab) card.IsVersionsTab = true;
+        Card = card;
+        _ = card.LoadAsync(_db, _cardLoad.Token);
     }
 
     /// <summary>
@@ -527,12 +541,29 @@ public sealed partial class ModsViewModel : ObservableObject
         var keep = Card?.Row;
         var pins = _main.ActiveProfile?.Model.PinnedMods ?? new Dictionary<string, string>();
         var kind = _main.ActiveProfile?.Model.Kind ?? ProfileKind.Client;
-        Rows.Clear();
-        foreach (var r in results)
+        // строки, которые не изменились, остаются прежними объектами (ModRowViewModel.SameAs): переключение одного мода
+        // меняет в таблице одну строку. Вид таблицы обновляется один раз, в конце, и новые строки встают на места
+        // прежних: опустей он между Clear и Add, таблица прокрутилась бы к началу — список прыгал бы вверх
+        var previous = new Dictionary<string, ModRowViewModel>(StringComparer.Ordinal);
+        foreach (var row in Rows) previous.TryAdd(row.FilePath, row);
+        _rebuilding = true;
+        try
         {
-            var modId = r.Local.Info?.ModId;
-            Rows.Add(new ModRowViewModel(r, DependencyIssues, modId is not null && pins.ContainsKey(modId), kind, Profile?.GameVersion,
-                modId is null ? null : _cardLogos.GetValueOrDefault(modId)));
+            using (View.DeferRefresh())
+            {
+                Rows.Clear();
+                foreach (var r in results)
+                {
+                    var modId = r.Local.Info?.ModId;
+                    var fresh = new ModRowViewModel(r, DependencyIssues, modId is not null && pins.ContainsKey(modId), kind, Profile?.GameVersion,
+                        modId is null ? null : _cardLogos.GetValueOrDefault(modId));
+                    Rows.Add(previous.TryGetValue(fresh.FilePath, out var was) && was.SameAs(fresh) ? was : fresh);
+                }
+            }
+        }
+        finally
+        {
+            _rebuilding = false;
         }
 
         UpdatesAvailable = Rows.Count(r => r.Kind == ModStatus.UpdateAvailable);
@@ -548,8 +579,14 @@ public sealed partial class ModsViewModel : ObservableObject
             var same = Rows.FirstOrDefault(r => r.FilePath == keep.FilePath)
                        ?? Rows.FirstOrDefault(r => r.ModId.Length > 0 && r.ModId == keep.ModId);
             if (same is null) Card = null; // мод удалили
-            else if (same == Selected) OnSelectedChanged(same);
-            else Selected = same;
+            else
+            {
+                // строка та же — карточку всё равно строим заново (числа конфигов, версия игры могли поменяться; что она
+                // уже узнала, новая берёт у прежней). Строка новая — карточку построит выбор
+                var refresh = same == Selected || ReferenceEquals(same, Card?.Row);
+                if (same != Selected) Selected = same;
+                if (refresh) ShowCard(same);
+            }
         }
         if (IsHistory) _ = LoadHistoryAsync(); // моды поменялись — в истории появилось новое
     }
@@ -594,8 +631,33 @@ public sealed partial class ModsViewModel : ObservableObject
 
     // ---------- включение / выключение ----------
 
-    [RelayCommand]
+    /// <summary>Переключения модов идут по одному, в порядке щелчков (см. <see cref="ToggleEnabledAsync"/>).</summary>
+    private readonly SemaphoreSlim _toggleGate = new(1, 1);
+
+    /// <summary>
+    /// Включить или выключить мод. Команда не занята, пока идёт переключение: занятая команда выключает всех, кто к ней
+    /// привязан, — переключатели всех строк и карточки гасли на время записи и перечитывания папки модов (у сотни
+    /// архивов — секунду-другую, с копиями миров — дольше). Поэтому щелчок во время переключения встаёт в очередь, а
+    /// его строка берётся из таблицы, перечитанной к тому времени: два щелчка по одному переключателю возвращают мод как
+    /// было, а не выключают его дважды.
+    /// </summary>
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task ToggleEnabledAsync(ModRowViewModel? row)
+    {
+        await _toggleGate.WaitAsync();
+        try
+        {
+            if (row is not null && !Rows.Contains(row))
+                row = Rows.FirstOrDefault(r => r.FilePath == row.FilePath); // таблицу построили заново; мода нет — нечего переключать
+            await ToggleOneAsync(row);
+        }
+        finally
+        {
+            _toggleGate.Release();
+        }
+    }
+
+    private async Task ToggleOneAsync(ModRowViewModel? row)
     {
         if (row?.Local.Info is null || CurrentTarget() is not { } target) return;
 

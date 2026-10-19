@@ -370,7 +370,7 @@
                                   SelectionMode="Single" RowHeight="54" Background="Transparent" RowBackground="Transparent" BorderThickness="0"
                                   ColumnHeaderTheme="{StaticResource Forest.ColumnHeader}"
                                   ctl:DoubleTap.Command="{Binding OpenPageCommand}" ctl:DoubleTap.CommandParameter="{Binding Selected}"
-                                  Classes.checking="{Binding IsChecking}"
+                                  Classes.checking="{Binding IsChecking}" ctl:GridOrder.FollowMoves="True"
                                   DragDrop.AllowDrop="True" AutomationProperties.AutomationId="ModsGrid">
                             <!-- контекстное меню строки: всё, что умеет вкладка; строка под курсором выделяется до открытия меню -->
                             <DataGrid.ContextMenu>
