@@ -2,12 +2,14 @@ using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Chrome;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Interactivity;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using eViSTool.Core.Game;
 using eViSTool.Desktop.Controls;
 using eViSTool.Desktop.Platform;
@@ -36,16 +38,30 @@ public partial class MainWindow : Window
         SizeChanged += (_, _) =>
         {
             if (WindowState == WindowState.Normal) _normalSize = ClientSize;
-            // узкое окно: подпись «Активный профиль» уступает место разделу и кнопкам окна, а «Играть · <сервер>» и список
-            // профилей — уже: полоса прижата вправо и сжиматься не умеет, список наехал бы на «Играть» (окно 860 —
-            // 606 px на всё: место под кнопки окна 130, стрелка 34, «Играть» до ~170, список до 240)
-            var width = ClientSize.Width;
-            ActiveProfileLabel.IsVisible = width >= 1100;
-            PlayLabel.MaxWidth = width >= 1100 ? 260 : 110;
-            ProfileCombo.MinWidth = width >= 1000 ? 240 : 160;
-            ProfileCombo.MaxWidth = width >= 1000 ? 340 : 240;
+            FitTopBar(ClientSize.Width);
         };
         SetupChrome();
+    }
+
+    /// <summary>С этой ширины окна видна подпись «Активный профиль», а «Играть · &lt;сервер&gt;» — до 260 px (уже — до 110).</summary>
+    internal const double TopBarWideFrom = 1100;
+
+    /// <summary>С этой ширины окна список профилей не уже 240: от имени к имени его ширина прыгает меньше.</summary>
+    internal const double ProfileComboRoomyFrom = 1200;
+
+    /// <summary>
+    /// Верхняя полоса по ширине окна. Список профилей сам берёт то, что осталось от кнопок окна и «Играть», и наехать на
+    /// «Играть» не может, пока помещаются минимумы. Здесь — чтобы помещались: в узком окне подпись «Активный профиль»
+    /// прячется, а «Играть · &lt;сервер&gt;» короче. На полосу остаётся ширина окна − 254 (боковая колонка и поля), худший
+    /// случай — кнопки окна Windows 130, стрелка 34, «Играть» 60 + подпись, значок ошибок ~40, «Активный профиль» ~110:
+    /// окно 860 (606 px) — узкое всё и список 160 занимают 534; 1100 (846) — подпись и «Играть» 320 со списком 160 —
+    /// 794; 1200 (946) — то же со списком 240 — 874. Проверяет MainWindowTopBarTests.
+    /// </summary>
+    internal void FitTopBar(double width)
+    {
+        ActiveProfileLabel.IsVisible = width >= TopBarWideFrom;
+        PlayLabel.MaxWidth = width >= TopBarWideFrom ? 260 : 110;
+        ProfileCombo.MinWidth = width >= ProfileComboRoomyFrom ? 240 : 160;
     }
 
     // ---------- своя шапка: верхняя полоса окна вместо системного заголовка
@@ -70,24 +86,50 @@ public partial class MainWindow : Window
             TopBar.PointerPressed += DragArea_PointerPressed;
             LogoArea.PointerPressed += DragArea_PointerPressed;
         }
-        ApplyWindowFrame(systemFrame: false);
+        ApplyWindowFrame();
     }
 
-    // Linux: рамку, тень и уголки для растягивания Avalonia рисует по краям окна, а отступ от них — дело окна
-    // (WindowDecorationMargin = рамка + тень, сверху ещё высота шапки, которую занимает наша полоса: её не вычитаем)
+    private bool _transparencyKnown; // уровень прозрачности окна пришёл от системы (до шаблона окна он None и ничего не значит)
+
+    protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
+    {
+        base.OnApplyTemplate(e); // здесь окно узнаёт уровень прозрачности
+        _transparencyKnown = true;
+        if (OperatingSystem.IsLinux()) ApplyWindowFrame();
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
+        // Linux: рамку, тень и уголки для растягивания Avalonia рисует по краям окна, а отступ от них — дело окна
+        // (WindowDecorationMargin = рамка + тень, сверху ещё высота шапки, которую занимает наша полоса: её не вычитаем)
         if (change.Property == WindowDecorationMarginProperty && OperatingSystem.IsLinux() && Root is { } root)
         {
             var m = WindowDecorationMargin;
             root.Margin = new Thickness(m.Left, m.Left, m.Right, m.Bottom);
         }
+        // композитор включили или выключили на ходу — своя рамка или системная (OwnFrameOnLinux)
+        else if (change.Property == ActualTransparencyLevelProperty && OperatingSystem.IsLinux() && Root is not null)
+        {
+            _transparencyKnown = true;
+            ApplyWindowFrame();
+        }
     }
 
-    private void ApplyWindowFrame(bool systemFrame)
+    /// <summary>
+    /// Своя рамка на Linux — если её не выключили в настройках («Системная рамка») и окно может быть прозрачным, то есть
+    /// работает композитор. Без него (Openbox, i3, Xfce без композитинга, xrdp) вместо прозрачной тени вокруг окна шла бы
+    /// сплошная полоса цвета окна в 9 px, а линии рамки не было бы видно: там системная рамка. null — уровень прозрачности
+    /// ещё не известен (до шаблона окна), решает только настройка.
+    /// </summary>
+    internal static bool OwnFrameOnLinux(bool systemFrameSetting, WindowTransparencyLevel? transparency) =>
+        !systemFrameSetting && transparency != WindowTransparencyLevel.None;
+
+    // настройку берёт из модели (до неё — своя рамка), прозрачность — у окна; вызывается, когда меняется любое из них
+    private void ApplyWindowFrame()
     {
-        var own = OperatingSystem.IsWindows() || (OperatingSystem.IsLinux() && !systemFrame);
+        var own = OperatingSystem.IsWindows() || (OperatingSystem.IsLinux() && OwnFrameOnLinux(
+            DataContext is MainViewModel { SystemWindowFrame: true }, _transparencyKnown ? ActualTransparencyLevel : null));
         ExtendClientAreaToDecorationsHint = own;
         CaptionSpace.Width = own ? CaptionWidth : 0;
         // под тенью своей рамки на Linux окно прозрачное; фон даёт Root
@@ -95,10 +137,19 @@ public partial class MainWindow : Window
         else ClearValue(BackgroundProperty);
     }
 
-    // кнопки и список профилей забирают нажатие себе, сюда доходит только пустое место и подписи
+    /// <summary>
+    /// Нажатие пришлось на саму область (полосу, логотип), а не всплыло к ней из попапа: содержимое меню «Играть» живёт в
+    /// своём окне попапа, но нажатие в нём идёт через Popup к полосе, где тот лежит в разметке.
+    /// </summary>
+    internal static bool PressedOn(Visual area, object? source) =>
+        source is not Visual visual || visual == area || area.IsVisualAncestorOf(visual);
+
+    // кнопки и список профилей забирают нажатие себе, сюда доходит только пустое место и подписи — и нажатия в меню
+    // «Играть» на пустом месте, подписях и подсказке: те окно не тащат и не разворачивают
     private void DragArea_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (!IsExtendedIntoWindowDecorations || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        if (sender is Visual area && !PressedOn(area, e.Source)) return;
         if (e.ClickCount == 2)
             WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
         else
@@ -113,7 +164,7 @@ public partial class MainWindow : Window
         base.OnDataContextChanged(e);
         if (DataContext is not MainViewModel vm) return;
         vm.PropertyChanged += OnVmPropertyChanged;
-        if (OperatingSystem.IsLinux()) ApplyWindowFrame(vm.SystemWindowFrame);
+        if (OperatingSystem.IsLinux()) ApplyWindowFrame();
         // смену профиля отменили (правки конфига) — вернуть список на текущий профиль, когда он закончит обработку выбора
         vm.ProfileSwitchDeclined += () => Dispatcher.UIThread.Post(() =>
         {
@@ -126,7 +177,7 @@ public partial class MainWindow : Window
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MainViewModel.SelectedTab)) ShowPage();
-        else if (e.PropertyName == nameof(MainViewModel.SystemWindowFrame) && OperatingSystem.IsLinux()) ApplyWindowFrame(Vm.SystemWindowFrame);
+        else if (e.PropertyName == nameof(MainViewModel.SystemWindowFrame) && OperatingSystem.IsLinux()) ApplyWindowFrame();
         // папки игры (сменили активный профиль или его папку игры) и галочка «Фон из игры»
         else if (e.PropertyName is nameof(MainViewModel.IconSearchDirs) or nameof(MainViewModel.GameBackground)) UpdateBackdrop();
     }

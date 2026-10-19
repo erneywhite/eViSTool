@@ -6,6 +6,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Threading;
 using eViSTool.Core.Localization;
+using eViSTool.Desktop.Controls;
 using eViSTool.Desktop.Platform;
 using eViSTool.Desktop.Views;
 using eViSTool.Presentation;
@@ -17,7 +18,11 @@ public partial class App : Application
 {
     private static string? _restartExe;
 
-    public override void Initialize() => AvaloniaXamlLoader.Load(this);
+    public override void Initialize()
+    {
+        Motion.Init(); // проявление и «живое» окно — до первого окна
+        AvaloniaXamlLoader.Load(this);
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {

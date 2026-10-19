@@ -538,6 +538,31 @@ public sealed class MotionTests
     }
 
     /// <summary>
+    /// Окно показалось без фокуса (запустили и сразу ушли в игру — система фокус не отдала): оно не «живое» с самого
+    /// показа, хотя ни фокус, ни свёрнутость ещё ни разу не менялись. Получило фокус — ожило.
+    /// </summary>
+    [AvaloniaFact]
+    public void Window_shown_without_focus_is_not_live()
+    {
+        var inner = new Border();
+        var window = new Window { Content = inner, Width = 200, Height = 100, ShowActivated = false };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(window.IsActive);
+        Assert.False(Motion.GetLive(inner));
+
+        window.Activate();
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(window.IsActive);
+        Assert.True(Motion.GetLive(inner));
+
+        window.Hide(); // спрятанное окно тоже не живое
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(Motion.GetLive(inner));
+        window.Close();
+    }
+
+    /// <summary>
     /// Анимация по кругу (IterationCount="Infinite": дыхание точки, блик заглушек, бегущая полоска) — только в стиле с
     /// условием [(ctl|Motion.Live)=True] (в нём и Motion.Enabled): иначе при выключенных в системе анимациях она так и
     /// крутится, а в окне под игрой без фокуса — перерисовывает его на каждом кадре экрана. Пакеты, писавшие такие стили

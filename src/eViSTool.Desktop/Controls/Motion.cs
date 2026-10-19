@@ -21,7 +21,7 @@ namespace eViSTool.Desktop.Controls;
 /// ставит окнам False: переходы темы мгновенные, проявление — сразу, без движения. Анимации по кругу в стилях
 /// (Style.Animations) включаются только условием <c>[(ctl|Motion.Enabled)=True]</c> — тогда и они стоят.</para>
 /// <para><c>Motion.Live</c> — наследуемое «двигаться можно сейчас»: движение не выключено (Enabled), окно показано, в
-/// фокусе и не свёрнуто. Ставит его само окно (обработчики ниже). Анимации по кругу пишутся с условием
+/// фокусе и не свёрнуто. Ставит его само окно (обработчики из <see cref="Init"/>). Анимации по кругу пишутся с условием
 /// <c>[(ctl|Motion.Live)=True]</c>: окно, которое лежит под игрой без фокуса, иначе перерисовывалось бы на каждом кадре
 /// экрана, пока, например, работает сервер (кольцо «дышит» часами). Avalonia сама ставит на паузу только анимации
 /// невидимых элементов, а окно без фокуса для неё видимо. Одно свойство, а не два условия: двух условий на прикреплённые
@@ -48,16 +48,27 @@ public static class Motion
     // проявление, которое ещё идёт: элемент спрятали и снова показали раньше конца — прежнее обрывается
     private static readonly ConditionalWeakTable<Visual, CancellationTokenSource> Running = new();
 
-    static Motion()
+    private static bool _initialized;
+
+    /// <summary>
+    /// Подключить обработчики проявления и «живого» окна. Зовут App и приложение тестов до первого окна, повторный вызов
+    /// ничего не делает. Не статический конструктор: тот срабатывает, когда тип впервые тронут, и окно, которое свернули
+    /// раньше, своё Live так и не пересчитало бы.
+    /// </summary>
+    public static void Init()
     {
+        if (_initialized) return;
+        _initialized = true;
         // один обработчик на всю программу, а не подписка на каждого ребёнка: стал видимым ребёнок панели с
-        // RevealChildren — проявить
+        // RevealChildren — проявить. Показали или спрятали само окно — пересчитать «живое»: окно, которое показалось без
+        // фокуса (запустили и сразу ушли в игру, система фокус не отдала), иначе так и считалось бы живым
         Visual.IsVisibleProperty.Changed.AddClassHandler<Control>((control, e) =>
         {
-            if (e.GetNewValue<bool>() && control.GetVisualParent() is Panel panel && GetRevealChildren(panel)) Reveal(control);
+            if (control is Window window) UpdateLive(window);
+            else if (e.GetNewValue<bool>() && control.GetVisualParent() is Panel panel && GetRevealChildren(panel)) Reveal(control);
         });
         // «двигаться можно сейчас» — у каждого окна, по смене фокуса, свёрнутости и Enabled (его ставит окнам
-        // Themes/ForestStill.axaml); видимость окна меняет и фокус
+        // Themes/ForestStill.axaml)
         WindowBase.IsActiveProperty.Changed.AddClassHandler<Window>((window, _) => UpdateLive(window));
         Window.WindowStateProperty.Changed.AddClassHandler<Window>((window, _) => UpdateLive(window));
         EnabledProperty.Changed.AddClassHandler<Window>((window, _) => UpdateLive(window));

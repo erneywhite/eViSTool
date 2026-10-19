@@ -1,5 +1,5 @@
 using Avalonia.Controls;
-using Avalonia.Input;
+using eViSTool.Desktop.Controls;
 using eViSTool.Presentation.ViewModels;
 
 namespace eViSTool.Desktop.Views;
@@ -16,6 +16,13 @@ public partial class CatalogView : UserControl
         InitializeComponent();
         Split.SizeChanged += (_, _) => FitDetails();
         Filters.SizeChanged += (_, e) => Filters.Columns = e.NewSize.Width >= FiltersInThreeFrom ? 3 : 2;
+        // ширину карточки запоминает только сдвинутый разделитель, не щелчок по нему
+        SplitterMemory.Remember(Splitter, DetailsColumn, width =>
+        {
+            if (_vm is null) return;
+            _vm.DetailsWidth = width;
+            _vm.SaveLayout();
+        });
     }
 
     /// <summary>С этой ширины ряда фильтры — по три: «Популярные сейчас» с шевроном помещается в треть.</summary>
@@ -47,12 +54,5 @@ public partial class CatalogView : UserControl
         if (Math.Abs(DetailsColumn.Width.Value - width) > 0.5) DetailsColumn.Width = new GridLength(width);
         if (Split.Bounds.Width > 0)
             Split.ColumnDefinitions[0].MinWidth = Math.Max(ListMin, Math.Min(ListRoom, Split.Bounds.Width - gap - DetailsColumn.MinWidth));
-    }
-
-    private void Splitter_DragCompleted(object? sender, VectorEventArgs e)
-    {
-        if (_vm is null) return;
-        _vm.DetailsWidth = DetailsColumn.ActualWidth;
-        _vm.SaveLayout();
     }
 }

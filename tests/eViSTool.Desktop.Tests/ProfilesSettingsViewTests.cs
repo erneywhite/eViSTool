@@ -177,6 +177,32 @@ public sealed class ProfilesSettingsViewTests : IDisposable
     }
 
     /// <summary>
+    /// Образцы выбора значка профиля подписаны для экранного диктора словами («мох», «меч», «Без цвета»), и подписи
+    /// меняются вместе с языком программы на ходу: контейнеры над постоянным списком образцов не пересоздаются.
+    /// </summary>
+    [AvaloniaFact]
+    public void Icon_choice_names_for_the_screen_reader_follow_the_language()
+    {
+        var main = Main();
+        Loc.Instance.SetLanguage("ru");
+        var profiles = Show(new ProfilesView { DataContext = main });
+        var colors = (ListBox)Named(profiles, "ProfileIconColor");
+        var glyphs = (ListBox)Named(profiles, "ProfileIconGlyph");
+        static string? NameOf(ListBox list, string choice) => AutomationProperties.GetName(list.ContainerFromItem(choice)!);
+
+        Assert.Equal("мох", NameOf(colors, "moss"));
+        Assert.Equal("Без цвета", NameOf(colors, ""));
+        Assert.Equal("меч", NameOf(glyphs, "sword"));
+
+        Loc.Instance.SetLanguage("en");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(Loc.T("icon.color.moss"), NameOf(colors, "moss"));
+        Assert.Equal(Loc.T("icon.color.none"), NameOf(colors, ""));
+        Assert.Equal(Loc.T("icon.glyph.sword"), NameOf(glyphs, "sword"));
+        Assert.NotEqual("Без цвета", Loc.T("icon.color.none")); // и правда другой язык
+    }
+
+    /// <summary>
     /// Меню и страницы главного окна. Здесь же смена страницы (docs/design.md, раздел 3): первая страница при показе
     /// окна — сразу на месте, новая проявляется (прозрачность и сдвиг снизу) и в конце стоит на месте, прежняя прячется
     /// сразу. Отдельным тестом пока нельзя: второе показанное главное окно за один прогон тестов зависает на щелчке

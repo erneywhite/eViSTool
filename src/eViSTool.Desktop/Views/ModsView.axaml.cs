@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
+using eViSTool.Desktop.Controls;
 using eViSTool.Presentation.ViewModels;
 
 namespace eViSTool.Desktop.Views;
@@ -27,6 +28,13 @@ public partial class ModsView : UserControl
         Grid.AddHandler(DragDrop.DropEvent, Grid_Drop);
         LeftPane.SizeChanged += (_, e) => ApplyCompact(e.NewSize.Width);
         Split.SizeChanged += (_, _) => FitCard();
+        // ширину карточки запоминает только сдвинутый разделитель, не щелчок по нему
+        SplitterMemory.Remember(Splitter, CardColumn, width =>
+        {
+            if (_vm is null) return;
+            _vm.CardWidth = width;
+            _vm.SaveLayout();
+        });
     }
 
     /// <summary>
@@ -106,12 +114,5 @@ public partial class ModsView : UserControl
         // бы только до первого изменения размера окна, а потом карточка сама сузилась бы
         if (Split.Bounds.Width > 0)
             Split.ColumnDefinitions[0].MinWidth = Math.Max(TableMin, Math.Min(TableRoom, Split.Bounds.Width - gap - CardColumn.MinWidth));
-    }
-
-    private void Splitter_DragCompleted(object? sender, VectorEventArgs e)
-    {
-        if (_vm is null) return;
-        _vm.CardWidth = CardColumn.ActualWidth;
-        _vm.SaveLayout();
     }
 }

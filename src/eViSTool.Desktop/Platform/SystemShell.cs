@@ -14,12 +14,20 @@ internal static class SystemShell
 
     public static void OpenFolder(string dir) => Open(dir);
 
+    /// <summary>
+    /// Linux: xdg-open запускается и не ждётся. Без своего рабочего стола (i3, Openbox, задан $BROWSER) он держит браузер
+    /// или файловый менеджер на переднем плане до их выхода: окно программы ждало бы до 5 с на каждой ссылке, а
+    /// запущенной программе потом достались бы закрытые каналы вывода. Нет xdg-open — в журнал ошибок.
+    /// </summary>
     private static void Open(string target)
     {
         if (OperatingSystem.IsWindows())
+        {
             Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
-        else
-            Run("xdg-open", target);
+            return;
+        }
+        try { Start("xdg-open", target); }
+        catch (System.ComponentModel.Win32Exception ex) { CrashLog.Write(ex); }
     }
 
     /// <summary>Открыть папку и выделить в ней файл.</summary>
@@ -31,11 +39,16 @@ internal static class SystemShell
             WindowsExplorer.ShowInFolder(path);
             return;
         }
-        // файловые менеджеры GNOME, KDE, XFCE понимают FileManager1.ShowItems; нет такого — просто папку
+        // файловые менеджеры GNOME, KDE, XFCE понимают FileManager1.ShowItems; нет такого — просто папку. Ответа gdbus
+        // ждём в фоне: пока D-Bus поднимает файловый менеджер, окно программы не замирает
         var uri = "file://" + FreedesktopTrash.Escape(path);
-        if (!Run("gdbus", "call", "--session", "--dest", "org.freedesktop.FileManager1", "--object-path", "/org/freedesktop/FileManager1",
-                "--method", "org.freedesktop.FileManager1.ShowItems", $"['{uri}']", ""))
-            Open(Path.GetDirectoryName(path)!);
+        var dir = Path.GetDirectoryName(path)!;
+        _ = Task.Run(() =>
+        {
+            if (!Run("gdbus", "call", "--session", "--dest", "org.freedesktop.FileManager1", "--object-path", "/org/freedesktop/FileManager1",
+                    "--method", "org.freedesktop.FileManager1.ShowItems", $"['{uri}']", ""))
+                Open(dir);
+        });
     }
 
     /// <summary>В корзину (файл или папку).</summary>
@@ -75,16 +88,19 @@ internal static class SystemShell
         using var process = Process.Start(psi); // Dispose отпускает только описатель, сам процесс живёт дальше
     }
 
-    /// <summary>Запустить и дождаться (до 5 с); false — не запустилось или вышло с ошибкой.</summary>
+    /// <summary>
+    /// Запустить и дождаться (до 5 с; не в потоке окна); false — не запустилось или вышло с ошибкой. Вывод не
+    /// перехватывается: непрочитанный канал заполнился бы, а закрытый достался бы тому, что программа запустила сама.
+    /// </summary>
     private static bool Run(string exe, params string[] args)
     {
         try
         {
-            var psi = new ProcessStartInfo(exe) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+            var psi = new ProcessStartInfo(exe) { UseShellExecute = false };
             foreach (var a in args) psi.ArgumentList.Add(a);
             using var p = Process.Start(psi);
             if (p is null) return false;
-            if (!p.WaitForExit(5000)) return true; // xdg-open может ждать сам; считаем, что открылось
+            if (!p.WaitForExit(5000)) return true; // не ответила за 5 с — считаем, что открылось
             return p.ExitCode == 0;
         }
         catch (System.ComponentModel.Win32Exception)
