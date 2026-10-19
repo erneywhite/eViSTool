@@ -52,7 +52,12 @@ public sealed partial class MainViewModel
     /// своей нет (удалённый профиль) — из любого другого профиля. null — игры нет нигде: показываются буквы «VS».
     /// </summary>
     public IReadOnlyList<string?> IconSearchDirs =>
-        [.. new[] { ActiveProfile?.GameDir }.Concat(Profiles.Select(p => p.GameDir)).Append(Core.Game.GameInstall.FindGameDir())];
+        [.. new[] { ActiveProfile?.GameDir }.Concat(Profiles.Select(p => p.GameDir)).Append(_foundGameDir.Value)];
+
+    // shortcut: игра, найденная поиском, запоминается до перезапуска окна — значок пересчитывается на каждой смене
+    // профиля, а поиск у игры не в стандартной папке читает весь реестр «Установка и удаление программ» в потоке окна.
+    // Поставят игру при открытом окне — значок появится после перезапуска (или раньше — из папки профиля).
+    private readonly Lazy<string?> _foundGameDir = new(Core.Game.GameInstall.FindGameDir);
 
     private void NotifyPlay()
     {

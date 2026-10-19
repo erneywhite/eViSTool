@@ -46,6 +46,21 @@ public sealed partial class ProfileViewModel : ObservableObject
     /// <summary>Варианты цвета в карточке профиля: первым — «не выбран».</summary>
     public static IReadOnlyList<string> IconColorOptions { get; } = ["", .. ProfileIcon.Colors];
 
+    /// <summary>
+    /// Цвет, выбранный в карточке. Список отдаёт null, когда выбор сняли (Ctrl+щелчок по выбранному образцу): цвет
+    /// тогда не меняется, а выделение возвращается на него (после записи привязки — синхронное уведомление внутри неё
+    /// список пропустил бы).
+    /// </summary>
+    public string? ColorChoice
+    {
+        get => IconColor;
+        set
+        {
+            if (value is null) { Ui.Post(() => OnPropertyChanged(nameof(ColorChoice))); return; }
+            IconColor = value;
+        }
+    }
+
     /// <summary>Варианты знака: знаки видов профиля и остальные.</summary>
     public static IReadOnlyList<string> IconGlyphOptions => ProfileIcon.Glyphs;
 
@@ -53,12 +68,13 @@ public sealed partial class ProfileViewModel : ObservableObject
     /// Знак, выбранный в карточке: пока свой не выбран — знак вида профиля. Выбрать знак своего вида — то же, что
     /// «не выбран»: в профиль ничего не пишется, и при смене вида (клонирование в сервер) знак сменится сам.
     /// </summary>
-    public string GlyphChoice
+    public string? GlyphChoice
     {
         get => BadgeGlyph;
         set
         {
-            if (value is null) return; // ListBox сбрасывает выбор при пересоздании списка
+            // выбор сняли (Ctrl+щелчок) — знак тот же, выделение вернуть на него (как у ColorChoice)
+            if (value is null) { Ui.Post(() => OnPropertyChanged(nameof(GlyphChoice))); return; }
             IconGlyph = value == KindGlyph ? "" : value;
         }
     }
@@ -69,7 +85,7 @@ public sealed partial class ProfileViewModel : ObservableObject
     /// <summary>Знак вида профиля — им рисуется вариант «не выбран» в выборе знака.</summary>
     public string KindGlyph => IsHosted ? "cloud" : IsServer ? "server" : "client";
 
-    public bool HasCustomIcon => IconColor.Length > 0 || IconGlyph.Length > 0;
+    public bool HasCustomIcon => !string.IsNullOrEmpty(IconColor) || !string.IsNullOrEmpty(IconGlyph);
 
     /// <summary>Вернуть значок по умолчанию.</summary>
     [RelayCommand]
@@ -83,6 +99,7 @@ public sealed partial class ProfileViewModel : ObservableObject
     partial void OnIconColorChanged(string value)
     {
         Model.IconColor = ProfileIcon.Color(value);
+        OnPropertyChanged(nameof(ColorChoice));
         OnPropertyChanged(nameof(HasCustomIcon));
         (_remembered ?? _changed)(this);
     }

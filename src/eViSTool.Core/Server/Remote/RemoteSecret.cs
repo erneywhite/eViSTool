@@ -19,6 +19,10 @@ public static class RemoteSecret
         SecretProtector.Unprotect(stored, Entropy) is { } text && ConnectionCode.TryParse(text, out var code) ? code : null;
 
     /// <summary>Ошибка подключения к удалённому агенту — человеческими словами.</summary>
+    /// <summary>Ошибка, которую повтор не вылечит: ключ не подходит, сертификат не тот — нужен новый код подключения.</summary>
+    public static bool NeedsNewCode(Exception ex) =>
+        ex is AgentHttpException { StatusCode: 401 } or HttpRequestException { InnerException: System.Security.Authentication.AuthenticationException };
+
     public static string Describe(Exception ex) => ex switch
     {
         AgentHttpException { StatusCode: 401 } => Loc.T("remote.errKey"),

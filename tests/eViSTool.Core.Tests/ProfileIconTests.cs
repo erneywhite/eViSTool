@@ -18,6 +18,19 @@ public sealed class ProfileIconTests
         Assert.Equal("server", ProfileIcon.Glyph("server")); // знак вида можно выбрать и профилю другого вида
     }
 
+    /// <summary>Каждый цвет и знак назван на обоих языках — так их читает экранный диктор (ключи собираются из имени).</summary>
+    [Fact]
+    public void EveryColorAndSign_HasANameInEveryLanguage()
+    {
+        foreach (var lang in new[] { "ru", "en" })
+        {
+            var keys = Localization.Loc.Keys(lang).ToHashSet();
+            var missing = ProfileIcon.Colors.Select(c => $"icon.color.{c}").Concat(ProfileIcon.Glyphs.Select(g => $"icon.glyph.{g}"))
+                .Append("icon.color.none").Where(k => !keys.Contains(k)).ToList();
+            Assert.True(missing.Count == 0, $"{lang}: нет {string.Join(", ", missing)}");
+        }
+    }
+
     [Fact]
     public void Unset_NotWritten_Set_RoundTrips()
     {

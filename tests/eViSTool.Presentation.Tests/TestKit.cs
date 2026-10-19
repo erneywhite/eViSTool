@@ -162,6 +162,8 @@ internal sealed class ScriptedDialogs : IDisposable
     public int TrashOpened { get; set; }
     /// <summary>Сколько раз модель просила перезапустить окно.</summary>
     public int Restarts { get; set; }
+    /// <summary>Что сделать, пока вопрос «открыт» (до ответа): щёлкнуть что-то ещё, сменить профиль.</summary>
+    public Action<string>? OnAsk { get; init; }
 
     public ScriptedDialogs(params Answer[] answers)
     {
@@ -174,6 +176,7 @@ internal sealed class ScriptedDialogs : IDisposable
     internal Answer Next(string text)
     {
         Asked.Add(text);
+        OnAsk?.Invoke(text);
         return _answers.Count > 0 ? _answers.Dequeue() : throw new InvalidOperationException("Неожиданный вопрос: " + text);
     }
 }

@@ -181,21 +181,24 @@ public sealed partial class ModCardViewModel : ObservableObject
         {
             true => Loc.T("mcard.compatYes", branch),
             false => Loc.T("mcard.compatNone", branch),
+            // последняя версия стоит, но под эту ветку автор её не отметил — модбазу спрашивали, ответ «не знаем»
+            null when row.Kind == ModStatus.UpToDate => Loc.T("mcard.compatUnmarked", branch),
             null => Loc.T("mcard.compatUnknown"),
         };
     }
 
     /// <summary>
     /// Совместим ли мод с этой версией игры: true — модбаза знает релиз под эту ветку, false — знает, что такого нет,
-    /// null — неизвестно (не сверяли, модбаза не ответила, мода в ней нет, файл не читается, мод хостера, игра не найдена).
-    /// Раньше «не ответила» и «не читается» показывались как совместимые.
+    /// null — неизвестно (не сверяли, модбаза не ответила, мода в ней нет, файл не читается, мод хостера, игра не найдена,
+    /// или стоит последняя версия, которую автор под эту ветку не отметил). Раньше «не ответила» и «не читается»
+    /// показывались как совместимые.
     /// </summary>
     internal static bool? Compat(ModRowViewModel row, ModVersion? game)
     {
         if (row.IsHosterMod || game is null) return null;
         return row.Kind switch
         {
-            ModStatus.UpToDate or ModStatus.UpdateAvailable or ModStatus.Pinned => true,
+            ModStatus.UpToDate or ModStatus.UpdateAvailable or ModStatus.Pinned when row.Result.LatestCompatible is not null => true,
             ModStatus.NoCompatibleRelease => false,
             _ => null,
         };

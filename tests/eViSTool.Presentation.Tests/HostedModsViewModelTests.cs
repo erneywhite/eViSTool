@@ -292,6 +292,42 @@ public sealed class HostedModsViewModelTests : IDisposable
         Assert.True(Row(mods, "alpha").IsEnabled);
     });
 
+    /// <summary>
+    /// Щелчок, который ждал в очереди, пока шло прежнее переключение, отменяется, если профиль за это время сменили:
+    /// второй сервер у того же хостера с теми же путями — мод с тем же файлом нашёлся бы в его таблице и переключился бы там.
+    /// </summary>
+    [Fact]
+    public void Toggle_QueuedClick_IsDropped_WhenTheProfileWasSwitchedMeanwhile() => Sta.Run(() =>
+    {
+        _host.PutMod("/Mods/alpha_1.0.0.zip", "alpha", "1.0.0");
+        _host.PutMod("/Mods/beta_1.0.0.zip", "beta", "1.0.0");
+        var (main, mods, _) = Open();
+        var twin = new GameProfile
+        {
+            Name = "Twin", Kind = ProfileKind.Server, RemoteCode = GameProfile.HostedMarker,
+            Hosted = JsonConvert.DeserializeObject<HostedConnection>(JsonConvert.SerializeObject(_host.Profile.Hosted)),
+        };
+        var other = new ProfileViewModel(twin, _ => { });
+        main.Profiles.Add(other);
+        var beta = Row(mods, "beta");
+        Task? queued = null;
+        using var dialogs = new ScriptedDialogs(Answer.Yes, Answer.Yes)
+        {
+            OnAsk = _ =>
+            {
+                if (queued is not null) return;
+                queued = mods.ToggleEnabledCommand.ExecuteAsync(beta); // встал в очередь: первое переключение ждёт ответа
+                main.ActiveProfile = other;
+            },
+        };
+
+        Sta.Wait(mods.ToggleEnabledCommand.ExecuteAsync(Row(mods, "alpha")));
+        Sta.Wait(queued!);
+
+        Assert.Single(dialogs.Asked); // второй щелчок до вопроса не дошёл
+        Assert.DoesNotContain("beta", Disabled()?.Select(t => (string?)t) ?? []);
+    });
+
     [Fact]
     public async Task ModDisabler_DisablesAModOfAHostedServer_ByItsRemotePath()
     {

@@ -61,6 +61,16 @@ public sealed partial class MainViewModel
     /// <summary>Копии одиночных миров редактируемого профиля (только у игрового профиля).</summary>
     [ObservableProperty] private WorldCopiesViewModel? _worldCopies;
 
+    /// <summary>
+    /// Открыть «Профили» на этом профиле: кнопки «Подключение…», «Профили» на «Сервере» и в плашке «Моих модов» говорят
+    /// о профиле, который сейчас активен, а «Профили» сами по себе показывают тот, что правили последним.
+    /// </summary>
+    public void OpenProfileEditor(ProfileViewModel? profile)
+    {
+        if (profile is not null) EditedProfile = profile;
+        SelectedTab = AppTab.Profiles;
+    }
+
     partial void OnEditedProfileChanged(ProfileViewModel? value)
     {
         NotifyEditedDefaultServer();

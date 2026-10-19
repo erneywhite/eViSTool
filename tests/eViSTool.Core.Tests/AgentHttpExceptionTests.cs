@@ -24,4 +24,15 @@ public sealed class AgentHttpExceptionTests
         Assert.Equal(Localization.Loc.T("remote.errOldAgent"), RemoteSecret.Describe(new AgentHttpException(404, "нет такого")));
         Assert.Equal("сервер запущен", RemoteSecret.Describe(new AgentHttpException(409, "сервер запущен")));
     }
+
+    [Fact]
+    public void OnlyKeyAndCertificate_NeedANewCode()
+    {
+        // повтор не вылечит — пустая консоль удалённого сервера говорит «поправь подключение», а не «жди связи»
+        Assert.True(RemoteSecret.NeedsNewCode(new AgentHttpException(401, "нет доступа")));
+        Assert.True(RemoteSecret.NeedsNewCode(new HttpRequestException("tls", new System.Security.Authentication.AuthenticationException())));
+        Assert.False(RemoteSecret.NeedsNewCode(new HttpRequestException("нет связи")));
+        Assert.False(RemoteSecret.NeedsNewCode(new TaskCanceledException()));
+        Assert.False(RemoteSecret.NeedsNewCode(new AgentHttpException(429, "подожди")));
+    }
 }

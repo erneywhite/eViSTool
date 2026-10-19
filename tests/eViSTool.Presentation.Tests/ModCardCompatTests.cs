@@ -14,10 +14,13 @@ public sealed class ModCardCompatTests
 {
     private static readonly ModVersion Game = ModVersion.ParseOrNull("1.22.7")!;
 
-    private static ModRowViewModel Row(ModStatus status, bool pinned = false)
+    private static ModRowViewModel Row(ModStatus status, bool known = true)
     {
         var local = new LocalMod("/mods/alpha.zip", new ModInfo { ModId = "alpha", Name = "Alpha", Version = "1.0.0" }, null);
-        return new ModRowViewModel(new ModCheckResult { Local = local, Status = status }, [], pinned, ProfileKind.Client);
+        // модбаза знает релиз под ветку игры — так у статусов «последняя», «есть обновление», «закреплён» после проверки
+        var release = known && status is ModStatus.UpToDate or ModStatus.UpdateAvailable or ModStatus.Pinned
+            ? new eViSTool.Core.ModDb.ModDbRelease { ModVersion = "1.0.0", Tags = ["v1.22.7"] } : null;
+        return new ModRowViewModel(new ModCheckResult { Local = local, Status = status, LatestCompatible = release }, [], false, ProfileKind.Client);
     }
 
     [Theory]
@@ -31,6 +34,14 @@ public sealed class ModCardCompatTests
     [InlineData(ModStatus.Unreadable, null)]
     public void Only_a_modDb_answer_makes_a_mod_compatible_or_not(ModStatus status, bool? expected) =>
         Assert.Equal(expected, ModCardViewModel.Compat(Row(status), Game));
+
+    /// <summary>
+    /// Стоит последняя версия, но автор не отметил её под ветку игры (UpToDate без совместимого релиза): это не «✔
+    /// совместим» зелёным — каталог для того же мода пишет «нет версии», а примечание в карточке — «автор не отметил».
+    /// </summary>
+    [Fact]
+    public void Latest_version_not_marked_for_the_branch_is_not_green() =>
+        Assert.Null(ModCardViewModel.Compat(Row(ModStatus.UpToDate, known: false), Game));
 
     [Fact]
     public void Without_the_game_version_compatibility_is_unknown() =>

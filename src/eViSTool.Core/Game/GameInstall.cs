@@ -113,10 +113,14 @@ public static class GameInstall
     /// <summary>
     /// Где игра по записи установщика в реестре Windows (список «Установка и удаление программ»): установщик Vintage Story
     /// пишет туда InstallLocation, а ставят игру куда угодно — на другой диск, в свою папку. Записи смотрим у пользователя
-    /// и у всей системы (64- и 32-битная ветка); на других системах — пусто.
+    /// и у всей системы (64- и 32-битная ветка); на других системах — пусто. Реестр читается, только когда до этих папок
+    /// дошла очередь: игра нашлась в стандартном месте — FindGameDir его не трогает (сотни записей, в том числе в потоке окна).
     /// </summary>
-    public static IEnumerable<string> RegistryInstallDirs() =>
-        OperatingSystem.IsWindows() ? GameDirsFromUninstallEntries(ReadUninstallEntries()) : [];
+    public static IEnumerable<string> RegistryInstallDirs()
+    {
+        if (!OperatingSystem.IsWindows()) yield break;
+        foreach (var dir in GameDirsFromUninstallEntries(ReadUninstallEntries())) yield return dir;
+    }
 
     /// <summary>
     /// Папки игры из записей «Установка и удаление программ»: только «Vintage Story…»; папка — InstallLocation, а без
@@ -162,9 +166,15 @@ public static class GameInstall
                 if (list is null) continue;
                 foreach (var name in list.GetSubKeyNames())
                 {
-                    using var app = list.OpenSubKey(name);
-                    if (app?.GetValue("DisplayName") is not string display) continue;
-                    entries.Add(new UninstallEntry(display, app.GetValue("InstallLocation") as string, app.GetValue("DisplayIcon") as string));
+                    // запись со своим запретом доступа (бывает у антивирусов, корпоративных агентов) — без неё, а не без
+                    // всех, что идут после: Vintage Story по алфавиту ближе к концу
+                    try
+                    {
+                        using var app = list.OpenSubKey(name);
+                        if (app?.GetValue("DisplayName") is not string display) continue;
+                        entries.Add(new UninstallEntry(display, app.GetValue("InstallLocation") as string, app.GetValue("DisplayIcon") as string));
+                    }
+                    catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException) { }
                 }
             }
             // реестр недоступен или ветки нет (32-битная на чистой системе) — просто без неё

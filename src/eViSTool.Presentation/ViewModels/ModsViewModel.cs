@@ -186,12 +186,16 @@ public sealed partial class ModsViewModel : ObservableObject
         RefreshSaidJob();
     }
 
-    /// <summary>Ширина карточки (тянется разделителем, запоминается).</summary>
+    /// <summary>Ширина карточки (тянется разделителем, запоминается). Нижняя граница — как минимум колонки в окне (280):
+    /// иначе оставленная разделителем ширина 280–340 запомнилась бы как 340, и карточка прыгнула бы шире.</summary>
     public double CardWidth
     {
         get => _main.Layout.ModsCardWidth;
-        set { _main.Layout.ModsCardWidth = Math.Max(340, value); OnPropertyChanged(); }
+        set { _main.Layout.ModsCardWidth = Math.Max(CardMinWidth, value); OnPropertyChanged(); }
     }
+
+    /// <summary>Самая узкая карточка «Моих модов» — она же MinWidth её колонки в окне.</summary>
+    public const double CardMinWidth = 280;
 
     public void SaveLayout() => _main.SaveSettings();
 
@@ -305,6 +309,28 @@ public sealed partial class ModsViewModel : ObservableObject
     {
         _disk.SetActive(active);
         _hosted.SetActive(active);
+        // «проверены сегодня, 23:40» после полуночи — уже «вчера»: пересчитать при заходе на вкладку и в полночь, пока она открыта
+        if (active) OnPropertyChanged(nameof(SummaryCheckedText));
+        if (active) ArmMidnight();
+        else _midnight?.Stop();
+    }
+
+    private IUiTimer? _midnight;
+
+    private void ArmMidnight()
+    {
+        if (_midnight is null)
+        {
+            _midnight = Ui.Timer(TimeSpan.FromHours(1));
+            _midnight.Tick += (_, _) =>
+            {
+                OnPropertyChanged(nameof(SummaryCheckedText));
+                ArmMidnight(); // при переводе часов сработает на час раньше или позже — тогда просто ещё раз до полуночи
+            };
+        }
+        _midnight.Stop();
+        _midnight.Interval = DateTime.Today.AddDays(1) - DateTime.Now + TimeSpan.FromSeconds(1);
+        _midnight.Start();
     }
 
     /// <summary>Сторож оповещений серверов у хостера: ему — что окно поставило на сервер («Обновлены моды»).</summary>
@@ -392,14 +418,14 @@ public sealed partial class ModsViewModel : ObservableObject
     /// <summary>Открыт сервер у хостера: моды — по FTP.</summary>
     public bool IsHosted => _main.ActiveProfile?.Model.IsHosted == true;
 
-    /// <summary>У сервера у хостера не определилась версия игры: плашка «укажи её в настройках профиля».</summary>
+    /// <summary>У сервера у хостера не определилась версия игры: плашка «укажи её в «Профилях»».</summary>
     public bool HostedVersionMissing => IsHosted && _hosted.Resolved is { GameVersion: null };
 
     public string HostedVersionMissingText => Loc.T("hosted.versionMissing");
 
     /// <summary>Перейти к настройкам профиля в «Профилях» (подключение, версия игры сервера у хостера).</summary>
     [RelayCommand]
-    private void OpenHostedSettings() => _main.SelectedTab = AppTab.Profiles;
+    private void OpenHostedSettings() => _main.OpenProfileEditor(_main.ActiveProfile);
 
     /// <summary>
     /// Цель для действия, начатого сейчас: снимок активного профиля. Дальше операция работает только с ней —
@@ -669,14 +695,18 @@ public sealed partial class ModsViewModel : ObservableObject
     /// привязан, — переключатели всех строк и карточки гасли на время записи и перечитывания папки модов (у сотни
     /// архивов — секунду-другую, с копиями миров — дольше). Поэтому щелчок во время переключения встаёт в очередь, а
     /// его строка берётся из таблицы, перечитанной к тому времени: два щелчка по одному переключателю возвращают мод как
-    /// было, а не выключают его дважды.
+    /// было, а не выключают его дважды. Щелчок относится к профилю, в котором его сделали: сменили профиль, пока щелчок
+    /// ждал очереди, — он отменяется, иначе мод с тем же файлом переключился бы в другом профиле (клон с той же папкой
+    /// модов, второй сервер у того же хостера).
     /// </summary>
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task ToggleEnabledAsync(ModRowViewModel? row)
     {
+        var owner = _main.ActiveProfile;
         await _toggleGate.WaitAsync();
         try
         {
+            if (_main.ActiveProfile != owner) return; // строки прежнего профиля уже заменены — сбрасывать нечего
             if (row is not null && !Rows.Contains(row))
                 row = Rows.FirstOrDefault(r => r.FilePath == row.FilePath); // таблицу построили заново; мода нет — нечего переключать
             if (row is not null) _renew.Add(row.FilePath);

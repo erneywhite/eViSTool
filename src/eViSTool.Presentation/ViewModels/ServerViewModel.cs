@@ -148,7 +148,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
 
     /// <summary>«Открыть профили» у клиентского профиля и «Подключение…» у сервера у хостера: профиль правят в «Профилях».</summary>
     [RelayCommand]
-    private void OpenProfiles() => _main.SelectedTab = AppTab.Profiles;
+    private void OpenProfiles() => _main.OpenProfileEditor(_main.ActiveProfile);
 
     /// <summary>Общие «Настройки»: там каналы оповещений (переход из вкладки «Оповещения»).</summary>
     internal void OpenAppSettings() => _main.SelectedTab = AppTab.Settings;
@@ -200,7 +200,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     public string ConsoleEmptyTitle => RemoteOffline ? Loc.T("server.emptyOffline") : Loc.T("server.emptyStopped");
 
     /// <summary>Почему запустить нельзя — тогда вместо кнопки эта строка. Пусто — можно (или мешает только идущее действие с кнопки).</summary>
-    public string ConsoleEmptyNote => RemoteOffline ? Loc.T("server.emptyOfflineHint")
+    public string ConsoleEmptyNote => RemoteOffline ? Loc.T(_remoteNeedsFix ? "server.emptyOfflineFix" : "server.emptyOfflineHint")
         : Schedule?.IsRestoring == true ? Loc.T("server.emptyRestoring")
         : "";
 
@@ -212,6 +212,17 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
 
     // удалённый сервер, а связи с его агентом нет: остановлен ли он, неизвестно
     private bool RemoteOffline => IsRemoteProfile && !AgentRunning;
+
+    // связь сама не вернётся (код не читается, ключ или сертификат не подходят): пустая консоль не обещает «появится,
+    // когда связь вернётся», а говорит, что поправить
+    private bool _remoteNeedsFix;
+
+    private void SetRemoteNeedsFix(bool value)
+    {
+        if (_remoteNeedsFix == value) return;
+        _remoteNeedsFix = value;
+        NotifyConsoleEmpty();
+    }
 
     private bool _hadLines; // в консоли были строки — при прошлом изменении списка
 
@@ -367,6 +378,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         Config.BeforeSwitch(nextServer && next is { IsLocal: true } ? next.DataDir : null, nextServer && next!.IsRemote ? next : null);
 
         _stateKnown = false;
+        _remoteNeedsFix = false;
         _monitor.Stop();
         AgentRunning = false;
         State = ServerState.Stopped;
@@ -449,6 +461,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     void IServerMonitorHost.OnRemoteAnswered()
     {
         if (ErrorText.Length > 0 && !IsBusy) ErrorText = "";
+        SetRemoteNeedsFix(false);
     }
 
     void IServerMonitorHost.OnRemoteChecked(Exception? error)
@@ -463,6 +476,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
             }
             else ErrorText = RemoteSecret.Describe(error);
         }
+        SetRemoteNeedsFix(error is not null && DateTime.UtcNow >= _agentRestartingUntil && RemoteSecret.NeedsNewCode(error));
         _stateKnown = true;
         Refresh();
     }
@@ -471,6 +485,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     {
         ErrorText = Loc.T("remote.errDecrypt");
         _stateKnown = true;
+        _remoteNeedsFix = true;
         NotifyConsoleEmpty();
     }
 

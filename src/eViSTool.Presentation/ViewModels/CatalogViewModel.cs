@@ -53,7 +53,7 @@ public sealed partial class CatalogViewModel : ObservableObject
     public double DetailsWidth
     {
         get => _main.Layout.CatalogDetailsWidth;
-        set { _main.Layout.CatalogDetailsWidth = Math.Max(320, value); OnPropertyChanged(); }
+        set { _main.Layout.CatalogDetailsWidth = Math.Max(280, value); OnPropertyChanged(); } // 280 — MinWidth колонки в окне
     }
 
     public void SaveLayout() => _main.SaveSettings();
