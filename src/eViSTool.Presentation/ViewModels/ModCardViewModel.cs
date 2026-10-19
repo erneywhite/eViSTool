@@ -27,6 +27,10 @@ public sealed partial class ModCardViewModel : ObservableObject
     [ObservableProperty] private IReadOnlyList<string> _screenshots = [];
     [ObservableProperty] private string _compatibility;
 
+    /// <summary>Совместимость известна и есть (зелёным) — или известно, что совместимой версии нет (красноватым).</summary>
+    public bool IsCompatible { get; }
+    public bool IsIncompatible { get; }
+
     /// <summary>Вкладка «Версии» (иначе «Обзор»). Список версий грузится при первом открытии.</summary>
     [ObservableProperty] private bool _isVersionsTab;
     [ObservableProperty] private IReadOnlyList<VersionRowViewModel> _versions = [];
@@ -57,6 +61,8 @@ public sealed partial class ModCardViewModel : ObservableObject
         // мод хостера без modinfo (исходник .cs) работает только на сервере хостера
         _side = SideText(row.IsHosterMod && info is null ? "server" : info?.Side);
         _compatibility = CompatibilityText(row, game);
+        IsCompatible = Compat(row, game) == true;
+        IsIncompatible = Compat(row, game) == false;
         var same = previous is not null && row.ModId.Length > 0
                    && string.Equals(previous.Row.ModId, row.ModId, StringComparison.OrdinalIgnoreCase) ? previous : null;
         if (row.Result.Remote is { } remote) Apply(remote);
@@ -171,12 +177,27 @@ public sealed partial class ModCardViewModel : ObservableObject
         if (row.IsHosterMod) return Loc.T("mcard.compatHoster");
         if (game is null) return Loc.T("common.notFound");
         var branch = $"{game.Major}.{game.Minor}.x";
+        return Compat(row, game) switch
+        {
+            true => Loc.T("mcard.compatYes", branch),
+            false => Loc.T("mcard.compatNone", branch),
+            null => Loc.T("mcard.compatUnknown"),
+        };
+    }
+
+    /// <summary>
+    /// Совместим ли мод с этой версией игры: true — модбаза знает релиз под эту ветку, false — знает, что такого нет,
+    /// null — неизвестно (не сверяли, модбаза не ответила, мода в ней нет, файл не читается, мод хостера, игра не найдена).
+    /// Раньше «не ответила» и «не читается» показывались как совместимые.
+    /// </summary>
+    internal static bool? Compat(ModRowViewModel row, ModVersion? game)
+    {
+        if (row.IsHosterMod || game is null) return null;
         return row.Kind switch
         {
-            ModStatus.NotChecked => Loc.T("mcard.compatUnknown"),
-            ModStatus.NotInModDb => Loc.T("mcard.compatUnknown"),
-            ModStatus.NoCompatibleRelease => Loc.T("mcard.compatNone", branch),
-            _ => Loc.T("mcard.compatYes", branch),
+            ModStatus.UpToDate or ModStatus.UpdateAvailable or ModStatus.Pinned => true,
+            ModStatus.NoCompatibleRelease => false,
+            _ => null,
         };
     }
 

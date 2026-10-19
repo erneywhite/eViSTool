@@ -94,6 +94,13 @@
         <Style Selector="TextBlock.cardValue.warn">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
         </Style>
+        <!-- карточка мода: совместимость — зелёным, нет совместимой версии — красноватым (как тон «Состояния») -->
+        <Style Selector="TextBlock.cardValue.good">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Good}" />
+        </Style>
+        <Style Selector="TextBlock.cardValue.danger">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Danger}" />
+        </Style>
     </UserControl.Styles>
 
     <DockPanel Margin="10,4,10,0">
@@ -683,7 +690,8 @@
                                                     <!-- ключевые сведения -->
                                                     <Grid Margin="0,12,0,0" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
                                                         <TextBlock Grid.Row="0" Classes="cardKey" Text="{local:Tr mcard.compat}" />
-                                                        <TextBlock Grid.Row="0" Grid.Column="1" Classes="cardValue" Text="{Binding Compatibility}" />
+                                                        <TextBlock Grid.Row="0" Grid.Column="1" Classes="cardValue" Text="{Binding Compatibility}"
+                                                                   Classes.good="{Binding IsCompatible}" Classes.danger="{Binding IsIncompatible}" />
                                                         <TextBlock Grid.Row="1" Classes="cardKey" Text="{local:Tr mcard.installed}" />
                                                         <TextBlock Grid.Row="1" Grid.Column="1" Classes="cardValue mono" Text="{Binding Row.Installed}" />
                                                         <TextBlock Grid.Row="2" Classes="cardKey" Text="{local:Tr mcard.available}" IsVisible="{Binding Row.CanSkip}" />
