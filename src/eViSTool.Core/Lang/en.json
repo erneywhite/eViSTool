@@ -915,6 +915,7 @@
   "menu.toggle": "Enable / disable",
   "menu.unskip": "Offer skipped versions again",
   "menu.update": "Update",
+  "moddb.badReply": "The mod database sent a reply that could not be read. The site may be under maintenance.",
   "mods.add": "Add mod…",
   "mods.addShort": "Add",
   "mods.addTip": "Install a mod from a zip archive. You can also just drag a zip onto the list.",

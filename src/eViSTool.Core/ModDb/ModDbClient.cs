@@ -31,7 +31,7 @@ public sealed class ModDbClient : IDisposable
         resp.EnsureSuccessStatusCode();
 
         var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-        var data = JsonConvert.DeserializeObject<ModDbModResponse>(json);
+        var data = Parse<ModDbModResponse>(json);
         // API отвечает HTTP 200 с {"statuscode":"404"}, если мода нет
         return data?.StatusCode == "200" ? data.Mod : null;
     }
@@ -52,9 +52,9 @@ public sealed class ModDbClient : IDisposable
                 {
                     r = new ModDbResult(await GetModAsync(id, token).ConfigureAwait(false), null);
                 }
-                catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException && !token.IsCancellationRequested)
+                catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !token.IsCancellationRequested)
                 {
-                    r = new ModDbResult(null, ex.Message);
+                    r = new ModDbResult(null, ex.Message); // и битый ответ: Parse отдаёт его как HttpRequestException
                 }
                 lock (results) results[id] = r;
                 progress?.Report(Interlocked.Increment(ref done));
@@ -67,7 +67,7 @@ public sealed class ModDbClient : IDisposable
     public async Task<IReadOnlyList<ModDbListItem>> GetAllModsAsync(CancellationToken ct = default)
     {
         var json = await _http.GetStringAsync("mods", ct).ConfigureAwait(false);
-        return JsonConvert.DeserializeObject<ModDbListResponse>(json)?.Mods ?? [];
+        return Parse<ModDbListResponse>(json)?.Mods ?? [];
     }
 
     /// <summary>
@@ -79,13 +79,30 @@ public sealed class ModDbClient : IDisposable
         var query = string.Join("&", tagIds.Select(t => $"gameversions[]={t}"));
         if (query.Length == 0) return [];
         var json = await _http.GetStringAsync($"mods?{query}", ct).ConfigureAwait(false);
-        return JsonConvert.DeserializeObject<ModDbListResponse>(json)?.Mods ?? [];
+        return Parse<ModDbListResponse>(json)?.Mods ?? [];
     }
 
     public async Task<IReadOnlyList<ModDbTag>> GetGameVersionsAsync(CancellationToken ct = default)
     {
         var json = await _http.GetStringAsync("gameversions", ct).ConfigureAwait(false);
-        return JsonConvert.DeserializeObject<ModDbGameVersionsResponse>(json)?.GameVersions ?? [];
+        return Parse<ModDbGameVersionsResponse>(json)?.GameVersions ?? [];
+    }
+
+    /// <summary>
+    /// Разбор ответа модбазы. HTTP 200 с телом не того вида (страница техработ, предупреждение PHP перед JSON, обрезанный
+    /// ответ, поле другого типа) — та же сетевая ошибка, что недоступный сайт: её ловят все, кто ходит в модбазу, а каталог
+    /// и ветки игры берут старый кэш.
+    /// </summary>
+    private static T? Parse<T>(string json)
+    {
+        try
+        {
+            return JsonConvert.DeserializeObject<T>(json);
+        }
+        catch (JsonException ex)
+        {
+            throw new HttpRequestException(Loc.T("moddb.badReply"), ex);
+        }
     }
 
     /// <summary>Скачивает файл (архив мода с CDN модбазы). Пишет во временный файл и переименовывает в конце.</summary>
