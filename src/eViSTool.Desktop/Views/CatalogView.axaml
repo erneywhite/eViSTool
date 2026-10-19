@@ -5,7 +5,9 @@
              xmlns:ctl="using:eViSTool.Desktop.Controls"
              xmlns:conv="using:eViSTool.Desktop.Converters"
              x:Class="eViSTool.Desktop.Views.CatalogView"
-             x:DataType="vm:CatalogViewModel">
+             x:DataType="vm:CatalogViewModel"
+             ctl:BackGesture.Command="{Binding ClearSelectionCommand}">
+    <!-- Esc и кнопка «Назад» мыши снимают выбор мода: справа снова «Выбери мод» (ctl:BackGesture) -->
     <UserControl.Styles>
         <!-- фильтры над списком: ровной сеткой, во всю ширину ячейки -->
         <Style Selector="ComboBox.filter">

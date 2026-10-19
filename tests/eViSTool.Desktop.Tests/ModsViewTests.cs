@@ -7,6 +7,7 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -30,7 +31,9 @@ namespace eViSTool.Desktop.Tests;
 /// «Мои моды» с настоящей главной моделью (docs/design.md, разделы 3 и 7): справа, пока мод не выбран, — сводка профиля;
 /// у выбранной строки песочная метка слева; значки модов — иконка из файла мода или буквы цветом мода; пока идёт проверка
 /// обновлений, в колонке статуса — заглушки с бегущим бликом, и только тогда; переключение мода не гасит переключатели, не
-/// сбивает таблице прокрутку и порядок и не сбрасывает карточку (раздел 9). Модбаза поддельная: ответ ждёт, пока тест
+/// сбивает таблице прокрутку и порядок и не сбрасывает карточку (раздел 9). Под вкладками-счётчиками одна песочная
+/// полоска едет к выбранному фильтру; Esc и кнопка «Назад» мыши снимают выбор мода (и в «Каталоге» тоже), Esc в поле
+/// поиска сначала очищает поиск. Модбаза поддельная: ответ ждёт, пока тест
 /// не отменит проверку. Профиль — свой клиентский во временной папке (игра — поддельный сервер 1.22.7, моды alpha с
 /// иконкой и выключенный beta без неё);
 /// настройки программы — в папке data рядом с тестами, после теста прежний файл возвращается. Данные пользователя
@@ -812,5 +815,257 @@ public sealed class ModsViewTests : IDisposable
         Assert.DoesNotContain("checking", grid.Classes);
         Assert.All(InRows<Border>(window, "skeleton"), s => Assert.False(s.IsEffectivelyVisible));
         Assert.Equal(2, InRows<StackPanel>(window, "status").Count(s => s.IsEffectivelyVisible));
+    }
+
+    // ---------- вкладки-счётчики: одна полоска на ряд
+
+    /// <summary>Вкладка-счётчик, отмеченная сейчас (фильтр таблицы).</summary>
+    private static RadioButton CheckedTab(Window root) =>
+        root.GetVisualDescendants().OfType<RadioButton>().Single(r => r.IsChecked == true && r.Theme == root.FindResource("Forest.StatTab"));
+
+    private static double BarLeft(TabIndicator bar) => bar.RenderTransform?.Value.M31 ?? 0;
+
+    [AvaloniaFact]
+    public async Task Counter_tabs_share_one_sand_bar_that_rides_to_the_chosen_filter()
+    {
+        var (window, mods) = await ShowAsync(Main(new HangingModDb()));
+        var bar = (TabIndicator)Named(window, "ModsTabIndicator");
+        var host = (Visual)bar.GetVisualParent()!;
+        Assert.Same(window.FindResource("Forest.Accent"), bar.Background);
+        Assert.Equal(2, bar.Height);
+
+        // при открытии — сразу под «установлено», во всю ширину вкладки; на линии ряда — нижний край рамки под вкладками
+        var all = CheckedTab(window);
+        Assert.Same(all, bar.Tab);
+        Assert.False(bar.IsMoving);
+        Assert.Equal(all.TranslatePoint(default, host)!.Value.X, BarLeft(bar), 3);
+        Assert.Equal(all.Bounds.Width, TabIndicator.BaseWidth * bar.RenderTransform!.Value.M11, 3);
+        var row = host.FindAncestorOfType<Border>()!;
+        var bottom = bar.TranslatePoint(new Point(0, bar.Bounds.Height), window)!.Value.Y;
+        Assert.Equal(row.TranslatePoint(new Point(0, row.Bounds.Height), window)!.Value.Y, bottom, 3);
+
+        // фильтр сменился (вкладки привязаны к нему и пересчитываются по одной) — полоска едет, не пропадая по дороге
+        mods.Filter = ModFilter.Disabled;
+        Dispatcher.UIThread.RunJobs();
+        var disabled = CheckedTab(window);
+        Assert.NotSame(all, disabled);
+        Assert.Same(disabled, bar.Tab);
+        Assert.True(bar.IsMoving);
+        Assert.True(bar.IsVisible);
+        var seen = new List<double>();
+        for (var i = 0; i < 40 && bar.IsMoving; i++)
+        {
+            await Run(10);
+            seen.Add(BarLeft(bar));
+        }
+        var target = disabled.TranslatePoint(default, host)!.Value.X;
+        Assert.Contains(seen, x => x > all.TranslatePoint(default, host)!.Value.X + 0.5 && x < target - 0.5); // ехала
+        Assert.False(bar.IsMoving);
+        Assert.Equal(target, BarLeft(bar), 3);
+        Assert.Equal(disabled.Bounds.Width, TabIndicator.BaseWidth * bar.RenderTransform!.Value.M11, 3);
+
+        // щелчок по «Истории» справа — туда же
+        var history = (RadioButton)Named(window, "ModsHistoryTab");
+        Mouse.Click(window, history);
+        await Run(400);
+        Assert.Equal(ModFilter.History, mods.Filter);
+        Assert.Same(history, bar.Tab);
+        Assert.Equal(history.TranslatePoint(default, host)!.Value.X, BarLeft(bar), 3);
+    }
+
+    // ---------- Esc и кнопка «Назад» мыши: снять выбор мода
+
+    private static void Esc(Window window)
+    {
+        window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+        window.KeyRelease(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    private static void Back(Window window, Visual over)
+    {
+        var at = Mouse.Center(window, over);
+        window.MouseDown(at, MouseButton.XButton1);
+        window.MouseUp(at, MouseButton.XButton1);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    [AvaloniaFact]
+    public async Task Esc_and_the_back_button_return_the_right_panel_to_the_summary()
+    {
+        var (window, mods) = await ShowAsync(Main(new HangingModDb()));
+        var summary = Named(window, "ModsSummary");
+        var grid = (DataGrid)Named(window, "ModsGrid");
+
+        // щелчок по строке: мод выбран, фокус в таблице, справа карточка
+        Mouse.Click(window, RowOf(window, "alpha"), x: 200);
+        Assert.Equal("alpha", mods.Selected?.ModId);
+        Assert.False(summary.IsEffectivelyVisible);
+
+        Esc(window);
+        Assert.Null(mods.Selected);
+        Assert.Null(mods.Card);
+        Assert.Null(grid.SelectedItem);
+        Assert.True(summary.IsEffectivelyVisible);
+        // строка не возвращается сама, когда таблицу строят заново (моды перечитаны)
+        await mods.ReloadAsync();
+        Assert.Null(mods.Selected);
+
+        // кнопка «Назад» мыши — над карточкой справа (где пользователь и смотрит)
+        Mouse.Click(window, RowOf(window, "beta"), x: 200);
+        Assert.Equal("beta", mods.Selected?.ModId);
+        Dispatcher.UIThread.RunJobs();
+        Back(window, window.GetVisualDescendants().OfType<ScrollViewer>().First(v => v.Content is ContentControl { Content: ModCardViewModel }));
+        Assert.Null(mods.Selected);
+        Assert.True(summary.IsEffectivelyVisible);
+    }
+
+    /// <summary>
+    /// Меню строки открыто — «Назад» мыши мимо него только закрывает меню, мод остаётся выбранным; следующее нажатие уже
+    /// снимает выбор. Меню строки закрывается само, раньше, чем нажатие дойдёт до страницы, и передаёт его тому, что под
+    /// ним, — страница это нажатие всё равно не берёт.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Back_button_that_closes_the_row_menu_keeps_the_mod()
+    {
+        var (window, mods) = await ShowAsync(Main(new HangingModDb()));
+        var grid = (DataGrid)Named(window, "ModsGrid");
+        var row = RowOf(window, "alpha");
+        Mouse.Prepare(window);
+        var at = row.TranslatePoint(new Point(200, row.Bounds.Height / 2), window)!.Value;
+        window.MouseDown(at, MouseButton.Right);
+        window.MouseUp(at, MouseButton.Right);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(grid.ContextMenu!.IsOpen);
+        Assert.Equal("alpha", mods.Selected?.ModId);
+
+        var card = window.GetVisualDescendants().OfType<ScrollViewer>().First(v => v.Content is ContentControl { Content: ModCardViewModel });
+        Back(window, card);
+        Assert.False(grid.ContextMenu.IsOpen);
+        Assert.Equal("alpha", mods.Selected?.ModId);
+
+        Back(window, card);
+        Assert.Null(mods.Selected);
+        Assert.True(Named(window, "ModsSummary").IsEffectivelyVisible);
+    }
+
+    [AvaloniaFact]
+    public async Task Esc_in_the_search_box_clears_the_search_before_the_mod()
+    {
+        var (window, mods) = await ShowAsync(Main(new HangingModDb()));
+        mods.Selected = mods.Rows.Single(r => r.ModId == "alpha");
+        var search = window.GetVisualDescendants().OfType<TextBox>().Single(t => t.Classes.Contains("search"));
+        search.Focus();
+        window.KeyTextInput("alp");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("alp", mods.Search);
+
+        Esc(window); // сначала поиск: введённое — не потеря выбора
+        Assert.Equal("", mods.Search);
+        Assert.Equal("alpha", mods.Selected?.ModId);
+
+        Esc(window); // поле пустое — снимается выбор
+        Assert.Null(mods.Selected);
+        Assert.True(Named(window, "ModsSummary").IsEffectivelyVisible);
+    }
+
+    [AvaloniaFact]
+    public async Task Hidden_mods_page_keeps_the_mod_on_esc_and_back()
+    {
+        var (window, mods) = await ShowAsync(Main(new HangingModDb()));
+        mods.Selected = mods.Rows.Single(r => r.ModId == "alpha");
+        var page = (Control)window.Content!;
+        var other = new Border { Background = Brushes.Gray };
+        window.Content = null;
+        Dispatcher.UIThread.RunJobs();
+        window.Content = new Panel { Children = { page, other } }; // как страницы главного окна: видна одна
+        page.IsVisible = false;
+        Mouse.Prepare(window);
+        window.Focus();
+        Esc(window);
+        Back(window, other);
+        Assert.Equal("alpha", mods.Selected?.ModId);
+        Assert.NotNull(mods.Card);
+
+        // страницу снова показали — Esc опять её
+        other.IsVisible = false;
+        page.IsVisible = true;
+        Mouse.Prepare(window);
+        Esc(window);
+        Assert.Null(mods.Selected);
+    }
+
+    /// <summary>
+    /// В главном окне: фокус в боковом меню — Esc всё равно снимает выбор на «Моих модах»; на экране другая страница —
+    /// выбор в «Моих модах» остаётся. Каталог не открываем: он пошёл бы на модбазу.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task In_the_main_window_esc_belongs_to_the_page_on_screen()
+    {
+        var main = Main(new HangingModDb());
+        var chrome = new ResourceInclude(Base) { Source = new Uri("avares://eViSTool/Themes/ForestWindowChrome.axaml") };
+        Application.Current!.Resources.MergedDictionaries.Add(chrome);
+        try
+        {
+            _window = new MainWindow { DataContext = main, Width = 1400, Height = 860 };
+            _window.Show();
+            var mods = main.Mods;
+            await Wait.Until(() => mods.Rows.Count == 2);
+            Mouse.Prepare(_window);
+
+            mods.Selected = mods.Rows.Single(r => r.ModId == "alpha");
+            _window.FindControl<ListBox>("Nav")!.Focus();
+            Esc(_window);
+            Assert.Null(mods.Selected);
+            Assert.Null(mods.Card);
+
+            mods.Selected = mods.Rows.Single(r => r.ModId == "alpha");
+            main.SelectedTab = AppTab.Settings;
+            Dispatcher.UIThread.RunJobs();
+            Esc(_window);
+            Back(_window, _window.FindControl<ListBox>("Nav")!);
+            Assert.Equal("alpha", mods.Selected?.ModId);
+
+            // вернулись на «Мои моды» — снова их Esc
+            main.SelectedTab = AppTab.Mods;
+            Dispatcher.UIThread.RunJobs();
+            Back(_window, _window.FindControl<ListBox>("Nav")!);
+            Assert.Null(mods.Selected);
+        }
+        finally
+        {
+            _window?.Close();
+            _window = null;
+            Application.Current!.Resources.MergedDictionaries.Remove(chrome);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Catalog_esc_and_the_back_button_close_the_mod_card()
+    {
+        var main = Main(new HangingModDb());
+        var catalog = main.Catalog;
+        _window = new Window { Width = 1400, Height = 860, Content = new CatalogView { DataContext = catalog } };
+        _window.Show();
+        Mouse.Prepare(_window);
+        TextBlock Pick() => _window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == Loc.T("catalog.pickMod"));
+        Assert.True(Pick().IsEffectivelyVisible);
+
+        var item = new CatalogItemViewModel(new ModDbListItem { ModId = 1, AssetId = 1, Name = "Alpha" }, new Dictionary<string, string>());
+        catalog.Selected = item;
+        Dispatcher.UIThread.RunJobs();
+        Assert.NotNull(catalog.Details);
+        Assert.False(Pick().IsEffectivelyVisible);
+
+        Esc(_window);
+        Assert.Null(catalog.Selected);
+        Assert.Null(catalog.Details);
+        Assert.True(Pick().IsEffectivelyVisible);
+
+        catalog.Selected = item;
+        Dispatcher.UIThread.RunJobs();
+        Back(_window, Pick().GetVisualParent()!);
+        Assert.Null(catalog.Selected);
+        Assert.Null(catalog.Details);
     }
 }

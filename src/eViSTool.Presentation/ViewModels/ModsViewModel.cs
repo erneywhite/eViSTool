@@ -62,18 +62,19 @@ public sealed partial class ModsViewModel : ObservableObject
     public FilteredList<ModRowViewModel> View { get; }
 
     [ObservableProperty] private string _statusText = "";
-    [ObservableProperty] private ModFilter _filter = ModFilter.All;
+    [ObservableProperty, NotifyCanExecuteChangedFor(nameof(ClearSelectionCommand))] private ModFilter _filter = ModFilter.All;
     [ObservableProperty] private string _search = "";
 
     /// <summary>Сортировка: 0 — сначала важное, 1 — по имени.</summary>
     [ObservableProperty] private int _sortIndex;
 
     /// <summary>Выбранный в таблице мод и его карточка справа.</summary>
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanChangeSelected))] private ModRowViewModel? _selected;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanChangeSelected)), NotifyCanExecuteChangedFor(nameof(ClearSelectionCommand))]
+    private ModRowViewModel? _selected;
 
     /// <summary>Пункты контекстного меню, которые меняют мод: у мода хостера недоступны.</summary>
     public bool CanChangeSelected => Selected is not { CanChange: false };
-    [ObservableProperty] private ModCardViewModel? _card;
+    [ObservableProperty, NotifyCanExecuteChangedFor(nameof(ClearSelectionCommand))] private ModCardViewModel? _card;
     private CancellationTokenSource? _cardLoad;
 
     /// <summary>Таблицу строят заново (<see cref="Rebuild"/>): выбор, который таблица меняет сама, карточку не трогает.</summary>
@@ -85,6 +86,23 @@ public sealed partial class ModsViewModel : ObservableObject
     /// повторяет: отказались, запись не удалась — переключатель так и показывал бы несделанное.
     /// </summary>
     private readonly HashSet<string> _renew = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Снять выбор мода (Esc и кнопка «Назад» мыши): строка в таблице больше не выбрана, справа вместо карточки снова
+    /// сводка профиля. В «Истории» правая панель — про сеанс, а не про мод: там снимать нечего, а спрятанный выбор
+    /// таблицы снимать незаметно не надо.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanClearSelection))]
+    private void ClearSelection()
+    {
+        // пустой выбор сам карточку не убирает (так таблицу перестраивают после операции, см. OnSelectedChanged) — убрать
+        // её явно; без карточки перестройка таблицы и выбор не вернёт
+        _cardLoad?.Cancel();
+        Card = null;
+        Selected = null;
+    }
+
+    private bool CanClearSelection() => !IsHistory && (Selected is not null || Card is not null);
 
     // счётчики над таблицей и на чипах
     [ObservableProperty] private int _updatesAvailable;

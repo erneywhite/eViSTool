@@ -27,8 +27,8 @@ public sealed partial class CatalogViewModel : ObservableObject
     private CancellationTokenSource? _detailsCts;
 
     [ObservableProperty] private IReadOnlyList<CatalogItemViewModel> _results = [];
-    [ObservableProperty] private CatalogItemViewModel? _selected;
-    [ObservableProperty] private ModDetailsViewModel? _details;
+    [ObservableProperty, NotifyCanExecuteChangedFor(nameof(ClearSelectionCommand))] private CatalogItemViewModel? _selected;
+    [ObservableProperty, NotifyCanExecuteChangedFor(nameof(ClearSelectionCommand))] private ModDetailsViewModel? _details;
     [ObservableProperty] private string _search = "";
     /// <summary>Теги; значение null — «все теги» (подпись переводится, значение — нет).</summary>
     [ObservableProperty] private IReadOnlyList<Choice<string?>> _tags = [];
@@ -334,6 +334,16 @@ public sealed partial class CatalogViewModel : ObservableObject
         _detailsCts = new CancellationTokenSource();
         _ = Details.LoadAsync(_db, _detailsCts.Token);
     }
+
+    /// <summary>Снять выбор мода (Esc и кнопка «Назад» мыши): плитка больше не выбрана, справа вместо карточки — «Выбери мод».</summary>
+    [RelayCommand(CanExecute = nameof(CanClearSelection))]
+    private void ClearSelection()
+    {
+        Selected = null; // карточку закрывает OnSelectedChanged
+        Details = null;
+    }
+
+    private bool CanClearSelection() => Selected is not null || Details is not null;
 
     /// <summary>Установка из карточки (последний совместимый релиз или выбранный).</summary>
     public async Task InstallAsync(ModDetailsViewModel details, ModDbRelease release)
