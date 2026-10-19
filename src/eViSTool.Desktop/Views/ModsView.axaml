@@ -24,6 +24,73 @@
             <Setter Property="Margin" Value="0" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         </Style>
+
+        <!-- выбранная строка таблицы: кроме фона выбора — песочная метка 2 px у левого края, проявляется за 180 мс -->
+        <Style Selector="Border.rowMark">
+            <Setter Property="Width" Value="2" />
+            <Setter Property="Margin" Value="0,10" />
+            <Setter Property="CornerRadius" Value="1" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Background" Value="{DynamicResource Forest.Accent}" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="DataGridRow:selected Border.rowMark">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+
+        <!-- пока идёт проверка обновлений (у таблицы класс checking), в колонке статуса вместо текста — полоска-заглушка с
+             бегущим бликом: светлая полоса (кромка Forest.Edge поверх Raised) пробегает слева направо за 1 с, по кругу.
+             Анимация одна на всех — в этом стиле; без проверки стиль не действует и ничего не крутится -->
+        <Style Selector="Border.skeleton">
+            <Setter Property="Width" Value="96" />
+            <Setter Property="Height" Value="10" />
+            <Setter Property="CornerRadius" Value="5" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Background" Value="{DynamicResource Forest.Raised}" />
+            <Setter Property="ClipToBounds" Value="True" />
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="Border.glint">
+            <Setter Property="Width" Value="96" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Background">
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                    <GradientStop Offset="0" Color="Transparent" />
+                    <GradientStop Offset="0.5" Color="{StaticResource Forest.EdgeColor}" />
+                    <GradientStop Offset="1" Color="Transparent" />
+                </LinearGradientBrush>
+            </Setter>
+        </Style>
+        <Style Selector="DataGrid.checking Border.skeleton">
+            <Setter Property="IsVisible" Value="True" />
+        </Style>
+        <Style Selector="DataGrid.checking StackPanel.status">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="DataGrid.checking Border.glint">
+            <Style.Animations>
+                <Animation Duration="0:0:1" IterationCount="Infinite">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="TranslateTransform.X" Value="-96" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="TranslateTransform.X" Value="96" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+
+        <!-- сводка профиля: проблемы — тёплым цветом -->
+        <Style Selector="TextBlock.cardValue.warn">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
+        </Style>
     </UserControl.Styles>
 
     <DockPanel Margin="10,4,10,0">
@@ -302,6 +369,7 @@
                                   SelectionMode="Single" RowHeight="54" Background="Transparent" RowBackground="Transparent" BorderThickness="0"
                                   ColumnHeaderTheme="{StaticResource Forest.ColumnHeader}"
                                   ctl:DoubleTap.Command="{Binding OpenPageCommand}" ctl:DoubleTap.CommandParameter="{Binding Selected}"
+                                  Classes.checking="{Binding IsChecking}"
                                   DragDrop.AllowDrop="True" AutomationProperties.AutomationId="ModsGrid">
                             <!-- контекстное меню строки: всё, что умеет вкладка; строка под курсором выделяется до открытия меню -->
                             <DataGrid.ContextMenu>
@@ -326,10 +394,14 @@
                                 <DataGridTemplateColumn Header="{local:Tr col.on}" Width="58" SortMemberPath="IsEnabled">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate x:DataType="vm:ModRowViewModel">
-                                            <CheckBox Theme="{StaticResource Forest.Switch}" IsChecked="{Binding IsEnabled, Mode=OneWay}" Focusable="False"
-                                                      Command="{Binding $parent[DataGrid].((vm:ModsViewModel)DataContext).ToggleEnabledCommand}"
-                                                      CommandParameter="{Binding}" ToolTip.Tip="{local:Tr col.onTip}" IsEnabled="{Binding CanChange}"
-                                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            <Panel>
+                                                <!-- метка выбранной строки у левого края таблицы (стиль Border.rowMark) -->
+                                                <Border Classes="rowMark" />
+                                                <CheckBox Theme="{StaticResource Forest.Switch}" IsChecked="{Binding IsEnabled, Mode=OneWay}" Focusable="False"
+                                                          Command="{Binding $parent[DataGrid].((vm:ModsViewModel)DataContext).ToggleEnabledCommand}"
+                                                          CommandParameter="{Binding}" ToolTip.Tip="{local:Tr col.onTip}" IsEnabled="{Binding CanChange}"
+                                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Panel>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
@@ -337,9 +409,11 @@
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate x:DataType="vm:ModRowViewModel">
                                             <DockPanel VerticalAlignment="Center" Classes.faded="{Binding !IsEnabled}">
+                                                <!-- значок с буквами: оттенок по modid (ModTint), у каждого мода свой -->
                                                 <Border DockPanel.Dock="Left" Width="30" Height="30" CornerRadius="6" Margin="0,0,12,0"
-                                                        Background="{DynamicResource Forest.Raised}" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="1">
-                                                    <TextBlock Text="{Binding Initials}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}"
+                                                        Background="{Binding Hue, Converter={x:Static conv:ModTintBrushes.Background}}">
+                                                    <TextBlock Text="{Binding Initials}" FontSize="10" FontWeight="Bold"
+                                                               Foreground="{Binding Hue, Converter={x:Static conv:ModTintBrushes.Foreground}}"
                                                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Border>
                                                 <StackPanel VerticalAlignment="Center">
@@ -380,16 +454,22 @@
                                 <DataGridTemplateColumn Header="{local:Tr col.status}" Width="170" SortMemberPath="Importance">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate x:DataType="vm:ModRowViewModel">
-                                            <!-- при наведении — что изменилось в обновлении / в чём проблема -->
-                                            <StackPanel VerticalAlignment="Center" Margin="10,0,6,0" Background="Transparent" ToolTip.Tip="{Binding Note}">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <Ellipse Classes="tone" ctl:EnumClass.Value="{Binding Tone}" />
-                                                    <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding Tone}" Text="{Binding StatusText}"
-                                                               TextTrimming="CharacterEllipsis" />
+                                            <Panel Margin="10,0,6,0">
+                                                <!-- при наведении — что изменилось в обновлении / в чём проблема -->
+                                                <StackPanel Classes="status" VerticalAlignment="Center" Background="Transparent" ToolTip.Tip="{Binding Note}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Ellipse Classes="tone" ctl:EnumClass.Value="{Binding Tone}" />
+                                                        <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding Tone}" Text="{Binding StatusText}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding SubState}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="12,1,0,0"
+                                                               IsVisible="{Binding SubState, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                                                 </StackPanel>
-                                                <TextBlock Text="{Binding SubState}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="12,1,0,0"
-                                                           IsVisible="{Binding SubState, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                                            </StackPanel>
+                                                <!-- идёт проверка обновлений — заглушка вместо статуса (стили Border.skeleton и Border.glint) -->
+                                                <Border Classes="skeleton">
+                                                    <Border Classes="glint" />
+                                                </Border>
+                                            </Panel>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
@@ -468,8 +548,32 @@
             <!-- ===== карточка выбранного мода ===== -->
             <Border Grid.Column="2" Classes="card" IsVisible="{Binding !IsHistory}">
                 <Panel>
-                    <TextBlock Text="{local:Tr mcard.pick}" Foreground="{DynamicResource Forest.Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                               IsVisible="{Binding Card, Converter={x:Static ObjectConverters.IsNull}}" />
+                    <!-- ===== мод не выбран: сводка профиля — сколько включено, проблемы, когда проверялись обновления ===== -->
+                    <StackPanel Margin="18,16,18,16" IsVisible="{Binding Card, Converter={x:Static ObjectConverters.IsNull}}"
+                                AutomationProperties.AutomationId="ModsSummary">
+                        <TextBlock Classes="cardTitle" Text="{Binding SummaryTitle}" TextWrapping="Wrap" />
+                        <Grid Margin="0,10,0,0" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto">
+                            <TextBlock Grid.Row="0" Classes="cardKey" Text="{local:Tr mods.summaryEnabled}" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Classes="cardValue" Text="{Binding SummaryEnabledText}"
+                                       AutomationProperties.AutomationId="ModsSummaryEnabled" />
+                            <TextBlock Grid.Row="1" Classes="cardKey" Text="{local:Tr mods.summaryProblems}" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Classes="cardValue" Classes.warn="{Binding HasProblems}"
+                                       Text="{Binding SummaryProblemsText}" AutomationProperties.AutomationId="ModsSummaryProblems" />
+                            <TextBlock Grid.Row="2" Classes="cardKey" Text="{local:Tr mods.summaryUpdates}" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Classes="cardValue" Text="{Binding SummaryCheckedText}"
+                                       AutomationProperties.AutomationId="ModsSummaryChecked" />
+                        </Grid>
+                        <!-- та же команда, что «Проверить» вверху; главная, пока нет «Обновить всё» -->
+                        <Button Margin="0,14,0,0" HorizontalAlignment="Stretch" Command="{Binding CheckCommand}" Classes.primary="{Binding !HasUpdates}"
+                                ToolTip.Tip="{local:Tr mods.checkTip}" AutomationProperties.AutomationId="ModsSummaryCheck">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Classes="icon" Data="{StaticResource Icon.Refresh}" Width="14" Height="14" Margin="0,0,8,0" />
+                                <TextBlock Text="{local:Tr mods.check}" />
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Classes="hint" Margin="0,10,0,0" Text="{local:Tr mods.summaryHint}"
+                                   IsVisible="{Binding ModCount, Converter={x:Static conv:Counts.Positive}}" />
+                    </StackPanel>
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                                   IsVisible="{Binding Card, Converter={x:Static ObjectConverters.IsNotNull}}">
                         <ContentControl Content="{Binding Card}">
@@ -479,10 +583,15 @@
                                         <!-- шапка: логотип с модбазы или буквы -->
                                         <Border Background="{DynamicResource Forest.Raised}" CornerRadius="9,9,0,0" Height="150" ClipToBounds="True">
                                             <Panel>
-                                                <!-- буквы под картинкой: логотипа нет, он грузится или не загрузился — видно их -->
-                                                <TextBlock IsVisible="{Binding #Logo1.Source, Converter={x:Static ObjectConverters.IsNull}}" Text="{Binding Row.Initials}"
-                                                           FontSize="40" FontWeight="Bold" Foreground="{DynamicResource Forest.Accent}"
-                                                           Margin="20,0,0,0" VerticalAlignment="Center" Opacity="0.85" />
+                                                <!-- буквы под картинкой: логотипа нет, он грузится или не загрузился — видно их цветом мода,
+                                                     как его значок в таблице. Фон шапки — тот же цвет вполсилы, как размытый логотип у мода с ним:
+                                                     во всю ширину карточки полный цвет кричал бы -->
+                                                <Panel IsVisible="{Binding #Logo1.Source, Converter={x:Static ObjectConverters.IsNull}}">
+                                                    <Border Background="{Binding Row.Hue, Converter={x:Static conv:ModTintBrushes.Background}}" Opacity="0.5" />
+                                                    <TextBlock Text="{Binding Row.Initials}" FontSize="40" FontWeight="Bold"
+                                                               Foreground="{Binding Row.Hue, Converter={x:Static conv:ModTintBrushes.Foreground}}"
+                                                               Margin="20,0,0,0" VerticalAlignment="Center" />
+                                                </Panel>
                                                 <!-- логотип целиком, по краям — он же, размытый. Размытый — во всю ширину и прижат к верху,
                                                      низ обрезает шапка: Image у Avalonia обрезает UniformToFill по центру
                                                      своих границ, а в StackPanel её высоту ничто не ограничивает -->

@@ -408,6 +408,9 @@ public sealed class CatalogItemViewModel(ModDbListItem item, IReadOnlyDictionary
     public string? Logo { get; } = string.IsNullOrWhiteSpace(item.Logo) ? null : item.Logo;
     public string Stats { get; } = $"⬇ {item.Downloads:N0}   ♥ {item.Follows:N0}";
     public string Initials { get; } = ModRowViewModel.MakeInitials(item.Name ?? item.PrimaryModId ?? "?");
+
+    /// <summary>Оттенок значка с буквами — тот же, что у этого мода в «Моих модах» (по modid).</summary>
+    public int Hue { get; } = ModTint.Hue(item.PrimaryModId ?? item.Name);
     public string Tag { get; } = item.Tags.FirstOrDefault(t => !string.IsNullOrWhiteSpace(t)) ?? "";
     public string? InstalledVersion { get; } = item.PrimaryModId is { } id && installed.TryGetValue(id, out var v) ? v : null;
     public bool IsInstalled => InstalledVersion is not null;
@@ -447,6 +450,9 @@ public sealed partial class ModDetailsViewModel : ObservableObject
     public string TagsText { get; }
     public string PageUrl { get; }
     public string Initials { get; }
+
+    /// <summary>Оттенок шапки с буквами, когда логотипа нет (<see cref="ModTint"/>).</summary>
+    public int Hue { get; }
     public string Tag { get; }
 
     public ModDetailsViewModel(ModDbListItem item, ModVersion? game, IReadOnlyDictionary<string, string> installed, CatalogViewModel owner)
@@ -468,6 +474,7 @@ public sealed partial class ModDetailsViewModel : ObservableObject
         TagsText = string.Join(", ", item.Tags.Where(t => !string.IsNullOrWhiteSpace(t)));
         Tag = item.Tags.FirstOrDefault(t => !string.IsNullOrWhiteSpace(t)) ?? "";
         Initials = ModRowViewModel.MakeInitials(Name);
+        Hue = ModTint.Hue(item.PrimaryModId ?? item.Name);
         PageUrl = item.PageUrl;
         Description = item.Summary ?? "";
         RefreshInstalled(installed);

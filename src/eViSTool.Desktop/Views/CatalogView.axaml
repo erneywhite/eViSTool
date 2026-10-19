@@ -97,14 +97,18 @@
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:CatalogItemViewModel">
                             <DockPanel>
-                                <!-- логотип; под ним буквы — пока картинки нет, она грузится или не загрузилась -->
+                                <!-- логотип; под ним буквы на фоне цвета мода (по modid, как в «Моих модах») — пока картинки
+                                     нет, она грузится или не загрузилась -->
                                 <Border DockPanel.Dock="Left" Width="46" Height="46" CornerRadius="6" Margin="0,0,14,0" ClipToBounds="True"
                                         Background="{DynamicResource Forest.Raised}" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="1"
                                         VerticalAlignment="Top">
                                     <Panel>
-                                        <TextBlock IsVisible="{Binding #Logo1.Source, Converter={x:Static ObjectConverters.IsNull}}" Text="{Binding Initials}"
-                                                   FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}"
-                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Border IsVisible="{Binding #Logo1.Source, Converter={x:Static ObjectConverters.IsNull}}"
+                                                Background="{Binding Hue, Converter={x:Static conv:ModTintBrushes.Background}}">
+                                            <TextBlock Text="{Binding Initials}" FontSize="14" FontWeight="Bold"
+                                                       Foreground="{Binding Hue, Converter={x:Static conv:ModTintBrushes.Foreground}}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
                                         <Image x:Name="Logo1" ctl:RemoteImage.Source="{Binding Logo}" ctl:RemoteImage.DecodeWidth="92" Stretch="UniformToFill"
                                                RenderOptions.BitmapInterpolationMode="HighQuality" />
                                     </Panel>
@@ -143,10 +147,14 @@
                                         <!-- шапка: логотип или буквы, тег -->
                                         <Border Background="{DynamicResource Forest.Raised}" CornerRadius="9,9,0,0" Height="150" ClipToBounds="True">
                                             <Panel>
-                                                <!-- буквы под картинкой: логотипа нет, он грузится или не загрузился — видно их -->
-                                                <TextBlock IsVisible="{Binding #Logo2.Source, Converter={x:Static ObjectConverters.IsNull}}" Text="{Binding Initials}"
-                                                           FontSize="40" FontWeight="Bold" Foreground="{DynamicResource Forest.Accent}"
-                                                           Margin="20,0,0,0" VerticalAlignment="Center" Opacity="0.85" />
+                                                <!-- буквы под картинкой: логотипа нет, он грузится или не загрузился — видно их цветом
+                                                     мода, как его плитку в списке; фон шапки — тот же цвет вполсилы (как в «Моих модах») -->
+                                                <Panel IsVisible="{Binding #Logo2.Source, Converter={x:Static ObjectConverters.IsNull}}">
+                                                    <Border Background="{Binding Hue, Converter={x:Static conv:ModTintBrushes.Background}}" Opacity="0.5" />
+                                                    <TextBlock Text="{Binding Initials}" FontSize="40" FontWeight="Bold"
+                                                               Foreground="{Binding Hue, Converter={x:Static conv:ModTintBrushes.Foreground}}"
+                                                               Margin="20,0,0,0" VerticalAlignment="Center" />
+                                                </Panel>
                                                 <!-- логотип целиком, по краям — он же, размытый. Размытый — во всю ширину и прижат к верху,
                                                      низ обрезает шапка: Image у Avalonia обрезает UniformToFill по центру
                                                      своих границ, а в StackPanel её высоту ничто не ограничивает -->
