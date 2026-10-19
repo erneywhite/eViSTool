@@ -51,8 +51,10 @@ public sealed class FontCoverageTests
     {
         using var noto = SKTypeface.FromFile(Path.Combine(Root, "src", "eViSTool.Desktop", "Assets", "Fonts", "NotoSans.ttf"));
         using var mono = SKTypeface.FromFile(Path.Combine(Root, "src", "eViSTool.Desktop", "Assets", "Fonts", "CascadiaMono.ttf"));
+        using var symbols = SKTypeface.FromFile(Path.Combine(Root, "src", "eViSTool.Desktop", "Assets", "Fonts", "NotoSansSymbols2.ttf"));
         Assert.Equal("Noto Sans", noto.FamilyName);
         Assert.Equal("Cascadia Mono", mono.FamilyName);
+        Assert.Equal("Noto Sans Symbols 2", symbols.FamilyName);
 
         var missing = new SortedDictionary<string, SortedSet<string>>(StringComparer.Ordinal);
         var checkedTexts = 0;
@@ -63,7 +65,7 @@ public sealed class FontCoverageTests
             {
                 var cp = rune.Value;
                 if (Rune.IsControl(rune) || cp == 0xFEFF || ForeignScriptLetter(cp)) continue;
-                if (noto.ContainsGlyph(cp) || mono.ContainsGlyph(cp)) continue;
+                if (noto.ContainsGlyph(cp) || mono.ContainsGlyph(cp) || symbols.ContainsGlyph(cp)) continue;
                 if (MessengerGlyphs.Contains((where, rune.ToString()))) continue;
                 var key = $"U+{cp:X4} «{rune}»";
                 if (!missing.TryGetValue(key, out var places)) missing[key] = places = new SortedSet<string>(StringComparer.Ordinal);
@@ -72,7 +74,7 @@ public sealed class FontCoverageTests
         }
 
         Assert.True(checkedTexts > 2000, $"текстов проверено: {checkedTexts}"); // проверка видит тексты, а не пустоту
-        Assert.True(missing.Count == 0, "нет ни в Noto Sans, ни в Cascadia Mono:\n" +
+        Assert.True(missing.Count == 0, "нет ни в одном вшитом шрифте (Noto Sans, Cascadia Mono, Noto Sans Symbols 2):\n" +
             string.Join("\n", missing.Select(m => $"{m.Key}: {string.Join(", ", m.Value.Take(8))}")));
     }
 
@@ -82,13 +84,17 @@ public sealed class FontCoverageTests
     {
         using var noto = SKTypeface.FromFile(Path.Combine(Root, "src", "eViSTool.Desktop", "Assets", "Fonts", "NotoSans.ttf"));
         using var mono = SKTypeface.FromFile(Path.Combine(Root, "src", "eViSTool.Desktop", "Assets", "Fonts", "CascadiaMono.ttf"));
+        using var symbols = SKTypeface.FromFile(Path.Combine(Root, "src", "eViSTool.Desktop", "Assets", "Fonts", "NotoSansSymbols2.ttf"));
         Assert.True(noto.ContainsGlyph('Ж') && noto.ContainsGlyph('«') && noto.ContainsGlyph('—'));
+        // кусочек Noto Sans Symbols 2 — ровно знаки, которых нет в двух других
+        foreach (var sign in "⚠★⬇✔✖")
+            Assert.True(symbols.ContainsGlyph(sign) && !noto.ContainsGlyph(sign) && !mono.ContainsGlyph(sign), $"«{sign}»");
         foreach (var arrow in "→←↑↓▾▲▼▸✓♥")
         {
             Assert.False(noto.ContainsGlyph(arrow), $"«{arrow}» в Noto Sans");
             Assert.True(mono.ContainsGlyph(arrow), $"«{arrow}» нет в Cascadia Mono");
         }
-        Assert.False(noto.ContainsGlyph('↗') || mono.ContainsGlyph('↗'));
+        Assert.False(noto.ContainsGlyph('↗') || mono.ContainsGlyph('↗') || symbols.ContainsGlyph('↗'));
     }
 
     /// <summary>
@@ -102,7 +108,7 @@ public sealed class FontCoverageTests
     {
         var options = Program.FontOptions;
         Assert.Equal(Program.UiFont, options.DefaultFamilyName);
-        Assert.Equal(new FontFamily(Program.MonoFont), Assert.Single(options.FontFallbacks!).FontFamily);
+        Assert.Equal([new FontFamily(Program.MonoFont), new FontFamily(Program.SymbolsFont)], options.FontFallbacks!.Select(f => f.FontFamily));
 
         const BindingFlags inside = BindingFlags.Instance | BindingFlags.NonPublic;
         var platform = typeof(FontManager).GetProperty("PlatformImpl", inside)?.GetValue(FontManager.Current) as IFontManagerImpl;
@@ -117,6 +123,8 @@ public sealed class FontCoverageTests
             && fonts.TryGetGlyphTypeface(typeface, out var glyphs) ? glyphs.FamilyName : "—";
         foreach (var c in "→▾✓♥")
             Assert.Equal(("Cascadia Mono", c), (Match(c), c));
+        foreach (var c in "⚠★⬇✔✖")
+            Assert.Equal(("Noto Sans Symbols 2", c), (Match(c), c));
         // в основном шрифте знак есть — запасной не нужен: Avalonia спрашивает запасные только о недостающих знаках
         Assert.True(FontManager.Current.TryGetGlyphTypeface(new Typeface(ui), out var noto));
         Assert.Equal("Noto Sans", noto.FamilyName);

@@ -416,7 +416,7 @@ public sealed class CatalogItemViewModel(ModDbListItem item, IReadOnlyDictionary
     public string Author { get; } = item.Author ?? "";
     public string Summary { get; } = item.Summary ?? "";
     public string? Logo { get; } = ModDbLogo.Usable(item.Logo); // стандартная картинка модбазы — не логотип: вместо неё буквы
-    public string Stats { get; } = $"↓ {item.Downloads:N0}   ♥ {item.Follows:N0}";
+    public string Stats { get; } = $"⬇ {item.Downloads:N0}   ♥ {item.Follows:N0}";
     public string Initials { get; } = ModRowViewModel.MakeInitials(item.Name ?? item.PrimaryModId ?? "?");
 
     /// <summary>Оттенок значка с буквами — тот же, что у этого мода в «Моих модах» (по modid).</summary>
@@ -518,9 +518,9 @@ public sealed partial class ModDetailsViewModel : ObservableObject
         Compatibility = choice.Fit switch
         {
             CatalogFit.UnknownGame => Loc.T("card.unknownGame") + (choice.Release is { } r ? " " + Loc.T("card.latestStable", r.ModVersion) : ""),
-            CatalogFit.NoneForBranch => "× " + Loc.T("card.noVersion", branch)
+            CatalogFit.NoneForBranch => "✖ " + Loc.T("card.noVersion", branch)
                                         + (choice.Latest is { } latest ? ". " + Loc.T("card.latestFor", latest.ModVersion, latest.GameVersions.LastOrDefault()) : ""),
-            _ => "✓ " + Loc.T("card.hasVersion", choice.Release!.ModVersion, branch)
+            _ => "✔ " + Loc.T("card.hasVersion", choice.Release!.ModVersion, branch)
                  + (choice.Fit == CatalogFit.CompatiblePrerelease ? " " + Loc.T("card.prerelease") : ""),
         };
     }

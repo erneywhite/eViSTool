@@ -16,14 +16,22 @@ internal static class Program
     /// ♥ ◆ ● …), — из вшитого же Cascadia Mono, первым запасным, раньше системных шрифтов. Иначе Avalonia ищет такой знак
     /// в системе: на другой машине он другой, а у знаков с вариантом-эмодзи бывает цветной квадрат Segoe UI Emoji, если
     /// тот шрифт уже подгружен (окно показало эмодзи из названия мода). Обычный текст не меняется: запасной шрифт
-    /// спрашивают только о знаках, которых нет в основном. Что все знаки текстов окна есть в одном из двух шрифтов,
+    /// спрашивают только о знаках, которых нет в основном. Знаков, которых нет и в Cascadia (⚠ ★ ⬇ ✔ ✖), ищут во вшитом
+    /// кусочке Noto Sans Symbols 2 — только эти знаки, 2 КБ. Что все знаки текстов окна есть в одном из вшитых шрифтов,
     /// проверяет FontCoverageTests.
     /// </summary>
     public static FontManagerOptions FontOptions => new()
     {
         DefaultFamilyName = UiFont,
-        FontFallbacks = [new FontFallback { FontFamily = new FontFamily(MonoFont) }],
+        FontFallbacks =
+        [
+            new FontFallback { FontFamily = new FontFamily(MonoFont) },
+            new FontFallback { FontFamily = new FontFamily(SymbolsFont) },
+        ],
     };
+
+    /// <summary>Знаки ⚠ ★ ⬇ ✔ ✖ — вшитый кусочек Noto Sans Symbols 2 (вырезан fonttools subset).</summary>
+    public const string SymbolsFont = "avares://eViSTool/Assets/Fonts#Noto Sans Symbols 2";
 
     /// <summary>Замок «одно окно на папку данных»; null — режим снимка (стенду замок не нужен).</summary>
     public static Platform.SingleInstance? Instance { get; private set; }

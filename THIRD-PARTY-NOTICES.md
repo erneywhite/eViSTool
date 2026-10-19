@@ -56,12 +56,14 @@ with the copyright line given below.
 
 ## Fonts
 
-The window ships its own fonts, so it looks the same on Windows and Linux. Both are licensed under the
+The window ships its own fonts, so it looks the same on Windows and Linux. All are licensed under the
 SIL Open Font License 1.1; the full license text is next to each font in `Assets/Fonts`.
 
 - **Noto Sans** — Copyright 2022 The Noto Project Authors, https://github.com/notofonts/latin-greek-cyrillic
 - **Cascadia Mono** — Copyright (c) 2019 - Present, Microsoft Corporation, with Reserved Font Name Cascadia Code,
   https://github.com/microsoft/cascadia-code
+- **Noto Sans Symbols 2** (a subset with only the signs ⚠ ★ ⬇ ✔ ✖) — Copyright 2022 The Noto Project Authors,
+  https://github.com/notofonts/symbols
 
 ## Lucide icons
 
