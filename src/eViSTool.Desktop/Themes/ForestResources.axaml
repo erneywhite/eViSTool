@@ -275,4 +275,7 @@
     <StreamGeometry x:Key="Icon.Close">M18 6 L6 18 M6 6 l12 12</StreamGeometry>
     <!-- профили: двое людей -->
     <StreamGeometry x:Key="Icon.Profiles">M16 21 v-2 a4 4 0 0 0 -4 -4 H6 a4 4 0 0 0 -4 4 v2 M5 7 A4 4 0 1 0 13 7 A4 4 0 1 0 5 7 Z M22 21 v-2 a4 4 0 0 0 -3 -3.87 M16 3.13 a4 4 0 0 1 0 7.75</StreamGeometry>
+    <!-- внешняя ссылка (откроется браузер): стрелка вверх-вправо. Вместо знака «↗»: его нет во вшитых шрифтах, и окно
+         брало его из системы, порой цветным эмодзи -->
+    <StreamGeometry x:Key="Icon.External">M7 7 h10 v10 M7 17 L17 7</StreamGeometry>
 </ResourceDictionary>

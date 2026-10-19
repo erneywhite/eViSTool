@@ -6,7 +6,9 @@
              x:Class="eViSTool.Desktop.Views.AboutView"
              x:DataType="vm:AboutViewModel">
     <UserControl.Resources>
-        <!-- строка-ссылка: иконка «↗» справа, вся строка кликабельна, при наведении текст становится песочным -->
+        <!-- строка-ссылка: справа стрелка «внешняя ссылка» (Icon.External, вровень с первой строкой текста), вся строка
+             кликабельна, при наведении текст становится песочным. Контур — как у Path.icon, но без класса: стиль icon
+             сильнее значений шаблона и сделал бы стрелку 18 px -->
         <ControlTheme x:Key="LinkRow" TargetType="Button">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
             <Setter Property="Background" Value="Transparent" />
@@ -17,7 +19,9 @@
                 <ControlTemplate>
                     <Border Background="Transparent" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1" Padding="0,9">
                         <DockPanel>
-                            <TextBlock DockPanel.Dock="Right" Text="↗" Foreground="{DynamicResource Forest.Accent}" />
+                            <Path DockPanel.Dock="Right" Data="{DynamicResource Icon.External}" Width="9" Height="9" Margin="12,5,1,0"
+                                  VerticalAlignment="Top" Stretch="Uniform" StrokeThickness="1.4" StrokeLineCap="Round" StrokeJoin="Round"
+                                  Stroke="{DynamicResource Forest.Accent}" />
                             <ContentPresenter x:Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
                                               ContentTemplate="{TemplateBinding ContentTemplate}" Foreground="{TemplateBinding Foreground}"
                                               HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" />

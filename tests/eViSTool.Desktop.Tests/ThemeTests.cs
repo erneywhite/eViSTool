@@ -284,6 +284,34 @@ public sealed class ThemeTests
         window.Close();
     }
 
+    /// <summary>
+    /// Ссылка наружу (класс external) — стрелка Icon.External после текста, цвета текста и с ним же тускнеет; у обычной
+    /// ссылки стрелки нет. Знака «↗» в текстах больше нет: его во вшитых шрифтах нет, и он приходил из системы эмодзи.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task LinkButton_External_HasArrowIconAfterText()
+    {
+        var external = new Button { Content = "Модбаза", Classes = { "external" } };
+        var plain = new Button { Content = "Удалить" };
+        var window = Show(new StackPanel { Children = { external, plain } });
+        external.Theme = plain.Theme = (ControlTheme)window.FindResource("Forest.LinkButton")!;
+        await Run(300);
+
+        var arrow = Part<Avalonia.Controls.Shapes.Path>(external, "Ext");
+        Assert.True(arrow.IsVisible);
+        Assert.Same(window.FindResource("Icon.External"), arrow.Data);
+        Assert.Equal((8, 8), (arrow.Bounds.Width, arrow.Bounds.Height)); // не 18, как у Path.icon
+        var text = Part<TextBlock>(external, "T");
+        Assert.True(arrow.Bounds.Left >= text.Bounds.Right, "стрелка после текста");
+        Assert.Equal(Token(window, "Forest.Accent"), ColorOf(arrow.Stroke));
+        Assert.False(Part<Avalonia.Controls.Shapes.Path>(plain, "Ext").IsVisible);
+
+        external.IsEnabled = false;
+        await Run(300);
+        Assert.Equal(Token(window, "Forest.Faint"), ColorOf(arrow.Stroke));
+        window.Close();
+    }
+
     [AvaloniaFact]
     public async Task Switch_KnobSlidesByTransform()
     {

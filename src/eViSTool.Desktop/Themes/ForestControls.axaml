@@ -153,7 +153,8 @@
     <!-- все кнопки по умолчанию — лесные -->
     <ControlTheme x:Key="{x:Type Button}" TargetType="Button" BasedOn="{StaticResource Forest.Button}" />
 
-    <!-- кнопка-ссылка: подчёркнутый текст без рамки («Модбаза ↗», «Удалить»); наведение — песок светлее -->
+    <!-- кнопка-ссылка: подчёркнутый текст без рамки («Модбаза», «Удалить»); наведение — песок светлее. Класс external —
+         ссылка ведёт наружу (откроется браузер): после текста стрелка Icon.External цвета текста -->
     <ControlTheme x:Key="Forest.LinkButton" TargetType="Button">
         <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
         <Setter Property="Background" Value="Transparent" />
@@ -164,8 +165,14 @@
         <Setter Property="Template">
             <ControlTemplate>
                 <Panel>
-                    <TextBlock x:Name="T" Text="{TemplateBinding Content}" TextDecorations="Underline"
-                               Foreground="{TemplateBinding Foreground}" Background="{TemplateBinding Background}" />
+                    <StackPanel Orientation="Horizontal" Background="{TemplateBinding Background}">
+                        <TextBlock x:Name="T" Text="{TemplateBinding Content}" TextDecorations="Underline"
+                                   Foreground="{TemplateBinding Foreground}" Background="{TemplateBinding Background}" />
+                        <!-- контур как у Path.icon, но без класса: стиль icon сильнее значений шаблона и сделал бы стрелку
+                             18 px. Цвет — у текста шаблона: стрелка идёт тем же переходом и тускнеет с выключенной ссылкой -->
+                        <Path x:Name="Ext" Data="{DynamicResource Icon.External}" Width="8" Height="8" Margin="4,1,0,0" VerticalAlignment="Center"
+                              Stretch="Uniform" StrokeThickness="1.4" StrokeLineCap="Round" StrokeJoin="Round" Stroke="{Binding #T.Foreground}" />
+                    </StackPanel>
                     <Border x:Name="FocusRing" Margin="-4" CornerRadius="6" BorderThickness="2" BorderBrush="{DynamicResource Forest.Accent}"
                             IsVisible="False" IsHitTestVisible="False" />
                 </Panel>
@@ -177,6 +184,12 @@
                     <ctl:PremulBrushTransition Property="Foreground" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
                 </Transitions>
             </Setter>
+        </Style>
+        <Style Selector="^ /template/ Path#Ext">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="^.external /template/ Path#Ext">
+            <Setter Property="IsVisible" Value="True" />
         </Style>
         <!-- наведение и нажатие меняют цвет самой кнопки, а не текста шаблона: у ссылки своего цвета («Удалить» —
              розовая, подпись внизу меню — приглушённая) он задан в разметке и сильнее темы — такая ссылка не
