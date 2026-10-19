@@ -203,15 +203,17 @@ public sealed class ProfilesSettingsViewTests : IDisposable
         Assert.IsType<SettingsView>(pages.Children[AppTab.Settings]);
         Assert.IsType<AboutView>(pages.Children[AppTab.About]);
 
-        // пункт меню «Профили» открывает свою страницу, название — в верхней полосе, без «Рабочего пространства».
+        // пункт меню «Профили» открывает свою страницу; название — крупно на ней самой, верхняя полоса его не повторяет.
         // Проявление смотрим по пути, а не мгновенным значением: щелчок разбирает очередь окна вместе с кадрами, и
         // на большой странице оно успевает пройти целиком ещё внутри него
+        var topBar = Named(_window, "TopBar");
         using (var seen = new MotionTests.RevealProbe(pages.Children[AppTab.Profiles]))
         {
             Mouse.Click(_window, Named(_window, "NavProfiles"));
             Assert.Equal(AppTab.Profiles, main.SelectedTab);
             Assert.Equal([AppTab.Profiles], pages.Children.Select((p, i) => (p, i)).Where(x => x.p.IsVisible).Select(x => x.i));
-            Assert.Equal(Loc.T("nav.profiles"), ((TextBlock)Named(_window, "PageTitle")).Text);
+            Assert.True(HasText(pages.Children[AppTab.Profiles], Loc.T("nav.profiles")));
+            Assert.False(HasText(topBar, Loc.T("nav.profiles")));
             await Wait.Frames(400);
             seen.AssertRevealed();
         }
@@ -223,7 +225,8 @@ public sealed class ProfilesSettingsViewTests : IDisposable
             Assert.Equal(AppTab.Settings, main.SelectedTab);
             Assert.True(settings.IsVisible);
             Assert.False(pages.Children[AppTab.Profiles].IsVisible);
-            Assert.Equal(Loc.T("nav.settings"), ((TextBlock)Named(_window, "PageTitle")).Text);
+            Assert.True(HasText(settings, Loc.T("nav.settings")));
+            Assert.False(HasText(topBar, Loc.T("nav.settings")));
             await Wait.Frames(400);
             seen.AssertRevealed();
         }

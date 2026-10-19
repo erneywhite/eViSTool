@@ -203,6 +203,18 @@
                             <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap">
                                 <Run Text="{local:Tr shell.profileVersion}" /><Run Text=" · " /><Run Text="{Binding ActiveProfile.GameVersionText, Mode=OneWay}" />
                             </TextBlock>
+                            <!-- сервер активного профиля работает: зелёная точка и вокруг неё мягкое «дыхание» (стиль
+                                 BreathingRing.breathing в теме; класс — только пока сервер работает). Не работает или профиль
+                                 клиента — строки нет -->
+                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0" IsVisible="{Binding Server.IsRunning}"
+                                        AutomationProperties.AutomationId="ServerRunning">
+                                <Panel Width="7" Height="7" Margin="0,1,8,0" VerticalAlignment="Center">
+                                    <ctl:BreathingRing x:Name="ServerRunningRing" Fill="{DynamicResource Forest.Good}" Opacity="0"
+                                                       Classes.breathing="{Binding Server.IsRunning}" IsHitTestVisible="False" />
+                                    <Ellipse Fill="{DynamicResource Forest.Good}" />
+                                </Panel>
+                                <TextBlock Text="{local:Tr shell.serverRunning}" FontSize="11" Foreground="{DynamicResource Forest.Good}" VerticalAlignment="Center" />
+                            </StackPanel>
                         </StackPanel>
                     </DockPanel>
                 </Border>
@@ -267,10 +279,12 @@
 
         <!-- ===== основная часть ===== (фон непрозрачный: картинка фона из игры видна только под боковой панелью) -->
         <DockPanel Grid.Column="1" Background="{DynamicResource Forest.Base}">
-            <!-- полоса: раздел и активный профиль. Она же шапка окна: тащится за пустое место и подписи, кнопки окна — справа
-                 (место под них — CaptionSpace); кнопки и список профилей помечены ролью User, чтобы нажимались -->
-            <Border x:Name="TopBar" DockPanel.Dock="Top" Height="60" Background="Transparent" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1">
-                <DockPanel Margin="24,0,20,0">
+            <!-- полоса: активный профиль и «Играть» справа; название раздела не повторяем — оно крупно на самой странице. Полоса
+                 же — шапка окна: тащится за пустое место и подписи, кнопки окна — справа (место под них — CaptionSpace); кнопки
+                 и список профилей помечены ролью User, чтобы нажимались. Растягивать нечего (LastChildFill="False"): всё справа -->
+            <Border x:Name="TopBar" DockPanel.Dock="Top" Height="60" Background="Transparent" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1"
+                    AutomationProperties.AutomationId="TopBar">
+                <DockPanel Margin="24,0,20,0" LastChildFill="False">
                     <Border x:Name="CaptionSpace" DockPanel.Dock="Right" Width="0" />
                     <!-- игра с активным клиентским профилем: его папка данных, его моды -->
                     <!-- «Играть ▾»: большая часть — с сервером по умолчанию (или без сервера), стрелка — меню серверов -->
@@ -358,8 +372,6 @@
                             </ComboBox.ItemTemplate>
                         </ComboBox>
                     </StackPanel>
-                    <TextBlock Text="{Binding PageTitle}" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}"
-                               TextTrimming="CharacterEllipsis" AutomationProperties.AutomationId="PageTitle" />
                 </DockPanel>
             </Border>
 

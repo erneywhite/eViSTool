@@ -811,6 +811,36 @@ public sealed class HostedLogsTests : IDisposable
         Assert.Equal(HostedServerState.Unknown, await logs.CheckNowAsync(default)); // вопрос «останови сервер» — как раньше
     }
 
+    // «дышащая» точка окна верит состоянию, только пока лог читали недавно: время и событие — у любого удачного опроса
+    [Fact]
+    public async Task EverySuccessfulPoll_WhoeverStartedIt_IsAnnounced_AndStamped_AFailedOneIsNot()
+    {
+        CancellationToken ct = default;
+        PutLog(Main, HostedLogSamples.Running);
+        var logs = Logs();
+        var updates = 0;
+        logs.Updated += () => Interlocked.Increment(ref updates);
+        Assert.Null(logs.PolledAt); // ещё не читали
+
+        await logs.PollAsync(ct);                       // раздел «Сервер»
+        Assert.Equal(_time.UtcNow, logs.PolledAt);
+        _time.UtcNow = _time.UtcNow.AddMinutes(1);
+        await logs.RefreshAsync(ct);                    // сторож оповещений
+        await logs.CheckNowAsync(ct);                   // проверка перед изменением модов
+        Assert.Equal(3, updates);
+        Assert.Equal(_time.UtcNow, logs.PolledAt);
+
+        // сбой сети: состояние прежнее, и время опроса прежнее — по нему видно, что состояние старое
+        var stamp = logs.PolledAt;
+        _time.UtcNow = _time.UtcNow.AddMinutes(1);
+        _host.Server.FailOn = (op, _) => op is "list" or "connect";
+        _host.Server.FailKind = RemoteFailure.Connect;
+        await Assert.ThrowsAsync<RemoteFilesException>(() => logs.PollAsync(ct));
+        Assert.Equal(HostedServerState.Running, logs.State);
+        Assert.Equal(stamp, logs.PolledAt);
+        Assert.Equal(3, updates);
+    }
+
     [Fact]
     public async Task QuickCheck_Stopped()
     {

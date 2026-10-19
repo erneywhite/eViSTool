@@ -138,7 +138,7 @@ public sealed class HostedServerViewModelTests : IDisposable
         Assert.DoesNotContain("203.0.113.7", player.SinceText); // адрес игрока не показываем
         Assert.Equal("1", vm.PlayersText);
         Assert.Equal("Erney", vm.PlayerNames);
-        Assert.NotEqual("—", vm.UptimeText);
+        Assert.NotEqual("", vm.UptimeText);
         Assert.Equal(Loc.T("server.hostedRunCurrent"), Assert.Single(vm.Runs).Text); // архива нет — только текущий
     });
 
@@ -161,8 +161,8 @@ public sealed class HostedServerViewModelTests : IDisposable
         Assert.Empty(vm.Players);
         Assert.False(vm.HasPlayers);
         Assert.Equal(Loc.T("server.hostedPlayersDown"), vm.PlayersEmptyText);
-        Assert.Equal("—", vm.PlayersText);
-        Assert.Equal("—", vm.UptimeText);
+        Assert.Equal("", vm.PlayersText); // не запущен — плитки пустые, без прочерков
+        Assert.Equal("", vm.UptimeText);
 
         // новый запуск: прошлый лог уехал в архив, новый короче
         _host.Server.Put("/Logs/Archive/2026-10-17_13_27_08/server-main.log", HostedLogSamples.Bytes(HostedLogSamples.Stopped));
@@ -232,6 +232,53 @@ public sealed class HostedServerViewModelTests : IDisposable
 
         main.SelectedTab = AppTab.Settings;
         Assert.False(vm.IsPolling);
+    });
+
+    // «дышащая» точка в карточке профиля: работает ли сервер — по любому свежему опросу лога, даже при закрытом разделе
+    [Fact]
+    public void IsRunning_FollowsAnyFreshPollOfTheLog_EvenWithTheSectionClosed() => Sta.Run(() =>
+    {
+        CancellationToken ct = default;
+        var local = PutLog(Main, HostedLogSamples.Running);
+        var vm = Vm(); // раздел не открывали: сам он лог не читает
+        Assert.False(vm.IsPolling);
+        Assert.False(vm.IsRunning);
+        Assert.Equal(TimeSpan.FromMinutes(3), vm.RunningFreshFor); // два пропущенных опроса сторожа оповещений
+
+        // лог прочитал сторож оповещений — тот же экземпляр логов профиля: точка знает, хотя раздел закрыт
+        var logs = HostedLogsPool.For(_host.Target);
+        Sta.Wait(logs.RefreshAsync(ct));
+        Sta.WaitFor(() => vm.IsRunning);
+        Assert.Equal(HostedServerState.Unknown, vm.State); // плитки раздела — по его собственным опросам
+
+        // сервер остановили — следующий же опрос гасит точку, «работает» не висит до открытия раздела
+        Append(local, StoppedTail);
+        Sta.Wait(logs.RefreshAsync(ct));
+        Sta.WaitFor(() => !vm.IsRunning);
+
+        // другой профиль — прежние логи точку больше не трогают
+        PutLog(Main, NextDay(HostedLogSamples.Running));
+        Sta.Wait(logs.RefreshAsync(ct));
+        Sta.WaitFor(() => vm.IsRunning);
+        vm.OnProfileSwitched(null);
+        Assert.False(vm.IsRunning);
+        Sta.Wait(logs.RefreshAsync(ct)); // очередь окна прокручена: опоздавшее уведомление уже пришло бы
+        Assert.Equal(HostedServerState.Running, logs.State);
+        Assert.False(vm.IsRunning);
+    });
+
+    // лог давно никто не читал — что сервер работает, уже не утверждаем: точка гаснет сама, без нового опроса
+    [Fact]
+    public void IsRunning_GoesOut_WhenNobodyHasReadTheLogForLong() => Sta.Run(() =>
+    {
+        PutLog(Main, HostedLogSamples.Running);
+        var vm = new HostedServerViewModel(null!) { RunningFreshFor = TimeSpan.FromSeconds(2) };
+        vm.OnProfileSwitched(_host.Profile);
+
+        Sta.Wait(HostedLogsPool.For(_host.Target).RefreshAsync(default));
+        Sta.WaitFor(() => vm.IsRunning);
+        Sta.WaitFor(() => !vm.IsRunning);
+        Assert.Equal(HostedServerState.Running, HostedLogsPool.For(_host.Target).State); // по логу — всё ещё «работает»
     });
 
     [Fact]

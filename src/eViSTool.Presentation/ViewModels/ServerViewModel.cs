@@ -93,7 +93,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     private bool _stateKnown;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowNotServer))]
+    [NotifyPropertyChangedFor(nameof(ShowNotServer), nameof(ShowConsoleEmpty))]
     private bool _isServerProfile;
 
     /// <summary>Сервер на другом компьютере: всё через агента по сети, своих папок у профиля нет.</summary>
@@ -101,7 +101,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
 
     /// <summary>Сервер у хостера: управляет им панель хостера, здесь — лог, состояние и игроки (<see cref="Hosted"/>) и переход к модам.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowNotServer))]
+    [NotifyPropertyChangedFor(nameof(ShowNotServer), nameof(IsRunning))]
     private bool _isHostedProfile;
 
     /// <summary>Плашка «это не серверный профиль»: у сервера у хостера своя плашка.</summary>
@@ -112,11 +112,11 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     [ObservableProperty] private bool _agentRunning;
     [ObservableProperty] private string _stateText = "";
 
-    // плитки над консолью
+    // плитки над консолью: пока сервер не запущен, значения пустые (не прочерки) — вид приглушает такую плитку
     [ObservableProperty] private RowTone _stateTone = RowTone.Muted;
-    [ObservableProperty] private string _uptimeText = "—";
-    [ObservableProperty] private string _memoryText = "—";
-    [ObservableProperty] private string _pidText = "—";
+    [ObservableProperty] private string _uptimeText = "";
+    [ObservableProperty] private string _memoryText = "";
+    [ObservableProperty] private string _pidText = "";
     /// <summary>Под плиткой состояния: перезапуск через N с / код выхода.</summary>
     [ObservableProperty] private string _stateNote = "";
 
@@ -171,9 +171,57 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     public bool CanStart => IsServerProfile && !IsBusy && ForeignPid is null && State == ServerState.Stopped && (!IsRemoteProfile || AgentRunning)
                             && Schedule?.IsRestoring != true;
 
-    internal void NotifyCanStart() => OnPropertyChanged(nameof(CanStart));
+    internal void NotifyCanStart()
+    {
+        OnPropertyChanged(nameof(CanStart));
+        NotifyConsoleEmpty(); // восстановление мира — причина не запускать
+    }
+
     public bool CanStop => AgentRunning && !IsBusy && State is ServerState.Running or ServerState.Starting;
     public bool CanCommand => AgentRunning && State is ServerState.Running or ServerState.Starting;
+
+    /// <summary>
+    /// Сервер профиля работает — не запускается и не останавливается: «дышащая» точка в карточке профиля внизу боковой
+    /// панели. Свой и удалённый — по статусу агента, у хостера — по свежему опросу лога, кто бы его ни читал
+    /// (<see cref="HostedServerViewModel.IsRunning"/>): раздел «Сервер» при этом может быть закрыт.
+    /// </summary>
+    public bool IsRunning => IsHostedProfile ? Hosted.IsRunning : AgentRunning && State == ServerState.Running;
+
+    // ---------- пустая консоль ----------
+
+    /// <summary>
+    /// Вместо пустой консоли — по центру «Сервер остановлен» и «Запустить»: строк нет, сервер не запущен и не чужой (о
+    /// чужом — плашка выше). Есть строки или сервер работает — обычная консоль. Пока первый проход слежения после смены
+    /// профиля не кончился, заглушки нет: сервер мог и работать, а крупное «остановлен» с кнопкой мелькало бы зря.
+    /// </summary>
+    public bool ShowConsoleEmpty => IsServerProfile && _stateKnown && Lines.Count == 0 && !IsServerUp && !HasForeign;
+
+    /// <summary>Заголовок пустой консоли: «Сервер остановлен», у удалённого без связи — «Нет связи с сервером».</summary>
+    public string ConsoleEmptyTitle => RemoteOffline ? Loc.T("server.emptyOffline") : Loc.T("server.emptyStopped");
+
+    /// <summary>Почему запустить нельзя — тогда вместо кнопки эта строка. Пусто — можно (или мешает только идущее действие с кнопки).</summary>
+    public string ConsoleEmptyNote => RemoteOffline ? Loc.T("server.emptyOfflineHint")
+        : Schedule?.IsRestoring == true ? Loc.T("server.emptyRestoring")
+        : "";
+
+    /// <summary>
+    /// «Запустить» в пустой консоли: видна, когда причины не запускать нет. Пока идёт действие с кнопки, она видна, но
+    /// неактивна (<see cref="CanStart"/>): иначе мигала бы на каждое нажатие.
+    /// </summary>
+    public bool ShowConsoleEmptyStart => ConsoleEmptyNote.Length == 0;
+
+    // удалённый сервер, а связи с его агентом нет: остановлен ли он, неизвестно
+    private bool RemoteOffline => IsRemoteProfile && !AgentRunning;
+
+    private bool _hadLines; // в консоли были строки — при прошлом изменении списка
+
+    private void NotifyConsoleEmpty()
+    {
+        OnPropertyChanged(nameof(ShowConsoleEmpty));
+        OnPropertyChanged(nameof(ConsoleEmptyTitle));
+        OnPropertyChanged(nameof(ConsoleEmptyNote));
+        OnPropertyChanged(nameof(ShowConsoleEmptyStart));
+    }
 
     public ServerViewModel(MainViewModel main)
     {
@@ -184,6 +232,13 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         // имени нет: у каждого свойства консоли есть двойник здесь, это держит тест ServerConsoleViewModelTests
         _console.PropertyChanging += (_, e) => OnPropertyChanging(e);
         _console.PropertyChanged += (_, e) => OnPropertyChanged(e);
+        // пустая консоль: заглушка видна, пока строк нет, — сообщаем, только когда список пустеет или наполняется
+        _console.Lines.CollectionChanged += (_, _) =>
+        {
+            if (_hadLines == Lines.Count > 0) return;
+            _hadLines = Lines.Count > 0;
+            OnPropertyChanged(nameof(ShowConsoleEmpty));
+        };
         Schedule = new ServerScheduleViewModel(this);
         Players = new ServerPlayersViewModel(this);
         _console.LinesReceived += Players.OnConsoleLines; // ответ сервера на команду вкладки «Игроки»
@@ -192,6 +247,11 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         Journal = new ServerJournalViewModel(this);
         Notify = new ServerNotifyViewModel(this);
         Hosted = new HostedServerViewModel(main);
+        // «дышащая» точка у хостера — по свежему опросу лога
+        Hosted.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(HostedServerViewModel.IsRunning)) OnPropertyChanged(nameof(IsRunning));
+        };
         HostedNotify = new ServerNotifyViewModel(this, hosted: true);
         // операции с копиями мира — общие на окно (их делает и расписание); без главной модели (тесты раздела) — свои
         HostedBackups = new HostedBackupsViewModel(main, main?.HostedWorldJobs ?? new HostedWorldJobs());
@@ -265,6 +325,8 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
             ServerState.Stopping => (Loc.T("server.stateStopping"), RowTone.Warn),
             _ => (Loc.T("server.stateStopped"), RowTone.Muted),
         };
+        OnPropertyChanged(nameof(IsRunning));
+        NotifyConsoleEmpty();
         PushServerState();
         Players?.OnServerStateChanged();
         Announcements?.OnServerStateChanged();
@@ -373,7 +435,11 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         // чужой сервер: из папки игры профиля, но не наш
         ForeignPid = serverPids.Where(pid => !(ourServerUp && pid == _serverPid)).Select(pid => (int?)pid).FirstOrDefault();
 
-        _stateKnown = true;
+        if (!_stateKnown)
+        {
+            _stateKnown = true;
+            NotifyConsoleEmpty(); // первый проход: теперь известно, остановлен ли сервер
+        }
         PushServerState();
         Players.PollLocal(); // файлы игроков поменялись (сервер записал списки, правка в другом окне)
         Announcements.PollLocal();
@@ -405,6 +471,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     {
         ErrorText = Loc.T("remote.errDecrypt");
         _stateKnown = true;
+        NotifyConsoleEmpty();
     }
 
     private int? _serverPid;
@@ -454,9 +521,9 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         // агент перезапускался — нумерация строк началась заново
         _console.CheckSequence(s);
 
-        UptimeText = s.StartedAt is { } started && s.State != ServerState.Stopped ? Dates.Uptime(DateTime.Now - started) : "—";
-        MemoryText = s.MemoryMb is { } mb && s.State != ServerState.Stopped ? Loc.T("server.memoryMb", mb.ToString("N0")) : "—";
-        PidText = s.ServerPid is { } pid && s.State != ServerState.Stopped ? pid.ToString() : "—";
+        UptimeText = s.StartedAt is { } started && s.State != ServerState.Stopped ? Dates.Uptime(DateTime.Now - started) : "";
+        MemoryText = s.MemoryMb is { } mb && s.State != ServerState.Stopped ? Loc.T("server.memoryMb", mb.ToString("N0")) : "";
+        PidText = s.ServerPid is { } pid && s.State != ServerState.Stopped ? pid.ToString() : "";
         ShowPlayers(s.Players, running: s.State == ServerState.Running);
         Schedule.ShowStatus(s);
         Remote.ShowStatus(s);
@@ -473,7 +540,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
 
     private void ClearStats()
     {
-        UptimeText = MemoryText = PidText = "—";
+        UptimeText = MemoryText = PidText = "";
         StateNote = "";
         ShowPlayers([], running: false);
         Schedule?.ShowStatus(null);
@@ -485,14 +552,14 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
 
     // ---------- игроки на сервере ----------
 
-    /// <summary>Плитка «Игроки»: число, имена одной строкой и подсказка «кто с какого времени».</summary>
-    [ObservableProperty] private string _playersText = "—";
+    /// <summary>Плитка «Игроки»: число, имена одной строкой и подсказка «кто с какого времени». Сервер не работает — пусто.</summary>
+    [ObservableProperty] private string _playersText = "";
     [ObservableProperty] private string _playerNames = "";
     [ObservableProperty] private string? _playersTip;
 
     private void ShowPlayers(IReadOnlyList<OnlinePlayer> players, bool running)
     {
-        PlayersText = running ? players.Count.ToString() : "—";
+        PlayersText = running ? players.Count.ToString() : "";
         PlayerNames = !running ? "" : players.Count == 0 ? Loc.T("server.playersNone") : string.Join(" · ", players.Select(p => p.Name));
         PlayersTip = players.Count == 0 ? null : string.Join(Environment.NewLine,
             players.Select(p => Loc.T("server.playerSince", p.Name, Dates.Clock(p.Since), Dates.Uptime(DateTime.Now - p.Since))));

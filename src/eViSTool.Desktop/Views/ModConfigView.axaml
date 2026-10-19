@@ -103,11 +103,13 @@
 
                     <DockPanel Margin="18,14,18,16" IsVisible="{Binding HasFile}">
                         <DockPanel DockPanel.Dock="Top">
-                            <!-- вид: форма или текст (форма — только для JSON) -->
+                            <!-- вид: форма или текст (форма — только для JSON). Чипы — одна группа по общему родителю, без
+                                 GroupName: группа по имени общая на все окна, и у двух главных окон в одном процессе (тесты)
+                                 чипы перещёлкивали друг друга без конца через сверку с моделью (SyncViewChips) -->
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" IsVisible="{Binding CanUseForm}">
-                                <RadioButton x:Name="FormChip" Theme="{StaticResource Forest.Chip}" GroupName="McfgView" IsChecked="{Binding IsFormMode}"
+                                <RadioButton x:Name="FormChip" Theme="{StaticResource Forest.Chip}" IsChecked="{Binding IsFormMode}"
                                              Content="{local:Tr mcfg.form}" AutomationProperties.AutomationId="McfgForm" />
-                                <RadioButton x:Name="TextChip" Theme="{StaticResource Forest.Chip}" GroupName="McfgView" IsChecked="{Binding IsTextMode}"
+                                <RadioButton x:Name="TextChip" Theme="{StaticResource Forest.Chip}" IsChecked="{Binding IsTextMode}"
                                              Content="{local:Tr mcfg.textView}" Margin="6,0,0,0" AutomationProperties.AutomationId="McfgTextView" />
                             </StackPanel>
                             <StackPanel>

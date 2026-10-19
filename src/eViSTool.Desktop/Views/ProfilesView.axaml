@@ -197,9 +197,10 @@
                                                           AutomationProperties.AutomationId="DefaultServer" AutomationProperties.Name="{local:Tr play.defaultServer}" />
                                             </StackPanel>
 
-                                            <!-- что удалось прочитать из файлов игры -->
-                                            <Border Margin="0,18,0,0" Padding="14,12" CornerRadius="6" Background="{DynamicResource Forest.Base}"
-                                                    BorderBrush="{DynamicResource Forest.Line}" BorderThickness="1">
+                                            <!-- что удалось прочитать из файлов игры: блок внутри карточки — фон на ступень
+                                                 светлее, без своей рамки (карточку в карточку не кладём) -->
+                                            <Border Margin="0,18,0,0" Padding="14,12" CornerRadius="8" Background="{DynamicResource Forest.Raised}"
+                                                    AutomationProperties.AutomationId="ProfileGameInfo">
                                                 <DockPanel>
                                                     <Button DockPanel.Dock="Right" Command="{Binding RereadCommand}" VerticalAlignment="Top" Margin="12,0,0,0"
                                                             Padding="10,6" MinHeight="0" ToolTip.Tip="{local:Tr settings.reread}">

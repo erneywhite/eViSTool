@@ -18,8 +18,9 @@
         <!-- ===== кто управляет сервером ===== -->
         <Border DockPanel.Dock="Top" Classes="card" Padding="14,12" Margin="0,16,0,0" AutomationProperties.AutomationId="HostedPlate">
             <DockPanel>
+                <!-- значок внутри карточки — фон на ступень светлее, без своей рамки (карточку в карточку не кладём) -->
                 <Border DockPanel.Dock="Left" Width="38" Height="38" CornerRadius="9" Background="{DynamicResource Forest.Raised}"
-                        BorderBrush="{DynamicResource Forest.Line}" BorderThickness="1" VerticalAlignment="Center">
+                        VerticalAlignment="Center">
                     <Path Classes="icon" Data="{StaticResource Icon.Cloud}" Stroke="{DynamicResource Forest.Accent}" Width="18" Height="18" />
                 </Border>
                 <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
@@ -45,13 +46,16 @@
                                IsVisible="{Binding StateNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 </StackPanel>
             </Border>
-            <Border Grid.Column="1" Classes="card tile">
+            <!-- сервер по логу не запущен — значений нет: плитки пустые и приглушённые (класс idle), без прочерков -->
+            <Border Grid.Column="1" Classes="card tile" Classes.idle="{Binding UptimeText, Converter={x:Static StringConverters.IsNullOrEmpty}}"
+                    AutomationProperties.AutomationId="HostedUptime">
                 <StackPanel>
                     <TextBlock Classes="tileLabel" Text="{local:Tr server.tileUptime}" />
                     <TextBlock Classes="tileValue" Text="{Binding UptimeText}" />
                 </StackPanel>
             </Border>
-            <Border Grid.Column="2" Classes="card tile">
+            <Border Grid.Column="2" Classes="card tile" Classes.idle="{Binding PlayersText, Converter={x:Static StringConverters.IsNullOrEmpty}}"
+                    AutomationProperties.AutomationId="HostedPlayersTile">
                 <StackPanel>
                     <TextBlock Classes="tileLabel" Text="{local:Tr server.tilePlayers}" />
                     <TextBlock Classes="tileValue" Text="{Binding PlayersText}" />
