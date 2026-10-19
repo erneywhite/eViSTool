@@ -5,7 +5,9 @@
              xmlns:ctl="using:eViSTool.Desktop.Controls"
              xmlns:conv="using:eViSTool.Desktop.Converters"
              x:Class="eViSTool.Desktop.Views.ModsView"
-             x:DataType="vm:ModsViewModel">
+             x:DataType="vm:ModsViewModel"
+             ctl:BackGesture.Command="{Binding ClearSelectionCommand}">
+    <!-- Esc и кнопка «Назад» мыши снимают выбор мода: справа снова сводка профиля (ctl:BackGesture) -->
     <UserControl.Styles>        <!-- пометка «не нужен на этой стороне» в строке мода -->
         <Style Selector="TextBlock.note">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
@@ -122,45 +124,49 @@
             </StackPanel>
         </DockPanel>
 
-        <!-- ===== вкладки-счётчики: число и фильтр таблицы в одном; справа — история изменений ===== -->
+        <!-- ===== вкладки-счётчики: число и фильтр таблицы в одном; справа — история изменений. Под выбранной — песочная
+             полоска на линии ряда, одна на все вкладки: при смене вкладки едет к новой (ctl:TabIndicator) ===== -->
         <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1" Padding="0,14,0,0">
-            <DockPanel>
-                <RadioButton DockPanel.Dock="Right" GroupName="ModFilter" Theme="{StaticResource Forest.StatTab}" Margin="12,0,0,0" FontSize="13"
-                             VerticalAlignment="Bottom" ToolTip.Tip="{local:Tr hist.tabTip}" AutomationProperties.AutomationId="ModsHistoryTab"
-                             IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=History}">
-                    <StackPanel Orientation="Horizontal">
-                        <Path Classes="icon" Data="{StaticResource Icon.History}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" />
-                        <TextBlock Text="{local:Tr hist.tab}" VerticalAlignment="Center" />
-                    </StackPanel>
-                </RadioButton>
-                <WrapPanel>
-                    <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
-                                 IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=All}">
-                        <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding ModCount}" FontSize="24" /><TextBlock Text="{Binding InstalledLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
+            <Panel>
+                <DockPanel>
+                    <RadioButton DockPanel.Dock="Right" GroupName="ModFilter" Theme="{StaticResource Forest.StatTab}" Margin="12,0,0,0" FontSize="13"
+                                 VerticalAlignment="Bottom" ToolTip.Tip="{local:Tr hist.tabTip}" AutomationProperties.AutomationId="ModsHistoryTab"
+                                 IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=History}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Classes="icon" Data="{StaticResource Icon.History}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" />
+                            <TextBlock Text="{local:Tr hist.tab}" VerticalAlignment="Center" />
+                        </StackPanel>
                     </RadioButton>
-                    <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
-                                 IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Updates}">
-                        <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding UpdatesAvailable}" FontSize="24" /><TextBlock Text="{Binding UpdatesLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
-                    </RadioButton>
-                    <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
-                                 IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Problems}">
-                        <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding ProblemCount}" FontSize="24" /><TextBlock Text="{Binding ProblemsLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
-                    </RadioButton>
-                    <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
-                                 IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Pinned}">
-                        <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding PinnedCount}" FontSize="24" /><TextBlock Text="{Binding PinnedLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
-                    </RadioButton>
-                    <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
-                                 IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Disabled}">
-                        <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding DisabledCount}" FontSize="24" /><TextBlock Text="{Binding DisabledLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
-                    </RadioButton>
-                    <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter" ToolTip.Tip="{local:Tr mods.chipUnneededTip}"
-                                 IsVisible="{Binding HasUnneeded}"
-                                 IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Unneeded}">
-                        <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding UnneededCount}" FontSize="24" /><TextBlock Text="{Binding UnneededLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
-                    </RadioButton>
-                </WrapPanel>
-            </DockPanel>
+                    <WrapPanel>
+                        <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
+                                     IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=All}">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding ModCount}" FontSize="24" /><TextBlock Text="{Binding InstalledLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
+                        </RadioButton>
+                        <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
+                                     IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Updates}">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding UpdatesAvailable}" FontSize="24" /><TextBlock Text="{Binding UpdatesLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
+                        </RadioButton>
+                        <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
+                                     IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Problems}">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding ProblemCount}" FontSize="24" /><TextBlock Text="{Binding ProblemsLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
+                        </RadioButton>
+                        <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
+                                     IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Pinned}">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding PinnedCount}" FontSize="24" /><TextBlock Text="{Binding PinnedLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
+                        </RadioButton>
+                        <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
+                                     IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Disabled}">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding DisabledCount}" FontSize="24" /><TextBlock Text="{Binding DisabledLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
+                        </RadioButton>
+                        <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter" ToolTip.Tip="{local:Tr mods.chipUnneededTip}"
+                                     IsVisible="{Binding HasUnneeded}"
+                                     IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Unneeded}">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding UnneededCount}" FontSize="24" /><TextBlock Text="{Binding UnneededLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
+                        </RadioButton>
+                    </WrapPanel>
+                </DockPanel>
+                <ctl:TabIndicator Background="{DynamicResource Forest.Accent}" AutomationProperties.AutomationId="ModsTabIndicator" />
+            </Panel>
         </Border>
 
         <!-- ===== игра не найдена: без неё не узнать версию и не поставить моды под неё ===== -->

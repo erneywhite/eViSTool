@@ -15,8 +15,9 @@ namespace eViSTool.Presentation.Tests;
 /// <summary>
 /// «Мои моды», правая панель без выбранного мода — сводка профиля: сколько модов включено из всех, сколько с проблемами,
 /// когда проверялись обновления; пока идёт проверка — IsChecking (по нему таблица показывает заглушки). Числа — те же,
-/// что на вкладках-счётчиках, у своего профиля и у сервера у хостера. Модбаза поддельная (ответ задерживается, пока тест
-/// не отпустит), профиль — во временной папке; данные пользователя не трогаются.
+/// что на вкладках-счётчиках, у своего профиля и у сервера у хостера. Снять выбор (Esc и «Назад» мыши) — снова сводка;
+/// так же закрывается карточка в «Каталоге». Модбаза поддельная (ответ задерживается, пока тест не отпустит), профиль —
+/// во временной папке; данные пользователя не трогаются.
 /// </summary>
 public sealed class ModsSummaryTests : IDisposable
 {
@@ -202,6 +203,56 @@ public sealed class ModsSummaryTests : IDisposable
         Assert.Equal(Loc.T("mods.summaryOf", 3, 4), mods.SummaryEnabledText);
         Assert.Equal($"Hosted · {profile.KindText}", mods.SummaryTitle);
         AssertSummaryMatchesCounters(mods);
+    });
+
+    [Fact]
+    public void ClearSelection_ReturnsTheRightPanelToTheSummary_ButNotInHistory() => Sta.Run(() =>
+    {
+        var mods = Main(new FakeModDb(), ClientProfile("a")).Mods;
+        Sta.WaitFor(() => mods.ModCount == 3);
+        var command = mods.ClearSelectionCommand;
+        Assert.False(command.CanExecute(null)); // мод не выбран — снимать нечего, Esc идёт дальше
+        var changed = 0;
+        command.CanExecuteChanged += (_, _) => changed++;
+
+        mods.Selected = mods.Rows.First(r => r.ModId == "alpha");
+        Assert.NotNull(mods.Card);
+        Assert.True(command.CanExecute(null));
+        Assert.NotEqual(0, changed);
+
+        command.Execute(null);
+        Assert.Null(mods.Selected);
+        Assert.Null(mods.Card); // справа снова сводка
+        Assert.False(command.CanExecute(null));
+
+        // таблицу перестроили (моды перечитаны) — выбор сам не вернулся
+        Sta.Wait(mods.ReloadAsync());
+        Assert.Null(mods.Selected);
+        Assert.Null(mods.Card);
+
+        // «История»: справа сеанс, а не мод — снимать нечего, даже если в спрятанной таблице мод выбран
+        mods.Selected = mods.Rows.First(r => r.ModId == "beta");
+        mods.Filter = ModFilter.History;
+        Assert.False(command.CanExecute(null));
+        mods.Filter = ModFilter.All;
+        Assert.True(command.CanExecute(null));
+    });
+
+    [Fact]
+    public void CatalogCard_ClosesOnClearSelection_LikeTheModsCard() => Sta.Run(() =>
+    {
+        var catalog = Main(new FakeModDb(), ClientProfile("a")).Catalog;
+        var command = catalog.ClearSelectionCommand;
+        Assert.False(command.CanExecute(null));
+
+        catalog.Selected = new CatalogItemViewModel(new ModDbListItem { ModId = 1, AssetId = 1, Name = "Alpha" }, new Dictionary<string, string>());
+        Assert.NotNull(catalog.Details);
+        Assert.True(command.CanExecute(null));
+
+        command.Execute(null);
+        Assert.Null(catalog.Selected);
+        Assert.Null(catalog.Details); // справа снова «Выбери мод»
+        Assert.False(command.CanExecute(null));
     });
 
     [Fact]

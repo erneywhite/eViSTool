@@ -397,7 +397,9 @@
     </ControlTheme>
 
     <!-- вкладка-счётчик «Моих модов»: число и подпись; невыбранная приглушена, при наведении — светлая; выбранная —
-         светлая и с песочным подчёркиванием на линии ряда (полоска 2 px, зазор 12 px) -->
+         светлая. Песочной полоски под выбранной в шаблоне нет: она одна на весь ряд и едет от вкладки к вкладке
+         (ctl:TabIndicator в панели вокруг ряда), поэтому такие вкладки — только в ряду с ней. Отступ снизу 14 px — зазор
+         до полоски на линии ряда -->
     <ControlTheme x:Key="Forest.StatTab" TargetType="RadioButton">
         <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
         <Setter Property="Cursor" Value="Hand" />
@@ -409,7 +411,6 @@
                 <Panel Background="Transparent">
                     <ContentPresenter x:Name="PART_ContentPresenter" Margin="0,0,0,14" Content="{TemplateBinding Content}"
                                       ContentTemplate="{TemplateBinding ContentTemplate}" Foreground="{TemplateBinding Foreground}" />
-                    <Border x:Name="Underline" Height="2" VerticalAlignment="Bottom" Background="{DynamicResource Forest.Accent}" />
                     <Border x:Name="FocusRing" Margin="-4" CornerRadius="6" BorderThickness="2" BorderBrush="{DynamicResource Forest.Accent}"
                             IsVisible="False" IsHitTestVisible="False" />
                 </Panel>
@@ -422,25 +423,11 @@
                 </Transitions>
             </Setter>
         </Style>
-        <Style Selector="^ /template/ Border#Underline">
-            <Setter Property="Transitions">
-                <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
-                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" Easing="0.2,0.7,0.2,1" />
-                </Transitions>
-            </Setter>
-            <Setter Property="RenderTransform" Value="scaleX(0)" />
-            <Setter Property="Opacity" Value="0" />
-        </Style>
         <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
         </Style>
         <Style Selector="^:checked /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
-        </Style>
-        <Style Selector="^:checked /template/ Border#Underline">
-            <Setter Property="RenderTransform" Value="scaleX(1)" />
-            <Setter Property="Opacity" Value="1" />
         </Style>
         <Style Selector="^:focus-visible /template/ Border#FocusRing">
             <Setter Property="IsVisible" Value="True" />
