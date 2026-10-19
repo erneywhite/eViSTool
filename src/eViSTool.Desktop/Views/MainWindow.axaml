@@ -365,9 +365,9 @@
                             <ComboBox.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ProfileViewModel">
                                     <StackPanel Orientation="Horizontal">
-                                        <!-- сервер у хостера — облако перед именем -->
-                                        <Path Classes="icon" Data="{StaticResource Icon.Cloud}" Width="13" Height="13" Margin="0,0,7,0" VerticalAlignment="Center"
-                                              Stroke="{DynamicResource Forest.Accent}" IsVisible="{Binding IsHosted}" />
+                                        <!-- значок профиля: цвет и знак, без своего — знак вида (клиент, сервер, облако у хостера) -->
+                                        <ctl:ProfileBadge Color="{Binding IconColor}" Glyph="{Binding BadgeGlyph}" Width="20" Height="20" Margin="0,0,8,0"
+                                                          VerticalAlignment="Center" />
                                         <TextBlock>
                                             <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding KindText, Mode=OneWay}" Foreground="{DynamicResource Forest.Muted}" />
                                         </TextBlock>

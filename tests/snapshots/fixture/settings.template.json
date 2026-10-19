@@ -4,6 +4,8 @@
       "Id": "stand",
       "Name": "Стенд",
       "Kind": "Server",
+      "IconColor": "rust",
+      "IconGlyph": "castle",
       "GameDir": "{{GAME}}",
       "DataDir": "{{VSDATA}}",
       "RemoteCode": null,

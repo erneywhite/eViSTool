@@ -63,6 +63,14 @@ public sealed class GameProfile
     [JsonIgnore]
     public bool IsLocal => Host == ProfileHost.Local;
 
+    /// <summary>Цвет значка профиля — имя из <see cref="ProfileIcon.Colors"/>; null — нейтральная плашка.</summary>
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public string? IconColor { get; set; }
+
+    /// <summary>Значок профиля — имя из <see cref="ProfileIcon.Glyphs"/>; null — значок вида (клиент, сервер, хостер).</summary>
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public string? IconGlyph { get; set; }
+
     /// <summary>Закреплённые моды: modid → версия, на которой закреплён. Такие не обновляются.</summary>
     public Dictionary<string, string> PinnedMods { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 

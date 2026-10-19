@@ -37,6 +37,15 @@
     <Color x:Key="Forest.Brand.DiscordColor">#5865F2</Color>
     <Color x:Key="Forest.Brand.NtfyColor">#317F6F</Color>
     <Color x:Key="Forest.OnBrandColor">#FFFFFF</Color>
+    <!-- цвета значка профиля (ProfileBadge): приглушённые, светлый знак Forest.Text на них читается -->
+    <Color x:Key="Forest.Badge.MossColor">#5E7A45</Color>
+    <Color x:Key="Forest.Badge.PineColor">#2F6B4F</Color>
+    <Color x:Key="Forest.Badge.TealColor">#2E7472</Color>
+    <Color x:Key="Forest.Badge.SkyColor">#3D6E96</Color>
+    <Color x:Key="Forest.Badge.PlumColor">#74507A</Color>
+    <Color x:Key="Forest.Badge.RustColor">#9A5434</Color>
+    <Color x:Key="Forest.Badge.AmberColor">#9C7428</Color>
+    <Color x:Key="Forest.Badge.StoneColor">#5F6660</Color>
     <Color x:Key="Forest.WarnColor">#EDBD86</Color>
     <Color x:Key="Forest.WarningBgColor">#372F1F</Color>
     <Color x:Key="Forest.WarnLineColor">#5A4A30</Color>
@@ -77,6 +86,14 @@
     <SolidColorBrush x:Key="Forest.Brand.Discord" Color="{StaticResource Forest.Brand.DiscordColor}" />
     <SolidColorBrush x:Key="Forest.Brand.Ntfy" Color="{StaticResource Forest.Brand.NtfyColor}" />
     <SolidColorBrush x:Key="Forest.OnBrand" Color="{StaticResource Forest.OnBrandColor}" />
+    <SolidColorBrush x:Key="Forest.Badge.Moss" Color="{StaticResource Forest.Badge.MossColor}" />
+    <SolidColorBrush x:Key="Forest.Badge.Pine" Color="{StaticResource Forest.Badge.PineColor}" />
+    <SolidColorBrush x:Key="Forest.Badge.Teal" Color="{StaticResource Forest.Badge.TealColor}" />
+    <SolidColorBrush x:Key="Forest.Badge.Sky" Color="{StaticResource Forest.Badge.SkyColor}" />
+    <SolidColorBrush x:Key="Forest.Badge.Plum" Color="{StaticResource Forest.Badge.PlumColor}" />
+    <SolidColorBrush x:Key="Forest.Badge.Rust" Color="{StaticResource Forest.Badge.RustColor}" />
+    <SolidColorBrush x:Key="Forest.Badge.Amber" Color="{StaticResource Forest.Badge.AmberColor}" />
+    <SolidColorBrush x:Key="Forest.Badge.Stone" Color="{StaticResource Forest.Badge.StoneColor}" />
     <SolidColorBrush x:Key="Forest.Warn" Color="{StaticResource Forest.WarnColor}" />
     <SolidColorBrush x:Key="Forest.WarningBg" Color="{StaticResource Forest.WarningBgColor}" />
     <SolidColorBrush x:Key="Forest.WarnLine" Color="{StaticResource Forest.WarnLineColor}" />
@@ -289,6 +306,20 @@
     <!-- внешняя ссылка (откроется браузер): стрелка вверх-вправо. Вместо знака «↗»: его нет во вшитых шрифтах, и окно
          брало его из системы, порой цветным эмодзи -->
     <StreamGeometry x:Key="Icon.External">M7 7 h10 v10 M7 17 L17 7</StreamGeometry>
+
+    <!-- знаки значка профиля — Lucide (ISC), склеены в один контур, поле 24×24; рисует ProfileBadge -->
+    <StreamGeometry x:Key="Badge.Sword">M14.5 17.5 L3 6 L3 3 L6 3 L17.5 14.5 M13 19 L19 13 M16 16 L20 20 M19 21 L21 19</StreamGeometry>
+    <StreamGeometry x:Key="Badge.Pickaxe">M14.531 12.469 6.619 20.38a1 1 0 1 1-3-3l7.912-7.912 M15.686 4.314A12.5 12.5 0 0 0 5.461 2.958 1 1 0 0 0 5.58 4.71a22 22 0 0 1 6.318 3.393 M17.7 3.7a1 1 0 0 0-1.4 0l-4.6 4.6a1 1 0 0 0 0 1.4l2.6 2.6a1 1 0 0 0 1.4 0l4.6-4.6a1 1 0 0 0 0-1.4z M19.686 8.314a12.501 12.501 0 0 1 1.356 10.225 1 1 0 0 1-1.751-.119 22 22 0 0 0-3.393-6.319</StreamGeometry>
+    <StreamGeometry x:Key="Badge.Shield">M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z</StreamGeometry>
+    <StreamGeometry x:Key="Badge.Castle">M22 20v-9H2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2Z M18 11V4H6v7 M15 22v-4a3 3 0 0 0-3-3a3 3 0 0 0-3 3v4 M22 11V9 M2 11V9 M6 4V2 M18 4V2 M10 4V2 M14 4V2</StreamGeometry>
+    <StreamGeometry x:Key="Badge.Tree">M17 14 l3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z M12 22v-3</StreamGeometry>
+    <StreamGeometry x:Key="Badge.Mountain">M8 3 l4 8 5-5 5 15H2L8 3z</StreamGeometry>
+    <StreamGeometry x:Key="Badge.Flame">M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z</StreamGeometry>
+    <StreamGeometry x:Key="Badge.House">M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8 M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z</StreamGeometry>
+    <StreamGeometry x:Key="Badge.Anchor">M12 22V8 M5 12H2a10 10 0 0 0 20 0h-3 M9 5 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0</StreamGeometry>
+    <StreamGeometry x:Key="Badge.Skull">M12.5 17 l-.5-1-.5 1h1z M15 22a1 1 0 0 0 1-1v-1a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20v1a1 1 0 0 0 1 1z M14 12 a1 1 0 1 0 2 0 a1 1 0 1 0 -2 0 M8 12 a1 1 0 1 0 2 0 a1 1 0 1 0 -2 0</StreamGeometry>
+    <StreamGeometry x:Key="Badge.Gem">M6 3h12l4 6-10 13L2 9Z M11 3 8 9l4 13 4-13-3-6 M2 9h20</StreamGeometry>
+    <StreamGeometry x:Key="Badge.Flask">M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2 M8.5 2h7 M7 16h10</StreamGeometry>
 
     <!-- логотипы сервисов оповещений — Simple Icons 13.21.0 (CC0-1.0), заливкой, поле 24×24; рисует ChannelLogo -->
     <StreamGeometry x:Key="Logo.Telegram">M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z</StreamGeometry>

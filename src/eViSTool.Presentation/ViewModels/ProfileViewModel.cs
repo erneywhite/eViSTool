@@ -21,6 +21,12 @@ public sealed partial class ProfileViewModel : ObservableObject
     [ObservableProperty] private string? _dataDir;
     [ObservableProperty] private ResolvedProfile _resolved;
 
+    /// <summary>Цвет значка (<see cref="ProfileIcon.Colors"/>); "" — не выбран, нейтральная плашка.</summary>
+    [ObservableProperty] private string _iconColor;
+
+    /// <summary>Знак значка (<see cref="ProfileIcon.Glyphs"/>); "" — не выбран, знак вида профиля.</summary>
+    [ObservableProperty] private string _iconGlyph;
+
     /// <param name="remembered">Сохранить настройки, когда профиль сам запомнил найденное (версию игры у хостера);
     /// в отличие от <paramref name="changed"/> это не правка профиля и ничего не перечитывает.</param>
     public ProfileViewModel(GameProfile model, Action<ProfileViewModel> changed, Action<ProfileViewModel>? remembered = null)
@@ -33,6 +39,46 @@ public sealed partial class ProfileViewModel : ObservableObject
         _gameDir = model.GameDir;
         _dataDir = model.DataDir;
         _resolved = ProfileResolver.Resolve(model);
+        _iconColor = ProfileIcon.Color(model.IconColor) ?? "";
+        _iconGlyph = ProfileIcon.Glyph(model.IconGlyph) ?? "";
+    }
+
+    /// <summary>Варианты цвета в карточке профиля: первым — «не выбран».</summary>
+    public static IReadOnlyList<string> IconColorOptions { get; } = ["", .. ProfileIcon.Colors];
+
+    /// <summary>Варианты знака: первым — «не выбран», он рисуется знаком вида профиля.</summary>
+    public IReadOnlyList<IconChoice> IconGlyphOptions => [new("", KindGlyph), .. ProfileIcon.Glyphs.Select(g => new IconChoice(g, g))];
+
+    /// <summary>Знак на значке: выбранный или по виду профиля — client, server, cloud (у хостера).</summary>
+    public string BadgeGlyph => IconGlyph is { Length: > 0 } g ? g : KindGlyph;
+
+    /// <summary>Знак вида профиля — им рисуется вариант «не выбран» в выборе знака.</summary>
+    public string KindGlyph => IsHosted ? "cloud" : IsServer ? "server" : "client";
+
+    public bool HasCustomIcon => IconColor.Length > 0 || IconGlyph.Length > 0;
+
+    /// <summary>Вернуть значок по умолчанию.</summary>
+    [RelayCommand]
+    private void ResetIcon()
+    {
+        IconColor = "";
+        IconGlyph = "";
+    }
+
+    // значок — не правка профиля: только сохранить настройки, моды не перечитываются
+    partial void OnIconColorChanged(string value)
+    {
+        Model.IconColor = ProfileIcon.Color(value);
+        OnPropertyChanged(nameof(HasCustomIcon));
+        (_remembered ?? _changed)(this);
+    }
+
+    partial void OnIconGlyphChanged(string value)
+    {
+        Model.IconGlyph = ProfileIcon.Glyph(value);
+        OnPropertyChanged(nameof(BadgeGlyph));
+        OnPropertyChanged(nameof(HasCustomIcon));
+        (_remembered ?? _changed)(this);
     }
 
     /// <summary>Тип задаётся при создании профиля и дальше не меняется.</summary>
@@ -168,6 +214,8 @@ public sealed partial class ProfileViewModel : ObservableObject
         Model.Kind = value;
         OnPropertyChanged(nameof(IsServer));
         OnPropertyChanged(nameof(KindText));
+        OnPropertyChanged(nameof(KindGlyph));
+        OnPropertyChanged(nameof(BadgeGlyph));
         Refresh();
     }
     partial void OnGameDirChanged(string? value) { Model.GameDir = value; Refresh(); }
@@ -219,3 +267,6 @@ public sealed partial class ProfileViewModel : ObservableObject
         if (Directory.Exists(DataDir)) Ui.OpenFolder(DataDir);
     }
 }
+
+/// <summary>Вариант знака в выборе: что сохранить (<see cref="Value"/>, "" — не выбран) и что нарисовать.</summary>
+public sealed record IconChoice(string Value, string Glyph);

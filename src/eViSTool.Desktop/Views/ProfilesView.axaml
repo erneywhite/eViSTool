@@ -27,16 +27,35 @@
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="Margin" Value="0,0,0,6" />
         </Style>
-        <!-- значок типа профиля: клиент — монитор, сервер — стойка -->
-        <Style Selector="Path.profileKind">
-            <Setter Property="Data" Value="{StaticResource Icon.Client}" />
-        </Style>
-        <Style Selector="Path.profileKind.server">
-            <Setter Property="Data" Value="{StaticResource Icon.Server}" />
-        </Style>
-        <!-- сервер у хостера — облако (после .server: хостовый профиль серверный, оба класса стоят) -->
-        <Style Selector="Path.profileKind.hosted">
-            <Setter Property="Data" Value="{StaticResource Icon.Cloud}" />
+        <!-- образец в выборе значка: выбранный обведён акцентом -->
+        <Style Selector="ListBox.iconChoices">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="ItemsPanel">
+                <ItemsPanelTemplate>
+                    <WrapPanel />
+                </ItemsPanelTemplate>
+            </Setter>
+            <Setter Property="ItemContainerTheme">
+                <ControlTheme TargetType="ListBoxItem">
+                    <Setter Property="Margin" Value="0,0,6,6" />
+                    <Setter Property="Cursor" Value="Hand" />
+                    <Setter Property="Template">
+                        <ControlTemplate>
+                            <Border x:Name="Ring" Padding="3" CornerRadius="11" BorderThickness="2" BorderBrush="Transparent">
+                                <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" />
+                            </Border>
+                        </ControlTemplate>
+                    </Setter>
+                    <Style Selector="^:pointerover /template/ Border#Ring">
+                        <Setter Property="BorderBrush" Value="{DynamicResource Forest.Line}" />
+                    </Style>
+                    <Style Selector="^:selected /template/ Border#Ring">
+                        <Setter Property="BorderBrush" Value="{DynamicResource Forest.Accent}" />
+                    </Style>
+                </ControlTheme>
+            </Setter>
         </Style>
     </UserControl.Styles>
 
@@ -97,8 +116,8 @@
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:ProfileViewModel">
                                 <DockPanel>
-                                    <Path Classes="icon profileKind" Classes.server="{Binding IsServer}" Classes.hosted="{Binding IsHosted}" DockPanel.Dock="Left" VerticalAlignment="Center"
-                                          Margin="0,0,12,0" />
+                                    <ctl:ProfileBadge Color="{Binding IconColor}" Glyph="{Binding BadgeGlyph}" DockPanel.Dock="Left" VerticalAlignment="Center"
+                                                      Margin="0,0,12,0" />
                                     <StackPanel>
                                         <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                         <TextBlock FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextTrimming="CharacterEllipsis">
@@ -132,6 +151,39 @@
                                         <!-- тип задаётся при создании профиля и не меняется: у клиента и сервера разные папки и файлы -->
                                         <TextBlock Text="{Binding KindText}" FontSize="13" Foreground="{DynamicResource Forest.Text}" Margin="0,6,0,0"
                                                    AutomationProperties.AutomationId="ProfileKind" />
+
+                                        <!-- значок: цвет плашки и знак; первый вариант в каждом ряду — как было (нейтральная плашка, знак вида) -->
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr settings.iconReset}"
+                                                    Command="{Binding ResetIconCommand}" IsVisible="{Binding HasCustomIcon}" VerticalAlignment="Bottom"
+                                                    AutomationProperties.AutomationId="ProfileIconReset" />
+                                            <TextBlock Text="{local:Tr settings.icon}" Classes="label" />
+                                        </DockPanel>
+                                        <TextBlock Classes="hint" Text="{local:Tr settings.iconHint}" />
+                                        <DockPanel Margin="0,10,0,0">
+                                            <ctl:ProfileBadge DockPanel.Dock="Left" Color="{Binding IconColor}" Glyph="{Binding BadgeGlyph}" Width="56" Height="56"
+                                                              VerticalAlignment="Top" Margin="0,3,18,0" />
+                                            <StackPanel>
+                                                <ListBox Classes="iconChoices" ItemsSource="{x:Static vm:ProfileViewModel.IconColorOptions}" SelectedItem="{Binding IconColor}"
+                                                         AutomationProperties.AutomationId="ProfileIconColor" AutomationProperties.Name="{local:Tr settings.icon}">
+                                                    <ListBox.ItemTemplate>
+                                                        <DataTemplate x:DataType="x:String">
+                                                            <ctl:ProfileBadge Color="{Binding}" Glyph="" Width="22" Height="22" />
+                                                        </DataTemplate>
+                                                    </ListBox.ItemTemplate>
+                                                </ListBox>
+                                                <ListBox Classes="iconChoices" ItemsSource="{Binding IconGlyphOptions}" SelectedValueBinding="{Binding Value, DataType=vm:IconChoice}"
+                                                         SelectedValue="{Binding IconGlyph}" AutomationProperties.AutomationId="ProfileIconGlyph"
+                                                         AutomationProperties.Name="{local:Tr settings.icon}">
+                                                    <ListBox.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:IconChoice">
+                                                            <ctl:ProfileBadge Color="{Binding $parent[ListBox].((vm:ProfileViewModel)DataContext).IconColor}" Glyph="{Binding Glyph}"
+                                                                              Width="30" Height="30" />
+                                                        </DataTemplate>
+                                                    </ListBox.ItemTemplate>
+                                                </ListBox>
+                                            </StackPanel>
+                                        </DockPanel>
 
                                         <!-- удалённый сервер: вместо папок — куда подключаемся; сам код не показываем -->
                                         <StackPanel IsVisible="{Binding IsRemote}">
