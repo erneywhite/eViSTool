@@ -65,6 +65,12 @@ internal sealed class MessageDialog : Window
         };
     }
 
+    protected override void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
+        WindowCaption.Dark(this); // заголовок в цвет окна, как у главного и остальных окон программы (Windows)
+    }
+
     private enum Glyph { Question, Info, Warning, Error }
 
     /// <summary>Цвет кружка со значком — токен темы по смыслу.</summary>
