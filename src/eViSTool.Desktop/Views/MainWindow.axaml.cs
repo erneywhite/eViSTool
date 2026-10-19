@@ -28,6 +28,8 @@ public partial class MainWindow : Window
         _backdropClock.Tick += (_, _) => UpdateBackdrop();
         _backdropClock.Start();
         Closed += (_, _) => _backdropClock.Stop();
+        // «горизонтали» заглушки плывут, пока окно на экране и в фокусе, а их видно (фона из игры нет)
+        Drift = new ContourDrift(this, Contours);
         SizeChanged += (_, _) =>
         {
             if (WindowState == WindowState.Normal) _normalSize = ClientSize;
@@ -125,6 +127,9 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _backdropClock = new() { Interval = TimeSpan.FromHours(1) };
     private string? _backdropPath; // показанная заставка; null — заглушка
     private int _backdropRun;      // номер пересчёта: ответ из фона, который опоздал к более свежему, отбрасывается
+
+    /// <summary>Сдвиг «горизонталей» заглушки (видны, когда картинки нет).</summary>
+    internal ContourDrift Drift { get; }
 
     /// <summary>
     /// Выбрать заставку на сегодня (<see cref="GameBackdrop"/>) и показать её: поиск файла и загрузка — в фоне, файл
