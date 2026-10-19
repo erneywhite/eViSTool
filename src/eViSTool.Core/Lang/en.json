@@ -2153,6 +2153,8 @@
   "shots.close": "Close (Esc)",
   "shots.hint": "← → — browse",
   "shots.loadFailed": "Could not load the image",
+  "shots.next": "Next screenshot",
+  "shots.prev": "Previous screenshot",
   "shots.title": "{0} — screenshots",
   "shots.windowTitle": "Screenshots",
   "size.bytes": "{0} B",

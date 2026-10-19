@@ -2153,6 +2153,8 @@
   "shots.close": "Закрыть (Esc)",
   "shots.hint": "← → — листать",
   "shots.loadFailed": "Не удалось загрузить картинку",
+  "shots.next": "Следующий скриншот",
+  "shots.prev": "Предыдущий скриншот",
   "shots.title": "{0} — скриншоты",
   "shots.windowTitle": "Скриншоты",
   "size.bytes": "{0} Б",

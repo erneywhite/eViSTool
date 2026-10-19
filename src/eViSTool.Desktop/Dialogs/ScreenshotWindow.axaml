@@ -45,10 +45,12 @@
     </Window.Resources>
 
     <DockPanel>
+        <!-- кнопки полосы берут фокус (Tab): у «Открыть в браузере» своей клавиши нет. ←/→ листают и с фокусом на кнопке —
+             привязки окна срабатывают раньше, чем переход фокуса стрелками -->
         <DockPanel DockPanel.Dock="Bottom" Background="#1C1C1C" Height="48">
-            <Button DockPanel.Dock="Right" Content="{local:Tr shots.close}" Click="Close_Click" Margin="8" Padding="12,4" Focusable="False"
+            <Button DockPanel.Dock="Right" Content="{local:Tr shots.close}" Click="Close_Click" Margin="8" Padding="12,4"
                     AutomationProperties.AutomationId="ScreenshotClose" />
-            <Button DockPanel.Dock="Right" Content="{local:Tr shots.browser}" Command="{Binding OpenInBrowserCommand}" Margin="8" Padding="12,4" Focusable="False"
+            <Button DockPanel.Dock="Right" Content="{local:Tr shots.browser}" Command="{Binding OpenInBrowserCommand}" Margin="8" Padding="12,4"
                     AutomationProperties.AutomationId="ScreenshotBrowser" />
             <TextBlock Text="{Binding Counter}" Foreground="#CCFFFFFF" VerticalAlignment="Center" Margin="16,0"
                        AutomationProperties.AutomationId="ScreenshotCounter" />
@@ -63,10 +65,13 @@
                        IsVisible="{Binding #Picture.(ctl:RemoteImage.IsLoading)}" AutomationProperties.AutomationId="ScreenshotLoading" />
             <TextBlock Text="{local:Tr shots.loadFailed}" Foreground="#99FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"
                        IsVisible="{Binding #Picture.(ctl:RemoteImage.Failed)}" AutomationProperties.AutomationId="ScreenshotFailed" />
+            <!-- стрелки фокус не берут (с клавиатуры листают ←/→); имя для экранного диктора — словами, а не «‹» -->
             <Button Content="‹" Theme="{StaticResource NavButton}" HorizontalAlignment="Left" Margin="12,0,0,0"
-                    Command="{Binding PreviousCommand}" IsVisible="{Binding HasSeveral}" AutomationProperties.AutomationId="ScreenshotPrev" />
+                    Command="{Binding PreviousCommand}" IsVisible="{Binding HasSeveral}" AutomationProperties.AutomationId="ScreenshotPrev"
+                    AutomationProperties.Name="{local:Tr shots.prev}" />
             <Button Content="›" Theme="{StaticResource NavButton}" HorizontalAlignment="Right" Margin="0,0,12,0"
-                    Command="{Binding NextCommand}" IsVisible="{Binding HasSeveral}" AutomationProperties.AutomationId="ScreenshotNext" />
+                    Command="{Binding NextCommand}" IsVisible="{Binding HasSeveral}" AutomationProperties.AutomationId="ScreenshotNext"
+                    AutomationProperties.Name="{local:Tr shots.next}" />
         </Grid>
     </DockPanel>
 </dialogs:DialogWindow>
