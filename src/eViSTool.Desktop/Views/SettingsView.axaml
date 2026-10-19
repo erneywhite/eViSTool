@@ -38,10 +38,10 @@
         </StackPanel>
         <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1" Margin="0,14,0,14" />
 
-        <!-- общее для всей программы, смысловыми блоками; всё про конкретный профиль — в «Профилях». Колонка не шире
-             880: строки с переключателем справа на всю ширину окна читаются плохо -->
+        <!-- общее для всей программы, смысловыми блоками; всё про конкретный профиль — в «Профилях». Колонка на всю
+             ширину окна, как на других вкладках -->
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="0,0,14,0" MaxWidth="880" HorizontalAlignment="Left">
+            <StackPanel Margin="0,0,14,0">
 
                 <!-- ===== вид ===== -->
                 <Border Classes="card settingsCard">
