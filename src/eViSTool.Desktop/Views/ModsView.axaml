@@ -323,8 +323,8 @@
                 <ColumnDefinition Width="420" MinWidth="280" />
             </Grid.ColumnDefinitions>
 
-            <GridSplitter Grid.Column="1" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext"
-                          ToolTip.Tip="{local:Tr catalog.splitterTip}" DragCompleted="Splitter_DragCompleted" />
+            <GridSplitter x:Name="Splitter" Grid.Column="1" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext"
+                          ToolTip.Tip="{local:Tr catalog.splitterTip}" />
 
             <!-- ===== левая часть: поиск, чипы, таблица ===== -->
             <!-- узкая (класс compact, ставит код окна): у кнопок над таблицей только иконки, список сортировки уже, колонки

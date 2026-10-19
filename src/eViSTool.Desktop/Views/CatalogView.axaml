@@ -69,8 +69,8 @@
             </Grid.ColumnDefinitions>
 
             <!-- разделитель: тяни, чтобы сделать карточку шире/уже (ширина запоминается) -->
-            <GridSplitter Grid.Column="1" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext"
-                          ToolTip.Tip="{local:Tr catalog.splitterTip}" DragCompleted="Splitter_DragCompleted" />
+            <GridSplitter x:Name="Splitter" Grid.Column="1" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext"
+                          ToolTip.Tip="{local:Tr catalog.splitterTip}" />
 
             <!-- ===== поиск, фильтры, список ===== -->
             <DockPanel>
