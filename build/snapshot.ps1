@@ -22,6 +22,10 @@
 .EXAMPLE
     pwsh build/snapshot.ps1 -Screens mods -GameDir C:\snap-game
     # профиль стенда смотрит в C:\snap-game: заставки из assets/game/textures/gui/backgrounds — фон под боковой панелью
+
+.EXAMPLE
+    pwsh build/snapshot.ps1 -Screens mods -NoBackdrop
+    # без фона из игры: под боковой панелью заглушка
 #>
 param(
     [Parameter(Mandatory)][string[]]$Screens,
@@ -30,8 +34,11 @@ param(
     [string]$Size = '1400x860',
     [double]$Wait = 4,
     [string]$Profile = 'Стенд',
-    # папка игры профиля стенда (окно её только читает); по умолчанию — пустая временная, без игры и без фона из игры
+    # папка игры профиля стенда (окно её только читает); по умолчанию — пустая временная. Фон из игры окно ищет и в
+    # установленной на компьютере игре — на машине с игрой он будет и без GameDir
     [string]$GameDir,
+    # выключить «Фон из игры»: под боковой панелью заглушка («горизонтали»), даже если игра установлена
+    [switch]$NoBackdrop,
     # не пересобирать: взять сборки из прошлого запуска (если они есть)
     [switch]$NoBuild
 )
@@ -74,6 +81,11 @@ function Reset-Fixture([string]$appDir) {
     $json = { param($s) ($s | ConvertTo-Json).Trim('"') } # экранировать путь для JSON
     $settings = (Get-Content (Join-Path $fixture 'settings.template.json') -Raw -Encoding utf8).
         Replace('{{VSDATA}}', (& $json $vsdata)).Replace('{{GAME}}', (& $json $game))
+    if ($NoBackdrop) {
+        $parsed = $settings | ConvertFrom-Json
+        $parsed | Add-Member GameBackground $false -Force
+        $settings = $parsed | ConvertTo-Json -Depth 20
+    }
     [IO.File]::WriteAllText((Join-Path $data 'settings.json'), $settings)
 
     # файлы агента профиля (журнал действий): время в шаблоне — «{{AGO:минуты}}» назад от сейчас, чтобы записи не устаревали

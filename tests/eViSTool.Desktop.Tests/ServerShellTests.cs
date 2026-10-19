@@ -181,6 +181,32 @@ public sealed class ServerShellTests : IDisposable
     }
 
     /// <summary>
+    /// Вкладка «Консоль» проявляется целиком: плитки-показатели над консолью — внутри вкладки, вместе с карточкой
+    /// консоли, а не стоят на месте сразу, пока карточка под ними проявляется.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Console_tab_tiles_reveal_together_with_the_console()
+    {
+        var main = Main();
+        var server = main.Server;
+        var window = Show(new Window { Width = 1200, Height = 860, Content = new ServerView { DataContext = server } });
+        server.Tab = ServerTab.Players;
+        await Run(400);
+
+        // вкладка — ребёнок панели с Motion.RevealChildren, в котором лежит элемент
+        Visual TabOf(string id) => Named(window, id).GetVisualAncestors()
+            .First(v => v.GetVisualParent() is Panel panel && Controls.Motion.GetRevealChildren(panel));
+        var tab = TabOf("SrvUptime");
+        Assert.Same(tab, TabOf("SrvConsole"));
+        using var seen = new MotionTests.RevealProbe(tab);
+        server.Tab = ServerTab.Console;
+        await Run(400);
+        seen.AssertRevealed();
+        Assert.Equal(1, tab.Opacity);
+        Assert.True(Named(window, "SrvUptime").IsEffectivelyVisible);
+    }
+
+    /// <summary>
     /// Главное окно с моделью без показа, как в <see cref="MainWindowBackdropTests"/>: привязкам и стилям хватает прохода
     /// раскладки, а «дыхание» само по себе проверяется на отдельном показанном окне (кольцо в карточке — то же).
     /// </summary>

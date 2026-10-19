@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Avalonia.Threading;
 
 namespace eViSTool.Desktop.Platform;
 
@@ -8,7 +9,9 @@ namespace eViSTool.Desktop.Platform;
 /// Включены ли анимации в системе (docs/design.md, раздел 3): Windows — флажок «Показывать анимацию в Windows»
 /// (SPI_GETCLIENTAREAANIMATION), Linux — ключ GNOME org.gnome.desktop.interface enable-animations, через gsettings.
 /// На других системах и когда узнать не вышло (gsettings нет, схемы GNOME нет, вызов не ответил) — включены.
-/// Читается один раз при запуске (App): выключены — к стилям подключается Themes/ForestStill.axaml.
+/// Читается один раз при запуске (App): выключены — к стилям подключается Themes/ForestStill.axaml. Windows отвечает
+/// сразу, и стили встают до первого окна; gsettings спрашивается в фоне (без сеанса D-Bus он думает до секунды, окно
+/// его не ждёт), до ответа анимации включены, а стили, подключённые позже, действуют и на уже открытые окна.
 /// </summary>
 internal static class SystemMotion
 {
@@ -25,7 +28,21 @@ internal static class SystemMotion
         string? GnomeAnimation();
     }
 
-    public static bool Read() => Read(new SystemSource());
+    /// <summary>Прочитать настройку: на Linux — в фоне (gsettings — отдельный процесс), на остальных — сразу.</summary>
+    public static Task<bool> ReadAsync() => ReadAsync(new SystemSource());
+
+    internal static Task<bool> ReadAsync(ISource source) =>
+        source.IsLinux ? Task.Run(() => Read(source)) : Task.FromResult(Read(source));
+
+    /// <summary>
+    /// Отдать прочитанную настройку <paramref name="apply"/> в потоке окна: уже прочитана — сразу, в этом же вызове (при
+    /// запуске это до первого окна); ещё нет — когда придёт. Не прочиталась — включены.
+    /// </summary>
+    internal static void Apply(Task<bool> reading, Action<bool> apply)
+    {
+        if (reading.IsCompleted) apply(!reading.IsCompletedSuccessfully || reading.Result);
+        else reading.ContinueWith(done => Dispatcher.UIThread.Post(() => apply(!done.IsCompletedSuccessfully || done.Result)), TaskScheduler.Default);
+    }
 
     internal static bool Read(ISource source)
     {
@@ -70,8 +87,8 @@ internal static class SystemMotion
                 if (process is null) return null;
                 var output = process.StandardOutput.ReadToEndAsync();
                 _ = process.StandardError.ReadToEndAsync(); // читать и ошибки: иначе полный канал не даст ему выйти
-                // окно ждёт ответа при запуске: обычно gsettings отвечает за десятки миллисекунд, а зависший (нет сеанса
-                // D-Bus и т. п.) задержит окно не больше чем на секунду с небольшим
+                // ответа ждут в фоне (ReadAsync): обычно gsettings отвечает за десятки миллисекунд, а зависший (нет
+                // сеанса D-Bus и т. п.) снимается через секунду — анимации тогда остаются включёнными
                 if (!process.WaitForExit(1000))
                 {
                     try { process.Kill(); }

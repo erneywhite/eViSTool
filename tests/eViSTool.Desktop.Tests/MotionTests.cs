@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Xml.Linq;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Shapes;
@@ -46,10 +47,11 @@ public sealed class MotionTests
 
     // ---------- системная настройка
 
-    /// <summary>Подмена системы: что ответить и сколько раз спросили.</summary>
+    /// <summary>Подмена системы: что ответить и сколько раз спросили; с <see cref="Gate"/> gsettings «думает», пока его не откроют.</summary>
     private sealed class FakeSystem(bool windows = false, bool linux = false, bool? spi = null, string? gsettings = null) : SystemMotion.ISource
     {
         public bool Throws { get; init; }
+        public ManualResetEventSlim? Gate { get; init; }
         public int Asked { get; private set; }
         public bool IsWindows => windows;
         public bool IsLinux => linux;
@@ -63,6 +65,7 @@ public sealed class MotionTests
         public string? GnomeAnimation()
         {
             Asked++;
+            Gate?.Wait(TimeSpan.FromSeconds(30));
             return Throws ? throw new InvalidOperationException("gsettings") : gsettings;
         }
     }
@@ -97,6 +100,30 @@ public sealed class MotionTests
     {
         Assert.True(SystemMotion.Read(new FakeSystem(windows: true) { Throws = true }));
         Assert.True(SystemMotion.Read(new FakeSystem(linux: true) { Throws = true }));
+    }
+
+    /// <summary>
+    /// Windows отвечает сразу — стили встают до первого окна, в том же вызове. gsettings спрашивается в фоне: окно его
+    /// не ждёт, а ответ отдаётся потоку окна, когда придёт.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Windows_answers_at_once_and_gsettings_in_background()
+    {
+        var windows = SystemMotion.ReadAsync(new FakeSystem(windows: true, spi: false));
+        Assert.True(windows.IsCompleted);
+        bool? applied = null;
+        SystemMotion.Apply(windows, enabled => applied = enabled);
+        Assert.False(applied); // сразу, без очереди окна
+
+        using var gate = new ManualResetEventSlim();
+        var linux = SystemMotion.ReadAsync(new FakeSystem(linux: true, gsettings: "false\n") { Gate = gate });
+        applied = null;
+        SystemMotion.Apply(linux, enabled => applied = enabled);
+        Assert.False(linux.IsCompleted); // gsettings ещё думает, а вызов уже вернулся
+        Assert.Null(applied);
+        gate.Set();
+        await Wait.Until(() => applied is not null);
+        Assert.False(applied);
     }
 
     // ---------- проявление
@@ -268,7 +295,8 @@ public sealed class MotionTests
 
     /// <summary>
     /// Вкладки «Сервера» (свой сервер и у хостера) — один общий механизм: каждая вкладка лежит в панели-обёртке внутри
-    /// панели вкладок, а у той — Motion.RevealChildren. Консоль (карточка) — ребёнок той же панели.
+    /// панели вкладок, а у той — Motion.RevealChildren. Консоль своего сервера вместе с плитками над ней — тоже вкладка
+    /// этой панели.
     /// </summary>
     [AvaloniaFact]
     public void Server_tabs_reveal_through_their_container()
@@ -298,6 +326,12 @@ public sealed class MotionTests
             }
             // панелей вкладок две: у своего сервера и у хостера
             Assert.Equal(2, found.Select(tab => tab.Parent!.Parent).Distinct().Count());
+
+            // плитки-показатели над консолью — в той же вкладке, что и консоль: проявляются вместе с ней, а не стоят
+            // сразу, пока карточка под ними проявляется
+            Control TabOf(string id) => view.GetLogicalDescendants().OfType<Control>().Single(c => AutomationProperties.GetAutomationId(c) == id)
+                .GetLogicalAncestors().OfType<Control>().First(c => c.Parent is Panel panel && Motion.GetRevealChildren(panel));
+            Assert.Same(TabOf("SrvConsole"), TabOf("SrvUptime"));
         }
         finally
         {
@@ -340,18 +374,61 @@ public sealed class MotionTests
 
     // ---------- «без анимаций» в теме
 
+    private static readonly Uri StillStyles = new("avares://eViSTool/Themes/ForestStill.axaml");
+
     /// <summary>Окно с лесной темой и стилями «без анимаций» (Themes/ForestStill.axaml), как при выключенных анимациях.</summary>
-    private static Window StillWindow(Control content)
+    private static Window StillWindow(Control content) => ForestWindow(content, still: true);
+
+    private static Window ForestWindow(Control content, bool still)
     {
         var window = new Window { Width = 400, Height = 300 };
         window.Resources.MergedDictionaries.Add(new ResourceInclude(Host) { Source = new Uri("avares://eViSTool/Themes/ForestResources.axaml") });
         window.Resources.MergedDictionaries.Add(new ResourceInclude(Host) { Source = new Uri("avares://eViSTool/Themes/ForestControls.axaml") });
         window.Styles.Add(new StyleInclude(Host) { Source = new Uri("avares://eViSTool/Themes/Forest.axaml") });
-        window.Styles.Add(new StyleInclude(Host) { Source = new Uri("avares://eViSTool/Themes/ForestStill.axaml") });
+        if (still) window.Styles.Add(new StyleInclude(Host) { Source = StillStyles });
         window.Content = new StackPanel { Margin = new Thickness(20), Spacing = 12, Children = { content } };
         window.Show();
         Mouse.Prepare(window);
         return window;
+    }
+
+    /// <summary>
+    /// Как на Linux, когда gsettings ответил позже, чем открылось окно: стили «без анимаций» подключаются к программе
+    /// уже при открытом окне — и действуют на него: переходы обнулены, «горизонтали» заглушки встали.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Still_theme_arriving_later_stops_motion_in_an_open_window()
+    {
+        var button = new Button { Content = "Проверить" };
+        var lines = new Avalonia.Controls.Shapes.Path { Data = ContourLines.Geometry, Width = 100, Height = 40 };
+        var window = ForestWindow(new StackPanel { Children = { button, lines } }, still: false);
+        var drift = new ContourDrift(window, lines);
+        var presenter = Part<ContentPresenter>(button, "PART_ContentPresenter");
+        Assert.True(Motion.GetEnabled(window));
+        Assert.NotNull(presenter.Transitions);
+        Assert.True(drift.IsMoving);
+
+        var app = Application.Current!;
+        var still = new StyleInclude(Host) { Source = StillStyles };
+        var answer = new TaskCompletionSource<bool>();
+        try
+        {
+            SystemMotion.Apply(answer.Task, enabled =>
+            {
+                if (!enabled) app.Styles.Add(still);
+            });
+            Assert.True(Motion.GetEnabled(window)); // ответа ещё нет — анимации включены
+            answer.SetResult(false);
+            await Wait.Until(() => !Motion.GetEnabled(window));
+            Assert.False(Motion.GetEnabled(button));
+            Assert.Null(presenter.Transitions);
+            Assert.False(drift.IsMoving);
+        }
+        finally
+        {
+            app.Styles.Remove(still);
+            window.Close();
+        }
     }
 
     private static Color Token(Window window, string key) =>

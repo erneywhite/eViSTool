@@ -2,7 +2,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Markup.Xaml.Styling;
+using Avalonia.Media;
 using Avalonia.VisualTree;
+using eViSTool.Desktop.Controls;
 using eViSTool.Desktop.Views;
 using GlyphPath = Avalonia.Controls.Shapes.Path;
 
@@ -58,9 +60,17 @@ public sealed class MainWindowBackdropTests : IDisposable
         var window = Window();
 
         Assert.Same(window.FindResource("Forest.Side"), window.FindControl<Border>("SideUnderlay")!.Background);
-        Assert.True(window.FindControl<GlyphPath>("Contours")!.IsVisible);
+        var contours = window.FindControl<GlyphPath>("Contours")!;
+        Assert.True(contours.IsVisible);
         Assert.Same(window.FindResource("Forest.Surface"), window.FindControl<Border>("ProfileCard")!.Background);
         Assert.Null(window.FindControl<Image>("Backdrop")!.Source);
+
+        // линии плывут через свой сдвиг (ContourDriftTests), в рамке, которая держит перерисовку в границах панели;
+        // окно не показано — таймер стоит
+        Assert.Same(ContourLines.Geometry, contours.Data);
+        Assert.IsType<TranslateTransform>(contours.RenderTransform);
+        Assert.True(window.FindControl<Border>("SideUnderlay")!.ClipToBounds);
+        Assert.False(window.Drift.IsMoving);
     }
 
     [AvaloniaFact]
