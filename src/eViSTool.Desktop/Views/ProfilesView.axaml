@@ -4,6 +4,7 @@
              xmlns:local="using:eViSTool.Desktop"
              xmlns:ctl="using:eViSTool.Desktop.Controls"
              xmlns:conv="using:eViSTool.Desktop.Converters"
+             xmlns:loc="using:eViSTool.Core.Localization"
              x:Class="eViSTool.Desktop.Views.ProfilesView"
              x:DataType="vm:MainViewModel">
     <UserControl.Styles>
@@ -42,8 +43,13 @@
                 <ControlTheme TargetType="ListBoxItem">
                     <Setter Property="Margin" Value="0,0,6,6" />
                     <Setter Property="Cursor" Value="Hand" />
-                    <!-- диктор читает «мох», «меч», а не внутренний ключ образца -->
-                    <Setter Property="AutomationProperties.Name" Value="{Binding Converter={x:Static conv:IconChoiceName.Instance}}" />
+                    <!-- диктор читает «мох», «меч», а не внутренний ключ образца; сменили язык — имя пересчитывается -->
+                    <Setter Property="AutomationProperties.Name">
+                        <MultiBinding Converter="{x:Static conv:IconChoiceName.Instance}">
+                            <Binding />
+                            <Binding Path="Language" Source="{x:Static loc:Loc.Instance}" />
+                        </MultiBinding>
+                    </Setter>
                     <Setter Property="Template">
                         <ControlTemplate>
                             <Border x:Name="Ring" Padding="3" CornerRadius="11" BorderThickness="2" BorderBrush="Transparent">
