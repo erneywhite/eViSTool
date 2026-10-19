@@ -1,0 +1,49 @@
+eViSTool 1.0.0: a new look.
+
+The whole window was redrawn: calmer colours, clearer cards, smooth transitions. Everything works as before, it just looks and feels better. Two rounds of code review before the release fixed a few long-standing bugs as well.
+
+New
+- Background from the game: behind the side panel there's a blurred picture from the game's main menu, taken from your game folder. It changes every week and turns festive at Halloween and Christmas. Settings → Background from the game turns it off.
+- A separate Profiles page. Settings keeps only what applies to the whole program.
+- Profile icon: pick a colour and a sign for each profile. It shows in the profile list and in the profile picker at the top.
+- Mod icons in My mods: the icon from the mod file, otherwise the ModDB logo, otherwise coloured initials.
+- The mod card shows compatibility in colour: green when the ModDB has a release for your game version, reddish when it has none. The same colours in the catalog, and installed mods are outlined in the catalog list.
+- Notification channels show the Telegram, Discord and ntfy logos.
+- New pages and tabs fade in, menus open smoothly. With animations turned off in Windows, everything stays still.
+- The game is found by the Windows installer record too, wherever you put it.
+
+Fixes
+- A mod switch clicked while another switch was still working no longer flips that mod in a different profile when you change profiles in between.
+- A broken answer from the ModDB (maintenance page, cut-off reply) no longer hangs the catalog on "Loading…": the cached catalog is used.
+- "Send a test" in server notifications is available right after you turn on the first route.
+- The narrow window works on every page: My mods, Mod catalog, Mod settings, Server, Profiles and the top bar no longer overlap or slide off the edge.
+- Animations stop while the window is in the background or minimized: a running server no longer costs CPU while you play.
+- Buttons are named for screen readers.
+
+Update from About.
+
+---
+
+eViSTool 1.0.0: новый вид.
+
+Окно нарисовано заново: спокойнее цвета, понятнее карточки, плавные переходы. Всё работает как раньше, просто смотрится и ощущается лучше. Перед выпуском было два круга проверки кода, заодно нашлись и исправлены давние ошибки.
+
+Новое
+- Фон из игры: под боковой панелью размытая заставка главного меню игры из её папки. Меняется раз в неделю, на Хэллоуин и Рождество становится праздничной. Выключается в «Настройки» → «Фон из игры».
+- Отдельная страница «Профили». В «Настройках» осталось только общее для всей программы.
+- Значок профиля: у каждого профиля свой цвет и знак. Виден в списке профилей и в выборе профиля сверху окна.
+- Значки модов в «Моих модах»: значок из файла мода, если его нет — логотип с модбазы, если нет и его — цветные буквы.
+- Карточка мода показывает совместимость цветом: зелёным, если на модбазе есть версия под твою игру, красноватым, если нет. Те же цвета в каталоге, а установленные моды в списке каталога обведены рамкой.
+- У каналов оповещений логотипы Telegram, Discord и ntfy.
+- Новые страницы и вкладки проявляются плавно, меню выпадают мягко. Если анимации выключены в Windows, ничего не движется.
+- Игра находится и по записи установщика Windows, куда бы её ни поставили.
+
+Исправления
+- Переключатель мода, нажатый, пока работал другой, больше не переключает мод в другом профиле, если ты успел сменить профиль.
+- Битый ответ модбазы (страница техработ, оборванный ответ) больше не вешает каталог на «Загружаю…»: берётся сохранённый каталог.
+- «Отправить проверочное» в оповещениях сервера доступна сразу, как включишь первый маршрут.
+- В узком окне всё на месте: «Мои моды», «Каталог», «Настройки модов», «Сервер», «Профили» и верхняя полоса больше не наезжают друг на друга и не уезжают за край.
+- Анимации стоят, пока окно в фоне или свёрнуто: запущенный сервер больше не тратит процессор, пока ты играешь.
+- У кнопок есть имена для экранного диктора.
+
+Обнови из «О программе».

@@ -1,0 +1,41 @@
+eViSTool 1.0.0 for Linux: a new look for the window.
+
+The window was redrawn: calmer colours, clearer cards, smooth transitions. Everything works as before. The agent on a server needs no changes, but update it anyway to keep the versions in step (the window offers "Update on the server").
+
+New
+- Background from the game: behind the side panel there's a blurred picture from the game's main menu, taken from your game folder. It changes every week and turns festive at Halloween and Christmas. Settings → Background from the game turns it off.
+- A separate Profiles page. Settings keeps only what applies to the whole program.
+- Profile icon: pick a colour and a sign for each profile.
+- Mod icons in My mods: the icon from the mod file, otherwise the ModDB logo, otherwise coloured initials.
+- Compatibility in colour in the mod card and the catalog; installed mods are outlined in the catalog list.
+- Notification channels show the Telegram, Discord and ntfy logos.
+- New pages and tabs fade in. With animations turned off in your desktop settings, everything stays still.
+
+Fixes
+- Without a compositor (Openbox, i3, Xfce with compositing off, xrdp) the window uses the system frame: there used to be a solid dark band around it instead of a shadow.
+- Pressing on an empty spot in the Play menu no longer drags the main window.
+- Opening a link or a folder no longer freezes the window for up to 5 seconds.
+- A broken answer from the ModDB no longer hangs the catalog on "Loading…".
+- The narrow window works on every page; animations stop while the window is in the background or minimized.
+
+---
+
+eViSTool 1.0.0 для Linux: новый вид окна.
+
+Окно нарисовано заново: спокойнее цвета, понятнее карточки, плавные переходы. Всё работает как раньше. Агенту на сервере правки не нужны, но обнови и его, чтобы версии совпадали (окно предложит «Обновить на сервере»).
+
+Новое
+- Фон из игры: под боковой панелью размытая заставка главного меню игры из её папки. Меняется раз в неделю, на Хэллоуин и Рождество становится праздничной. Выключается в «Настройки» → «Фон из игры».
+- Отдельная страница «Профили». В «Настройках» осталось только общее для всей программы.
+- Значок профиля: у каждого профиля свой цвет и знак.
+- Значки модов в «Моих модах»: значок из файла мода, если его нет — логотип с модбазы, если нет и его — цветные буквы.
+- Совместимость цветом в карточке мода и в каталоге; установленные моды в списке каталога обведены рамкой.
+- У каналов оповещений логотипы Telegram, Discord и ntfy.
+- Новые страницы и вкладки проявляются плавно. Если анимации выключены в настройках рабочего стола, ничего не движется.
+
+Исправления
+- Без композитора (Openbox, i3, Xfce с выключенным композитингом, xrdp) окно берёт системную рамку: раньше вокруг него вместо тени шла сплошная тёмная полоса.
+- Нажатие на пустое место в меню «Играть» больше не тащит главное окно.
+- Ссылки и папки открываются без подвисания окна до 5 секунд.
+- Битый ответ модбазы больше не вешает каталог на «Загружаю…».
+- В узком окне всё на месте; анимации стоят, пока окно в фоне или свёрнуто.

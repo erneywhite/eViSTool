@@ -488,3 +488,12 @@ dist/
 
 # рабочие заметки ревью — только локально
 docs/REVIEW-*.md
+
+# витрина скриншотов: сборка, копии данных, снимки
+build/shots/app/
+build/shots/clientdata/
+build/shots/srvdata/
+build/shots/out/
+build/shots/snapshot-client/
+build/shots/codegen/bin/
+build/shots/codegen/obj/
