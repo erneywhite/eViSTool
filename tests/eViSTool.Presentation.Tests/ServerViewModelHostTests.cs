@@ -59,13 +59,18 @@ public sealed class ServerViewModelHostTests
     public void ConsoleEmpty_OnlyForAStoppedServerWithoutLines() => WithServer((server, host) =>
     {
         server.IsServerProfile = true;
+        var changed = new List<string?>();
+        server.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        // первый проход слежения ещё не кончился: остановлен ли сервер, неизвестно — заглушки нет
+        Assert.False(server.ShowConsoleEmpty);
+        host.OnLocalChecked([], ourServerUp: false);
         Assert.True(server.ShowConsoleEmpty);
+        Assert.Contains(nameof(ServerViewModel.ShowConsoleEmpty), changed);
         Assert.Equal(Loc.T("server.emptyStopped"), server.ConsoleEmptyTitle);
         Assert.True(server.ShowConsoleEmptyStart);
         Assert.True(server.CanStart); // кнопка в заглушке — та же «Запустить», что сверху
 
-        var changed = new List<string?>();
-        server.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        changed.Clear();
         server.Lines.Add(Line("Server stopped earlier"));
         Assert.False(server.ShowConsoleEmpty); // строки есть — обычная консоль, даже у остановленного
         Assert.Contains(nameof(ServerViewModel.ShowConsoleEmpty), changed);
@@ -93,6 +98,7 @@ public sealed class ServerViewModelHostTests
     {
         server.IsServerProfile = true;
         server.IsRemoteProfile = true;
+        Assert.False(server.ShowConsoleEmpty); // подключиться ещё не пробовали — «нет связи» говорить рано
         host.OnRemoteChecked(new HttpRequestException("connection refused"));
         Assert.True(server.ShowConsoleEmpty);
         Assert.Equal(Loc.T("server.emptyOffline"), server.ConsoleEmptyTitle); // остановлен ли — неизвестно
@@ -138,7 +144,7 @@ public sealed class ServerViewModelHostTests
         Assert.False(server.IsRunning);
     });
 
-    // у хостера агента нет: работает ли сервер — по его логу
+    // у хостера агента нет: работает ли сервер — по свежему опросу его лога (сам опрос — HostedServerViewModelTests)
     [Fact]
     public void IsRunning_OfAHostedServer_FollowsItsLog() => WithServer((server, _) =>
     {
@@ -147,13 +153,16 @@ public sealed class ServerViewModelHostTests
         server.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
         Assert.False(server.IsRunning);
 
-        server.Hosted.State = HostedServerState.Running;
+        server.Hosted.IsRunning = true;
         Assert.True(server.IsRunning);
         Assert.Contains(nameof(ServerViewModel.IsRunning), changed);
 
-        server.Hosted.State = HostedServerState.Stopping;
-        Assert.False(server.IsRunning);
+        // состояние, прочитанное самим разделом, точку не зажигает: опрос мог устареть
+        server.Hosted.IsRunning = false;
         server.Hosted.State = HostedServerState.Running;
+        Assert.False(server.IsRunning);
+
+        server.Hosted.IsRunning = true;
         server.IsHostedProfile = false; // сменили на профиль без сервера у хостера — его лог уже ни при чём
         Assert.False(server.IsRunning);
     });

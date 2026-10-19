@@ -125,6 +125,7 @@ public sealed class HostedLogs
     private RemoteEntry? _crash;    // server-crash.log из последнего листинга
     private bool _crashOfRun;       // и он записан во время текущего запуска
     private HostedServerState _state = HostedServerState.Unknown;
+    private DateTime? _polledAt;    // последний удачный опрос (UTC по Time)
     private TimeSpan? _serverOffset;
     private event Action<HostedLogPoll>? Polled;    // наблюдатели (WatchAsync): каждый удачный опрос
     private event Action<HostedCrash>? CrashFound;  // и каждый отданный вылет
@@ -146,6 +147,22 @@ public sealed class HostedLogs
     {
         get { lock (_lock) return _state; }
     }
+
+    /// <summary>
+    /// Когда лог последний раз прочитан удачно, кто бы ни опрашивал (UTC по <see cref="Time"/>); ещё не читали — null.
+    /// По нему видно, насколько свежо <see cref="State"/>: сбой сети состояние не меняет.
+    /// </summary>
+    public DateTime? PolledAt
+    {
+        get { lock (_lock) return _polledAt; }
+    }
+
+    /// <summary>
+    /// Удачный опрос, кто бы его ни начал (раздел «Сервер», сторож оповещений, проверка перед изменением модов):
+    /// <see cref="State"/> и <see cref="PolledAt"/> уже новые. Приходит из потока опроса, пока следующий опрос ждёт:
+    /// обработчик — короткий, методы этих логов из него не звать.
+    /// </summary>
+    public event Action? Updated;
 
     /// <summary>Строки текущего запуска (последние 20 000).</summary>
     public IReadOnlyList<string> Lines
@@ -327,6 +344,7 @@ public sealed class HostedLogs
         var fetch = await HostedSessions.UseAsync(Id, Hosted.Endpoint, files => FetchAsync(files, ct), readOnly: true, ct).ConfigureAwait(false);
         var (update, poll) = Apply(fetch);
         Polled?.Invoke(poll); // ещё под замком опросов: наблюдатели получают опросы по порядку
+        Updated?.Invoke();
         return update;
     }
 
@@ -392,6 +410,7 @@ public sealed class HostedLogs
         string? run;
         lock (_lock)
         {
+            _polledAt = now;
             _logsDir = fetch.LogsDir;
             if (!fetch.KeepArchive)
             {

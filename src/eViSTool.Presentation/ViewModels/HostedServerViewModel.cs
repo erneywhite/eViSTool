@@ -115,6 +115,22 @@ public sealed partial class HostedServerViewModel : ObservableObject
     /// <summary>Состояние сервера по логу. Надёжны только «остановлен» и «вылетел» (см. <see cref="HostedServerState"/>).</summary>
     [ObservableProperty] private HostedServerState _state = HostedServerState.Unknown;
 
+    /// <summary>
+    /// Сколько верить «работает» из последнего опроса лога. Раздел читает лог раз в 3 с, сторож оповещений — раз в минуту:
+    /// три минуты — два его пропущенных опроса. Дольше лог никто не читал — работает ли сервер, уже не знаем.
+    /// </summary>
+    public TimeSpan RunningFreshFor { get; set; } = TimeSpan.FromMinutes(3);
+
+    /// <summary>
+    /// Сервер работает по свежему опросу лога (не старше <see cref="RunningFreshFor"/>), кто бы его ни опрашивал: этот
+    /// раздел, сторож оповещений, проверка перед изменением модов. Это «дышащая» точка в карточке профиля — она видна и
+    /// при закрытом разделе. Лог давно никто не читал — точки нет: «работает» по старому опросу могло бы оказаться
+    /// неправдой, сервер за это время могли остановить.
+    /// </summary>
+    [ObservableProperty] private bool _isRunning;
+
+    private IUiTimer? _staleTimer; // гасит IsRunning, когда последний опрос устареет
+
     [ObservableProperty] private string _stateText = "";
     [ObservableProperty] private RowTone _stateTone = RowTone.Muted;
 
@@ -178,10 +194,41 @@ public sealed partial class HostedServerViewModel : ObservableObject
         if (same) return;
 
         Reset();
-        _logs = target is { IsHosted: true } ? HostedLogsPool.For(target) : null;
+        Watch(target is { IsHosted: true } ? HostedLogsPool.For(target) : null);
         if (_profile is not null && _logs is null) StatusText = ModTarget.UnreadableText(_profile);
         ShowState(); // «читаю лог сервера…» до первого опроса
         UpdatePolling();
+    }
+
+    /// <summary>Логи профиля и подписка на их опросы (для <see cref="IsRunning"/>); от прежних — отписаться.</summary>
+    private void Watch(HostedLogs? logs)
+    {
+        if (_logs is { } old) old.Updated -= OnLogsUpdated;
+        _logs = logs;
+        if (logs is not null) logs.Updated += OnLogsUpdated;
+        ShowRunning(); // логи профиля могли прочитать и раньше: сторож, прошлый заход в раздел
+    }
+
+    // приходит из потока опроса
+    private void OnLogsUpdated() => Ui.Post(ShowRunning);
+
+    /// <summary>«Работает» по последнему опросу логов профиля; когда опрос устареет, погаснет само.</summary>
+    private void ShowRunning()
+    {
+        var logs = _logs;
+        var left = logs?.PolledAt is { } at && logs.State == HostedServerState.Running
+            ? at + RunningFreshFor - logs.Time.GetUtcNow().UtcDateTime
+            : TimeSpan.Zero;
+        IsRunning = left > TimeSpan.Zero;
+        _staleTimer?.Stop();
+        if (!IsRunning) return;
+        if (_staleTimer is null)
+        {
+            _staleTimer = Ui.Timer(left);
+            _staleTimer.Tick += (_, _) => ShowRunning();
+        }
+        _staleTimer.Interval = left;
+        _staleTimer.Start();
     }
 
     /// <summary>Раздел «Сервер» открыт или закрыт.</summary>

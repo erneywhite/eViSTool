@@ -129,14 +129,15 @@ public sealed class ServerShellTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void Stopped_server_without_lines_shows_stopped_and_start_instead_of_an_empty_console()
+    public async Task Stopped_server_without_lines_shows_stopped_and_start_instead_of_an_empty_console()
     {
         var main = Main();
         var server = main.Server;
         var window = Show(new Window { Width = 1200, Height = 860, Content = new ServerView { DataContext = server } });
 
+        // заглушка — после первого прохода слежения: до него неизвестно, остановлен ли сервер
         var empty = Named(window, "SrvConsoleEmpty");
-        Assert.True(empty.IsEffectivelyVisible);
+        await Wait.Until(() => empty.IsEffectivelyVisible);
         Assert.Equal(Loc.T("server.emptyStopped"), ((TextBlock)Named(window, "SrvConsoleEmptyTitle")).Text);
         var start = (Button)Named(window, "SrvConsoleEmptyStart");
         Assert.True(start.IsEffectivelyVisible);

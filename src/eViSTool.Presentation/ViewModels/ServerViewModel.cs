@@ -180,21 +180,21 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     public bool CanStop => AgentRunning && !IsBusy && State is ServerState.Running or ServerState.Starting;
     public bool CanCommand => AgentRunning && State is ServerState.Running or ServerState.Starting;
 
-    // shortcut: у хостера — последнее состояние, прочитанное разделом «Сервер»; пока раздел закрыт, лог он не читает и
-    // состояние не обновляется. Переделать на общий HostedLogs.State с уведомлением, если точка начнёт заметно отставать
     /// <summary>
     /// Сервер профиля работает — не запускается и не останавливается: «дышащая» точка в карточке профиля внизу боковой
-    /// панели. Свой и удалённый — по статусу агента, у хостера — по логу (<see cref="HostedServerViewModel.State"/>).
+    /// панели. Свой и удалённый — по статусу агента, у хостера — по свежему опросу лога, кто бы его ни читал
+    /// (<see cref="HostedServerViewModel.IsRunning"/>): раздел «Сервер» при этом может быть закрыт.
     /// </summary>
-    public bool IsRunning => IsHostedProfile ? Hosted.State == HostedServerState.Running : AgentRunning && State == ServerState.Running;
+    public bool IsRunning => IsHostedProfile ? Hosted.IsRunning : AgentRunning && State == ServerState.Running;
 
     // ---------- пустая консоль ----------
 
     /// <summary>
     /// Вместо пустой консоли — по центру «Сервер остановлен» и «Запустить»: строк нет, сервер не запущен и не чужой (о
-    /// чужом — плашка выше). Есть строки или сервер работает — обычная консоль.
+    /// чужом — плашка выше). Есть строки или сервер работает — обычная консоль. Пока первый проход слежения после смены
+    /// профиля не кончился, заглушки нет: сервер мог и работать, а крупное «остановлен» с кнопкой мелькало бы зря.
     /// </summary>
-    public bool ShowConsoleEmpty => IsServerProfile && Lines.Count == 0 && !IsServerUp && !HasForeign;
+    public bool ShowConsoleEmpty => IsServerProfile && _stateKnown && Lines.Count == 0 && !IsServerUp && !HasForeign;
 
     /// <summary>Заголовок пустой консоли: «Сервер остановлен», у удалённого без связи — «Нет связи с сервером».</summary>
     public string ConsoleEmptyTitle => RemoteOffline ? Loc.T("server.emptyOffline") : Loc.T("server.emptyStopped");
@@ -247,10 +247,10 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         Journal = new ServerJournalViewModel(this);
         Notify = new ServerNotifyViewModel(this);
         Hosted = new HostedServerViewModel(main);
-        // «дышащая» точка у хостера — по состоянию из лога
+        // «дышащая» точка у хостера — по свежему опросу лога
         Hosted.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(HostedServerViewModel.State)) OnPropertyChanged(nameof(IsRunning));
+            if (e.PropertyName == nameof(HostedServerViewModel.IsRunning)) OnPropertyChanged(nameof(IsRunning));
         };
         HostedNotify = new ServerNotifyViewModel(this, hosted: true);
         // операции с копиями мира — общие на окно (их делает и расписание); без главной модели (тесты раздела) — свои
@@ -435,7 +435,11 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
         // чужой сервер: из папки игры профиля, но не наш
         ForeignPid = serverPids.Where(pid => !(ourServerUp && pid == _serverPid)).Select(pid => (int?)pid).FirstOrDefault();
 
-        _stateKnown = true;
+        if (!_stateKnown)
+        {
+            _stateKnown = true;
+            NotifyConsoleEmpty(); // первый проход: теперь известно, остановлен ли сервер
+        }
         PushServerState();
         Players.PollLocal(); // файлы игроков поменялись (сервер записал списки, правка в другом окне)
         Announcements.PollLocal();
@@ -467,6 +471,7 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
     {
         ErrorText = Loc.T("remote.errDecrypt");
         _stateKnown = true;
+        NotifyConsoleEmpty();
     }
 
     private int? _serverPid;
