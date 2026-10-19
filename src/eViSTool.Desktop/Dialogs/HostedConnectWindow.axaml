@@ -97,7 +97,7 @@
 
         <!-- «Дополнительно»: папка сервера и активный режим FTP -->
         <Button Classes="small flat" HorizontalAlignment="Left" Padding="0,4" Margin="0,16,0,0"
-                Click="Advanced_Click" AutomationProperties.AutomationId="HostedAdvanced">
+                Click="Advanced_Click" AutomationProperties.AutomationId="HostedAdvanced" AutomationProperties.Name="{local:Tr hosted.advanced}">
             <StackPanel Orientation="Horizontal">
                 <!-- поле 12×6 по контуру: поворот идёт вокруг его центра, и шеврон не прыгает на 6 px при раскрытии -->
                 <Path Classes="icon chevron" Classes.open="{Binding IsAdvancedOpen}" Data="{StaticResource Icon.ChevronDown}" Width="12" Height="NaN"

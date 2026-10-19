@@ -36,7 +36,8 @@
             <!-- заголовок — как у своего сервера; вместо кнопок управления — моды и подключение -->
             <DockPanel DockPanel.Dock="Top">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
-                    <Button Classes="primary" Command="{Binding OpenServerModsCommand}" Padding="18,8" AutomationProperties.AutomationId="ServerHostedMods">
+                    <Button Classes="primary" Command="{Binding OpenServerModsCommand}" Padding="18,8" AutomationProperties.AutomationId="ServerHostedMods"
+                            AutomationProperties.Name="{local:Tr server.hostedOpenMods}">
                         <StackPanel Orientation="Horizontal">
                             <Path Classes="icon" Data="{StaticResource Icon.Mods}" Width="14" Height="14" Margin="0,0,8,0" />
                             <TextBlock Text="{local:Tr server.hostedOpenMods}" />
@@ -89,14 +90,15 @@
             <!-- ===== заголовок и управление ===== -->
             <DockPanel DockPanel.Dock="Top">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
-                    <Button Command="{Binding OpenServerModsCommand}" Margin="0,0,8,0" ToolTip.Tip="{local:Tr server.serverMods}">
+                    <Button Command="{Binding OpenServerModsCommand}" Margin="0,0,8,0" ToolTip.Tip="{local:Tr server.serverMods}"
+                            AutomationProperties.Name="{local:Tr server.serverMods}">
                         <StackPanel Orientation="Horizontal">
                             <Path Classes="icon" Data="{StaticResource Icon.Mods}" Width="14" Height="14" Margin="0,0,8,0" />
                             <TextBlock Text="{local:Tr server.serverMods}" />
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding OpenLogsCommand}" Padding="10,8" Margin="0,0,16,0" ToolTip.Tip="{local:Tr server.logs}"
-                            IsVisible="{Binding !IsRemoteProfile}">
+                            AutomationProperties.Name="{local:Tr server.logs}" IsVisible="{Binding !IsRemoteProfile}">
                         <Path Classes="icon" Data="{StaticResource Icon.Folder}" Width="16" Height="16" />
                     </Button>
                     <Button Classes="primary" Content="{local:Tr server.start}" Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}"
@@ -172,7 +174,8 @@
             <!-- агент старее окна: у удалённого — кнопка «Обновить там», ход обновления — в той же строке -->
             <DockPanel DockPanel.Dock="Top" Margin="0,12,0,0" IsVisible="{Binding AgentNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 <Button DockPanel.Dock="Right" Command="{Binding UpdateRemoteAgentCommand}" Margin="16,0,0,0" Padding="12,6" VerticalAlignment="Center"
-                        IsVisible="{Binding CanUpdateRemoteAgent}" AutomationProperties.AutomationId="UpdateRemoteAgent">
+                        IsVisible="{Binding CanUpdateRemoteAgent}" AutomationProperties.AutomationId="UpdateRemoteAgent"
+                        AutomationProperties.Name="{local:Tr selfupd.button}">
                     <StackPanel Orientation="Horizontal">
                         <Path Classes="icon" Data="{StaticResource Icon.Download}" Width="13" Height="13" Margin="0,0,7,0" />
                         <TextBlock Text="{local:Tr selfupd.button}" />
@@ -228,11 +231,13 @@
                         <Border Classes="card tile">
                             <StackPanel>
                                 <TextBlock Classes="tileLabel" Text="{local:Tr server.tileState}" />
-                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                    <Ellipse Classes="tone stateDot" ctl:EnumClass.Value="{Binding StateTone}" />
+                                <!-- не StackPanel: тот даёт тексту сколько попросит, и длинное состояние вылезало из плитки без многоточия -->
+                                <DockPanel Margin="0,4,0,0">
+                                    <Ellipse DockPanel.Dock="Left" Classes="tone stateDot" ctl:EnumClass.Value="{Binding StateTone}" />
                                     <TextBlock Classes="tileValue" Text="{Binding StateText}" Margin="0" />
-                                </StackPanel>
+                                </DockPanel>
                                 <TextBlock Text="{Binding StateNote}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0"
+                                           TextTrimming="CharacterEllipsis"
                                            IsVisible="{Binding StateNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                             </StackPanel>
                         </Border>
@@ -276,7 +281,8 @@
                                         Margin="0,0,8,0" ToolTip.Tip="{local:Tr cmds.buttonTip}" AutomationProperties.AutomationId="SrvCommands" />
                                 <!-- копия мира сейчас — та же команда, что на вкладке «Расписание» -->
                                 <Button DockPanel.Dock="Right" Classes="small" Command="{Binding Schedule.BackupNowCommand}" Margin="0,0,8,0"
-                                        ToolTip.Tip="{local:Tr sched.nowTip}" ToolTip.ShowOnDisabled="True" AutomationProperties.AutomationId="SrvBackupNow">
+                                        ToolTip.Tip="{local:Tr sched.nowTip}" ToolTip.ShowOnDisabled="True" AutomationProperties.AutomationId="SrvBackupNow"
+                                        AutomationProperties.Name="{local:Tr server.backupNow}">
                                     <StackPanel Orientation="Horizontal">
                                         <Path Classes="icon" Data="{StaticResource Icon.Download}" Width="12" Height="12" Margin="0,0,7,0" />
                                         <TextBlock Text="{local:Tr server.backupNow}" />
@@ -365,7 +371,8 @@
                                                    TextWrapping="Wrap" Margin="0,6,0,0" IsVisible="{Binding !ShowConsoleEmptyStart}"
                                                    AutomationProperties.AutomationId="SrvConsoleEmptyNote" />
                                         <Button Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}" IsVisible="{Binding ShowConsoleEmptyStart}"
-                                                HorizontalAlignment="Center" Margin="0,16,0,0" Padding="16,8" AutomationProperties.AutomationId="SrvConsoleEmptyStart">
+                                                HorizontalAlignment="Center" Margin="0,16,0,0" Padding="16,8" AutomationProperties.AutomationId="SrvConsoleEmptyStart"
+                                                AutomationProperties.Name="{local:Tr server.start}">
                                             <StackPanel Orientation="Horizontal">
                                                 <Path Classes="icon" Data="{StaticResource Icon.Play}" Width="12" Height="12" Margin="0,0,8,0" />
                                                 <TextBlock Text="{local:Tr server.start}" />

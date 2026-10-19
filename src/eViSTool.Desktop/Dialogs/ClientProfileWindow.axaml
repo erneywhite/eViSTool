@@ -52,7 +52,7 @@
                 <StackPanel>
                     <RadioButton GroupName="Mods" IsEnabled="{Binding HasMods}"
                                  IsChecked="{Binding Mods, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Shared}"
-                                 AutomationProperties.AutomationId="CProfileModsShared">
+                                 AutomationProperties.AutomationId="CProfileModsShared" AutomationProperties.Name="{local:Tr cprofile.modsShared}">
                         <StackPanel>
                             <TextBlock Classes="optionTitle" Text="{local:Tr cprofile.modsShared}" />
                             <TextBlock Classes="hint" Text="{Binding SharedModsHint}" />
@@ -61,7 +61,7 @@
                     <Border Classes="row" Margin="0,10,0,0" Padding="0,10,0,0">
                         <RadioButton GroupName="Mods" IsEnabled="{Binding HasMods}"
                                      IsChecked="{Binding Mods, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Copy}"
-                                     AutomationProperties.AutomationId="CProfileModsCopy">
+                                     AutomationProperties.AutomationId="CProfileModsCopy" AutomationProperties.Name="{local:Tr cprofile.modsCopy}">
                             <StackPanel>
                                 <TextBlock Classes="optionTitle" Text="{local:Tr cprofile.modsCopy}" />
                                 <TextBlock Classes="hint" Text="{local:Tr cprofile.modsCopyHint}" />
@@ -71,7 +71,7 @@
                     <Border Classes="row" Margin="0,10,0,0" Padding="0,10,0,0">
                         <RadioButton GroupName="Mods"
                                      IsChecked="{Binding Mods, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Empty}"
-                                     AutomationProperties.AutomationId="CProfileModsEmpty">
+                                     AutomationProperties.AutomationId="CProfileModsEmpty" AutomationProperties.Name="{local:Tr cprofile.modsEmpty}">
                             <StackPanel>
                                 <TextBlock Classes="optionTitle" Text="{local:Tr cprofile.modsEmpty}" />
                                 <TextBlock Classes="hint" Text="{local:Tr cprofile.modsEmptyHint}" />
@@ -85,7 +85,8 @@
             <TextBlock Classes="label" Text="{local:Tr cprofile.settings}" />
             <Border Classes="card" Padding="14,10" Margin="0,6,0,0">
                 <StackPanel>
-                    <RadioButton GroupName="Settings" IsChecked="{Binding CopySettings}" AutomationProperties.AutomationId="CProfileSettingsCopy">
+                    <RadioButton GroupName="Settings" IsChecked="{Binding CopySettings}" AutomationProperties.AutomationId="CProfileSettingsCopy"
+                                 AutomationProperties.Name="{local:Tr cprofile.settingsCopy}">
                         <StackPanel>
                             <TextBlock Classes="optionTitle" Text="{local:Tr cprofile.settingsCopy}" />
                             <TextBlock Classes="hint" Text="{local:Tr cprofile.settingsCopyHint}" />
@@ -94,7 +95,7 @@
                     <Border Classes="row" Margin="0,10,0,0" Padding="0,10,0,0">
                         <!-- в одну сторону: выбор этого варианта снимает соседний, и тот сам пишет CopySettings = false -->
                         <RadioButton GroupName="Settings" IsChecked="{Binding !CopySettings, Mode=OneWay}"
-                                     AutomationProperties.AutomationId="CProfileSettingsClean">
+                                     AutomationProperties.AutomationId="CProfileSettingsClean" AutomationProperties.Name="{local:Tr cprofile.settingsClean}">
                             <StackPanel>
                                 <TextBlock Classes="optionTitle" Text="{local:Tr cprofile.settingsClean}" />
                                 <TextBlock Classes="hint" Text="{local:Tr cprofile.settingsCleanHint}" />

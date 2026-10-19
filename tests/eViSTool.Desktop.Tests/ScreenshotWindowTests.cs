@@ -1,12 +1,14 @@
 using System.Net;
 using Avalonia;
 using Avalonia.Automation;
+using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using eViSTool.Core.Localization;
 using eViSTool.Desktop.Controls;
 using eViSTool.Desktop.Dialogs;
 using eViSTool.Presentation.ViewModels;
@@ -108,6 +110,27 @@ public sealed class ScreenshotWindowTests : IDisposable
         Assert.False(Named(one, "ScreenshotPrev").IsVisible);
         Assert.False(Named(one, "ScreenshotNext").IsVisible);
         one.Close();
+    }
+
+    /// <summary>
+    /// Без мыши: Tab доходит до «Открыть в браузере», и с фокусом на ней ←/→ всё так же листают. Стрелки по краям
+    /// фокус не берут, но для экранного диктора названы словами, а не «‹»/«›».
+    /// </summary>
+    [AvaloniaFact]
+    public void Browser_button_is_reachable_by_tab_and_arrows_still_page()
+    {
+        var (window, model) = Open(Urls);
+        var browser = (Button)Named(window, "ScreenshotBrowser");
+        for (var i = 0; i < 3 && !browser.IsFocused; i++) Press(window, Key.Tab, PhysicalKey.Tab);
+        Assert.True(browser.IsFocused);
+
+        Press(window, Key.Right, PhysicalKey.ArrowRight);
+        Assert.Equal(1, model.Index);
+        Assert.True(browser.IsFocused);
+
+        Assert.Equal(Loc.T("shots.prev"), ControlAutomationPeer.CreatePeerForElement(Named(window, "ScreenshotPrev")).GetName());
+        Assert.Equal(Loc.T("shots.next"), ControlAutomationPeer.CreatePeerForElement(Named(window, "ScreenshotNext")).GetName());
+        window.Close();
     }
 
     /// <summary>Сеть, которая молчит, пока её не отпустят, а потом отвечает 404.</summary>

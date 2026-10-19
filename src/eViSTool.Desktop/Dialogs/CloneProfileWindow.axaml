@@ -45,7 +45,7 @@
             <TextBlock Classes="label" Text="{local:Tr clone.world}" />
             <Border Classes="card" Padding="14,12" Margin="0,6,0,0">
                 <StackPanel>
-                    <RadioButton GroupName="CloneWorld" IsChecked="{Binding !NewWorld, Mode=OneWay}">
+                    <RadioButton GroupName="CloneWorld" IsChecked="{Binding !NewWorld, Mode=OneWay}" AutomationProperties.Name="{local:Tr clone.sameWorld}">
                         <StackPanel>
                             <TextBlock Text="{local:Tr clone.sameWorld}" FontSize="13" Foreground="{DynamicResource Forest.Text}" />
                             <TextBlock Classes="hint" Text="{local:Tr clone.sameWorldHint}" />
@@ -55,7 +55,7 @@
                     <CheckBox Margin="28,8,0,0" Content="{Binding BackupsText}" IsChecked="{Binding IncludeBackups}" IsVisible="{Binding ShowBackups}" />
 
                     <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Margin="0,12,0,0" Padding="0,12,0,0">
-                        <RadioButton GroupName="CloneWorld" IsChecked="{Binding NewWorld}">
+                        <RadioButton GroupName="CloneWorld" IsChecked="{Binding NewWorld}" AutomationProperties.Name="{local:Tr clone.newWorld}">
                             <StackPanel>
                                 <TextBlock Text="{local:Tr clone.newWorld}" FontSize="13" Foreground="{DynamicResource Forest.Text}" />
                                 <TextBlock Classes="hint" Text="{local:Tr clone.newWorldHint}" />
@@ -72,14 +72,14 @@
             <TextBlock Classes="label" Text="{local:Tr clone.mods}" />
             <Border Classes="card" Padding="14,12" Margin="0,6,0,0">
                 <StackPanel>
-                    <RadioButton GroupName="CloneMods" IsChecked="{Binding ShareMods}">
+                    <RadioButton GroupName="CloneMods" IsChecked="{Binding ShareMods}" AutomationProperties.Name="{local:Tr clone.modsShared}">
                         <StackPanel>
                             <TextBlock Text="{local:Tr clone.modsShared}" FontSize="13" Foreground="{DynamicResource Forest.Text}" />
                             <TextBlock Classes="hint" Text="{Binding SharedModsHint}" />
                         </StackPanel>
                     </RadioButton>
                     <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Margin="0,12,0,0" Padding="0,12,0,0">
-                        <RadioButton GroupName="CloneMods" IsChecked="{Binding !ShareMods, Mode=OneWay}">
+                        <RadioButton GroupName="CloneMods" IsChecked="{Binding !ShareMods, Mode=OneWay}" AutomationProperties.Name="{local:Tr clone.modsOwn}">
                             <StackPanel>
                                 <TextBlock Text="{local:Tr clone.modsOwn}" FontSize="13" Foreground="{DynamicResource Forest.Text}" />
                                 <TextBlock Classes="hint" Text="{local:Tr clone.modsOwnHint}" />

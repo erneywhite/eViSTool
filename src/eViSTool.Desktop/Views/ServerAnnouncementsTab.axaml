@@ -50,7 +50,7 @@
                 <StackPanel>
                     <DockPanel>
                         <Button DockPanel.Dock="Right" Command="{Binding EditWelcomeCommand}" Padding="12,6" VerticalAlignment="Top"
-                                AutomationProperties.AutomationId="AnnWelcomeEdit">
+                                AutomationProperties.AutomationId="AnnWelcomeEdit" AutomationProperties.Name="{local:Tr ann.welcomeEdit}">
                             <StackPanel Orientation="Horizontal">
                                 <Path Classes="icon" Data="{StaticResource Icon.Edit}" Width="12" Height="12" Margin="0,0,7,0" />
                                 <TextBlock Text="{local:Tr ann.welcomeEdit}" />
@@ -86,7 +86,7 @@
                 <StackPanel>
                     <DockPanel>
                         <Button DockPanel.Dock="Right" Command="{Binding AddCommand}" IsEnabled="{Binding Loaded}" Padding="12,6" VerticalAlignment="Top"
-                                AutomationProperties.AutomationId="AnnAdd">
+                                AutomationProperties.AutomationId="AnnAdd" AutomationProperties.Name="{local:Tr ann.add}">
                             <StackPanel Orientation="Horizontal">
                                 <Path Classes="icon" Data="{StaticResource Icon.Plus}" Width="12" Height="12" Margin="0,0,7,0" />
                                 <TextBlock Text="{local:Tr ann.add}" />

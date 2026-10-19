@@ -23,10 +23,14 @@
 
         <!-- ===== режим, настройки модов, кнопки ===== -->
         <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
-            <RadioButton GroupName="ImportMode" Content="{local:Tr packi.modeAdd}" IsChecked="{Binding !Mirror, Mode=OneWay}"
-                         AutomationProperties.AutomationId="ImportPackAddMode" />
-            <RadioButton GroupName="ImportMode" Margin="0,6,0,0" Content="{Binding MirrorText}" IsEnabled="{Binding CanMirror}"
-                         IsChecked="{Binding Mirror}" ToolTip.Tip="{Binding MirrorTip}" AutomationProperties.AutomationId="ImportPackMirrorMode" />
+            <!-- подписи — с переносом: строкой RadioButton перенести не может, и в узком окне конец уходил за край -->
+            <RadioButton GroupName="ImportMode" IsChecked="{Binding !Mirror, Mode=OneWay}" AutomationProperties.AutomationId="ImportPackAddMode">
+                <TextBlock Text="{local:Tr packi.modeAdd}" TextWrapping="Wrap" />
+            </RadioButton>
+            <RadioButton GroupName="ImportMode" Margin="0,6,0,0" IsEnabled="{Binding CanMirror}" IsChecked="{Binding Mirror}"
+                         ToolTip.Tip="{Binding MirrorTip}" AutomationProperties.AutomationId="ImportPackMirrorMode">
+                <TextBlock Text="{Binding MirrorText}" TextWrapping="Wrap" />
+            </RadioButton>
             <CheckBox Margin="0,10,0,0" Content="{local:Tr packi.applyConfig}" IsChecked="{Binding ApplyConfig}"
                       IsVisible="{Binding HasModConfig}" AutomationProperties.AutomationId="ImportPackApplyConfig" />
             <DockPanel Margin="0,14,0,0">
