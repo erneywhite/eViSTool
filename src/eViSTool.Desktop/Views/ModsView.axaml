@@ -74,7 +74,8 @@
         <Style Selector="DataGrid.checking StackPanel.status">
             <Setter Property="IsVisible" Value="False" />
         </Style>
-        <Style Selector="DataGrid.checking Border.glint">
+        <!-- блик бежит, только если в системе не выключены анимации (Motion.Enabled); иначе заглушка просто стоит -->
+        <Style Selector="DataGrid.checking Border.glint[(ctl|Motion.Enabled)=True]">
             <Style.Animations>
                 <Animation Duration="0:0:1" IterationCount="Infinite">
                     <KeyFrame Cue="0%">

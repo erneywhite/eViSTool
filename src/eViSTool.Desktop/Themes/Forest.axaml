@@ -176,8 +176,9 @@
     <!-- кольцо (BreathingRing) — круг размером с точку под ней: раз в 2,6 с расходится от неё и тает, остаток цикла —
          пауза. Только масштаб и прозрачность (RenderTransform и Opacity), без пересчёта раскладки. Анимация держится на
          классе breathing: убрать класс (или перекрыть этот стиль) — кольцо стоит, остаётся одна точка. Стиль — на свой
-         тип, а не на любой Ellipse: почему, сказано у BreathingRing -->
-    <Style Selector="ctl|BreathingRing.breathing">
+         тип, а не на любой Ellipse: почему, сказано у BreathingRing. В системе выключены анимации (Motion.Enabled) —
+         не дышит -->
+    <Style Selector="ctl|BreathingRing.breathing[(ctl|Motion.Enabled)=True]">
         <Style.Animations>
             <Animation Duration="0:0:2.6" IterationCount="Infinite">
                 <KeyFrame Cue="0%">

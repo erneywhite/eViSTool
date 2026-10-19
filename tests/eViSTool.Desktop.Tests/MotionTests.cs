@@ -441,4 +441,31 @@ public sealed class MotionTests
         }
         window.Close();
     }
+
+    /// <summary>
+    /// Анимация по кругу (IterationCount="Infinite": дыхание точки, блик заглушек, бегущая полоска) — только в стиле с
+    /// условием [(ctl|Motion.Enabled)=True]: иначе при выключенных в системе анимациях она так и крутится. Пакеты,
+    /// писавшие такие стили параллельно, условие забывали — этот тест не даст забыть снова.
+    /// </summary>
+    [Fact]
+    public void Endless_animations_run_only_while_motion_is_enabled()
+    {
+        var src = System.IO.Path.Combine(ThemeTests.RepoRoot(), "src", "eViSTool.Desktop");
+        var endless = new List<string>();
+        var missing = new List<string>();
+        foreach (var file in Directory.EnumerateFiles(src, "*.axaml", SearchOption.AllDirectories))
+        {
+            var relative = System.IO.Path.GetRelativePath(src, file).Replace('\\', '/');
+            if (relative.StartsWith("bin/") || relative.StartsWith("obj/")) continue;
+            foreach (var animation in XDocument.Load(file).Descendants().Where(e => e.Name.LocalName == "Animation"
+                         && (string?)e.Attribute("IterationCount") is { } count && count.Equals("Infinite", StringComparison.OrdinalIgnoreCase)))
+            {
+                var selector = (string?)animation.Ancestors().FirstOrDefault(e => e.Name.LocalName == "Style")?.Attribute("Selector") ?? "";
+                endless.Add($"{relative}: {selector}");
+                if (!selector.Contains("(ctl|Motion.Enabled)=True]", StringComparison.Ordinal)) missing.Add($"{relative}: {selector}");
+            }
+        }
+        Assert.NotEmpty(endless); // сами анимации нашлись — иначе тест ничего не проверяет
+        Assert.Empty(missing);
+    }
 }
