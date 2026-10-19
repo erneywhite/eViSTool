@@ -54,6 +54,12 @@ public sealed partial class ModCardViewModel : ObservableObject
 
     public string Name => Row.Name;
 
+    /// <summary>
+    /// Иконка из файла мода для шапки — без запасного логотипа: логотип у шапки свой (<see cref="Logo"/>) и важнее, а
+    /// иконка встаёт на его место, только когда его нет.
+    /// </summary>
+    public ModIconSource FileIcon => new(Row.Icon.File, null);
+
     /// <summary>«Настройки мода (2)» — у мода есть файлы в ModConfig; ссылка ведёт на вкладку «Настройки модов».</summary>
     public int ConfigCount => Owner.ConfigCount(Row.ModId);
     public bool HasConfigs => ConfigCount > 0;
@@ -87,7 +93,7 @@ public sealed partial class ModCardViewModel : ObservableObject
                 Summary = first.Length > 240 ? first[..240].TrimEnd() + "…" : first;
             }
         }
-        Logo = string.IsNullOrWhiteSpace(mod.LogoFile) ? null : mod.LogoFile;
+        Logo = ModDbLogo.Usable(mod.LogoFile); // стандартная картинка модбазы — не логотип: шапка покажет иконку из файла
         if (!string.IsNullOrWhiteSpace(mod.Author)) Author = mod.Author;
         Tag = mod.Tags.FirstOrDefault(t => !string.IsNullOrWhiteSpace(t)) ?? "";
         // сторона — как её видит игра (modinfo.json установленного файла); модбаза — только справка, если пишет другое

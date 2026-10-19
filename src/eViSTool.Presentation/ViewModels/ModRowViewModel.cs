@@ -1,3 +1,4 @@
+using eViSTool.Core.ModDb;
 using eViSTool.Core.Mods;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Profiles;
@@ -28,6 +29,8 @@ public sealed class ModRowViewModel
         Installed = r.Local.Info?.Version ?? "";
         Latest = r.LatestCompatible?.ModVersion ?? "";
         PageUrl = r.Remote?.PageUrl;
+        // файл — только с диска этой машины (отметку ставит сканер папки), логотип — из ответа модбазы при проверке
+        Icon = new ModIconSource(r.Local.Stamp, ModDbLogo.Usable(r.Remote?.LogoFile));
         Initials = MakeInitials(Name);
         Hue = ModTint.Hue(ModId.Length > 0 ? ModId : FileName);
         CanUpdate = r.Status == ModStatus.UpdateAvailable && r.LatestCompatible?.MainFile is not null;
@@ -123,7 +126,13 @@ public sealed class ModRowViewModel
     public string Latest { get; }
     public string? PageUrl { get; }
 
-    /// <summary>Значок с буквами вместо логотипа: «Carry On» → «CO».</summary>
+    /// <summary>
+    /// Значок мода, первое из: иконка из файла мода на этом диске, логотип с модбазы (известен после проверки обновлений),
+    /// буквы цветом мода (<see cref="Initials"/>, <see cref="Hue"/>).
+    /// </summary>
+    public ModIconSource Icon { get; }
+
+    /// <summary>Значок с буквами вместо иконки и логотипа: «Carry On» → «CO».</summary>
     public string Initials { get; }
 
     /// <summary>Оттенок значка с буквами (<see cref="ModTint"/>): по modid, у мода без modinfo — по имени файла.</summary>

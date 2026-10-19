@@ -9,6 +9,8 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using eViSTool.Core;
@@ -16,6 +18,7 @@ using eViSTool.Core.Localization;
 using eViSTool.Core.ModDb;
 using eViSTool.Core.Profiles;
 using eViSTool.Core.Settings;
+using eViSTool.Desktop.Controls;
 using eViSTool.Desktop.Platform;
 using eViSTool.Desktop.Views;
 using eViSTool.Presentation;
@@ -25,9 +28,10 @@ namespace eViSTool.Desktop.Tests;
 
 /// <summary>
 /// «Мои моды» с настоящей главной моделью (docs/design.md, разделы 3 и 7): справа, пока мод не выбран, — сводка профиля;
-/// у выбранной строки песочная метка слева; значки модов — цветом мода; пока идёт проверка обновлений, в колонке
-/// статуса — заглушки с бегущим бликом, и только тогда. Модбаза поддельная: ответ ждёт, пока тест не отменит проверку.
-/// Профиль — свой клиентский во временной папке (игра — поддельный сервер 1.22.7, моды alpha и выключенный beta);
+/// у выбранной строки песочная метка слева; значки модов — иконка из файла мода или буквы цветом мода; пока идёт проверка
+/// обновлений, в колонке статуса — заглушки с бегущим бликом, и только тогда. Модбаза поддельная: ответ ждёт, пока тест
+/// не отменит проверку. Профиль — свой клиентский во временной папке (игра — поддельный сервер 1.22.7, моды alpha с
+/// иконкой и выключенный beta без неё);
 /// настройки программы — в папке data рядом с тестами, после теста прежний файл возвращается. Данные пользователя
 /// тест не трогает.
 /// </summary>
@@ -95,13 +99,27 @@ public sealed class ModsViewTests : IDisposable
         }
     }
 
-    private static byte[] Zip(string modId)
+    /// <summary>Архив мода; <paramref name="icon"/> — modicon.png в корне (иконка мода) или null.</summary>
+    private static byte[] Zip(string modId, byte[]? icon = null)
     {
         using var ms = new MemoryStream();
         using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
-        using (var w = new StreamWriter(zip.CreateEntry("modinfo.json").Open()))
-            w.Write($"{{ \"type\": \"code\", \"modid\": \"{modId}\", \"name\": \"{modId}\", \"version\": \"1.0.0\" }}");
+        {
+            using (var w = new StreamWriter(zip.CreateEntry("modinfo.json").Open()))
+                w.Write($"{{ \"type\": \"code\", \"modid\": \"{modId}\", \"name\": \"{modId}\", \"version\": \"1.0.0\" }}");
+            if (icon is not null)
+                using (var s = zip.CreateEntry("modicon.png").Open())
+                    s.Write(icon);
+        }
         return ms.ToArray();
+    }
+
+    private static byte[] Png(int size)
+    {
+        var bitmap = new WriteableBitmap(new PixelSize(size, size), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Premul);
+        using var stream = new MemoryStream();
+        bitmap.Save(stream, PngBitmapEncoderOptions.Default);
+        return stream.ToArray();
     }
 
     /// <summary>Главная модель над своими настройками: один клиентский профиль, без автопроверки, модбаза — <paramref name="db"/>.</summary>
@@ -116,7 +134,7 @@ public sealed class ModsViewTests : IDisposable
         File.Copy(Path.Combine(FakeBin, "FakeVsServer.dll"), Path.Combine(game, "VintagestoryServer.dll")); // версия игры — 1.22.7
         var data = Directory.CreateDirectory(Path.Combine(_dir, "data")).FullName;
         var mods = Directory.CreateDirectory(Path.Combine(data, "Mods")).FullName;
-        File.WriteAllBytes(Path.Combine(mods, "alpha_1.0.0.zip"), Zip("alpha"));
+        File.WriteAllBytes(Path.Combine(mods, "alpha_1.0.0.zip"), Zip("alpha", Png(128))); // у alpha своя иконка, у beta нет
         File.WriteAllBytes(Path.Combine(mods, "beta_1.0.0.zip"), Zip("beta"));
         File.WriteAllText(Path.Combine(data, "clientsettings.json"), """{ "stringListSettings": { "disabledMods": ["beta"] } }""");
         var profile = new GameProfile { Id = "mods-view-test", Name = "Игрок", Kind = ProfileKind.Client, GameDir = game, DataDir = data };
@@ -216,6 +234,62 @@ public sealed class ModsViewTests : IDisposable
             Assert.Equal(Color.FromRgb(fg.R, fg.G, fg.B), Assert.IsAssignableFrom<ISolidColorBrush>(letters.Foreground).Color);
         }
         Assert.NotEqual(mods.Rows[0].Hue, mods.Rows[1].Hue);
+    }
+
+    private static Image IconOf(Visual root) => root.GetVisualDescendants().OfType<Image>().Single(i => i.Name == "Icon");
+
+    private static TextBlock LettersOf(Visual root, ModRowViewModel row) =>
+        root.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == row.Initials && t.FontSize == 10);
+
+    [AvaloniaFact]
+    public async Task Mod_icon_from_its_file_replaces_the_letters_in_the_row_and_the_card_header()
+    {
+        var (window, mods) = await ShowAsync(Main(new HangingModDb()));
+        var alpha = mods.Rows.Single(r => r.ModId == "alpha");
+        var beta = mods.Rows.Single(r => r.ModId == "beta");
+
+        // строка: у alpha — иконка из архива, сразу маленькая; буквы под ней спрятаны. У beta иконки нет, логотипа
+        // модбаза не дала — буквы цветом мода
+        var icon = IconOf(RowOf(window, "alpha"));
+        await Wait.Until(() => icon.Source is not null);
+        Assert.True(ModIconImage.GetFromFile(icon));
+        Assert.Equal(ModIconImage.DefaultSize, ((Bitmap)icon.Source!).PixelSize.Width);
+        Assert.Equal(Stretch.UniformToFill, icon.Stretch);
+        var tile = icon.FindAncestorOfType<Border>()!; // плитка 30 × 30 со скруглением
+        Assert.Equal(new Size(30, 30), tile.Bounds.Size);
+        Assert.True(tile.ClipToBounds);
+        Assert.Equal(new CornerRadius(6), tile.CornerRadius);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(LettersOf(RowOf(window, "alpha"), alpha).IsEffectivelyVisible);
+        Assert.Null(IconOf(RowOf(window, "beta")).Source);
+        Assert.True(LettersOf(RowOf(window, "beta"), beta).IsEffectivelyVisible);
+
+        // шапка карточки: логотипа нет (модбаза молчит) — на его месте та же иконка, буквы спрятаны
+        mods.Selected = alpha;
+        Dispatcher.UIThread.RunJobs();
+        Image Header() => window.GetVisualDescendants().OfType<Image>().Single(i => i.Name == "FileIcon1");
+        TextBlock Big() => window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.FontSize == 40);
+        await Wait.Until(() => Header().Source is not null && Header().IsEffectivelyVisible);
+        Assert.True(ModIconImage.GetFromFile(Header()));
+        Assert.False(Big().IsEffectivelyVisible);
+
+        // у beta — буквы
+        mods.Selected = beta;
+        await Wait.Until(() => Header().Source is null && Big().IsEffectivelyVisible && Big().Text == beta.Initials);
+    }
+
+    [AvaloniaFact]
+    public async Task Card_tabs_reveal_like_the_catalog()
+    {
+        var (window, mods) = await ShowAsync(Main(new HangingModDb()));
+        mods.Selected = mods.Rows.Single(r => r.ModId == "alpha");
+        Dispatcher.UIThread.RunJobs();
+
+        // проявляются только сами вкладки «Обзор» и «Версии»: шапка, название и полоса вкладок — снаружи
+        var tabs = window.GetVisualDescendants().OfType<Panel>().Single(Motion.GetRevealChildren);
+        Assert.Equal(2, tabs.Children.Count);
+        Assert.Equal([true, false], tabs.Children.Select(c => c.IsVisible));
+        Assert.Empty(tabs.GetVisualDescendants().OfType<RadioButton>());
     }
 
     [AvaloniaFact]
