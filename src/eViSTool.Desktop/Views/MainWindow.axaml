@@ -338,7 +338,7 @@
 
                                 <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,0" Margin="6,6,6,2" />
                                 <!-- «Найти сервер…»: общий список и избранное целиком -->
-                                <Button Theme="{StaticResource MenuRowButton}" Classes="hover" Click="FindServer_Click" CornerRadius="7" Padding="12,8,8,8"
+                                <Button AutomationProperties.Name="{local:Tr play.findServer}" Theme="{StaticResource MenuRowButton}" Classes="hover" Click="FindServer_Click" CornerRadius="7" Padding="12,8,8,8"
                                         AutomationProperties.AutomationId="PlayFindServer">
                                     <DockPanel>
                                         <Path Classes="icon" DockPanel.Dock="Left" Data="{StaticResource Icon.Search}" Width="16" Height="16"

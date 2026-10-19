@@ -88,8 +88,10 @@
                 </MultiBinding>
             </DockPanel.IsVisible>
             <!-- ===== заголовок и управление ===== -->
-            <DockPanel DockPanel.Dock="Top">
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+            <!-- заголовок слева (не шире 320, подпись — многоточием), кнопки справа; не помещаются в строку (узкое окно) —
+                 переносятся, а не съедают заголовок -->
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*">
+                <WrapPanel Grid.Column="1" ItemsAlignment="End" LineSpacing="8" VerticalAlignment="Top" Margin="16,0,0,0">
                     <Button Command="{Binding OpenServerModsCommand}" Margin="0,0,8,0" ToolTip.Tip="{local:Tr server.serverMods}"
                             AutomationProperties.Name="{local:Tr server.serverMods}">
                         <StackPanel Orientation="Horizontal">
@@ -107,16 +109,17 @@
                     <Button Content="{local:Tr server.restart}" Command="{Binding RestartCommand}" IsEnabled="{Binding CanStop}" Margin="8,0,0,0" />
                     <Button Classes="danger" Content="{local:Tr server.kill}" Command="{Binding KillCommand}" IsEnabled="{Binding CanStop}" Margin="8,0,0,0"
                             ToolTip.Tip="{local:Tr server.killTip}" />
-                </StackPanel>
-                <StackPanel>
+                </WrapPanel>
+                <StackPanel MaxWidth="320">
                     <TextBlock Classes="pageTitle" Text="{local:Tr nav.server}" />
                     <TextBlock Text="{Binding HeaderSubtitle}" ToolTip.Tip="{Binding DataDir}" Foreground="{DynamicResource Forest.Accent}" FontSize="12"
                                Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
-            </DockPanel>
+            </Grid>
 
             <!-- ===== виды раздела: консоль, игроки, статистика, журнал, объявления, serverconfig.json, расписание, удалённый доступ, оповещения ===== -->
-            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,16,0,0">
+            <!-- в узком окне (уже ~1150) вкладки переносятся на вторую строку, а не уходят за край -->
+            <WrapPanel DockPanel.Dock="Top" Margin="0,16,0,0">
                 <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr srvcfg.modeConsole}"
                              IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Console}"
                              AutomationProperties.AutomationId="SrvTabConsole" />
@@ -152,7 +155,7 @@
                 <RadioButton Theme="{StaticResource Forest.TabHeader}" GroupName="SrvMode" FontSize="15" Content="{local:Tr srvnotify.tab}"
                              IsChecked="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Notify}"
                              AutomationProperties.AutomationId="SrvTabNotify" />
-            </StackPanel>
+            </WrapPanel>
 
             <!-- ===== сервер, запущенный не нами ===== -->
             <Border DockPanel.Dock="Top" Classes="warning" Margin="0,14,0,0" IsVisible="{Binding HasForeign}">

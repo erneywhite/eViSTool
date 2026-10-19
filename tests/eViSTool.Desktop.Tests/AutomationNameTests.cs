@@ -41,15 +41,12 @@ public sealed class AutomationNameTests
     public void Markup_buttons_with_composite_content_have_names()
     {
         var src = System.IO.Path.Combine(ThemeTests.RepoRoot(), "src", "eViSTool.Desktop");
-        // shortcut: эти виды правятся в соседних ветках ревью 1.0, имена кнопкам там дадут они; убрать список после слияния
-        string[] pending = ["Views/MainWindow.axaml", "Views/ProfilesView.axaml", "Views/CatalogView.axaml", "Views/ModsView.axaml"];
         var checkedButtons = 0;
         var found = new List<string>();
         foreach (var folder in new[] { "Views", "Dialogs" })
             foreach (var file in Directory.EnumerateFiles(System.IO.Path.Combine(src, folder), "*.axaml"))
             {
                 var relative = System.IO.Path.GetRelativePath(src, file).Replace('\\', '/');
-                if (pending.Contains(relative)) continue;
                 foreach (var button in XDocument.Load(file, LoadOptions.SetLineInfo).Descendants().Where(e => Buttons.Contains(e.Name.LocalName)))
                 {
                     // свойства-элементы (<Button.Flyout> и т. п.) — не содержимое

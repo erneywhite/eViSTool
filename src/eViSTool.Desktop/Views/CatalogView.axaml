@@ -39,7 +39,7 @@
     <DockPanel Margin="10,4,10,0">
         <!-- ===== заголовок ===== -->
         <DockPanel DockPanel.Dock="Top">
-            <Button DockPanel.Dock="Right" VerticalAlignment="Top" Command="{Binding RefreshCommand}" ToolTip.Tip="{local:Tr catalog.refreshTip}"
+            <Button AutomationProperties.Name="{local:Tr catalog.refresh}" DockPanel.Dock="Right" VerticalAlignment="Top" Command="{Binding RefreshCommand}" ToolTip.Tip="{local:Tr catalog.refreshTip}"
                     IsEnabled="{Binding !IsLoading}">
                 <StackPanel Orientation="Horizontal">
                     <Path Classes="icon" Data="{StaticResource Icon.Refresh}" Width="14" Height="14" Margin="0,0,8,0" />
@@ -224,7 +224,7 @@
                                                         <TextBlock Grid.Row="4" Grid.Column="1" Classes="cardValue" Text="{Binding Stats}" />
                                                     </Grid>
 
-                                                    <Button Classes="primary" Margin="0,14,0,0" HorizontalAlignment="Stretch"
+                                                    <Button AutomationProperties.Name="{Binding InstallText}" Classes="primary" Margin="0,14,0,0" HorizontalAlignment="Stretch"
                                                             Command="{Binding InstallCommand}" IsEnabled="{Binding CanInstall}">
                                                         <StackPanel Orientation="Horizontal">
                                                             <Path Classes="icon" Data="{StaticResource Icon.Download}" Width="14" Height="14" Margin="0,0,8,0" />
@@ -245,7 +245,7 @@
                                                         </ItemsControl.ItemsPanel>
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate x:DataType="x:String">
-                                                                <Button Padding="0" Margin="0,0,6,6" MinHeight="0" ToolTip.Tip="{local:Tr card.screenshotTip}"
+                                                                <Button AutomationProperties.Name="{local:Tr card.screenshotTip}" Padding="0" Margin="0,0,6,6" MinHeight="0" ToolTip.Tip="{local:Tr card.screenshotTip}"
                                                                         Command="{Binding $parent[ItemsControl].((vm:ModDetailsViewModel)DataContext).OpenScreenshotCommand}"
                                                                         CommandParameter="{Binding}">
                                                                     <Image ctl:RemoteImage.Source="{Binding}" ctl:RemoteImage.DecodeWidth="400" Stretch="UniformToFill"

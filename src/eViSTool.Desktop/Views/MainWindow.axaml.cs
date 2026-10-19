@@ -89,15 +89,6 @@ public partial class MainWindow : Window
         ApplyWindowFrame();
     }
 
-    private bool _transparencyKnown; // уровень прозрачности окна пришёл от системы (до шаблона окна он None и ничего не значит)
-
-    protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
-    {
-        base.OnApplyTemplate(e); // здесь окно узнаёт уровень прозрачности
-        _transparencyKnown = true;
-        if (OperatingSystem.IsLinux()) ApplyWindowFrame();
-    }
-
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -108,28 +99,26 @@ public partial class MainWindow : Window
             var m = WindowDecorationMargin;
             root.Margin = new Thickness(m.Left, m.Left, m.Right, m.Bottom);
         }
-        // композитор включили или выключили на ходу — своя рамка или системная (OwnFrameOnLinux)
+        // композитор включили или выключили на ходу — своя рамка или системная (OwnFrameOnLinux). Не сразу, а после: смена
+        // уровня приходит и посреди раскладки (из шаблона окна), а перестройка шапки там рушит её первый проход
         else if (change.Property == ActualTransparencyLevelProperty && OperatingSystem.IsLinux() && Root is not null)
-        {
-            _transparencyKnown = true;
-            ApplyWindowFrame();
-        }
+            Dispatcher.UIThread.Post(ApplyWindowFrame);
     }
 
     /// <summary>
     /// Своя рамка на Linux — если её не выключили в настройках («Системная рамка») и окно может быть прозрачным, то есть
     /// работает композитор. Без него (Openbox, i3, Xfce без композитинга, xrdp) вместо прозрачной тени вокруг окна шла бы
-    /// сплошная полоса цвета окна в 9 px, а линии рамки не было бы видно: там системная рамка. null — уровень прозрачности
-    /// ещё не известен (до шаблона окна), решает только настройка.
+    /// сплошная полоса цвета окна в 9 px, а линии рамки не было бы видно: там системная рамка. Уровень прозрачности верен
+    /// уже в конструкторе окна (X11 спрашивает композитор при создании), так что рамка выбирается сразу, до раскладки.
     /// </summary>
-    internal static bool OwnFrameOnLinux(bool systemFrameSetting, WindowTransparencyLevel? transparency) =>
+    internal static bool OwnFrameOnLinux(bool systemFrameSetting, WindowTransparencyLevel transparency) =>
         !systemFrameSetting && transparency != WindowTransparencyLevel.None;
 
     // настройку берёт из модели (до неё — своя рамка), прозрачность — у окна; вызывается, когда меняется любое из них
     private void ApplyWindowFrame()
     {
         var own = OperatingSystem.IsWindows() || (OperatingSystem.IsLinux() && OwnFrameOnLinux(
-            DataContext is MainViewModel { SystemWindowFrame: true }, _transparencyKnown ? ActualTransparencyLevel : null));
+            DataContext is MainViewModel { SystemWindowFrame: true }, ActualTransparencyLevel));
         ExtendClientAreaToDecorationsHint = own;
         CaptionSpace.Width = own ? CaptionWidth : 0;
         // под тенью своей рамки на Linux окно прозрачное; фон даёт Root

@@ -87,20 +87,20 @@
                     </StackPanel>
                     <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
                         <UniformGrid Columns="2" Margin="0,0,0,8">
-                            <Button Command="{Binding AddClientProfileCommand}" Margin="0,0,4,0">
+                            <Button AutomationProperties.Name="{local:Tr settings.kindClient}" Command="{Binding AddClientProfileCommand}" Margin="0,0,4,0">
                                 <StackPanel Orientation="Horizontal">
                                     <Path Classes="icon" Data="{StaticResource Icon.Plus}" Width="11" Height="11" Margin="0,0,7,0" />
                                     <TextBlock Text="{local:Tr settings.kindClient}" />
                                 </StackPanel>
                             </Button>
-                            <Button Command="{Binding AddServerProfileCommand}" Margin="4,0,0,0">
+                            <Button AutomationProperties.Name="{local:Tr tab.server}" Command="{Binding AddServerProfileCommand}" Margin="4,0,0,0">
                                 <StackPanel Orientation="Horizontal">
                                     <Path Classes="icon" Data="{StaticResource Icon.Plus}" Width="11" Height="11" Margin="0,0,7,0" />
                                     <TextBlock Text="{local:Tr tab.server}" />
                                 </StackPanel>
                             </Button>
                         </UniformGrid>
-                        <Button Command="{Binding CloneProfileCommand}" CommandParameter="{Binding EditedProfile}" HorizontalAlignment="Stretch"
+                        <Button AutomationProperties.Name="{local:Tr settings.clone}" Command="{Binding CloneProfileCommand}" CommandParameter="{Binding EditedProfile}" HorizontalAlignment="Stretch"
                                 Margin="0,0,0,8" ToolTip.Tip="{local:Tr settings.cloneTip}">
                             <StackPanel Orientation="Horizontal">
                                 <Path Classes="icon" Data="{StaticResource Icon.Copy}" Width="13" Height="13" Margin="0,0,8,0" />
@@ -108,7 +108,7 @@
                             </StackPanel>
                         </Button>
                         <!-- что копят игра и eViSTool в этом профиле — убрать в корзину -->
-                        <Button Command="{Binding CleanupDiskCommand}" CommandParameter="{Binding EditedProfile}" HorizontalAlignment="Stretch"
+                        <Button AutomationProperties.Name="{local:Tr clean.button}" Command="{Binding CleanupDiskCommand}" CommandParameter="{Binding EditedProfile}" HorizontalAlignment="Stretch"
                                 Margin="0,0,0,8" ToolTip.Tip="{local:Tr clean.buttonTip}" ToolTip.ShowOnDisabled="True"
                                 AutomationProperties.AutomationId="CleanupDisk">
                             <StackPanel Orientation="Horizontal">
@@ -238,7 +238,7 @@
                                             <TextBlock Text="{local:Tr settings.dataDir}" Classes="label" />
                                             <TextBlock Classes="hint" Text="{local:Tr settings.dataDirHint}" />
                                             <DockPanel>
-                                                <Button DockPanel.Dock="Right" Command="{Binding OpenDataDirCommand}" Margin="8,0,0,0" Padding="10,8" ToolTip.Tip="{local:Tr common.open}">
+                                                <Button AutomationProperties.Name="{local:Tr common.open}" DockPanel.Dock="Right" Command="{Binding OpenDataDirCommand}" Margin="8,0,0,0" Padding="10,8" ToolTip.Tip="{local:Tr common.open}">
                                                     <Path Classes="icon" Data="{StaticResource Icon.Folder}" Width="16" Height="16" />
                                                 </Button>
                                                 <Button DockPanel.Dock="Right" Content="{local:Tr common.browse}" Command="{Binding BrowseDataDirCommand}" Margin="8,0,0,0" />
@@ -265,7 +265,7 @@
                                                 <!-- «Перечитать» — под сведениями, а не справа: справа кнопка отнимала у колонки значений
                                                      ~120 px, и в узком окне пути рвались по букве в строку -->
                                                 <DockPanel>
-                                                    <Button DockPanel.Dock="Bottom" HorizontalAlignment="Left" Command="{Binding RereadCommand}" Margin="0,10,0,0"
+                                                    <Button AutomationProperties.Name="{local:Tr settings.reread}" DockPanel.Dock="Bottom" HorizontalAlignment="Left" Command="{Binding RereadCommand}" Margin="0,10,0,0"
                                                             Padding="10,6" MinHeight="0" ToolTip.Tip="{local:Tr settings.reread}">
                                                         <StackPanel Orientation="Horizontal">
                                                             <Path Classes="icon" Data="{StaticResource Icon.Refresh}" Width="13" Height="13" Margin="0,0,7,0" />

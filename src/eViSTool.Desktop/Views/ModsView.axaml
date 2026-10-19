@@ -138,13 +138,13 @@
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
                 <Button Command="{Binding CheckCancelCommand}" Content="{local:Tr common.cancel}" Margin="0,0,8,0"
                         IsVisible="{Binding CheckCommand.IsRunning}" />
-                <Button Command="{Binding CheckCommand}" ToolTip.Tip="{local:Tr mods.checkTip}">
+                <Button AutomationProperties.Name="{local:Tr mods.checkShort}" Command="{Binding CheckCommand}" ToolTip.Tip="{local:Tr mods.checkTip}">
                     <StackPanel Orientation="Horizontal">
                         <Path Classes="icon" Data="{StaticResource Icon.Refresh}" Width="14" Height="14" Margin="0,0,8,0" />
                         <TextBlock Text="{local:Tr mods.checkShort}" />
                     </StackPanel>
                 </Button>
-                <Button Classes="primary" Command="{Binding UpdateAllCommand}" Margin="8,0,0,0"
+                <Button AutomationProperties.Name="{Binding UpdateAllText}" Classes="primary" Command="{Binding UpdateAllCommand}" Margin="8,0,0,0"
                         IsEnabled="{Binding CanQueue}" IsVisible="{Binding UpdateCount, Converter={x:Static conv:Counts.Positive}}"
                         ToolTip.Tip="{local:Tr mods.updateAllTip}">
                     <StackPanel Orientation="Horizontal">
@@ -165,7 +165,7 @@
         <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1" Padding="0,14,0,0">
             <Panel>
                 <DockPanel>
-                    <RadioButton DockPanel.Dock="Right" GroupName="ModFilter" Theme="{StaticResource Forest.StatTab}" Margin="12,0,0,0" FontSize="13"
+                    <RadioButton AutomationProperties.Name="{local:Tr hist.tab}" DockPanel.Dock="Right" GroupName="ModFilter" Theme="{StaticResource Forest.StatTab}" Margin="12,0,0,0" FontSize="13"
                                  VerticalAlignment="Bottom" ToolTip.Tip="{local:Tr hist.tabTip}" AutomationProperties.AutomationId="ModsHistoryTab"
                                  IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=History}">
                         <StackPanel Orientation="Horizontal">
@@ -174,27 +174,27 @@
                         </StackPanel>
                     </RadioButton>
                     <WrapPanel>
-                        <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
+                        <RadioButton AutomationProperties.Name="{Binding InstalledLabel}" Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
                                      IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=All}">
                             <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding ModCount}" FontSize="24" /><TextBlock Text="{Binding InstalledLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
                         </RadioButton>
-                        <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
+                        <RadioButton AutomationProperties.Name="{Binding UpdatesLabel}" Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
                                      IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Updates}">
                             <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding UpdatesAvailable}" FontSize="24" /><TextBlock Text="{Binding UpdatesLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
                         </RadioButton>
-                        <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
+                        <RadioButton AutomationProperties.Name="{Binding ProblemsLabel}" Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
                                      IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Problems}">
                             <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding ProblemCount}" FontSize="24" /><TextBlock Text="{Binding ProblemsLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
                         </RadioButton>
-                        <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
+                        <RadioButton AutomationProperties.Name="{Binding PinnedLabel}" Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
                                      IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Pinned}">
                             <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding PinnedCount}" FontSize="24" /><TextBlock Text="{Binding PinnedLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
                         </RadioButton>
-                        <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
+                        <RadioButton AutomationProperties.Name="{Binding DisabledLabel}" Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter"
                                      IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Disabled}">
                             <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding DisabledCount}" FontSize="24" /><TextBlock Text="{Binding DisabledLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
                         </RadioButton>
-                        <RadioButton Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter" ToolTip.Tip="{local:Tr mods.chipUnneededTip}"
+                        <RadioButton AutomationProperties.Name="{Binding UnneededLabel}" Theme="{StaticResource Forest.StatTab}" GroupName="ModFilter" ToolTip.Tip="{local:Tr mods.chipUnneededTip}"
                                      IsVisible="{Binding HasUnneeded}"
                                      IsChecked="{Binding Filter, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=Unneeded}">
                             <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding UnneededCount}" FontSize="24" /><TextBlock Text="{Binding UnneededLabel}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" VerticalAlignment="Bottom" Margin="7,0,0,4" /></StackPanel>
@@ -338,14 +338,14 @@
                             <ComboBoxItem Content="{local:Tr mods.sortImportant}" />
                             <ComboBoxItem Content="{local:Tr mods.sortName}" />
                         </ComboBox>
-                        <Button Command="{Binding AddFromFileCommand}" ToolTip.Tip="{local:Tr mods.addTip}" IsEnabled="{Binding !IsBusy}">
+                        <Button AutomationProperties.Name="{local:Tr mods.addShort}" Command="{Binding AddFromFileCommand}" ToolTip.Tip="{local:Tr mods.addTip}" IsEnabled="{Binding !IsBusy}">
                             <StackPanel Orientation="Horizontal">
                                 <Path Classes="icon btnIcon" Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
                                 <TextBlock Classes="btnLabel" Text="{local:Tr mods.addShort}" />
                             </StackPanel>
                         </Button>
                         <!-- у удалённого сервера — только импорт: сборка пака читает файлы модов на месте -->
-                        <Button Margin="8,0,0,0" ToolTip.Tip="{local:Tr pack.menuTip}" IsEnabled="{Binding !IsBusy}">
+                        <Button AutomationProperties.Name="{local:Tr pack.menu}" Margin="8,0,0,0" ToolTip.Tip="{local:Tr pack.menuTip}" IsEnabled="{Binding !IsBusy}">
                             <Button.Flyout>
                                 <MenuFlyout Placement="BottomEdgeAlignedLeft">
                                     <MenuItem Header="{local:Tr pack.export}" Command="{Binding ExportPackCommand}" IsVisible="{Binding IsLocalProfile}" />
@@ -361,7 +361,7 @@
                                 <TextBlock Classes="btnLabel" Text="{local:Tr pack.menu}" />
                             </StackPanel>
                         </Button>
-                        <Button Margin="8,0,0,0" Command="{Binding OpenModsFolderCommand}" ToolTip.Tip="{local:Tr mods.openFolder}" Padding="10,8"
+                        <Button AutomationProperties.Name="{local:Tr mods.openFolder}" Margin="8,0,0,0" Command="{Binding OpenModsFolderCommand}" ToolTip.Tip="{local:Tr mods.openFolder}" Padding="10,8"
                                 IsVisible="{Binding IsLocalProfile}">
                             <Path Classes="icon" Data="{StaticResource Icon.Folder}" Width="16" Height="16" />
                         </Button>
@@ -548,7 +548,7 @@
                                         <TextBlock Text="{Binding Sources}" FontSize="12" Foreground="{DynamicResource Forest.Accent}" Margin="0,2,0,0" TextWrapping="Wrap" />
 
                                         <!-- откат сеанса целиком: моды — к версиям до него -->
-                                        <Button Classes="primary" Margin="0,14,0,0" HorizontalAlignment="Stretch"
+                                        <Button AutomationProperties.Name="{local:Tr hist.revertSession}" Classes="primary" Margin="0,14,0,0" HorizontalAlignment="Stretch"
                                                 Command="{Binding $parent[UserControl].((vm:ModsViewModel)DataContext).RollbackSessionCommand}"
                                                 CommandParameter="{Binding}" IsEnabled="{Binding CanRevert}" ToolTip.Tip="{local:Tr hist.revertSessionTip}"
                                                 AutomationProperties.AutomationId="HistoryRevertSession">
@@ -618,7 +618,7 @@
                                        AutomationProperties.AutomationId="ModsSummaryChecked" />
                         </Grid>
                         <!-- та же команда, что «Проверить» вверху; главная, пока нет «Обновить всё» -->
-                        <Button Margin="0,14,0,0" HorizontalAlignment="Stretch" Command="{Binding CheckCommand}" Classes.primary="{Binding !HasUpdates}"
+                        <Button AutomationProperties.Name="{local:Tr mods.check}" Margin="0,14,0,0" HorizontalAlignment="Stretch" Command="{Binding CheckCommand}" Classes.primary="{Binding !HasUpdates}"
                                 ToolTip.Tip="{local:Tr mods.checkTip}" AutomationProperties.AutomationId="ModsSummaryCheck">
                             <StackPanel Orientation="Horizontal">
                                 <Path Classes="icon" Data="{StaticResource Icon.Refresh}" Width="14" Height="14" Margin="0,0,8,0" />
@@ -764,7 +764,7 @@
                                                     </Border>
 
                                                     <!-- действия -->
-                                                    <Button Classes="primary" Margin="0,14,0,0" HorizontalAlignment="Stretch"
+                                                    <Button AutomationProperties.Name="{Binding UpdateText}" Classes="primary" Margin="0,14,0,0" HorizontalAlignment="Stretch"
                                                             Command="{Binding Owner.UpdateOneCommand}" CommandParameter="{Binding Row}"
                                                             IsEnabled="{Binding Owner.CanQueue}" IsVisible="{Binding Row.CanUpdate}">
                                                         <StackPanel Orientation="Horizontal">
@@ -818,7 +818,7 @@
                                                         </ItemsControl.ItemsPanel>
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate x:DataType="x:String">
-                                                                <Button Padding="0" Margin="0,0,6,6" MinHeight="0" ToolTip.Tip="{local:Tr card.screenshotTip}"
+                                                                <Button AutomationProperties.Name="{local:Tr card.screenshotTip}" Padding="0" Margin="0,0,6,6" MinHeight="0" ToolTip.Tip="{local:Tr card.screenshotTip}"
                                                                         Command="{Binding $parent[ItemsControl].((vm:ModCardViewModel)DataContext).OpenScreenshotCommand}"
                                                                         CommandParameter="{Binding}">
                                                                     <Image ctl:RemoteImage.Source="{Binding}" ctl:RemoteImage.DecodeWidth="400" Stretch="UniformToFill"

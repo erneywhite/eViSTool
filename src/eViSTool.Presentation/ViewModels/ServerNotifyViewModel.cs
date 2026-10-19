@@ -232,8 +232,13 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
             }
             else return;
             if (generation != _generation) return;
-            // в таблице щелчки, которые ждут записи: прочитанное старше их, а пересобранная по нему таблица ушла бы в эту запись
-            if (_saveAgain) return;
+            // в таблице щелчки, которые ждут записи, или запись ещё идёт: прочитанное может быть старше их, а пересобранная по
+            // нему таблица ушла бы в следующую запись. Перечитать, когда запись дойдёт (первое чтение профиля не пропускаем)
+            if (_saveAgain || _saving && Loaded)
+            {
+                _seenChange = null;
+                return;
+            }
             _saved = settings;
             Build(settings);
             Loaded = true;

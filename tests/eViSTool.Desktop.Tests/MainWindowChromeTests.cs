@@ -160,23 +160,16 @@ public sealed class MainWindowChromeTests : IDisposable
 
     /// <summary>
     /// Своя рамка на Linux — пока её не выключили в настройках и окно может быть прозрачным (работает композитор): без
-    /// композитора тень своей рамки — сплошная полоса цвета окна. Пока уровень прозрачности не известен (до шаблона
-    /// окна) — по настройке.
+    /// композитора тень своей рамки — сплошная полоса цвета окна.
     /// </summary>
     [AvaloniaTheory]
-    [InlineData(false, null, true)]
-    [InlineData(true, null, false)]
     [InlineData(false, "Transparent", true)]
     [InlineData(false, "None", false)]
     [InlineData(true, "Transparent", false)]
-    public void Own_frame_on_linux_needs_the_setting_and_a_compositor(bool systemFrameSetting, string? level, bool own)
+    [InlineData(true, "None", false)]
+    public void Own_frame_on_linux_needs_the_setting_and_a_compositor(bool systemFrameSetting, string level, bool own)
     {
-        WindowTransparencyLevel? transparency = level switch
-        {
-            "Transparent" => WindowTransparencyLevel.Transparent,
-            "None" => WindowTransparencyLevel.None,
-            _ => null,
-        };
+        var transparency = level == "None" ? WindowTransparencyLevel.None : WindowTransparencyLevel.Transparent;
         Assert.Equal(own, MainWindow.OwnFrameOnLinux(systemFrameSetting, transparency));
     }
 

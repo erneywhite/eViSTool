@@ -48,9 +48,10 @@
         <!-- кнопки полосы берут фокус (Tab): у «Открыть в браузере» своей клавиши нет. ←/→ листают и с фокусом на кнопке —
              привязки окна срабатывают раньше, чем переход фокуса стрелками -->
         <DockPanel DockPanel.Dock="Bottom" Background="#1C1C1C" Height="48">
-            <Button DockPanel.Dock="Right" Content="{local:Tr shots.close}" Click="Close_Click" Margin="8" Padding="12,4"
+            <!-- Tab — слева направо, как видно: «Открыть в браузере», потом «Закрыть» (в разметке они наоборот — прижаты вправо) -->
+            <Button DockPanel.Dock="Right" Content="{local:Tr shots.close}" Click="Close_Click" Margin="8" Padding="12,4" TabIndex="2"
                     AutomationProperties.AutomationId="ScreenshotClose" />
-            <Button DockPanel.Dock="Right" Content="{local:Tr shots.browser}" Command="{Binding OpenInBrowserCommand}" Margin="8" Padding="12,4"
+            <Button DockPanel.Dock="Right" Content="{local:Tr shots.browser}" Command="{Binding OpenInBrowserCommand}" Margin="8" Padding="12,4" TabIndex="1"
                     AutomationProperties.AutomationId="ScreenshotBrowser" />
             <TextBlock Text="{Binding Counter}" Foreground="#CCFFFFFF" VerticalAlignment="Center" Margin="16,0"
                        AutomationProperties.AutomationId="ScreenshotCounter" />
