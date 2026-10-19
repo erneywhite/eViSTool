@@ -91,16 +91,36 @@
         </Style>
 
         <!-- сводка профиля: проблемы — тёплым цветом -->
+        <!-- узкая левая часть: кнопки над таблицей — одними иконками, сортировка уже -->
+        <Style Selector="DockPanel#LeftPane.compact StackPanel#Toolbar TextBlock.btnLabel">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="DockPanel#LeftPane.compact StackPanel#Toolbar Path.icon">
+            <Setter Property="Margin" Value="0" />
+        </Style>
+        <Style Selector="DockPanel#LeftPane.compact StackPanel#Toolbar ComboBox">
+            <Setter Property="MinWidth" Value="120" />
+        </Style>
+        <!-- узкая: поиск — строкой на всю ширину, кнопки — строкой под ним -->
+        <!-- место панели задают стили, не атрибуты: локальное значение перебило бы узкий режим -->
+        <Style Selector="StackPanel#Toolbar">
+            <Setter Property="Grid.Column" Value="1" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+        </Style>
+        <Style Selector="DockPanel#LeftPane.compact StackPanel#Toolbar">
+            <Setter Property="Grid.Row" Value="1" />
+            <Setter Property="Grid.Column" Value="0" />
+            <Setter Property="Grid.ColumnSpan" Value="2" />
+            <Setter Property="Margin" Value="0,8,0,0" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
+        <Style Selector="DockPanel#LeftPane.compact TextBox#SearchBox">
+            <Setter Property="Grid.ColumnSpan" Value="2" />
+        </Style>
         <Style Selector="TextBlock.cardValue.warn">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
         </Style>
-        <!-- карточка мода: совместимость — зелёным, нет совместимой версии — красноватым (как тон «Состояния») -->
-        <Style Selector="TextBlock.cardValue.good">
-            <Setter Property="Foreground" Value="{DynamicResource Forest.Good}" />
-        </Style>
-        <Style Selector="TextBlock.cardValue.danger">
-            <Setter Property="Foreground" Value="{DynamicResource Forest.Danger}" />
-        </Style>
+
     </UserControl.Styles>
 
     <DockPanel Margin="10,4,10,0">
@@ -287,19 +307,22 @@
 
         <Grid x:Name="Split" Margin="0,14,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="440" />
+                <ColumnDefinition Width="*" MinWidth="320" />
                 <ColumnDefinition Width="14" />
-                <!-- ширина карточки — из настроек (ModsViewModel.CardWidth), её ставит и сохраняет код окна -->
-                <ColumnDefinition Width="420" MinWidth="340" />
+                <!-- ширина карточки — из настроек (ModsViewModel.CardWidth), её ставит и сохраняет код окна; в узком окне
+                     код ужимает её до того, что помещается (FitCard) -->
+                <ColumnDefinition Width="420" MinWidth="280" />
             </Grid.ColumnDefinitions>
 
             <GridSplitter Grid.Column="1" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext"
                           ToolTip.Tip="{local:Tr catalog.splitterTip}" DragCompleted="Splitter_DragCompleted" />
 
             <!-- ===== левая часть: поиск, чипы, таблица ===== -->
-            <DockPanel>
-                <DockPanel DockPanel.Dock="Top">
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="8,0,0,0">
+            <!-- узкая (класс compact, ставит код окна): у кнопок над таблицей только иконки, список сортировки уже, колонки
+                 «Сторона» нет — поиску и названию мода остаётся место -->
+            <DockPanel x:Name="LeftPane">
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                    <StackPanel x:Name="Toolbar" Orientation="Horizontal">
                         <!-- пункты в разметке, а не из модели: так их подписи переводятся при смене языка, как и остальные -->
                         <ComboBox SelectedIndex="{Binding SortIndex}" MinWidth="160" FontSize="12" Margin="0,0,8,0"
                                   Classes.hidden="{Binding IsHistory}" VerticalAlignment="Stretch">
@@ -309,7 +332,7 @@
                         <Button Command="{Binding AddFromFileCommand}" ToolTip.Tip="{local:Tr mods.addTip}" IsEnabled="{Binding !IsBusy}">
                             <StackPanel Orientation="Horizontal">
                                 <Path Classes="icon" Data="{StaticResource Icon.Plus}" Width="12" Height="12" Margin="0,0,8,0" />
-                                <TextBlock Text="{local:Tr mods.addShort}" />
+                                <TextBlock Classes="btnLabel" Text="{local:Tr mods.addShort}" />
                             </StackPanel>
                         </Button>
                         <!-- у удалённого сервера — только импорт: сборка пака читает файлы модов на месте -->
@@ -326,7 +349,7 @@
                             </Button.Flyout>
                             <StackPanel Orientation="Horizontal">
                                 <Path Classes="icon" Data="{StaticResource Icon.Package}" Width="14" Height="14" Margin="0,0,8,0" />
-                                <TextBlock Text="{local:Tr pack.menu}" />
+                                <TextBlock Classes="btnLabel" Text="{local:Tr pack.menu}" />
                             </StackPanel>
                         </Button>
                         <Button Margin="8,0,0,0" Command="{Binding OpenModsFolderCommand}" ToolTip.Tip="{local:Tr mods.openFolder}" Padding="10,8"
@@ -335,13 +358,13 @@
                         </Button>
                     </StackPanel>
                     <!-- поле поиска с лупой и подсказкой -->
-                    <TextBox Classes="search" Text="{Binding Search}" PlaceholderText="{local:Tr mods.searchPlaceholder}"
+                    <TextBox x:Name="SearchBox" Classes="search" Text="{Binding Search}" PlaceholderText="{local:Tr mods.searchPlaceholder}" MinWidth="150"
                              ToolTip.Tip="{local:Tr mods.searchTip}">
                         <TextBox.InnerLeftContent>
                             <Path Classes="icon searchIcon" Data="{StaticResource Icon.Search}" />
                         </TextBox.InnerLeftContent>
                     </TextBox>
-                </DockPanel>
+                </Grid>
 
                 <Panel Margin="0,12,0,0">
                     <!-- история: сеансы изменений модов -->
@@ -419,7 +442,7 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="{local:Tr col.modAndId}" Width="*" SortMemberPath="Name">
+                                <DataGridTemplateColumn Header="{local:Tr col.modAndId}" Width="*" MinWidth="170" SortMemberPath="Name">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate x:DataType="vm:ModRowViewModel">
                                             <DockPanel VerticalAlignment="Center" Classes.faded="{Binding !IsEnabled}">

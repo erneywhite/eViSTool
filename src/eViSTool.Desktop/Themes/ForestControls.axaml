@@ -454,7 +454,8 @@
          Кольца фокуса у пунктов списков нет: клавиши двигают выбор, его и видно -->
     <ControlTheme x:Key="Forest.CardItem" TargetType="ListBoxItem">
         <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
-        <Setter Property="Margin" Value="0,0,0,8" />
+        <!-- справа зазор: полоса прокрутки списка (Fluent рисует её поверх содержимого) ложится в него, а не на карточку -->
+        <Setter Property="Margin" Value="0,0,12,8" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="Template">

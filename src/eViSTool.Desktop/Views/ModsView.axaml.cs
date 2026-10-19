@@ -25,6 +25,21 @@ public partial class ModsView : UserControl
         // перетаскивание zip-архивов из Проводника (Nautilus, Dolphin) в список модов
         Grid.AddHandler(DragDrop.DragOverEvent, Grid_DragOver);
         Grid.AddHandler(DragDrop.DropEvent, Grid_Drop);
+        LeftPane.SizeChanged += (_, e) => ApplyCompact(e.NewSize.Width);
+        Split.SizeChanged += (_, _) => FitCard();
+    }
+
+    /// <summary>
+    /// Левая часть уже этого — кнопки над таблицей теряют подписи (остаются иконки с подсказками), колонка «Сторона»
+    /// прячется: иначе при сильно суженном окне поле поиска и название мода сжимались почти в ноль.
+    /// </summary>
+    internal const double CompactBelow = 640;
+
+    private void ApplyCompact(double width)
+    {
+        var compact = width < CompactBelow;
+        LeftPane.Classes.Set("compact", compact);
+        foreach (var column in Grid.Columns.Where(c => c.SortMemberPath == "SideText")) column.IsVisible = !compact; // «Сторона»
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -34,7 +49,7 @@ public partial class ModsView : UserControl
         _vm = DataContext as ModsViewModel;
         if (_vm is null) return;
         _vm.PropertyChanged += OnVmChanged;
-        CardColumn.Width = new GridLength(_vm.CardWidth); // ширина карточки — как в прошлый раз
+        FitCard(); // ширина карточки — как в прошлый раз, если помещается
     }
 
     // выбрали порядок в списке «Сначала важное / По имени» — сортировка кликом по заголовку колонки уступает ему
@@ -69,6 +84,22 @@ public partial class ModsView : UserControl
     {
         var files = e.DataTransfer.TryGetFiles()?.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
         if (files is { Count: > 0 }) _ = _vm?.AddFilesAsync(files);
+    }
+
+    /// <summary>
+    /// Ширина карточки — сохранённая (<see cref="ModsViewModel.CardWidth"/>), но не шире, чем оставляет окно: таблице
+    /// нужно <see cref="TableRoom"/>, иначе название мода сжимается в ноль. В узком окне карточка временно уже (до своего
+    /// минимума), расширили окно — вернулась к своей ширине. Сохранённую ширину меняет только разделитель.
+    /// </summary>
+    internal const double TableRoom = 520; // таблица с колонкой названия не уже её минимума
+
+    private void FitCard()
+    {
+        if (_vm is null) return;
+        var room = Split.Bounds.Width - TableRoom - Split.ColumnDefinitions[1].Width.Value;
+        var width = room > 0 ? Math.Min(_vm.CardWidth, room) : _vm.CardWidth;
+        width = Math.Max(width, CardColumn.MinWidth);
+        if (Math.Abs(CardColumn.Width.Value - width) > 0.5) CardColumn.Width = new GridLength(width);
     }
 
     private void Splitter_DragCompleted(object? sender, VectorEventArgs e)
