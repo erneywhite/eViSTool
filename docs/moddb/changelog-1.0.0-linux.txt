@@ -1,4 +1,6 @@
-eViSTool 1.0.0 for Linux: a new look for the window.
+eViSTool 1.0.0 for Linux: the first stable release, with a new look!
+
+Hooray, 1.0! Thank you to everyone who tried the early versions on Linux, reported bugs and suggested ideas.
 
 The window was redrawn: calmer colours, clearer cards, smooth transitions. Everything works as before. The agent on a server needs no changes, but update it anyway to keep the versions in step (the window offers "Update on the server").
 
@@ -20,7 +22,9 @@ Fixes
 
 ---
 
-eViSTool 1.0.0 для Linux: новый вид окна.
+eViSTool 1.0.0 для Linux: первая стабильная версия, и в новом виде!
+
+Ура, 1.0! Спасибо всем, кто пробовал ранние версии на Linux, писал об ошибках и предлагал идеи.
 
 Окно нарисовано заново: спокойнее цвета, понятнее карточки, плавные переходы. Всё работает как раньше. Агенту на сервере правки не нужны, но обнови и его, чтобы версии совпадали (окно предложит «Обновить на сервере»).
 

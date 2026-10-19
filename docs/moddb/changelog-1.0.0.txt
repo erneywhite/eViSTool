@@ -1,4 +1,6 @@
-eViSTool 1.0.0: a new look.
+eViSTool 1.0.0: the first stable release, with a new look!
+
+Hooray, 1.0! eViSTool has grown from a small mod updater into one window for your mods and your server, at home, on another computer or at a host. Thank you to everyone who tried the early versions, reported bugs and suggested ideas.
 
 The whole window was redrawn: calmer colours, clearer cards, smooth transitions. Everything works as before, it just looks and feels better. Two rounds of code review before the release fixed a few long-standing bugs as well.
 
@@ -24,7 +26,9 @@ Update from About.
 
 ---
 
-eViSTool 1.0.0: новый вид.
+eViSTool 1.0.0: первая стабильная версия, и в новом виде!
+
+Ура, 1.0! eViSTool вырос из маленькой программы для обновления модов в одно окно для модов и сервера: дома, на другом компьютере или у хостера. Спасибо всем, кто пробовал ранние версии, писал об ошибках и предлагал идеи.
 
 Окно нарисовано заново: спокойнее цвета, понятнее карточки, плавные переходы. Всё работает как раньше, просто смотрится и ощущается лучше. Перед выпуском было два круга проверки кода, заодно нашлись и исправлены давние ошибки.
 
