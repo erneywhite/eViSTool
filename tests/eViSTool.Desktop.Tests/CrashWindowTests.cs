@@ -65,6 +65,29 @@ public sealed class CrashWindowTests
         window.Close();
     }
 
+    /// <summary>
+    /// Все пять кнопок в строку не влезают: каждая строка прижата к правому краю, «Закрыть» — справа внизу, между строками
+    /// и кнопками зазор. Окно уже обычного — чтобы перенос был при любом шрифте.
+    /// </summary>
+    [AvaloniaFact]
+    public void Buttons_WrapToTheRight_WithGaps()
+    {
+        var window = Open(new CrashWindowViewModel(View(), () => Task.FromResult(new ModDisableResult("x", false)), () => { }, "Найти", new Host()));
+        window.Width = 420;
+        Dispatcher.UIThread.RunJobs();
+        var panel = (WrapPanel)Named(window, "CrashButtons");
+        var rows = panel.Children.Where(b => b.IsVisible).GroupBy(b => b.Bounds.Top).OrderBy(r => r.Key).Select(r => r.OrderBy(b => b.Bounds.Left).ToList()).ToList();
+        Assert.True(rows.Count > 1, "кнопки не перенеслись");
+        foreach (var row in rows)
+        {
+            Assert.Equal(panel.Bounds.Width, row[^1].Bounds.Right, 1);
+            for (var i = 1; i < row.Count; i++) Assert.Equal(8, row[i].Bounds.Left - row[i - 1].Bounds.Right, 1);
+        }
+        for (var i = 1; i < rows.Count; i++) Assert.True(rows[i][0].Bounds.Top - rows[i - 1].Max(b => b.Bounds.Bottom) >= 8 - 0.5, "строки слиплись");
+        Assert.Same(Named(window, "CrashClose"), rows[^1][^1]);
+        window.Close();
+    }
+
     // стек — в несколько строк: TextBox без AcceptsReturn сложил бы его в одну
     [AvaloniaFact]
     public void Details_KeepLines()

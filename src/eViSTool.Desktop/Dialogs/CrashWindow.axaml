@@ -64,14 +64,16 @@
         <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource Forest.Accent}" TextWrapping="Wrap" Margin="0,10,0,0"
                    AutomationProperties.AutomationId="CrashStatus" />
 
-        <WrapPanel HorizontalAlignment="Right" Margin="0,16,0,0">
+        <!-- все пять кнопок в ширину окна не влезают: перенос — тоже к правому краю («Закрыть» справа внизу), строки с зазором.
+             Панель во всю ширину: прижатая вправо, она была бы шириной в длинную строку, и короткая вставала бы у её левого края -->
+        <WrapPanel ItemsAlignment="End" ItemSpacing="8" LineSpacing="8" Margin="0,16,0,0" AutomationProperties.AutomationId="CrashButtons">
             <Button Classes="primary" Content="{local:Tr crash.disable}" Command="{Binding DisableCommand}" IsVisible="{Binding CanDisable}"
-                    Padding="14,8" Margin="0,0,8,0" AutomationProperties.AutomationId="CrashDisable" />
-            <Button Content="{Binding ShowLabel}" Command="{Binding ShowCommand}" Padding="14,8" Margin="0,0,8,0"
+                    Padding="14,8" AutomationProperties.AutomationId="CrashDisable" />
+            <Button Content="{Binding ShowLabel}" Command="{Binding ShowCommand}" Padding="14,8"
                     AutomationProperties.AutomationId="CrashShow" />
             <Button Content="{local:Tr crash.catalog}" Command="{Binding CatalogCommand}" IsVisible="{Binding HasCatalogLink}"
-                    Padding="14,8" Margin="0,0,8,0" AutomationProperties.AutomationId="CrashCatalog" />
-            <Button Content="{local:Tr crash.copy}" Command="{Binding CopyCommand}" Padding="14,8" Margin="0,0,8,0"
+                    Padding="14,8" AutomationProperties.AutomationId="CrashCatalog" />
+            <Button Content="{local:Tr crash.copy}" Command="{Binding CopyCommand}" Padding="14,8"
                     AutomationProperties.AutomationId="CrashCopy" />
             <Button Content="{local:Tr common.close}" Click="Close_Click" Padding="16,8" AutomationProperties.AutomationId="CrashClose" />
         </WrapPanel>
