@@ -17,7 +17,7 @@ using GlyphPath = Avalonia.Controls.Shapes.Path;
 namespace eViSTool.Desktop.Tests;
 
 /// <summary>
-/// «Горизонтали» заглушки под боковой панелью плывут (docs/design.md, раздел 5): по таймеру 30 раз в секунду, сдвиг по
+/// «Горизонтали» заглушки под боковой панелью плывут (docs/design.md, раздел 5): по таймеру 20 раз в секунду, сдвиг по
 /// часам и дробный — плавно, без шагов по целому пикселю; только пока окно на экране, в фокусе и не свёрнуто, линии
 /// видны и движение не выключено — иначе таймер стоит, а после остановки линии продолжают с того же места. Через период
 /// узора сдвиг возвращается к нулю, а узор при этом тот же: скачка нет. Сдвиг перерисовывает только боковую панель.
@@ -72,14 +72,14 @@ public sealed class ContourDriftTests
         var layouts = 0;
         window.LayoutUpdated += (_, _) => layouts++;
         var watch = Stopwatch.StartNew();
-        // кадры тикают чаще (~раз в 10 мс), а сдвиг меняется только по таймеру, не чаще 30 раз в секунду
+        // кадры тикают чаще (~раз в 10 мс), а сдвиг меняется только по таймеру, не чаще 20 раз в секунду
         await Wait.Frames(1100);
         var most = (int)(watch.ElapsedMilliseconds * ContourDrift.Rate / 1000.0) + 2;
 
         Assert.InRange(steps.Count, 5, most);
         var moves = steps.Zip(steps.Skip(1), (a, b) => a.Offset - b.Offset).ToList();
         Assert.All(moves, move => Assert.True(move > 0, $"шаг {move}: линии идут только влево"));
-        // плавно: обычный шаг — доля пикселя (5 px/с × 1/30 с ≈ 0,17 px), сдвиг не круглый
+        // плавно: обычный шаг — доля пикселя (5 px/с × 1/20 с = 0,25 px, на Windows около 0,3), сдвиг не круглый
         var median = moves.Order().ElementAt(moves.Count / 2);
         Assert.InRange(median, 0.01, 0.5);
         Assert.Contains(steps, s => s.Offset != Math.Round(s.Offset));
