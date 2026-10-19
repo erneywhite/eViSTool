@@ -296,10 +296,12 @@
         <DockPanel Grid.Column="1" Background="{DynamicResource Forest.Base}">
             <!-- полоса: активный профиль и «Играть» справа; название раздела не повторяем — оно крупно на самой странице. Полоса
                  же — шапка окна: тащится за пустое место и подписи, кнопки окна — справа (место под них — CaptionSpace); кнопки
-                 и список профилей помечены ролью User, чтобы нажимались. Растягивать нечего (LastChildFill="False"): всё справа -->
+                 и список профилей помечены ролью User, чтобы нажимались. Кнопки окна и «Играть» берут своё, последней — блоку
+                 профиля — достаётся остаток (LastChildFill): в узком окне список профилей ужимается и обрезает имя
+                 многоточием, а не наезжает на «Играть» -->
             <Border x:Name="TopBar" DockPanel.Dock="Top" Height="60" Background="Transparent" BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1"
                     AutomationProperties.AutomationId="TopBar">
-                <DockPanel Margin="24,0,20,0" LastChildFill="False">
+                <DockPanel Margin="24,0,20,0">
                     <Border x:Name="CaptionSpace" DockPanel.Dock="Right" Width="0" />
                     <!-- игра с активным клиентским профилем: его папка данных, его моды -->
                     <!-- «Играть ▾»: большая часть — с сервером по умолчанию (или без сервера), стрелка — меню серверов -->
@@ -353,27 +355,29 @@
                             </StackPanel>
                         </Border>
                     </Popup>
+                    <!-- диктору — то же, что видно на кнопке: «Играть · <сервер>», «Игра запущена» -->
                     <Button DockPanel.Dock="Right" Classes="primary splitMain" Command="{Binding PlayCommand}" WindowDecorationProperties.ElementRole="User"
                             VerticalAlignment="Center" Height="36" MinHeight="0" Padding="13,0" Margin="12,0,0,0" BorderThickness="1,1,0,1"
                             ToolTip.Tip="{Binding PlayTip}" ToolTip.ShowOnDisabled="True"
-                            IsVisible="{Binding CanPlay}" AutomationProperties.AutomationId="PlayButton">
+                            IsVisible="{Binding CanPlay}" AutomationProperties.AutomationId="PlayButton" AutomationProperties.Name="{Binding PlayText}">
                         <StackPanel Orientation="Horizontal">
                             <Path Classes="icon" Data="{StaticResource Icon.Play}" Width="13" Height="13" Margin="0,0,8,0" />
                             <TextBlock x:Name="PlayLabel" Text="{Binding PlayText}" MaxWidth="260" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                     </Button>
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- блок профиля — остаток полосы, прижат вправо: значок ошибок и подпись берут своё, список — что осталось -->
+                    <DockPanel HorizontalAlignment="Right" VerticalAlignment="Center">
                         <!-- моды профиля сыплют ошибками (игра работает, но лог пухнет и бывают фризы) — отчёт по кнопке -->
-                        <Button Command="{Binding ShowErrorsCommand}" ToolTip.Tip="{Binding ErrorBadgeTip}" Margin="0,0,10,0" Padding="10,4" MinHeight="0"
+                        <Button DockPanel.Dock="Left" Command="{Binding ShowErrorsCommand}" ToolTip.Tip="{Binding ErrorBadgeTip}" Margin="0,0,10,0" Padding="10,4" MinHeight="0"
                                 IsVisible="{Binding HasErrorBadge}" AutomationProperties.AutomationId="ErrorBadge" WindowDecorationProperties.ElementRole="User"
                                 Background="{DynamicResource Forest.Warn}" BorderBrush="{DynamicResource Forest.Warn}">
                             <TextBlock Text="!" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource Forest.Base}" />
                         </Button>
-                        <TextBlock x:Name="ActiveProfileLabel" Text="{local:Tr shell.activeProfile}" VerticalAlignment="Center" Margin="0,0,10,0"
+                        <TextBlock x:Name="ActiveProfileLabel" DockPanel.Dock="Left" Text="{local:Tr shell.activeProfile}" VerticalAlignment="Center" Margin="0,0,10,0"
                                    Foreground="{DynamicResource Forest.Muted}" FontSize="12" />
-                        <!-- ширина ограничена (длинное имя — многоточием), в узком окне её ещё ужимает код окна: полоса прижата
-                             вправо и не сжимается сама — иначе список наехал бы на «Играть» -->
-                        <ComboBox x:Name="ProfileCombo" ItemsSource="{Binding Profiles}" SelectedItem="{Binding ActiveProfile}" MinWidth="240" MaxWidth="340"
+                        <!-- ширина — по имени, до 340 (длинное — многоточием); места меньше — уже, до 160. В широком окне код
+                             окна держит список не уже 240 -->
+                        <ComboBox x:Name="ProfileCombo" ItemsSource="{Binding Profiles}" SelectedItem="{Binding ActiveProfile}" MinWidth="160" MaxWidth="340"
                                   AutomationProperties.AutomationId="ProfileCombo" WindowDecorationProperties.ElementRole="User">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ProfileViewModel">
@@ -388,7 +392,7 @@
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
-                    </StackPanel>
+                    </DockPanel>
                 </DockPanel>
             </Border>
 

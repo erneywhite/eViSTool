@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:local="using:eViSTool.Desktop"
                     xmlns:ctl="using:eViSTool.Desktop.Controls">
     <!--
         Своя шапка главного окна (ExtendClientAreaToDecorationsHint): шапкой служит верхняя полоса окна (раздел, профиль,
@@ -7,6 +8,8 @@
         Кнопки находятся по именам PART_* и ролям ElementRole (так их подключает WindowDrawnDecorations); фона у шапки нет,
         его даёт полоса окна. Основа — шаблон Fluent из Avalonia 12.1 (Controls/WindowDrawnDecorations.xaml).
         Windows — прямоугольные кнопки 46×32 у верхнего края, как у системных; Linux — круглые, в духе GNOME, по центру полосы.
+        Имена кнопок для экранного диктора и подсказки — на языке программы, у средней по состоянию окна: «Развернуть» или
+        «Восстановить» (свои английские имена Avalonia пишет кнопкам поверх стилей, их сбрасывает Controls/CaptionButtonName).
     -->
 
     <x:Double x:Key="Forest.TitleBarHeight">60</x:Double>
@@ -19,6 +22,7 @@
         <Setter Property="Width" Value="46" />
         <Setter Property="Height" Value="32" />
         <Setter Property="(WindowDecorationProperties.ElementRole)" Value="DecorationsElement" />
+        <Setter Property="(ctl:CaptionButtonName.FromTheme)" Value="True" />
         <Setter Property="Template">
             <ControlTemplate>
                 <ContentPresenter Name="PART_ContentPresenter" Background="{TemplateBinding Background}"
@@ -53,6 +57,7 @@
         <Setter Property="Width" Value="24" />
         <Setter Property="Height" Value="24" />
         <Setter Property="(WindowDecorationProperties.ElementRole)" Value="DecorationsElement" />
+        <Setter Property="(ctl:CaptionButtonName.FromTheme)" Value="True" />
         <Setter Property="Template">
             <ControlTemplate>
                 <ContentPresenter Name="PART_ContentPresenter" Background="{TemplateBinding Background}" CornerRadius="12"
@@ -121,6 +126,22 @@
         <Style Selector="^:maximized /template/ Path#MaximizePath">
             <Setter Property="Data" Value="{StaticResource Icon.WinRestore}" />
         </Style>
+        <!-- имена и подсказки (см. вверху). У «Развернуть» подсказки нет: при наведении на неё Windows 11 сама показывает
+             макеты прикрепления (Snap), подсказка легла бы поверх -->
+        <Style Selector="^ /template/ Button#PART_MinimizeButton">
+            <Setter Property="AutomationProperties.Name" Value="{local:Tr shell.minimize}" />
+            <Setter Property="ToolTip.Tip" Value="{local:Tr shell.minimize}" />
+        </Style>
+        <Style Selector="^ /template/ Button#PART_MaximizeButton">
+            <Setter Property="AutomationProperties.Name" Value="{local:Tr shell.maximize}" />
+        </Style>
+        <Style Selector="^:maximized /template/ Button#PART_MaximizeButton">
+            <Setter Property="AutomationProperties.Name" Value="{local:Tr shell.restore}" />
+        </Style>
+        <Style Selector="^ /template/ Button#PART_CloseButton">
+            <Setter Property="AutomationProperties.Name" Value="{local:Tr common.close}" />
+            <Setter Property="ToolTip.Tip" Value="{local:Tr common.close}" />
+        </Style>
         <Style Selector="^ /template/ Button:disabled">
             <Setter Property="Opacity" Value="0.3" />
         </Style>
@@ -182,6 +203,23 @@
         </Style>
         <Style Selector="^:maximized /template/ Path#MaximizePath">
             <Setter Property="Data" Value="{StaticResource Icon.WinRestore}" />
+        </Style>
+        <!-- имена и подсказки (см. вверху) -->
+        <Style Selector="^ /template/ Button#PART_MinimizeButton">
+            <Setter Property="AutomationProperties.Name" Value="{local:Tr shell.minimize}" />
+            <Setter Property="ToolTip.Tip" Value="{local:Tr shell.minimize}" />
+        </Style>
+        <Style Selector="^ /template/ Button#PART_MaximizeButton">
+            <Setter Property="AutomationProperties.Name" Value="{local:Tr shell.maximize}" />
+            <Setter Property="ToolTip.Tip" Value="{local:Tr shell.maximize}" />
+        </Style>
+        <Style Selector="^:maximized /template/ Button#PART_MaximizeButton">
+            <Setter Property="AutomationProperties.Name" Value="{local:Tr shell.restore}" />
+            <Setter Property="ToolTip.Tip" Value="{local:Tr shell.restore}" />
+        </Style>
+        <Style Selector="^ /template/ Button#PART_CloseButton">
+            <Setter Property="AutomationProperties.Name" Value="{local:Tr common.close}" />
+            <Setter Property="ToolTip.Tip" Value="{local:Tr common.close}" />
         </Style>
         <!-- тень: рамка и кнопки отступают внутрь на её толщину -->
         <Style Selector="^:has-shadow /template/ Panel#PART_UnderlayWrapper">
