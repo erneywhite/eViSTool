@@ -3,6 +3,7 @@
              xmlns:vm="using:eViSTool.Presentation.ViewModels"
              xmlns:local="using:eViSTool.Desktop"
              xmlns:ctl="using:eViSTool.Desktop.Controls"
+             xmlns:notify="using:eViSTool.Core.Notifications"
              x:Class="eViSTool.Desktop.Views.ServerNotifyTab"
              x:DataType="vm:ServerNotifyViewModel">
     <UserControl.Styles>
@@ -67,22 +68,25 @@
                         </DockPanel>
                     </Border>
 
-                    <!-- шапка: имена каналов над столбцами тумблеров -->
+                    <!-- шапка: логотипы и имена каналов над столбцами тумблеров -->
                     <DockPanel Margin="0,16,0,0" IsVisible="{Binding HasChannels}">
-                        <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding ChannelNames}" Focusable="False">
+                        <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding ChannelHeaders}" Focusable="False" VerticalAlignment="Bottom">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <StackPanel Orientation="Horizontal" />
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="x:String">
-                                    <TextBlock Text="{Binding .}" Width="120" TextAlignment="Center" FontSize="12" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource Forest.Text}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding .}" />
+                                <DataTemplate x:DataType="notify:NotifyChannel">
+                                    <StackPanel Width="120" ToolTip.Tip="{Binding Name}">
+                                        <ctl:ChannelLogo Kind="{Binding Kind}" Width="22" Height="22" HorizontalAlignment="Center" Margin="0,0,0,6" />
+                                        <TextBlock Text="{Binding Name}" TextAlignment="Center" FontSize="12" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource Forest.Text}" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <TextBlock Text="{local:Tr srvnotify.event}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" />
+                        <TextBlock Text="{local:Tr srvnotify.event}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" VerticalAlignment="Bottom" />
                     </DockPanel>
 
                     <ItemsControl ItemsSource="{Binding Rows}" Focusable="False" IsVisible="{Binding HasChannels}" IsEnabled="{Binding Loaded}">

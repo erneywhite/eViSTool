@@ -1,0 +1,6 @@
+[
+  { "Id": "snap-tg", "Name": "Telegram", "Kind": 0, "ChatTitle": "@stand_chat" },
+  { "Id": "snap-ds", "Name": "Discord сервера", "Kind": 1, "ChatTitle": "#анонсы" },
+  { "Id": "snap-nt", "Name": "ntfy", "Kind": 2 },
+  { "Id": "snap-wh", "Name": "Свой вебхук", "Kind": 3, "ChatTitle": "hooks.example.org" }
+]

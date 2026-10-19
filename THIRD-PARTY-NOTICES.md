@@ -65,6 +65,15 @@ SIL Open Font License 1.1; the full license text is next to each font in `Assets
 - **Noto Sans Symbols 2** (a subset with only the signs ⚠ ★ ⬇ ✔ ✖) — Copyright 2022 The Noto Project Authors,
   https://github.com/notofonts/symbols
 
+## Notification service logos
+
+The Telegram, Discord and ntfy logos next to notification channels are the services' own logos in their brand
+colours, taken as SVG paths from Simple Icons 13.21.0.
+
+- Source: https://simpleicons.org, https://github.com/simple-icons/simple-icons
+- License: CC0 1.0 (the SVG data). The logos themselves are trademarks of their owners (Telegram FZ-LLC,
+  Discord Inc., ntfy); they are shown only to say which service a channel sends to.
+
 ## Lucide icons
 
 The window icons (navigation, buttons, menus) are taken from Lucide.

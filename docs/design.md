@@ -34,6 +34,10 @@
 | Forest.NavHover | `#99283128` | `#22303D32` (вписан) | наведение на пункт меню |
 | Forest.Good | `#AFC798` | `#B0C898` | |
 | Forest.InstalledLine | `#73AFC798` | — (новый) | лёгкая обводка установленного мода в списке каталога (Good, 45 %) |
+| Forest.Brand.Telegram | `#26A5E4` | — (новый) | фирменный цвет Telegram — его логотип у канала оповещений |
+| Forest.Brand.Discord | `#5865F2` | — (новый) | фирменный цвет Discord — плашка логотипа |
+| Forest.Brand.Ntfy | `#317F6F` | — (новый) | фирменный цвет ntfy — плашка логотипа |
+| Forest.OnBrand | `#FFFFFF` | — (новый) | белый знак на фирменной плашке |
 | Forest.Warn | `#EDBD86` | `#EDBF82` | |
 | Forest.WarningBg | `#372F1F` | `#3A3425` | |
 | Forest.WarnLine | `#5A4A30` | `#5A4C33` (вписан) | рамка плашки-предупреждения |

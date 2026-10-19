@@ -87,6 +87,7 @@ function Reset-Fixture([string]$appDir) {
         $settings = $parsed | ConvertTo-Json -Depth 20
     }
     [IO.File]::WriteAllText((Join-Path $data 'settings.json'), $settings)
+    Copy-Item (Join-Path $fixture 'notify-channels.json') $data # каналы оповещений: логотипы в «Настройках» и у сервера
 
     # файлы агента профиля (журнал действий): время в шаблоне — «{{AGO:минуты}}» назад от сейчас, чтобы записи не устаревали
     $agents = Join-Path $data 'agents'

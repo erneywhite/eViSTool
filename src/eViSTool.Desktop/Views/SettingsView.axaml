@@ -176,6 +176,7 @@
                                                                     Command="{Binding $parent[ItemsControl].((vm:NotifyChannelsViewModel)DataContext).DeleteChannelCommand}"
                                                                     CommandParameter="{Binding}" />
                                                         </StackPanel>
+                                                        <ctl:ChannelLogo DockPanel.Dock="Left" Kind="{Binding Kind}" VerticalAlignment="Center" Margin="0,0,12,0" />
                                                         <StackPanel>
                                                             <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}"
                                                                        TextTrimming="CharacterEllipsis" />

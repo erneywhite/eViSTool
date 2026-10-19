@@ -15,6 +15,7 @@ public sealed class NotifyChannelRowViewModel(NotifyChannel channel)
 {
     public NotifyChannel Channel { get; } = channel;
     public string Name => Channel.Name;
+    public NotifyKind Kind => Channel.Kind;
 
     /// <summary>«Telegram · @erney», «ntfy · evistool-…», «Вебхук · hooks.example.org» — без секретов.</summary>
     public string Details => (Channel.Kind switch

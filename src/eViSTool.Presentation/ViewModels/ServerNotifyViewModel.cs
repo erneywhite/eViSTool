@@ -98,8 +98,9 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
     }
 
     public ObservableCollection<NotifyEventRowViewModel> Rows { get; } = [];
-    public ObservableCollection<string> ChannelNames { get; } = [];
-    public bool HasChannels => ChannelNames.Count > 0;
+    /// <summary>Шапка столбцов тумблеров: каналы по порядку — имя и логотип.</summary>
+    public ObservableCollection<NotifyChannel> ChannelHeaders { get; } = [];
+    public bool HasChannels => ChannelHeaders.Count > 0;
 
     [ObservableProperty] private bool _loaded;
 
@@ -249,8 +250,8 @@ public sealed partial class ServerNotifyViewModel : ObservableObject
         _loading = true;
         try
         {
-            ChannelNames.Clear();
-            foreach (var c in _channels) ChannelNames.Add(c.Name);
+            ChannelHeaders.Clear();
+            foreach (var c in _channels) ChannelHeaders.Add(c);
             ChatChannels.Clear();
             ChatChannels.Add(new ChatChannelOption("", Loc.T("chat.off")));
             foreach (var c in _channels.Where(c => c.Kind == NotifyKind.Discord)) ChatChannels.Add(new ChatChannelOption(c.Id, c.Name));
