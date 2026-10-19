@@ -13,7 +13,7 @@ public sealed record SnapshotRequest(string Screen, string OutPath, int Width, i
 /// EVISTOOL_SNAPSHOT, переходит на нужный экран, ждёт, сохраняет себя в PNG и закрывается. Данные и навигацию окно берёт отсюда — снимки воспроизводимы.
 /// Формат: <c>screen=server.config.world;out=C:\snap\a.png;size=1400x860;wait=5;profile=Сервер</c> (size, wait, profile —
 /// необязательно).
-/// Экраны: mods, mods.history, mods.card, catalog, catalog.card, modconfig[.&lt;modid&gt;], profiles, settings, about[.update], server[.console|players|stats|announcements|
+/// Экраны: mods, mods.history, mods.card[.&lt;modid&gt;], catalog, catalog.card, modconfig[.&lt;modid&gt;], profiles, settings, about[.update], server[.console|players|stats|announcements|
 /// config[.general|world|roles|advanced]|schedule|remote|notify|backups] (backups — у профиля у хостера).
 /// Окна: dialog.&lt;имя&gt; — окно открывает метод с атрибутом <see cref="SnapshotDialogAttribute"/> (по файлу на окно в папке
 /// SnapshotDialogs); снимается верхнее окно, а не главное.
@@ -68,7 +68,7 @@ public static class Snapshots
             _ => throw new ArgumentException($"Неизвестный экран для снимка: {screen}"),
         };
         if (path[0] == "mods" && path.Length > 1 && path[1] == "history") main.Mods.Filter = ModFilter.History;
-        if (path[0] == "mods" && path.Length > 1 && path[1] == "card") main.Mods.Selected = main.Mods.View.Items.FirstOrDefault(); // карточка первого мода
+        if (path[0] == "mods" && path.Length > 1 && path[1] == "card") main.Mods.Selected = path.Length > 2 ? main.Mods.View.Items.FirstOrDefault(r => r.ModId == path[2]) : main.Mods.View.Items.FirstOrDefault(); // карточка мода с modid path[2] или первого
         if (path[0] == "catalog" && path.Length > 1 && path[1] == "card") main.Catalog.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(CatalogViewModel.Results) && main.Catalog.Selected is null) main.Catalog.Selected = main.Catalog.Results.FirstOrDefault(); }; // карточка первого найденного: список придёт из сети позже
         if (path[0] == "modconfig" && path.Length > 1) main.ModConfig.Focus(path[1], ""); // открыт первый файл мода с modid path[1], список — весь
         if (path[0] == "about" && path.Length > 1 && path[1] == "update") _ = Task.Delay(request.Wait / 2).ContinueWith(_ => Ui.Post(() => main.About.AvailableUpdate = new Core.AppUpdate.AppRelease { Version = Core.Versioning.ModVersion.ParseOrNull("9.9.9")!, Tag = "v9.9.9", AssetName = "eViSTool-9.9.9-win-x64.zip", AssetUrl = "https://example.invalid/x.zip" })); // найдено обновление: после фоновой проверки при запуске, иначе она его сбросит

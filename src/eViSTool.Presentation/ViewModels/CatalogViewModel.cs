@@ -405,7 +405,7 @@ public sealed class CatalogItemViewModel(ModDbListItem item, IReadOnlyDictionary
     public string Name { get; } = item.Name ?? item.PrimaryModId ?? "?";
     public string Author { get; } = item.Author ?? "";
     public string Summary { get; } = item.Summary ?? "";
-    public string? Logo { get; } = string.IsNullOrWhiteSpace(item.Logo) ? null : item.Logo;
+    public string? Logo { get; } = ModDbLogo.Usable(item.Logo); // стандартная картинка модбазы — не логотип: вместо неё буквы
     public string Stats { get; } = $"⬇ {item.Downloads:N0}   ♥ {item.Follows:N0}";
     public string Initials { get; } = ModRowViewModel.MakeInitials(item.Name ?? item.PrimaryModId ?? "?");
 
@@ -463,7 +463,7 @@ public sealed partial class ModDetailsViewModel : ObservableObject
         Name = item.Name ?? item.PrimaryModId ?? "?";
         ModId = item.PrimaryModId;
         Author = item.Author is { Length: > 0 } a ? Loc.T("card.author", a) : "";
-        Logo = string.IsNullOrWhiteSpace(item.Logo) ? null : item.Logo;
+        Logo = ModDbLogo.Usable(item.Logo);
         Stats = Loc.T("card.stats", item.Downloads.ToString("N0"), item.Follows.ToString("N0"), item.LastReleased?[..10]);
         Side = item.Side switch
         {

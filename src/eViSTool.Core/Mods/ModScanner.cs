@@ -21,7 +21,19 @@ public sealed record LocalMod(string Path, ModInfo? Info, string? Error)
     /// обновлений сравнивает такой мод по версии релиза. null — отметки нет, сравнение по modinfo.
     /// </summary>
     public ReleaseMark? Release { get; init; }
+
+    /// <summary>
+    /// Отметка файла мода на диске этой машины — по ней окно узнаёт, что иконку (<see cref="ModIcon"/>) пора прочитать
+    /// заново. Ставит сканер папки; у модов удалённого сервера и сервера у хостера её нет: их файлов здесь нет.
+    /// </summary>
+    public ModFileStamp? Stamp { get; init; }
 }
+
+/// <summary>
+/// Файл мода на диске этой машины: путь, время изменения и размер. Другая отметка у того же пути — другой файл (мод
+/// обновили на месте).
+/// </summary>
+public sealed record ModFileStamp(string Path, DateTime WriteTimeUtc, long Length);
 
 /// <summary>Сканирует папку модов: zip-архивы и распакованные папки с modinfo.json.</summary>
 public static class ModScanner
@@ -41,22 +53,30 @@ public static class ModScanner
             throw new DirectoryNotFoundException(Loc.T("err.modsDirNotFound", modsDir));
 
         var result = new List<LocalMod>();
+        // время и размер приходят вместе с перечнем папки, отдельно файлы не опрашиваем. Путь — как у
+        // Directory.EnumerateFiles (папка, как её дали, плюс имя): по нему мод узнают история и отметки релизов
+        var folder = new DirectoryInfo(modsDir);
 
-        foreach (var file in System.IO.Directory.EnumerateFiles(modsDir))
+        foreach (var info in folder.EnumerateFiles())
         {
-            var ext = System.IO.Path.GetExtension(file);
+            var file = System.IO.Path.Combine(modsDir, info.Name);
+            var stamp = new ModFileStamp(file, info.LastWriteTimeUtc, info.Length);
+            var ext = info.Extension;
             if (ext.Equals(".zip", StringComparison.OrdinalIgnoreCase))
-                result.Add(ReadZip(file));
+                result.Add(ReadZip(file) with { Stamp = stamp });
             else if (ext.Equals(".dll", StringComparison.OrdinalIgnoreCase) || ext.Equals(".cs", StringComparison.OrdinalIgnoreCase))
-                result.Add(new LocalMod(file, null, Loc.T("scan.codeModUnsupported")));
+                result.Add(new LocalMod(file, null, Loc.T("scan.codeModUnsupported")) { Stamp = stamp });
             // остальное (json-файлы менеджеров, архивы .rar и т. п.) игра не грузит — пропускаем
         }
 
-        foreach (var dir in System.IO.Directory.EnumerateDirectories(modsDir))
+        foreach (var info in folder.EnumerateDirectories())
         {
+            var dir = System.IO.Path.Combine(modsDir, info.Name);
             var infoPath = System.IO.Path.Combine(dir, ModInfoFile);
             if (!File.Exists(infoPath)) continue;
-            result.Add(Read(dir, () => File.ReadAllText(infoPath)));
+            // shortcut: у папки — её собственное время, а правка modicon.png внутри его не меняет; новая иконка такого мода
+            // видна со следующего запуска. Папками ставят моды их авторы при разработке — переделать, если начнут жаловаться
+            result.Add(Read(dir, () => File.ReadAllText(infoPath)) with { Stamp = new ModFileStamp(dir, info.LastWriteTimeUtc, 0) });
         }
 
         return result.OrderBy(m => m.Info?.Name ?? m.FileName, StringComparer.OrdinalIgnoreCase).ToList();

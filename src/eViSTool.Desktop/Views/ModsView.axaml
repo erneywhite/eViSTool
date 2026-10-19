@@ -410,12 +410,20 @@
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate x:DataType="vm:ModRowViewModel">
                                             <DockPanel VerticalAlignment="Center" Classes.faded="{Binding !IsEnabled}">
-                                                <!-- значок с буквами: оттенок по modid (ModTint), у каждого мода свой -->
-                                                <Border DockPanel.Dock="Left" Width="30" Height="30" CornerRadius="6" Margin="0,0,12,0"
-                                                        Background="{Binding Hue, Converter={x:Static conv:ModTintBrushes.Background}}">
-                                                    <TextBlock Text="{Binding Initials}" FontSize="10" FontWeight="Bold"
-                                                               Foreground="{Binding Hue, Converter={x:Static conv:ModTintBrushes.Foreground}}"
-                                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <!-- значок мода: иконка из его файла, логотип с модбазы (ModIconImage) или буквы на
+                                                     оттенке по modid (ModTint). Картинка — по центру, лишнее обрезается, углы как у плитки -->
+                                                <Border DockPanel.Dock="Left" Width="30" Height="30" CornerRadius="6" Margin="0,0,12,0" ClipToBounds="True"
+                                                        Background="{DynamicResource Forest.Raised}">
+                                                    <Panel>
+                                                        <Border IsVisible="{Binding #Icon.Source, Converter={x:Static ObjectConverters.IsNull}}"
+                                                                Background="{Binding Hue, Converter={x:Static conv:ModTintBrushes.Background}}">
+                                                            <TextBlock Text="{Binding Initials}" FontSize="10" FontWeight="Bold"
+                                                                       Foreground="{Binding Hue, Converter={x:Static conv:ModTintBrushes.Foreground}}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                        <Image x:Name="Icon" ctl:ModIconImage.Source="{Binding Icon}" Stretch="UniformToFill"
+                                                               RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                                    </Panel>
                                                 </Border>
                                                 <StackPanel VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"
@@ -581,17 +589,51 @@
                             <ContentControl.ContentTemplate>
                                 <DataTemplate x:DataType="vm:ModCardViewModel">
                                     <StackPanel>
-                                        <!-- шапка: логотип с модбазы или буквы -->
+                                        <!-- шапка: логотип с модбазы, иконка из файла мода или буквы -->
                                         <Border Background="{DynamicResource Forest.Raised}" CornerRadius="9,9,0,0" Height="150" ClipToBounds="True">
                                             <Panel>
-                                                <!-- буквы под картинкой: логотипа нет, он грузится или не загрузился — видно их цветом мода,
-                                                     как его значок в таблице. Фон шапки — тот же цвет вполсилы, как размытый логотип у мода с ним:
-                                                     во всю ширину карточки полный цвет кричал бы -->
-                                                <Panel IsVisible="{Binding #Logo1.Source, Converter={x:Static ObjectConverters.IsNull}}">
+                                                <!-- буквы под картинкой: ни логотипа, ни иконки в файле (или логотип ещё грузится) — видно их
+                                                     цветом мода, как его значок в таблице. Фон шапки — тот же цвет вполсилы, как размытый логотип у
+                                                     мода с ним: во всю ширину карточки полный цвет кричал бы -->
+                                                <Panel>
+                                                    <Panel.IsVisible>
+                                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                            <Binding ElementName="Logo1" Path="Source" Converter="{x:Static ObjectConverters.IsNull}" />
+                                                            <Binding ElementName="FileIcon1" Path="Source" Converter="{x:Static ObjectConverters.IsNull}" />
+                                                        </MultiBinding>
+                                                    </Panel.IsVisible>
                                                     <Border Background="{Binding Row.Hue, Converter={x:Static conv:ModTintBrushes.Background}}" Opacity="0.5" />
                                                     <TextBlock Text="{Binding Row.Initials}" FontSize="40" FontWeight="Bold"
                                                                Foreground="{Binding Row.Hue, Converter={x:Static conv:ModTintBrushes.Foreground}}"
                                                                Margin="20,0,0,0" VerticalAlignment="Center" />
+                                                </Panel>
+                                                <!-- логотипа нет — на его месте иконка из файла мода: плитка 120 px по центру, под ней она же,
+                                                     размытая во всю ширину и прижатая к верху, как у логотипа ниже. Размытая — та же маленькая
+                                                     иконка, что в строке таблицы: файл второй раз не читается, а растянутая мелкая и так мягкая.
+                                                     Логотип известен с открытия карточки — иконку не просим вовсе (CardHeaderIcon): спрятанная
+                                                     картинка всё равно читала бы архив. Не загрузился логотип — встаёт иконка -->
+                                                <Panel IsVisible="{Binding #Logo1.Source, Converter={x:Static ObjectConverters.IsNull}}">
+                                                    <StackPanel>
+                                                        <Image ctl:ModIconImage.Source="{Binding #FileIcon1.(ctl:ModIconImage.Source)}" Stretch="UniformToFill"
+                                                               Opacity="0.35" RenderOptions.BitmapInterpolationMode="HighQuality">
+                                                            <Image.Effect>
+                                                                <BlurEffect Radius="24" />
+                                                            </Image.Effect>
+                                                        </Image>
+                                                    </StackPanel>
+                                                    <Border Width="120" Height="120" CornerRadius="12" ClipToBounds="True"
+                                                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <Image x:Name="FileIcon1" ctl:ModIconImage.DecodeWidth="256"
+                                                               Stretch="UniformToFill" RenderOptions.BitmapInterpolationMode="HighQuality">
+                                                            <ctl:ModIconImage.Source>
+                                                                <MultiBinding Converter="{x:Static conv:CardHeaderIcon.FileUnlessLogo}">
+                                                                    <Binding Path="FileIcon" />
+                                                                    <Binding Path="IconWaitsForLogo" />
+                                                                    <Binding ElementName="Logo1" Path="(ctl:RemoteImage.Failed)" />
+                                                                </MultiBinding>
+                                                            </ctl:ModIconImage.Source>
+                                                        </Image>
+                                                    </Border>
                                                 </Panel>
                                                 <!-- логотип целиком, по краям — он же, размытый. Размытый — во всю ширину и прижат к верху,
                                                      низ обрезает шапка: Image у Avalonia обрезает UniformToFill по центру
@@ -625,172 +667,175 @@
                                                 </StackPanel>
                                             </Border>
 
-                                            <!-- ===== вкладка «Обзор» ===== -->
-                                            <StackPanel IsVisible="{Binding !IsVersionsTab}">
-                                                <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Foreground="{DynamicResource Forest.Text}" FontSize="13" Margin="0,14,0,0"
-                                                           IsVisible="{Binding Summary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                            <!-- вкладки: видна одна, показанная проявляется (как в каталоге) -->
+                                            <Panel ctl:Motion.RevealChildren="True">
+                                                <!-- ===== вкладка «Обзор» ===== -->
+                                                <StackPanel IsVisible="{Binding !IsVersionsTab}">
+                                                    <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Foreground="{DynamicResource Forest.Text}" FontSize="13" Margin="0,14,0,0"
+                                                               IsVisible="{Binding Summary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
-                                                <!-- ключевые сведения -->
-                                                <Grid Margin="0,12,0,0" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
-                                                    <TextBlock Grid.Row="0" Classes="cardKey" Text="{local:Tr mcard.compat}" />
-                                                    <TextBlock Grid.Row="0" Grid.Column="1" Classes="cardValue" Text="{Binding Compatibility}" />
-                                                    <TextBlock Grid.Row="1" Classes="cardKey" Text="{local:Tr mcard.installed}" />
-                                                    <TextBlock Grid.Row="1" Grid.Column="1" Classes="cardValue mono" Text="{Binding Row.Installed}" />
-                                                    <TextBlock Grid.Row="2" Classes="cardKey" Text="{local:Tr mcard.available}" IsVisible="{Binding Row.CanSkip}" />
-                                                    <TextBlock Grid.Row="2" Grid.Column="1" Classes="cardValue mono" Text="{Binding Row.Latest}"
-                                                               Foreground="{DynamicResource Forest.Accent}" IsVisible="{Binding Row.CanSkip}" />
-                                                    <TextBlock Grid.Row="3" Classes="cardKey" Text="{local:Tr mcard.state}" />
-                                                    <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4"
-                                                                Background="Transparent" ToolTip.Tip="{Binding Row.Note}">
-                                                        <Ellipse Classes="tone" ctl:EnumClass.Value="{Binding Row.Tone}" />
-                                                        <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding Row.Tone}" Text="{Binding Row.StatusText}" />
-                                                    </StackPanel>
-                                                    <TextBlock Grid.Row="4" Classes="cardKey" Text="{local:Tr mcard.side}" />
-                                                    <TextBlock Grid.Row="4" Grid.Column="1" Classes="cardValue" Text="{Binding Side}" />
-                                                    <TextBlock Grid.Row="5" Classes="cardKey" Text="{local:Tr mcard.file}" />
-                                                    <TextBlock Grid.Row="5" Grid.Column="1" Classes="cardValue" Text="{Binding Row.FileName}" ToolTip.Tip="{Binding Row.FilePath}"
-                                                               TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
-                                                </Grid>
-
-                                                <!-- проблема с зависимостями — текстом -->
-                                                <TextBlock Text="{Binding Row.Note}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Forest.Warn}" Margin="0,8,0,0"
-                                                           IsVisible="{Binding Row.IsProblem}" />
-                                                <!-- мод хостера: почему его нельзя менять — спокойным цветом, это не проблема -->
-                                                <TextBlock Text="{Binding Row.Note}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Forest.Muted}" Margin="0,8,0,0"
-                                                           IsVisible="{Binding Row.IsHosterMod}" />
-
-                                                <!-- включён ли мод в этом профиле -->
-                                                <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,1" Padding="0,12" Margin="0,14,0,0"
-                                                        IsVisible="{Binding Row.CanChange}">
-                                                    <DockPanel>
-                                                        <CheckBox DockPanel.Dock="Right" Theme="{StaticResource Forest.Switch}" VerticalAlignment="Center"
-                                                                  IsChecked="{Binding Row.IsEnabled, Mode=OneWay}"
-                                                                  Command="{Binding Owner.ToggleEnabledCommand}" CommandParameter="{Binding Row}" />
-                                                        <StackPanel>
-                                                            <TextBlock Text="{local:Tr mcard.enabledIn}" Foreground="{DynamicResource Forest.Text}" FontSize="13" />
-                                                            <TextBlock Text="{Binding ProfileName}" Foreground="{DynamicResource Forest.Muted}" FontSize="11" />
+                                                    <!-- ключевые сведения -->
+                                                    <Grid Margin="0,12,0,0" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+                                                        <TextBlock Grid.Row="0" Classes="cardKey" Text="{local:Tr mcard.compat}" />
+                                                        <TextBlock Grid.Row="0" Grid.Column="1" Classes="cardValue" Text="{Binding Compatibility}" />
+                                                        <TextBlock Grid.Row="1" Classes="cardKey" Text="{local:Tr mcard.installed}" />
+                                                        <TextBlock Grid.Row="1" Grid.Column="1" Classes="cardValue mono" Text="{Binding Row.Installed}" />
+                                                        <TextBlock Grid.Row="2" Classes="cardKey" Text="{local:Tr mcard.available}" IsVisible="{Binding Row.CanSkip}" />
+                                                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="cardValue mono" Text="{Binding Row.Latest}"
+                                                                   Foreground="{DynamicResource Forest.Accent}" IsVisible="{Binding Row.CanSkip}" />
+                                                        <TextBlock Grid.Row="3" Classes="cardKey" Text="{local:Tr mcard.state}" />
+                                                        <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4"
+                                                                    Background="Transparent" ToolTip.Tip="{Binding Row.Note}">
+                                                            <Ellipse Classes="tone" ctl:EnumClass.Value="{Binding Row.Tone}" />
+                                                            <TextBlock Classes="tone" ctl:EnumClass.Value="{Binding Row.Tone}" Text="{Binding Row.StatusText}" />
                                                         </StackPanel>
-                                                    </DockPanel>
-                                                </Border>
+                                                        <TextBlock Grid.Row="4" Classes="cardKey" Text="{local:Tr mcard.side}" />
+                                                        <TextBlock Grid.Row="4" Grid.Column="1" Classes="cardValue" Text="{Binding Side}" />
+                                                        <TextBlock Grid.Row="5" Classes="cardKey" Text="{local:Tr mcard.file}" />
+                                                        <TextBlock Grid.Row="5" Grid.Column="1" Classes="cardValue" Text="{Binding Row.FileName}" ToolTip.Tip="{Binding Row.FilePath}"
+                                                                   TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                                                    </Grid>
 
-                                                <!-- действия -->
-                                                <Button Classes="primary" Margin="0,14,0,0" HorizontalAlignment="Stretch"
-                                                        Command="{Binding Owner.UpdateOneCommand}" CommandParameter="{Binding Row}"
-                                                        IsEnabled="{Binding Owner.CanQueue}" IsVisible="{Binding Row.CanUpdate}">
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <Path Classes="icon" Data="{StaticResource Icon.Download}" Width="14" Height="14" Margin="0,0,8,0" />
-                                                        <TextBlock Text="{Binding UpdateText}" />
+                                                    <!-- проблема с зависимостями — текстом -->
+                                                    <TextBlock Text="{Binding Row.Note}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Forest.Warn}" Margin="0,8,0,0"
+                                                               IsVisible="{Binding Row.IsProblem}" />
+                                                    <!-- мод хостера: почему его нельзя менять — спокойным цветом, это не проблема -->
+                                                    <TextBlock Text="{Binding Row.Note}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Forest.Muted}" Margin="0,8,0,0"
+                                                               IsVisible="{Binding Row.IsHosterMod}" />
+
+                                                    <!-- включён ли мод в этом профиле -->
+                                                    <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,1,0,1" Padding="0,12" Margin="0,14,0,0"
+                                                            IsVisible="{Binding Row.CanChange}">
+                                                        <DockPanel>
+                                                            <CheckBox DockPanel.Dock="Right" Theme="{StaticResource Forest.Switch}" VerticalAlignment="Center"
+                                                                      IsChecked="{Binding Row.IsEnabled, Mode=OneWay}"
+                                                                      Command="{Binding Owner.ToggleEnabledCommand}" CommandParameter="{Binding Row}" />
+                                                            <StackPanel>
+                                                                <TextBlock Text="{local:Tr mcard.enabledIn}" Foreground="{DynamicResource Forest.Text}" FontSize="13" />
+                                                                <TextBlock Text="{Binding ProfileName}" Foreground="{DynamicResource Forest.Muted}" FontSize="11" />
+                                                            </StackPanel>
+                                                        </DockPanel>
+                                                    </Border>
+
+                                                    <!-- действия -->
+                                                    <Button Classes="primary" Margin="0,14,0,0" HorizontalAlignment="Stretch"
+                                                            Command="{Binding Owner.UpdateOneCommand}" CommandParameter="{Binding Row}"
+                                                            IsEnabled="{Binding Owner.CanQueue}" IsVisible="{Binding Row.CanUpdate}">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Path Classes="icon" Data="{StaticResource Icon.Download}" Width="14" Height="14" Margin="0,0,8,0" />
+                                                            <TextBlock Text="{Binding UpdateText}" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <Grid Margin="0,8,0,0" ColumnDefinitions="*,8,*" IsVisible="{Binding Row.CanChange}">
+                                                        <Button Content="{Binding PinText}" Command="{Binding Owner.TogglePinCommand}" CommandParameter="{Binding Row}"
+                                                                HorizontalAlignment="Stretch" ToolTip.Tip="{local:Tr mcard.pinTip}" />
+                                                        <Button Grid.Column="2" Content="{local:Tr mcard.skip}" Command="{Binding Owner.SkipVersionCommand}" CommandParameter="{Binding Row}"
+                                                                HorizontalAlignment="Stretch" IsEnabled="{Binding Row.CanSkip}" ToolTip.Tip="{local:Tr mcard.skipTip}" />
+                                                    </Grid>
+                                                    <Button Content="{local:Tr mcard.chooseVersion}" Margin="0,8,0,0" HorizontalAlignment="Stretch"
+                                                            Command="{Binding Owner.RollbackCommand}" CommandParameter="{Binding Row}"
+                                                            IsEnabled="{Binding Owner.CanQueue}" IsVisible="{Binding Row.CanChange}" />
+
+                                                    <WrapPanel Margin="0,14,0,0">
+                                                        <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr mcard.modDb}" Margin="0,0,14,4"
+                                                                Command="{Binding Owner.OpenPageCommand}" CommandParameter="{Binding Row}"
+                                                                IsVisible="{Binding Row.PageUrl, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                                        <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr mcard.inCatalog}" Margin="0,0,14,4"
+                                                                IsVisible="{Binding Row.CanFindInCatalog}"
+                                                                Command="{Binding Owner.ShowInCatalogCommand}" CommandParameter="{Binding Row}" />
+                                                        <Button Theme="{StaticResource Forest.LinkButton}" Content="{Binding ConfigText}" Margin="0,0,14,4"
+                                                                IsVisible="{Binding HasConfigs}"
+                                                                Command="{Binding Owner.OpenModConfigCommand}" CommandParameter="{Binding Row}"
+                                                                AutomationProperties.AutomationId="CardModConfig" />
+                                                        <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr mcard.showFile}" Margin="0,0,14,4"
+                                                                IsVisible="{Binding Owner.IsLocalProfile}"
+                                                                Command="{Binding Owner.ShowFileCommand}" CommandParameter="{Binding Row}" />
+                                                        <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr menu.delete}" Margin="0,0,14,4"
+                                                                Foreground="{DynamicResource Forest.Danger}" IsVisible="{Binding Row.CanChange}"
+                                                                Command="{Binding Owner.DeleteCommand}" CommandParameter="{Binding Row}" />
+                                                    </WrapPanel>
+
+                                                    <!-- что нового в предлагаемой версии -->
+                                                    <StackPanel Margin="0,16,0,0" IsVisible="{Binding HasChangelog}">
+                                                        <TextBlock Text="{Binding ChangelogTitle}" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" FontSize="13" />
+                                                        <Border Background="{DynamicResource Forest.Base}" CornerRadius="6" Padding="10,8" Margin="0,6,0,0">
+                                                            <TextBlock Text="{Binding Row.Changelog}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Forest.Muted}" />
+                                                        </Border>
                                                     </StackPanel>
-                                                </Button>
-                                                <Grid Margin="0,8,0,0" ColumnDefinitions="*,8,*" IsVisible="{Binding Row.CanChange}">
-                                                    <Button Content="{Binding PinText}" Command="{Binding Owner.TogglePinCommand}" CommandParameter="{Binding Row}"
-                                                            HorizontalAlignment="Stretch" ToolTip.Tip="{local:Tr mcard.pinTip}" />
-                                                    <Button Grid.Column="2" Content="{local:Tr mcard.skip}" Command="{Binding Owner.SkipVersionCommand}" CommandParameter="{Binding Row}"
-                                                            HorizontalAlignment="Stretch" IsEnabled="{Binding Row.CanSkip}" ToolTip.Tip="{local:Tr mcard.skipTip}" />
-                                                </Grid>
-                                                <Button Content="{local:Tr mcard.chooseVersion}" Margin="0,8,0,0" HorizontalAlignment="Stretch"
-                                                        Command="{Binding Owner.RollbackCommand}" CommandParameter="{Binding Row}"
-                                                        IsEnabled="{Binding Owner.CanQueue}" IsVisible="{Binding Row.CanChange}" />
 
-                                                <WrapPanel Margin="0,14,0,0">
-                                                    <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr mcard.modDb}" Margin="0,0,14,4"
-                                                            Command="{Binding Owner.OpenPageCommand}" CommandParameter="{Binding Row}"
-                                                            IsVisible="{Binding Row.PageUrl, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                                                    <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr mcard.inCatalog}" Margin="0,0,14,4"
-                                                            IsVisible="{Binding Row.CanFindInCatalog}"
-                                                            Command="{Binding Owner.ShowInCatalogCommand}" CommandParameter="{Binding Row}" />
-                                                    <Button Theme="{StaticResource Forest.LinkButton}" Content="{Binding ConfigText}" Margin="0,0,14,4"
-                                                            IsVisible="{Binding HasConfigs}"
-                                                            Command="{Binding Owner.OpenModConfigCommand}" CommandParameter="{Binding Row}"
-                                                            AutomationProperties.AutomationId="CardModConfig" />
-                                                    <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr mcard.showFile}" Margin="0,0,14,4"
-                                                            IsVisible="{Binding Owner.IsLocalProfile}"
-                                                            Command="{Binding Owner.ShowFileCommand}" CommandParameter="{Binding Row}" />
-                                                    <Button Theme="{StaticResource Forest.LinkButton}" Content="{local:Tr menu.delete}" Margin="0,0,14,4"
-                                                            Foreground="{DynamicResource Forest.Danger}" IsVisible="{Binding Row.CanChange}"
-                                                            Command="{Binding Owner.DeleteCommand}" CommandParameter="{Binding Row}" />
-                                                </WrapPanel>
-
-                                                <!-- что нового в предлагаемой версии -->
-                                                <StackPanel Margin="0,16,0,0" IsVisible="{Binding HasChangelog}">
-                                                    <TextBlock Text="{Binding ChangelogTitle}" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" FontSize="13" />
-                                                    <Border Background="{DynamicResource Forest.Base}" CornerRadius="6" Padding="10,8" Margin="0,6,0,0">
-                                                        <TextBlock Text="{Binding Row.Changelog}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Forest.Muted}" />
-                                                    </Border>
+                                                    <!-- скриншоты и полное описание с модбазы -->
+                                                    <ItemsControl x:Name="Shots" ItemsSource="{Binding Screenshots}" Margin="0,16,0,0">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="x:String">
+                                                                <Button Padding="0" Margin="0,0,6,6" MinHeight="0" ToolTip.Tip="{local:Tr card.screenshotTip}"
+                                                                        Command="{Binding $parent[ItemsControl].((vm:ModCardViewModel)DataContext).OpenScreenshotCommand}"
+                                                                        CommandParameter="{Binding}">
+                                                                    <Image ctl:RemoteImage.Source="{Binding}" ctl:RemoteImage.DecodeWidth="400" Stretch="UniformToFill"
+                                                                           RenderOptions.BitmapInterpolationMode="HighQuality"
+                                                                           Width="{Binding $parent[ItemsControl].Bounds.Width, Converter={x:Static conv:ScreenshotThumbConverter.Instance}, ConverterParameter=w}"
+                                                                           Height="{Binding $parent[ItemsControl].Bounds.Width, Converter={x:Static conv:ScreenshotThumbConverter.Instance}, ConverterParameter=h}" />
+                                                                </Button>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                    <StackPanel IsVisible="{Binding FullText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Margin="0,10,0,0">
+                                                        <TextBlock Text="{local:Tr mcard.about}" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" FontSize="13" />
+                                                        <TextBlock Text="{Binding FullText}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Forest.Muted}" Margin="0,6,0,0" />
+                                                    </StackPanel>
                                                 </StackPanel>
 
-                                                <!-- скриншоты и полное описание с модбазы -->
-                                                <ItemsControl x:Name="Shots" ItemsSource="{Binding Screenshots}" Margin="0,16,0,0">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <WrapPanel />
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate x:DataType="x:String">
-                                                            <Button Padding="0" Margin="0,0,6,6" MinHeight="0" ToolTip.Tip="{local:Tr card.screenshotTip}"
-                                                                    Command="{Binding $parent[ItemsControl].((vm:ModCardViewModel)DataContext).OpenScreenshotCommand}"
-                                                                    CommandParameter="{Binding}">
-                                                                <Image ctl:RemoteImage.Source="{Binding}" ctl:RemoteImage.DecodeWidth="400" Stretch="UniformToFill"
-                                                                       RenderOptions.BitmapInterpolationMode="HighQuality"
-                                                                       Width="{Binding $parent[ItemsControl].Bounds.Width, Converter={x:Static conv:ScreenshotThumbConverter.Instance}, ConverterParameter=w}"
-                                                                       Height="{Binding $parent[ItemsControl].Bounds.Width, Converter={x:Static conv:ScreenshotThumbConverter.Instance}, ConverterParameter=h}" />
-                                                            </Button>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                                <StackPanel IsVisible="{Binding FullText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Margin="0,10,0,0">
-                                                    <TextBlock Text="{local:Tr mcard.about}" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" FontSize="13" />
-                                                    <TextBlock Text="{Binding FullText}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Forest.Muted}" Margin="0,6,0,0" />
+                                                <!-- ===== вкладка «Версии» ===== -->
+                                                <StackPanel IsVisible="{Binding IsVersionsTab}" Margin="0,12,0,0">
+                                                    <!-- что с модом делали: последние изменения из истории -->
+                                                    <StackPanel IsVisible="{Binding HasHistory}" Margin="0,0,0,14">
+                                                        <TextBlock Text="{local:Tr mcard.historyTitle}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" Margin="0,0,0,4" />
+                                                        <!-- видно около пяти строк, остальное — прокруткой: за день действий бывает много -->
+                                                        <Border Background="{DynamicResource Forest.Base}" CornerRadius="6" Padding="10,8">
+                                                            <ScrollViewer MaxHeight="96" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                                                <ItemsControl ItemsSource="{Binding HistoryLines}">
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate x:DataType="x:String">
+                                                                            <TextBlock Text="{Binding}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2" />
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
+                                                            </ScrollViewer>
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding VersionsStatus}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap"
+                                                               Margin="0,0,0,8" />
+                                                    <ItemsControl ItemsSource="{Binding Versions}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="vm:VersionRowViewModel">
+                                                                <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1" Padding="0,9">
+                                                                    <DockPanel>
+                                                                        <Button DockPanel.Dock="Right" Classes="small" Content="{local:Tr mcard.installThis}" VerticalAlignment="Center"
+                                                                                Command="{Binding $parent[ItemsControl].((vm:ModCardViewModel)DataContext).InstallVersionCommand}"
+                                                                                CommandParameter="{Binding}"
+                                                                                IsEnabled="{Binding $parent[ItemsControl].((vm:ModCardViewModel)DataContext).Owner.CanQueue}"
+                                                                                IsVisible="{Binding !IsInstalled}" />
+                                                                        <Border DockPanel.Dock="Right" CornerRadius="4" Padding="8,2" VerticalAlignment="Center"
+                                                                                Background="{DynamicResource Forest.Selected}" IsVisible="{Binding IsInstalled}">
+                                                                            <TextBlock Text="{local:Tr mcard.installedBadge}" FontSize="11" Foreground="{DynamicResource Forest.Good}" />
+                                                                        </Border>
+                                                                        <StackPanel VerticalAlignment="Center">
+                                                                            <TextBlock>
+                                                                                <Run Text="{Binding Version, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" FontSize="13" Foreground="{DynamicResource Forest.Text}" /><Run Text=" " /><Run Text="{Binding PreText, Mode=OneWay}" FontSize="11" Foreground="{DynamicResource Forest.Warn}" />
+                                                                            </TextBlock>
+                                                                            <TextBlock Text="{Binding Meta}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2,8,0" />
+                                                                        </StackPanel>
+                                                                    </DockPanel>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
                                                 </StackPanel>
-                                            </StackPanel>
-
-                                            <!-- ===== вкладка «Версии» ===== -->
-                                            <StackPanel IsVisible="{Binding IsVersionsTab}" Margin="0,12,0,0">
-                                                <!-- что с модом делали: последние изменения из истории -->
-                                                <StackPanel IsVisible="{Binding HasHistory}" Margin="0,0,0,14">
-                                                    <TextBlock Text="{local:Tr mcard.historyTitle}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" Margin="0,0,0,4" />
-                                                    <!-- видно около пяти строк, остальное — прокруткой: за день действий бывает много -->
-                                                    <Border Background="{DynamicResource Forest.Base}" CornerRadius="6" Padding="10,8">
-                                                        <ScrollViewer MaxHeight="96" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                                            <ItemsControl ItemsSource="{Binding HistoryLines}">
-                                                                <ItemsControl.ItemTemplate>
-                                                                    <DataTemplate x:DataType="x:String">
-                                                                        <TextBlock Text="{Binding}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2" />
-                                                                    </DataTemplate>
-                                                                </ItemsControl.ItemTemplate>
-                                                            </ItemsControl>
-                                                        </ScrollViewer>
-                                                    </Border>
-                                                </StackPanel>
-                                                <TextBlock Text="{Binding VersionsStatus}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap"
-                                                           Margin="0,0,0,8" />
-                                                <ItemsControl ItemsSource="{Binding Versions}">
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate x:DataType="vm:VersionRowViewModel">
-                                                            <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1" Padding="0,9">
-                                                                <DockPanel>
-                                                                    <Button DockPanel.Dock="Right" Classes="small" Content="{local:Tr mcard.installThis}" VerticalAlignment="Center"
-                                                                            Command="{Binding $parent[ItemsControl].((vm:ModCardViewModel)DataContext).InstallVersionCommand}"
-                                                                            CommandParameter="{Binding}"
-                                                                            IsEnabled="{Binding $parent[ItemsControl].((vm:ModCardViewModel)DataContext).Owner.CanQueue}"
-                                                                            IsVisible="{Binding !IsInstalled}" />
-                                                                    <Border DockPanel.Dock="Right" CornerRadius="4" Padding="8,2" VerticalAlignment="Center"
-                                                                            Background="{DynamicResource Forest.Selected}" IsVisible="{Binding IsInstalled}">
-                                                                        <TextBlock Text="{local:Tr mcard.installedBadge}" FontSize="11" Foreground="{DynamicResource Forest.Good}" />
-                                                                    </Border>
-                                                                    <StackPanel VerticalAlignment="Center">
-                                                                        <TextBlock>
-                                                                            <Run Text="{Binding Version, Mode=OneWay}" FontFamily="{DynamicResource Forest.Mono}" FontSize="13" Foreground="{DynamicResource Forest.Text}" /><Run Text=" " /><Run Text="{Binding PreText, Mode=OneWay}" FontSize="11" Foreground="{DynamicResource Forest.Warn}" />
-                                                                        </TextBlock>
-                                                                        <TextBlock Text="{Binding Meta}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2,8,0" />
-                                                                    </StackPanel>
-                                                                </DockPanel>
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                            </StackPanel>
+                                            </Panel>
                                         </StackPanel>
                                     </StackPanel>
                                 </DataTemplate>

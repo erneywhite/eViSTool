@@ -47,6 +47,14 @@ public sealed partial class ModsViewModel : ObservableObject
     /// <summary>Последний ответ модбазы (modid → что там есть): после локальных операций статусы не теряются.</summary>
     internal Dictionary<string, ModDbResult> ModDbAnswers { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Логотипы, которые узнали карточки модов до проверки обновлений (modid → адрес): строка таблицы показывает тот же
+    /// логотип, что шапка карточки, и не теряет его, когда таблицу строят заново. В <see cref="ModDbAnswers"/> их не
+    /// кладём: тот считается полным ответом проверки (по нему досверяются новые моды и собирается модпак), а здесь
+    /// известны моды поштучно. Логотип мода от профиля не зависит — при смене профиля память остаётся.
+    /// </summary>
+    private readonly Dictionary<string, string> _cardLogos = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Моды открытого профиля: с диска этой машины, со слов агента удалённого сервера или по FTP у хостера.</summary>
     internal IReadOnlyList<LocalMod> Locals { get; set; } = [];
 
@@ -194,6 +202,18 @@ public sealed partial class ModsViewModel : ObservableObject
         Card = new ModCardViewModel(value, this, Profile?.GameVersion, _main.ActiveProfile?.Name ?? "");
         if (keepTab) Card.IsVersionsTab = true;
         _ = Card.LoadAsync(_db, _cardLoad.Token);
+    }
+
+    /// <summary>
+    /// Карточка сама сходила на модбазу (мод ещё не проверяли) и узнала логотип — он встаёт и в строку таблицы: у всех
+    /// строк с этим modid (дубликаты тоже) и у тех, что построятся заново после операции.
+    /// </summary>
+    internal void LogoLearned(string modId, string logo)
+    {
+        if (modId.Length == 0) return;
+        _cardLogos[modId] = logo;
+        foreach (var row in Rows)
+            if (string.Equals(row.ModId, modId, StringComparison.OrdinalIgnoreCase)) row.UseLogo(logo);
     }
 
     [RelayCommand]
@@ -509,7 +529,11 @@ public sealed partial class ModsViewModel : ObservableObject
         var kind = _main.ActiveProfile?.Model.Kind ?? ProfileKind.Client;
         Rows.Clear();
         foreach (var r in results)
-            Rows.Add(new ModRowViewModel(r, DependencyIssues, r.Local.Info?.ModId is { } id && pins.ContainsKey(id), kind, Profile?.GameVersion));
+        {
+            var modId = r.Local.Info?.ModId;
+            Rows.Add(new ModRowViewModel(r, DependencyIssues, modId is not null && pins.ContainsKey(modId), kind, Profile?.GameVersion,
+                modId is null ? null : _cardLogos.GetValueOrDefault(modId)));
+        }
 
         UpdatesAvailable = Rows.Count(r => r.Kind == ModStatus.UpdateAvailable);
         ProblemCount = Rows.Count(r => r.IsProblem);
