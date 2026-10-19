@@ -31,6 +31,7 @@
     <Color x:Key="Forest.SelectedHoverColor">#3E4936</Color>
     <Color x:Key="Forest.NavHoverColor">#99283128</Color>
     <Color x:Key="Forest.GoodColor">#AFC798</Color>
+    <Color x:Key="Forest.InstalledLineColor">#73AFC798</Color>
     <Color x:Key="Forest.WarnColor">#EDBD86</Color>
     <Color x:Key="Forest.WarningBgColor">#372F1F</Color>
     <Color x:Key="Forest.WarnLineColor">#5A4A30</Color>
@@ -66,6 +67,7 @@
     <SolidColorBrush x:Key="Forest.SelectedHover" Color="{StaticResource Forest.SelectedHoverColor}" />
     <SolidColorBrush x:Key="Forest.NavHover" Color="{StaticResource Forest.NavHoverColor}" />
     <SolidColorBrush x:Key="Forest.Good" Color="{StaticResource Forest.GoodColor}" />
+    <SolidColorBrush x:Key="Forest.InstalledLine" Color="{StaticResource Forest.InstalledLineColor}" />
     <SolidColorBrush x:Key="Forest.Warn" Color="{StaticResource Forest.WarnColor}" />
     <SolidColorBrush x:Key="Forest.WarningBg" Color="{StaticResource Forest.WarningBgColor}" />
     <SolidColorBrush x:Key="Forest.WarnLine" Color="{StaticResource Forest.WarnLineColor}" />

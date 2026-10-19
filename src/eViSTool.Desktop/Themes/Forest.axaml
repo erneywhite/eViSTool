@@ -258,6 +258,13 @@
         <Setter Property="TextAlignment" Value="Right" />
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
+    <!-- значение в карточке мода тоном: совместим — зелёным, нет совместимой версии — красноватым (как «Состояние») -->
+    <Style Selector="TextBlock.cardValue.good">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Good}" />
+    </Style>
+    <Style Selector="TextBlock.cardValue.danger">
+        <Setter Property="Foreground" Value="{DynamicResource Forest.Danger}" />
+    </Style>
 
     <!-- прокрутка: полоса тонкая, как у Fluent, но место под неё оставлено, а не поверх содержимого -->
     <Style Selector="ScrollViewer /template/ ScrollContentPresenter#PART_ContentPresenter">

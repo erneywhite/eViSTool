@@ -436,6 +436,10 @@ public sealed partial class ModDetailsViewModel : ObservableObject
 
     [ObservableProperty] private string _description = "";
     [ObservableProperty] private string _compatibility = Loc.T("card.loadingReleases");
+
+    /// <summary>Есть релиз под версию игры профиля (зелёным) — или известно, что его нет (красноватым), как в «Моих модах».</summary>
+    [ObservableProperty] private bool _isCompatible;
+    [ObservableProperty] private bool _isIncompatible;
     [ObservableProperty] private bool _canInstall;
     [ObservableProperty] private string _installText = Loc.T("card.install", "");
     [ObservableProperty] private string? _installedVersion;
@@ -453,6 +457,9 @@ public sealed partial class ModDetailsViewModel : ObservableObject
     public string Author { get; }
     public string? Logo { get; }
     public string Stats { get; }
+
+    /// <summary>Дата последнего релиза на модбазе (ГГГГ-ММ-ДД); нет — пусто, строка «Обновлён» не видна.</summary>
+    public string Updated { get; }
     public string Side { get; }
 
     /// <summary>Сторона, как её пишет модбаза («both» / «client» / «server»).</summary>
@@ -474,7 +481,8 @@ public sealed partial class ModDetailsViewModel : ObservableObject
         ModId = item.PrimaryModId;
         Author = item.Author is { Length: > 0 } a ? Loc.T("card.author", a) : "";
         Logo = ModDbLogo.Usable(item.Logo);
-        Stats = Loc.T("card.stats", item.Downloads.ToString("N0"), item.Follows.ToString("N0"), item.LastReleased?[..10]);
+        Stats = Loc.T("card.stats", item.Downloads.ToString("N0"), item.Follows.ToString("N0"));
+        Updated = item.LastReleased is { Length: >= 10 } released ? released[..10] : "";
         Side = item.Side switch
         {
             "client" => Loc.T("card.sideClient"),
@@ -515,6 +523,8 @@ public sealed partial class ModDetailsViewModel : ObservableObject
         var choice = CatalogPick.Best(mod.Releases, _game, onPrerelease);
         BestRelease = choice.Release;
         var branch = _game is { } g ? $"{g.Major}.{g.Minor}.x" : "";
+        IsIncompatible = choice.Fit == CatalogFit.NoneForBranch;
+        IsCompatible = choice.Fit is CatalogFit.Compatible or CatalogFit.CompatiblePrerelease;
         Compatibility = choice.Fit switch
         {
             CatalogFit.UnknownGame => Loc.T("card.unknownGame") + (choice.Release is { } r ? " " + Loc.T("card.latestStable", r.ModVersion) : ""),

@@ -98,6 +98,18 @@
                          AutoScrollToSelectedItem="True" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:CatalogItemViewModel">
+                            <Panel>
+                            <!-- установленный мод — лёгкая зелёная обводка по краю карточки (поля карточки 14,12 — обводка на них);
+                                 у выбранной карточки своя песочная рамка, обводка её не перекрывает -->
+                            <Border Margin="-14,-12" CornerRadius="10" BorderThickness="1" BorderBrush="{DynamicResource Forest.InstalledLine}"
+                                    IsHitTestVisible="False">
+                                <Border.IsVisible>
+                                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                        <Binding Path="IsInstalled" />
+                                        <Binding Path="!IsSelected" RelativeSource="{RelativeSource AncestorType=ListBoxItem}" />
+                                    </MultiBinding>
+                                </Border.IsVisible>
+                            </Border>
                             <DockPanel>
                                 <!-- логотип; под ним буквы на фоне цвета мода (по modid, как в «Моих модах») — пока картинки
                                      нет, она грузится или не загрузилась -->
@@ -129,6 +141,7 @@
                                     </TextBlock>
                                 </StackPanel>
                             </DockPanel>
+                            </Panel>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
@@ -193,15 +206,20 @@
                                             <Panel ctl:Motion.RevealChildren="True">
                                                 <!-- ===== «Обзор» ===== -->
                                                 <StackPanel IsVisible="{Binding !IsVersionsTab}">
-                                                    <Grid Margin="0,12,0,0" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                                                    <Grid Margin="0,12,0,0" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
                                                         <TextBlock Grid.Row="0" Classes="cardKey" Text="{local:Tr mcard.compat}" />
-                                                        <TextBlock Grid.Row="0" Grid.Column="1" Classes="cardValue" Text="{Binding Compatibility}" />
+                                                        <TextBlock Grid.Row="0" Grid.Column="1" Classes="cardValue" Text="{Binding Compatibility}"
+                                                                   Classes.good="{Binding IsCompatible}" Classes.danger="{Binding IsIncompatible}" />
                                                         <TextBlock Grid.Row="1" Classes="cardKey" Text="{local:Tr mcard.installed}" />
                                                         <TextBlock Grid.Row="1" Grid.Column="1" Classes="cardValue mono" Text="{Binding InstalledVersion, TargetNullValue=—}" />
-                                                        <TextBlock Grid.Row="2" Classes="cardKey" Text="{local:Tr mcard.side}" />
-                                                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="cardValue" Text="{Binding Side}" />
-                                                        <TextBlock Grid.Row="3" Classes="cardKey" Text="{local:Tr catalog.popularity}" />
-                                                        <TextBlock Grid.Row="3" Grid.Column="1" Classes="cardValue" Text="{Binding Stats}" />
+                                                        <TextBlock Grid.Row="2" Classes="cardKey" Text="{local:Tr card.updatedKey}"
+                                                                   IsVisible="{Binding Updated, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="cardValue mono" Text="{Binding Updated}"
+                                                                   IsVisible="{Binding Updated, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                                        <TextBlock Grid.Row="3" Classes="cardKey" Text="{local:Tr mcard.side}" />
+                                                        <TextBlock Grid.Row="3" Grid.Column="1" Classes="cardValue" Text="{Binding Side}" />
+                                                        <TextBlock Grid.Row="4" Classes="cardKey" Text="{local:Tr catalog.popularity}" />
+                                                        <TextBlock Grid.Row="4" Grid.Column="1" Classes="cardValue" Text="{Binding Stats}" />
                                                     </Grid>
 
                                                     <Button Classes="primary" Margin="0,14,0,0" HorizontalAlignment="Stretch"

@@ -33,6 +33,7 @@
 | Forest.SelectedHover | `#3E4936` | `#414D39` | выбранное при наведении |
 | Forest.NavHover | `#99283128` | `#22303D32` (вписан) | наведение на пункт меню |
 | Forest.Good | `#AFC798` | `#B0C898` | |
+| Forest.InstalledLine | `#73AFC798` | — (новый) | лёгкая обводка установленного мода в списке каталога (Good, 45 %) |
 | Forest.Warn | `#EDBD86` | `#EDBF82` | |
 | Forest.WarningBg | `#372F1F` | `#3A3425` | |
 | Forest.WarnLine | `#5A4A30` | `#5A4C33` (вписан) | рамка плашки-предупреждения |
