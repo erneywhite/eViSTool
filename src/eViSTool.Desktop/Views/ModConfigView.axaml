@@ -6,13 +6,14 @@
              x:Class="eViSTool.Desktop.Views.ModConfigView"
              x:DataType="vm:ModConfigViewModel">
     <UserControl.Styles>
-        <!-- ключ поля формы -->
+        <!-- ключ поля формы; в узкой карточке обрезан многоточием — полный ключ в подсказке -->
         <Style Selector="TextBlock.fieldKey">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
             <Setter Property="Margin" Value="0,0,12,0" />
+            <Setter Property="ToolTip.Tip" Value="{Binding $self.Text}" />
         </Style>
         <!-- что не так со значением — под полем справа; пустая строка скрыта привязкой IsVisible -->
         <Style Selector="TextBlock.fieldError">
@@ -40,7 +41,8 @@
     <DockPanel Margin="10,4,10,0">
         <!-- ===== заголовок ===== -->
         <DockPanel DockPanel.Dock="Top">
-            <Button DockPanel.Dock="Right" VerticalAlignment="Top" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsLoading}">
+            <Button DockPanel.Dock="Right" VerticalAlignment="Top" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsLoading}"
+                    AutomationProperties.Name="{local:Tr mcfg.refresh}">
                 <StackPanel Orientation="Horizontal">
                     <Path Classes="icon" Data="{StaticResource Icon.Refresh}" Width="14" Height="14" Margin="0,0,8,0" />
                     <TextBlock Text="{local:Tr mcfg.refresh}" />
@@ -63,11 +65,13 @@
         <TextBlock DockPanel.Dock="Top" Text="{Binding Notice}" Foreground="{DynamicResource Forest.Muted}" FontSize="13" TextWrapping="Wrap"
                    Margin="0,24,0,0" IsVisible="{Binding Notice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
-        <Grid Margin="0,14,0,0">
+        <!-- список и редактор; в узком окне список уже 340: его потолок выставляет код вида (OnColumnsSizeChanged) -->
+        <Grid x:Name="Columns" Margin="0,14,0,0" SizeChanged="OnColumnsSizeChanged"
+              IsVisible="{Binding Notice, Converter={x:Static StringConverters.IsNullOrEmpty}}">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="340" MinWidth="240" />
+                <ColumnDefinition Width="340" MinWidth="200" />
                 <ColumnDefinition Width="14" />
-                <ColumnDefinition Width="*" MinWidth="360" />
+                <ColumnDefinition Width="*" MinWidth="340" />
             </Grid.ColumnDefinitions>
             <GridSplitter Grid.Column="1" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Cursor="SizeWestEast" />
 
@@ -128,23 +132,22 @@
                             <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Forest.Danger}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"
                                        IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                             <DockPanel>
+                                <!-- на одной строке с «Сохранить», когда кнопки справа перенеслись -->
                                 <Button DockPanel.Dock="Left" Content="{local:Tr mcfg.openFolder}" Command="{Binding OpenFolderCommand}" Padding="12,6"
-                                        IsVisible="{Binding CanShowFile}" />
+                                        VerticalAlignment="Bottom" Margin="0,0,8,0" IsVisible="{Binding CanShowFile}" />
                                 <!--
-                                    кнопки справа. Не влезают (узкое окно) — уходят под левый край, «Сохранить» видно всегда.
-                                    Панель с HorizontalAlignment=Right Avalonia сжала бы до места и вытолкнула
-                                    правые кнопки за карточку, поэтому холст: он ставит панель по её полной ширине от правого края
+                                    кнопки справа. Не влезают (узкое окно) — переносятся строкой ниже, тоже вправо: «Сохранить»
+                                    остаётся в правом нижнем углу. Не прячем: спрятанная кнопка осталась бы в обходе по Tab.
+                                    Кнопка шире всей строки — текст с многоточием
                                 -->
-                                <Canvas ClipToBounds="True" Height="{Binding #Actions.Bounds.Height}">
-                                    <StackPanel x:Name="Actions" Canvas.Right="0" Orientation="Horizontal">
-                                        <Button Content="{local:Tr mcfg.reset}" Command="{Binding ResetCommand}" ToolTip.Tip="{local:Tr mcfg.resetTip}"
-                                                Padding="12,6" AutomationProperties.AutomationId="McfgReset" />
-                                        <Button Content="{Binding RestoreText}" Command="{Binding RestorePreviousCommand}" ToolTip.Tip="{local:Tr mcfg.restoreTip}"
-                                                ToolTip.ShowOnDisabled="True" Padding="12,6" Margin="8,0,0,0" AutomationProperties.AutomationId="McfgRestore" />
-                                        <Button Classes="primary" Content="{local:Tr mcfg.save}" Command="{Binding SaveCommand}"
-                                                Padding="18,6" Margin="8,0,0,0" AutomationProperties.AutomationId="McfgSave" />
-                                    </StackPanel>
-                                </Canvas>
+                                <WrapPanel ItemsAlignment="End" ItemSpacing="8" LineSpacing="8" TextBlock.TextTrimming="CharacterEllipsis">
+                                    <Button Content="{local:Tr mcfg.reset}" Command="{Binding ResetCommand}" ToolTip.Tip="{local:Tr mcfg.resetTip}"
+                                            Padding="12,6" AutomationProperties.AutomationId="McfgReset" />
+                                    <Button Content="{Binding RestoreText}" Command="{Binding RestorePreviousCommand}" ToolTip.Tip="{local:Tr mcfg.restoreTip}"
+                                            ToolTip.ShowOnDisabled="True" Padding="12,6" AutomationProperties.AutomationId="McfgRestore" />
+                                    <Button Classes="primary" Content="{local:Tr mcfg.save}" Command="{Binding SaveCommand}"
+                                            Padding="18,6" AutomationProperties.AutomationId="McfgSave" />
+                                </WrapPanel>
                             </DockPanel>
                         </StackPanel>
 
@@ -184,14 +187,19 @@
                                         </DataTemplate>
                                         <DataTemplate DataType="vm:TextField">
                                             <Border Classes="fieldRow" Margin="{Binding IndentLeft, Converter={x:Static conv:LeftMarginConverter.Instance}}">
-                                                <DockPanel MinHeight="36">
+                                                <!-- поле — 260, в узкой карточке уже: ключу остаётся не меньше 80 -->
+                                                <Grid MinHeight="36">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" MinWidth="80" />
+                                                        <ColumnDefinition Width="1.5*" MaxWidth="260" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Classes="fieldKey" Text="{Binding Key}" />
                                                     <!-- подсказка «null» — только у поля, где в файле был null -->
-                                                    <TextBox DockPanel.Dock="Right" Text="{Binding Value}" Width="260" VerticalAlignment="Center"
+                                                    <TextBox Grid.Column="1" Text="{Binding Value}" VerticalAlignment="Center"
                                                              ToolTip.Tip="{Binding Hint}"
                                                              ToolTip.ServiceEnabled="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                                              AutomationProperties.Name="{Binding Key}" />
-                                                    <TextBlock Classes="fieldKey" Text="{Binding Key}" />
-                                                </DockPanel>
+                                                </Grid>
                                             </Border>
                                         </DataTemplate>
                                         <DataTemplate DataType="vm:JsonField">

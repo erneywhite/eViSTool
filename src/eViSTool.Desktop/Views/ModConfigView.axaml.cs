@@ -38,4 +38,13 @@ public partial class ModConfigView : UserControl
         if (FormChip.IsChecked != _vm.IsFormMode) FormChip.SetCurrentValue(ToggleButton.IsCheckedProperty, _vm.IsFormMode);
         if (TextChip.IsChecked != _vm.IsTextMode) TextChip.SetCurrentValue(ToggleButton.IsCheckedProperty, _vm.IsTextMode);
     }
+
+    // Колонку списка в пикселях Grid не ужимает, даже когда места меньше суммы колонок: в узком окне карточка редактора
+    // уезжала за край окна вместе с «Сохранить». Потолок списка — сколько остаётся рядом с редактором наименьшей ширины.
+    // Саму ширину (её задаёт сплиттер) не трогаем: окно снова шире — и список прежний.
+    private void OnColumnsSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        var columns = Columns.ColumnDefinitions;
+        columns[0].MaxWidth = Math.Max(columns[0].MinWidth, e.NewSize.Width - columns[1].Width.Value - columns[2].MinWidth);
+    }
 }
