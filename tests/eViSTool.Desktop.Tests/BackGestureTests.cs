@@ -248,6 +248,55 @@ public sealed class BackGestureTests
         s.Window.Close();
     }
 
+    /// <summary>
+    /// «Назад» мыши мимо открытого меню: меню закрывается щелчком мимо, как от любой кнопки, а выбор остаётся. Меню
+    /// закрывается раньше, чем нажатие всплывёт до окна, — страница должна увидеть его ещё открытым. Так и у меню, которое
+    /// передаёт нажатие дальше, тому, что под ним (так устроено меню строки таблицы, ContextMenu).
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Back_mouse_button_that_dismisses_a_menu_does_not_clear_the_selection(bool passThrough)
+    {
+        var s = Show();
+        var menu = new Popup
+        {
+            PlacementTarget = s.Button, IsLightDismissEnabled = true, OverlayDismissEventPassThrough = passThrough,
+            Child = new Border { Width = 100, Height = 50 },
+        };
+        ((StackPanel)s.Window.Content!).Children.Add(menu);
+        menu.IsOpen = true;
+        Dispatcher.UIThread.RunJobs();
+        Back(s.Window, s.Other);
+        Assert.False(menu.IsOpen);
+        Assert.Equal(0, s.Command.Runs);
+
+        // меню закрыто — следующее нажатие уже странице
+        Back(s.Window, s.Other);
+        Assert.Equal(1, s.Command.Runs);
+        s.Window.Close();
+    }
+
+    /// <summary>
+    /// Меню кнопки (MenuFlyout, как меню модпака в «Моих модах»): «Назад» мыши мимо него тоже только закрывает меню.
+    /// </summary>
+    [AvaloniaFact]
+    public void Back_mouse_button_that_dismisses_a_menu_flyout_does_not_clear_the_selection()
+    {
+        var s = Show();
+        var flyout = new MenuFlyout { Items = { new MenuItem { Header = "Собрать модпак…" } } };
+        flyout.ShowAt(s.Button);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(flyout.IsOpen);
+        Back(s.Window, s.Search); // над полем поиска: меню открыто под кнопкой и до него не достаёт
+        Assert.False(flyout.IsOpen);
+        Assert.Equal(0, s.Command.Runs);
+
+        Back(s.Window, s.Search);
+        Assert.Equal(1, s.Command.Runs);
+        s.Window.Close();
+    }
+
     [AvaloniaFact]
     public void Page_taken_out_of_the_window_stops_listening()
     {

@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 
 namespace eViSTool.Desktop.Controls;
@@ -19,12 +20,18 @@ namespace eViSTool.Desktop.Controls;
 /// <item>Команда недоступна (выбора нет) — событие идёт дальше нетронутым.</item>
 /// <item>Esc, который уже забрал кто-то другой (выпадающий список или меню закрылись), сюда не доходит: слушаем всплытие
 /// и только необработанные. Пока в окне открыто меню или выпадающий список, страница Esc и «Назад» не трогает вовсе —
-/// даже если само меню на Esc не закрывается («Играть ▾»). Диалоги — свои окна, их Esc сюда не попадает.</item>
+/// даже если само меню на Esc не закрывается («Играть ▾»). То же с меню, которое закрылось этим же нажатием или
+/// клавишей: ввод, закрывший меню, — его. Диалоги — свои окна, их Esc сюда не попадает.</item>
 /// <item>Фокус в поле поиска страницы (TextBox с классом search), и в нём есть текст, — Esc сначала очищает поле, как
 /// принято у полей поиска (Ctrl+Z его возвращает), выбор остаётся; поле пустое — Esc снимает выбор. Фокус в любом
 /// другом поле — Esc его, страница его не трогает.</item>
-/// <item>Кнопку мыши слушаем и уже обработанную: строки таблицы и плитки забирают нажатие себе, а другого смысла у неё в
-/// окне нет.</item>
+/// <item>Кнопку мыши слушаем туннелем, у самого окна, и уже обработанную: так страница получает её раньше строк таблицы
+/// и плиток, которые забирают нажатие себе. Другого смысла у этой кнопки в окне нет, поэтому, если команда выполнилась,
+/// нажатие дальше не идёт. Меню поверх страницы нажатие мимо закрывает по-разному: всплывающее окно — слоем под собой на
+/// всплытии (туннель видит его ещё открытым), а меню строки (ContextMenu) — своим обработчиком туннеля у того же окна.
+/// Тот подписан позже нашего, а туннель зовёт обработчики одного элемента от последнего подписанного к первому, так что
+/// меню закрывается раньше, чем нажатие дойдёт до нас. Поэтому меню, закрытое этим же вводом, считается ещё открытым
+/// (<see cref="_menuJustClosed"/>).</item>
 /// </list>
 /// </summary>
 public static class BackGesture
@@ -38,12 +45,23 @@ public static class BackGesture
     // открытые всплывающие окна (выпадающие списки, меню, «Играть ▾»): слабые ссылки — закрытое окно их не держит
     private static readonly ConditionalWeakTable<Popup, object> OpenPopups = new();
 
+    // меню закрылось в этом проходе ввода: нажатие или клавиша, которые его закрыли, могут ещё идти по окну. Сбрасывается
+    // следующим заданием диспетчера: обычный приоритет выше ввода, так что следующее нажатие застаёт уже сброшенным
+    private static bool _menuJustClosed;
+
     static BackGesture()
     {
         Popup.IsOpenProperty.Changed.AddClassHandler<Popup>((popup, e) =>
         {
-            if (e.GetNewValue<bool>()) OpenPopups.AddOrUpdate(popup, popup);
-            else OpenPopups.Remove(popup);
+            if (e.GetNewValue<bool>())
+            {
+                OpenPopups.AddOrUpdate(popup, popup);
+                return;
+            }
+            OpenPopups.Remove(popup);
+            if (!popup.IsLightDismissEnabled || _menuJustClosed) return;
+            _menuJustClosed = true;
+            Dispatcher.UIThread.Post(() => _menuJustClosed = false, DispatcherPriority.Normal);
         });
         CommandProperty.Changed.AddClassHandler<Control>((control, e) =>
         {
@@ -82,10 +100,12 @@ public static class BackGesture
     /// <summary>
     /// Открыто ли в окне меню или выпадающий список — всплывающее окно, которое закрывается щелчком мимо (подсказки не в
     /// счёт). Пока открыто, Esc и «Назад» — его: даже то, что само на Esc не закрывается («Играть ▾»), не должно снимать
-    /// выбор у страницы под собой.
+    /// выбор у страницы под собой. Меню, закрытое этим же вводом, ещё считается открытым (какого окна — не важно: за один
+    /// проход ввод идёт в одно окно).
     /// </summary>
     private static bool HasOpenMenu(TopLevel top)
     {
+        if (_menuJustClosed) return true;
         foreach (var (popup, _) in OpenPopups)
         {
             if (!popup.IsOpen || !popup.IsLightDismissEnabled) continue;
@@ -106,7 +126,8 @@ public static class BackGesture
             _page = page;
             _top = top;
             top.AddHandler(InputElement.KeyDownEvent, OnKeyDown, RoutingStrategies.Bubble);
-            top.AddHandler(InputElement.PointerPressedEvent, OnPointerPressed, RoutingStrategies.Bubble, handledEventsToo: true);
+            // туннелем: раньше строк таблицы и плиток (см. шапку класса)
+            top.AddHandler(InputElement.PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
         }
 
         public void Dispose()

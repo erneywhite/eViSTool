@@ -609,6 +609,35 @@ public sealed class ModsViewTests : IDisposable
         Assert.True(summary.IsEffectivelyVisible);
     }
 
+    /// <summary>
+    /// Меню строки открыто — «Назад» мыши мимо него только закрывает меню, мод остаётся выбранным; следующее нажатие уже
+    /// снимает выбор. Меню строки закрывается само, раньше, чем нажатие дойдёт до страницы, и передаёт его тому, что под
+    /// ним, — страница это нажатие всё равно не берёт.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Back_button_that_closes_the_row_menu_keeps_the_mod()
+    {
+        var (window, mods) = await ShowAsync(Main(new HangingModDb()));
+        var grid = (DataGrid)Named(window, "ModsGrid");
+        var row = RowOf(window, "alpha");
+        Mouse.Prepare(window);
+        var at = row.TranslatePoint(new Point(200, row.Bounds.Height / 2), window)!.Value;
+        window.MouseDown(at, MouseButton.Right);
+        window.MouseUp(at, MouseButton.Right);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(grid.ContextMenu!.IsOpen);
+        Assert.Equal("alpha", mods.Selected?.ModId);
+
+        var card = window.GetVisualDescendants().OfType<ScrollViewer>().First(v => v.Content is ContentControl { Content: ModCardViewModel });
+        Back(window, card);
+        Assert.False(grid.ContextMenu.IsOpen);
+        Assert.Equal("alpha", mods.Selected?.ModId);
+
+        Back(window, card);
+        Assert.Null(mods.Selected);
+        Assert.True(Named(window, "ModsSummary").IsEffectivelyVisible);
+    }
+
     [AvaloniaFact]
     public async Task Esc_in_the_search_box_clears_the_search_before_the_mod()
     {
