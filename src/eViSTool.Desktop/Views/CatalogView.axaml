@@ -166,7 +166,8 @@
                                             </Panel>
                                         </Border>
 
-                                        <StackPanel Margin="18,14,18,16">
+                                        <!-- вкладки «Обзор» и «Версии» ниже: показанная проявляется -->
+                                        <StackPanel Margin="18,14,18,16" ctl:Motion.RevealChildren="True">
                                             <TextBlock Text="{Binding Name}" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap" />
                                             <TextBlock Text="{Binding Author}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" Margin="0,2,0,0" />
 

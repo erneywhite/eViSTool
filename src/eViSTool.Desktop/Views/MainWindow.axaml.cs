@@ -169,7 +169,9 @@ public partial class MainWindow : Window
         }
     }
 
-    // виден один раздел — по SelectedTab (порядок страниц в разметке = порядок AppTab)
+    // виден один раздел — по SelectedTab (порядок страниц в разметке = порядок AppTab). Показанная страница проявляется
+    // сама (Motion.RevealChildren у Pages), только прозрачностью и сдвигом. Первый вызов — до показа окна: при запуске
+    // страница сразу на месте
     private void ShowPage()
     {
         var index = (int)Vm.SelectedTab;

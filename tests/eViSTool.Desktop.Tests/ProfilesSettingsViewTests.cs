@@ -176,8 +176,14 @@ public sealed class ProfilesSettingsViewTests : IDisposable
         Assert.False(Has(profiles, "GameBackground"));
     }
 
+    /// <summary>
+    /// Меню и страницы главного окна. Здесь же смена страницы (docs/design.md, раздел 3): первая страница при показе
+    /// окна — сразу на месте, новая проявляется (прозрачность и сдвиг снизу) и в конце стоит на месте, прежняя прячется
+    /// сразу. Отдельным тестом пока нельзя: второе показанное главное окно за один прогон тестов зависает на щелчке
+    /// (зависание было и раньше, к движению оно не относится).
+    /// </summary>
     [AvaloniaFact]
-    public void Side_menu_and_pages_follow_the_tab_order_and_profiles_come_before_settings()
+    public async Task Side_menu_and_pages_follow_the_tab_order_and_profiles_come_before_settings()
     {
         var main = Main();
         _window = new MainWindow { DataContext = main, Width = 1400, Height = 860 };
@@ -185,6 +191,9 @@ public sealed class ProfilesSettingsViewTests : IDisposable
         Dispatcher.UIThread.RunJobs();
         var nav = _window.FindControl<ListBox>("Nav")!;
         var pages = _window.FindControl<Panel>("Pages")!;
+        var first = pages.Children[main.SelectedTab];
+        Assert.Equal(1, first.Opacity);
+        Assert.Null(first.RenderTransform);
 
         // страница по номеру вкладки: порядок в разметке = порядок AppTab
         Assert.Equal(7, nav.ItemCount);
@@ -194,16 +203,31 @@ public sealed class ProfilesSettingsViewTests : IDisposable
         Assert.IsType<SettingsView>(pages.Children[AppTab.Settings]);
         Assert.IsType<AboutView>(pages.Children[AppTab.About]);
 
-        // пункт меню «Профили» открывает свою страницу, название — в верхней полосе, без «Рабочего пространства»
-        Mouse.Click(_window, Named(_window, "NavProfiles"));
-        Assert.Equal(AppTab.Profiles, main.SelectedTab);
-        Assert.Equal([AppTab.Profiles], pages.Children.Select((p, i) => (p, i)).Where(x => x.p.IsVisible).Select(x => x.i));
-        Assert.Equal(Loc.T("nav.profiles"), ((TextBlock)Named(_window, "PageTitle")).Text);
+        // пункт меню «Профили» открывает свою страницу, название — в верхней полосе, без «Рабочего пространства».
+        // Проявление смотрим по пути, а не мгновенным значением: щелчок разбирает очередь окна вместе с кадрами, и
+        // на большой странице оно успевает пройти целиком ещё внутри него
+        using (var seen = new MotionTests.RevealProbe(pages.Children[AppTab.Profiles]))
+        {
+            Mouse.Click(_window, Named(_window, "NavProfiles"));
+            Assert.Equal(AppTab.Profiles, main.SelectedTab);
+            Assert.Equal([AppTab.Profiles], pages.Children.Select((p, i) => (p, i)).Where(x => x.p.IsVisible).Select(x => x.i));
+            Assert.Equal(Loc.T("nav.profiles"), ((TextBlock)Named(_window, "PageTitle")).Text);
+            await Wait.Frames(400);
+            seen.AssertRevealed();
+        }
 
-        Mouse.Click(_window, Named(_window, "NavSettings"));
-        Assert.Equal(AppTab.Settings, main.SelectedTab);
-        Assert.True(pages.Children[AppTab.Settings].IsVisible);
-        Assert.False(pages.Children[AppTab.Profiles].IsVisible);
-        Assert.Equal(Loc.T("nav.settings"), ((TextBlock)Named(_window, "PageTitle")).Text);
+        var settings = pages.Children[AppTab.Settings];
+        using (var seen = new MotionTests.RevealProbe(settings))
+        {
+            Mouse.Click(_window, Named(_window, "NavSettings"));
+            Assert.Equal(AppTab.Settings, main.SelectedTab);
+            Assert.True(settings.IsVisible);
+            Assert.False(pages.Children[AppTab.Profiles].IsVisible);
+            Assert.Equal(Loc.T("nav.settings"), ((TextBlock)Named(_window, "PageTitle")).Text);
+            await Wait.Frames(400);
+            seen.AssertRevealed();
+        }
+        Assert.Equal(1, settings.Opacity);
+        Assert.Equal(0, settings.RenderTransform?.Value.M32 ?? 0);
     }
 }

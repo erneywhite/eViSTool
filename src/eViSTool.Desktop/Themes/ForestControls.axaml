@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:conv="using:eViSTool.Desktop.Converters">
+                    xmlns:conv="using:eViSTool.Desktop.Converters"
+                    xmlns:ctl="using:eViSTool.Desktop.Controls">
     <!--
         Шаблоны элементов лесной темы.
         Правила:
@@ -12,7 +13,9 @@
         Движение (docs/design.md, раздел 3): наведение и смена цвета — 180 мс, нажатие — 60 мс, отпускание — 100 мс,
         кривая «торможение» 0.2,0.7,0.2,1. Анимируются только цвет, прозрачность и RenderTransform. Наведение делает
         элемент ярче, а не тусклее: прозрачность на наведении не используется. Переходы висят на частях шаблона, а не на
-        самом элементе: свойство Transitions элемента остаётся свободным для разметки.
+        самом элементе: свойство Transitions элемента остаётся свободным для разметки. В системе выключены анимации —
+        переходы обнуляет Themes/ForestStill.axaml; анимации по кругу пишутся только в стиле с условием
+        [(ctl|Motion.Enabled)=True], иначе они не остановятся.
         Кольцо фокуса клавиатуры — отдельная рамка шаблона FocusRing: 2 px песка снаружи, с зазором 2 px (поле −4),
         скругление — на 4 больше, чем у элемента; появляется сразу, без перехода.
         Ресурсы из ForestResources — только через DynamicResource: тесты подключают этот файл отдельно, и StaticResource
@@ -549,6 +552,13 @@
         </Style>
         <Style Selector="^:indeterminate /template/ Border#Runner">
             <Setter Property="IsVisible" Value="True" />
+        </Style>
+        <!-- бежит, только пока движение не выключено (Controls/Motion); в системе выключены анимации — отрезок стоит
+             посередине -->
+        <Style Selector="^:indeterminate /template/ Border#Runner[(ctl|Motion.Enabled)=False]">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="^:indeterminate /template/ Border#Runner[(ctl|Motion.Enabled)=True]">
             <Style.Animations>
                 <Animation Duration="0:0:1" IterationCount="Infinite">
                     <KeyFrame Cue="0%">

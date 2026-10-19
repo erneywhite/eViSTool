@@ -364,7 +364,7 @@
             </Border>
 
             <!-- разделы: все живут всё время (прокрутка и раскрытые блоки не сбрасываются), виден один — по SelectedTab -->
-            <Panel x:Name="Pages" Margin="16,12,16,12">
+            <Panel x:Name="Pages" Margin="16,12,16,12" ctl:Motion.RevealChildren="True">
                 <views:ModsView DataContext="{Binding Mods}" />
                 <views:CatalogView DataContext="{Binding Catalog}" IsVisible="False" />
                 <views:ModConfigView DataContext="{Binding ModConfig}" IsVisible="False" />

@@ -1,0 +1,19 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctl="using:eViSTool.Desktop.Controls">
+    <!--
+        «Без анимаций» (docs/design.md, раздел 3). Подключается к стилям программы, только если в системе выключены
+        анимации (App, Platform/SystemMotion): каждый стиль темы не правится, всё — отсюда.
+        • Окна (и всплывающие окна) получают Motion.Enabled = False, его наследует всё содержимое: проявление страниц и
+          вкладок — сразу, анимации по кругу с условием [(ctl|Motion.Enabled)=True] стоят.
+        • Переходы всех элементов обнулены — наведение, нажатие, переключатель, вкладки, пункты меню меняются сразу.
+          Условие на Motion.Enabled здесь нужно и для силы: стиль с условием сильнее условных стилей тем (у кнопки
+          Transitions меняет ^:pressed), а стиль без условия им бы уступил.
+    -->
+    <Style Selector=":is(TopLevel)">
+        <Setter Property="ctl:Motion.Enabled" Value="False" />
+    </Style>
+    <Style Selector=":is(Control)[(ctl|Motion.Enabled)=False]">
+        <Setter Property="Transitions" Value="{x:Null}" />
+    </Style>
+</Styles>

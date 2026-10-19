@@ -5,6 +5,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using eViSTool.Desktop.Controls;
 using eViSTool.Desktop.Platform;
 using eViSTool.Desktop.Views;
 using eViSTool.Presentation;
@@ -130,6 +131,29 @@ public sealed class ServerConfigViewTests : IDisposable
         Assert.Equal("myModSetting", unknown.Text);
         Assert.Equal("42", Find<TextBox>(window, "WorldSetting.myModSetting").Text);
         Assert.False(vm.IsDirty);
+        Close(window, vm);
+    }
+
+    /// <summary>Смена вкладки: показанная проявляется (docs/design.md, раздел 3) и в конце стоит на месте, прежняя прячется сразу.</summary>
+    [AvaloniaFact]
+    public async Task Switching_tab_reveals_its_content()
+    {
+        using var theme = new ForestTheme();
+        var (window, vm) = Show();
+        var tabs = window.GetVisualDescendants().OfType<Panel>().Single(Motion.GetRevealChildren);
+        var (general, world) = (tabs.Children[0], tabs.Children[1]);
+        Assert.True(general.IsVisible);
+        Assert.False(world.IsVisible);
+
+        using var seen = new MotionTests.RevealProbe(world);
+        vm.Tab = ConfigTab.World;
+        Assert.True(world.IsVisible);
+        Assert.False(general.IsVisible);
+
+        await Wait.Frames(400);
+        seen.AssertRevealed();
+        Assert.Equal(1, world.Opacity);
+        Assert.Equal(0, world.RenderTransform?.Value.M32 ?? 0);
         Close(window, vm);
     }
 

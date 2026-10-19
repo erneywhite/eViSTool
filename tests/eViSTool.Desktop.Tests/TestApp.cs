@@ -65,6 +65,22 @@ internal static class Wait
         }
     }
 
+    /// <summary>
+    /// Дать часам анимаций пройти <paramref name="ms"/> миллисекунд. Окно без экрана двигает их только по тику
+    /// отрисовки — тикаем сами, примерно раз в 10 мс; переход или проявление к концу ожидания закончены.
+    /// </summary>
+    public static async Task Frames(int ms)
+    {
+        var watch = Stopwatch.StartNew();
+        do
+        {
+            await Task.Delay(10);
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            Dispatcher.UIThread.RunJobs();
+        } while (watch.ElapsedMilliseconds < ms);
+    }
+
     /// <summary>Просто дать очереди окна и фоновым задачам поработать.</summary>
     public static async Task Idle(int ms = 200)
     {
