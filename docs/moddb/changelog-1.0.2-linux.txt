@@ -1,11 +1,11 @@
 eViSTool 1.0.2 for Linux: the catalog sees mods that changed their modid.
 
 Fixes
-- GiMap 3.0.0 and other mods whose author changed the modid were installed, but the Mod catalog still showed them as not installed and kept offering "Install". Now the catalog recognises the mod by any of its modids. The agent on a server is unchanged.
+- When a mod's author changes its modid in a new version, the Mod catalog showed the installed mod as not installed and kept offering "Install". Now the catalog recognises a mod by any of its modids. The agent on a server is unchanged.
 
 ---
 
 eViSTool 1.0.2 для Linux: каталог видит моды, у которых сменился modid.
 
 Исправления
-- GiMap 3.0.0 и другие моды, у которых автор сменил modid, ставились, но «Каталог модов» по-прежнему показывал их как не установленные и предлагал «Установить». Теперь каталог узнаёт мод по любому из его modid. Агента на сервере правка не касается.
+- Если автор мода сменил modid в новой версии, «Каталог модов» показывал установленный мод как не установленный и предлагал «Установить». Теперь каталог узнаёт мод по любому из его modid. Агента на сервере правка не касается.
