@@ -1,0 +1,17 @@
+eViSTool 1.0.1: mods that changed their modid install again.
+
+Fixes
+- Some authors rename their mod in a new version: GiMap 3.0.0 is on the same ModDB page, but its modid is now gimapcore instead of gimap. Installing or updating such a mod failed with "the downloaded archive contains a different mod". Now it installs, and the old version with the old modid is removed (a copy is kept), so the game doesn't load both. The operation summary says so. An archive with a mod that the ModDB doesn't list for that release is still refused.
+- After a mod update check, the status line could stay on "Querying ModDB: 16/16" instead of "Checked at …". The same happened after sharing mods with a code and with modpacks.
+
+Update from About.
+
+---
+
+eViSTool 1.0.1: моды, у которых сменился modid, снова ставятся.
+
+Исправления
+- Бывает, что автор переименовывает мод в новой версии: GiMap 3.0.0 лежит на той же странице модбазы, но его modid теперь gimapcore вместо gimap. Установка и обновление такого мода падали с ошибкой «в скачанном архиве другой мод». Теперь мод ставится, а прежняя версия со старым modid убирается (копия сохраняется), чтобы игра не загрузила обе. Об этом есть строка в итоге операции. Архив с модом, которого модбаза у этого релиза не указала, по-прежнему не ставится.
+- После проверки обновлений строка состояния могла застрять на «Запрос модбазы: 16/16» вместо «Проверено …». То же бывало после передачи модов кодом и с модпаками.
+
+Обнови из «О программе».
