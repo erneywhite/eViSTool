@@ -88,6 +88,13 @@ public sealed class ModDbListItem
     /// <summary>Строковый modid (для установки и сверки с установленными).</summary>
     [JsonIgnore]
     public string? PrimaryModId => ModIdStrs.FirstOrDefault(s => !string.IsNullOrWhiteSpace(s))?.ToLowerInvariant();
+
+    /// <summary>
+    /// Который из modid мода стоит в профиле: у мода их бывает несколько — автор сменил modid в новой версии (GiMap:
+    /// gimap → gimapcore, модбаза отдаёт оба). Не стоит ни один — null.
+    /// </summary>
+    public string? InstalledModId(IReadOnlyDictionary<string, string> installed) =>
+        ModIdStrs.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s!.ToLowerInvariant()).FirstOrDefault(installed.ContainsKey);
 }
 
 internal sealed class ModDbListResponse

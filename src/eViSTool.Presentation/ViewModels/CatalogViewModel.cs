@@ -436,7 +436,7 @@ public sealed class CatalogItemViewModel(ModDbListItem item, IReadOnlyDictionary
     /// <summary>Оттенок значка с буквами — тот же, что у этого мода в «Моих модах» (по modid).</summary>
     public int Hue { get; } = ModTint.Hue(item.PrimaryModId ?? item.Name);
     public string Tag { get; } = item.Tags.FirstOrDefault(t => !string.IsNullOrWhiteSpace(t)) ?? "";
-    public string? InstalledVersion { get; } = item.PrimaryModId is { } id && installed.TryGetValue(id, out var v) ? v : null;
+    public string? InstalledVersion { get; } = item.InstalledModId(installed) is { } id ? installed[id] : null;
     public bool IsInstalled => InstalledVersion is not null;
     public string InstalledText => IsInstalled ? Loc.T("catalog.installedBadge", InstalledVersion) : Loc.T("catalog.availableBadge");
 }
@@ -467,7 +467,9 @@ public sealed partial class ModDetailsViewModel : ObservableObject
     [ObservableProperty] private string _versionsStatus = "";
 
     public string Name { get; }
-    public string? ModId { get; }
+
+    /// <summary>modid мода: тот, что стоит в профиле (у мода, сменившего modid, их несколько), иначе первый.</summary>
+    public string? ModId { get; private set; }
     public string Author { get; }
     public string? Logo { get; }
     public string Stats { get; }
@@ -514,7 +516,9 @@ public sealed partial class ModDetailsViewModel : ObservableObject
 
     public void RefreshInstalled(IReadOnlyDictionary<string, string> installed)
     {
-        InstalledVersion = ModId is not null && installed.TryGetValue(ModId, out var v) ? v : null;
+        var id = _item.InstalledModId(installed);
+        ModId = id ?? _item.PrimaryModId;
+        InstalledVersion = id is not null ? installed[id] : null;
         // от установленной версии зависит лучший релиз: стоит пре-релиз — предлагаем и пре-релизы (сменили профиль, поставили другую)
         if (Mod is { } mod) Evaluate(mod);
         UpdateInstallText();
