@@ -752,6 +752,8 @@
   "dl.versionMismatch": "Heads up: the {0} file says version {1}, but ModDB lists {2}. The author probably forgot to bump the version in the archive. The mod is installed and will show up in the game as {1}.",
   "dl.versionMissing": "Heads up: the {0} file has no version inside, while ModDB lists {1}. The mod is installed.",
   "dl.wrongMod": "The downloaded archive contains a different mod: {0} instead of {1}",
+  "dl.renamed": "{0}: the author changed the modid ({1} → {2}); the old file was removed (a copy is kept)",
+  "dl.renamedLeft": "{0}: the author changed the modid ({1} → {2}), and the old file could not be removed — delete it yourself, or the game will load both: {3}",
   "err.modsDirNotFound": "Mods folder not found: {0}",
   "err.noGameVersion": "Game version is unknown",
   "err.installTargetTaken": "The file \"{0}\" in the mods folder belongs to another mod — not overwriting it. Check your mods and try again.",

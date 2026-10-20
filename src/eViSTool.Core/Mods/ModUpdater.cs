@@ -30,13 +30,22 @@ public sealed class ModUpdater(ModDbClient db, string? downloadDir = null)
             Cleanup(dest);
             throw new InvalidDataException(Loc.T("dl.unreadable", name, check.Error));
         }
-        if (!string.Equals(check.Info.ModId, expectedModId, StringComparison.OrdinalIgnoreCase))
+        if (!IsExpectedMod(check.Info.ModId, expectedModId, release))
         {
             Cleanup(dest);
             throw new InvalidDataException(Loc.T("dl.wrongMod", check.Info.ModId, expectedModId));
         }
         return dest;
     }
+
+    /// <summary>
+    /// В архиве тот мод, что ждали: modid мода или modid, который модбаза указала у самого релиза. Авторы меняют modid
+    /// в новой версии (GiMap 3.0.0: gimap → gimapcore) — такой архив не чужой; прежний мод с тем же назначением убирает
+    /// установка (ModInstallService.DownloadAndInstallAsync).
+    /// </summary>
+    public static bool IsExpectedMod(string archiveModId, string expectedModId, ModDbRelease release) =>
+        string.Equals(archiveModId, expectedModId, StringComparison.OrdinalIgnoreCase)
+        || (!string.IsNullOrWhiteSpace(release.ModIdStr) && string.Equals(archiveModId, release.ModIdStr, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Лучший релиз мода для ветки игры с учётом закреплений/пропусков. null — нет в модбазе или нет релиза для ветки.</summary>
     public async Task<(ModDbMod Mod, ModDbRelease Release)?> FindBestReleaseAsync(

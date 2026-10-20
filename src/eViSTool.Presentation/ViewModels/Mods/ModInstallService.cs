@@ -209,6 +209,7 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
             file = await updater.DownloadReleaseAsync(release, modId, progress, ct);
             if (!await InstallZipAsync(target, file, interactive: false, installed, problems, release)) return false;
             if (ReleaseMarks.Warning(name, ModScanner.ReadZip(file).Info?.Version, release.ModVersion) is { } note) notes?.Add(note);
+            await RemoveRenamedAsync(target, modId, ModScanner.ReadZip(file).Info?.ModId, name, notes, ct);
             return true;
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or TaskCanceledException)
@@ -221,6 +222,28 @@ internal sealed class ModInstallService(MainViewModel main, ModUpdater updater, 
         finally
         {
             if (file is not null) updater.Cleanup(file);
+        }
+    }
+
+    /// <summary>
+    /// Автор сменил modid в новой версии (GiMap 3.0.0: gimap → gimapcore): поставленный мод — уже с новым modid, а прежний
+    /// остался бы рядом, и игра загрузила бы оба. Убираем прежний обычным удалением (своё — в корзину, у хостера — с копией
+    /// на этой машине, у удалённого сервера — в его корзину) и пишем об этом в итог операции.
+    /// </summary>
+    private async Task RemoveRenamedAsync(ModTarget target, string oldModId, string? newModId, string name, List<string>? notes,
+        CancellationToken ct)
+    {
+        if (newModId is null || string.Equals(newModId, oldModId, StringComparison.OrdinalIgnoreCase)) return;
+        try
+        {
+            var (_, mods) = await ModTargets.ScanAsync(target, ct);
+            var old = mods.Where(m => string.Equals(m.Info?.ModId, oldModId, StringComparison.OrdinalIgnoreCase)).ToList();
+            foreach (var mod in old) await ModTargets.DeleteAsync(target, mod, Ui.Platform.MoveToTrash, ct);
+            if (old.Count > 0) notes?.Add(Loc.T("dl.renamed", name, oldModId, newModId));
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            notes?.Add(Loc.T("dl.renamedLeft", name, oldModId, newModId, ex.Message));
         }
     }
 

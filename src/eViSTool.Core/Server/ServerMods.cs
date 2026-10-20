@@ -146,6 +146,13 @@ public sealed class ServerMods(string profileId, string gameDir, string dataDir)
                 }
                 var result = Install(file, release);
                 updated.Add($"{name}: {result.OldVersion ?? info.Version} → {result.Version}");
+                // автор сменил modid в новой версии (gimap → gimapcore): прежний мод убрать, иначе сервер загрузит оба
+                if (ModScanner.ReadZip(file).Info?.ModId is { } newId && !string.Equals(newId, info.ModId, StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var old in Locals().Where(l => string.Equals(l.Info?.ModId, info.ModId, StringComparison.OrdinalIgnoreCase)))
+                        Delete(old.Path);
+                    notes.Add(Loc.T("dl.renamed", name, info.ModId, newId));
+                }
                 // ставим всё равно; отметка «файл релиза» не даст предлагать его снова (ReleaseMarks)
                 if (ReleaseMarks.Warning(name, result.Version, release.ModVersion) is { } note) notes.Add(note);
             }

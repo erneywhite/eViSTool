@@ -217,6 +217,56 @@ public sealed class ModInstallServiceTests : IDisposable
         Assert.Equal(ModStatus.UpToDate, check.Status);
     });
 
+    /// <summary>
+    /// Автор сменил modid в новой версии (GiMap 3.0.0: gimap → gimapcore, у релиза на модбазе modidstr — новый): архив не
+    /// «чужой», мод ставится, а прежний с тем же назначением убирается — иначе игра загрузила бы оба.
+    /// </summary>
+    [Fact]
+    public void Download_AuthorRenamedModId_InstalledAndOldOneRemoved() => Sta.Run(() =>
+    {
+        var target = Server();
+        File.Copy(Zip("gimap_2.1.0.zip", "gimap", "2.1.0"), Path.Combine(ModsDir, "gimap_2.1.0.zip"));
+        var bytes = File.ReadAllBytes(Zip("gimapcore_3.0.0.zip", "gimapcore", "3.0.0"));
+        var service = Service(new FakeModDb(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) }));
+        var release = new ModDbRelease
+        {
+            ModIdStr = "gimapcore", ModVersion = "3.0.0", MainFile = "https://mods.vintagestory.at/files/gimapcore_3.0.0.zip",
+            FileName = "gimapcore_3.0.0.zip",
+        };
+        var installed = new List<string>();
+        var problems = new List<string>();
+        var notes = new List<string>();
+
+        var task = service.DownloadAndInstallAsync(target, "gimap", "GiMap", release, installed, problems, notes: notes);
+        Sta.Wait(task);
+
+        Assert.True(task.Result);
+        Assert.Empty(problems);
+        Assert.Equal(["gimapcore_3.0.0.zip"], Directory.GetFiles(ModsDir).Select(Path.GetFileName));
+        Assert.Equal([Loc.T("dl.renamed", "GiMap", "gimap", "gimapcore")], notes);
+    });
+
+    /// <summary>В архиве мод, которого модбаза у релиза не обещала (ни modid мода, ни modidstr релиза), — не ставится.</summary>
+    [Fact]
+    public void Download_ArchiveWithAnotherMod_Rejected() => Sta.Run(() =>
+    {
+        var bytes = File.ReadAllBytes(Zip("gimapcore_3.0.0.zip", "somethingelse", "3.0.0"));
+        var service = Service(new FakeModDb(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) }));
+        var release = new ModDbRelease
+        {
+            ModIdStr = "gimapcore", ModVersion = "3.0.0", MainFile = "https://mods.vintagestory.at/files/gimapcore_3.0.0.zip",
+            FileName = "gimapcore_3.0.0.zip",
+        };
+        var problems = new List<string>();
+
+        var task = service.DownloadAndInstallAsync(Server(), "gimap", "GiMap", release, [], problems);
+        Sta.Wait(task);
+
+        Assert.False(task.Result);
+        Assert.Equal([Loc.T("dl.failed", "GiMap", "3.0.0", Loc.T("dl.wrongMod", "somethingelse", "gimap"))], problems);
+        Assert.Empty(Directory.GetFiles(ModsDir));
+    });
+
     [Fact]
     public void Download_SameVersion_NoNote() => Sta.Run(() =>
     {
