@@ -68,7 +68,7 @@ public static class AlsoInstall
         var wanted = files.Where(f => Needed(ModSides.Parse(f.Info.Side), target.Profile.Kind)).ToList();
         try
         {
-            var (resolved, mods) = await ModTargets.ScanAsync(target, ct).ConfigureAwait(false);
+            var (resolved, mods) = await ModTargets.ScanForOfferAsync(target, ct).ConfigureAwait(false);
             var have = mods.Where(m => m.Info is not null)
                 .GroupBy(m => m.Info!.ModId, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First().Info!.Version, StringComparer.OrdinalIgnoreCase);
@@ -91,7 +91,7 @@ public static class AlsoInstall
         IReadOnlyList<LocalMod> mods;
         try
         {
-            (resolved, mods) = await ModTargets.ScanAsync(target, ct).ConfigureAwait(false);
+            (resolved, mods) = await ModTargets.ScanForOfferAsync(target, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidOperationException or UnauthorizedAccessException
                                        or TaskCanceledException or Newtonsoft.Json.JsonException)

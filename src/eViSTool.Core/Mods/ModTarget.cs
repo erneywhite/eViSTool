@@ -220,6 +220,38 @@ public static class ModTargets
         : target.IsRemote ? RemoteSecret.Describe(ex)
         : ex.Message;
 
+    /// <summary>Удалённые серверы, не ответившие проверке «Установить также в»: id профиля → когда и почему.</summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTime At, Exception Error)> Unreachable = new();
+
+    /// <summary>Сколько помнить, что удалённый сервер не ответил: выключенную машину не ждать при каждой установке.</summary>
+    public static readonly TimeSpan UnreachableMemory = TimeSpan.FromMinutes(2);
+
+    /// <summary>Удалённый сервер этой цели недавно не ответил проверке — пока не спрашиваем его снова.</summary>
+    public static bool RecentlyUnreachable(ModTarget target) =>
+        target.IsRemote && Unreachable.TryGetValue(target.ProfileId, out var miss) && DateTime.UtcNow - miss.At < UnreachableMemory;
+
+    /// <summary>
+    /// Скан цели для проверки «Установить также в». Удалённый сервер, недавно не ответивший, не спрашиваем: сразу та же
+    /// ошибка, и профиль в окне выбора — «нет связи». Ответил — забываем отказ. Своя установка мода идёт мимо этого.
+    /// </summary>
+    public static async Task<(ResolvedProfile Profile, IReadOnlyList<LocalMod> Mods)> ScanForOfferAsync(ModTarget target, CancellationToken ct = default)
+    {
+        if (!target.IsRemote) return await ScanAsync(target, ct).ConfigureAwait(false);
+        if (RecentlyUnreachable(target) && Unreachable.TryGetValue(target.ProfileId, out var miss))
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(miss.Error);
+        try
+        {
+            var scanned = await ScanAsync(target, ct).ConfigureAwait(false);
+            Unreachable.TryRemove(target.ProfileId, out _);
+            return scanned;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
+        {
+            Unreachable[target.ProfileId] = (DateTime.UtcNow, ex);
+            throw;
+        }
+    }
+
     /// <summary>Сколько ждать скан цели в фоновых проверках («Установить также в»): у хостера первое чтение долгое.</summary>
     public static TimeSpan ScanTimeout(ModTarget target) => target.IsHosted ? TimeSpan.FromSeconds(45) : TimeSpan.FromSeconds(10);
 }

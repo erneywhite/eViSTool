@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using eViSTool.Core.Localization;
 using eViSTool.Core.Mods;
@@ -15,16 +16,22 @@ public sealed class AgentClient : IDisposable
 
     public AgentEndpoint Endpoint { get; }
 
+    /// <summary>Сколько ждать подключения к агенту (не ответа: долгие запросы ждут своё, см. Timed).</summary>
+    public static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(5);
+
     public AgentClient(AgentEndpoint endpoint, string key) : this(endpoint, new Uri($"http://127.0.0.1:{endpoint.Port}/"), key, null) { }
 
     private AgentClient(AgentEndpoint endpoint, Uri baseAddress, string key, string? fingerprint)
     {
         Endpoint = endpoint;
-        var handler = new HttpClientHandler();
+        // выключенная машина удалённого агента не отвечает на подключение вовсе: без своего таймаута подключение висело бы
+        // до таймаута запроса (40 с), и окно ждало бы его, например, перед установкой мода
+        var handler = new SocketsHttpHandler { ConnectTimeout = ConnectTimeout };
         // удалённый агент — только тот, чей сертификат указан в коде подключения: подменить его по дороге не выйдет
         if (fingerprint is not null)
-            handler.ServerCertificateCustomValidationCallback = (_, cert, _, _) =>
-                cert is not null && string.Equals(RemoteAccess.Fingerprint(cert), fingerprint, StringComparison.OrdinalIgnoreCase);
+            handler.SslOptions.RemoteCertificateValidationCallback = (_, cert, _, _) =>
+                cert is not null && string.Equals(RemoteAccess.Fingerprint(cert as X509Certificate2 ?? X509CertificateLoader.LoadCertificate(cert.GetRawCertData())),
+                    fingerprint, StringComparison.OrdinalIgnoreCase);
         _http = new HttpClient(handler)
         {
             BaseAddress = baseAddress,
