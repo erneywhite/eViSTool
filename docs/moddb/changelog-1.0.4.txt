@@ -1,0 +1,15 @@
+eViSTool 1.0.4: a server shut down from inside is no longer a crash.
+
+Fixes
+- A server shut down from inside, by a mod through the Server API or by an admin typing /stop in the game, was counted as a crash: the statistics showed a crash, and the notification channels got "server crashed". Now it is a normal stop: "down" in the statistics and "server stopped" in notifications. The watchdog already treated it correctly and did not restart the server.
+
+Update from About.
+
+---
+
+eViSTool 1.0.4: сервер, выключенный изнутри, больше не считается упавшим.
+
+Исправления
+- Сервер, который выключили изнутри (мод через Server API или админ командой /stop в игре), считался упавшим: в статистике было падение, а в каналы оповещений уходило «сервер упал». Теперь это обычная остановка: в статистике остановка, в оповещениях «сервер остановлен». Сторож и раньше понимал это правильно и сервер не поднимал.
+
+Обнови из «О программе».
