@@ -1,0 +1,11 @@
+eViSTool 1.0.3 for Linux: a Windows-only fix.
+
+Fixes
+- This release fixes creating new profiles on Windows (an antivirus scanning freshly copied files blocked the final rename). On Linux nothing changes; updating keeps the versions in step with the Windows window and the agent.
+
+---
+
+eViSTool 1.0.3 для Linux: исправление только для Windows.
+
+Исправления
+- Выпуск чинит создание новых профилей на Windows (антивирус, проверяя только что скопированные файлы, мешал переименовать папку профиля). На Linux ничего не меняется; обновление держит версии вровень с окном на Windows и агентом.

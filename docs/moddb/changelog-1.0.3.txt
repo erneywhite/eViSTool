@@ -1,0 +1,15 @@
+eViSTool 1.0.3: new profiles with mods and settings are created again.
+
+Fixes
+- Creating a new client profile with shared mods, its own copy of the mods or the source profile's game settings could fail with "Access to the path '….evistool-clone-…' is denied". The new profile is assembled in a temporary folder and then renamed into place, and Windows refuses to rename a folder while an antivirus is still scanning the freshly copied files. Now eViSTool waits for the scan to finish instead of giving up.
+
+Update from About.
+
+---
+
+eViSTool 1.0.3: новые профили с модами и настройками снова создаются.
+
+Исправления
+- Создание клиентского профиля с общими модами, своей копией модов или настройками игры исходного профиля могло падать с ошибкой «Access to the path '….evistool-clone-…' is denied». Новый профиль собирается во временной папке и переименовывается на место, а Windows не даёт переименовать папку, пока антивирус проверяет только что скопированные файлы. Теперь eViSTool ждёт конца проверки, а не сдаётся.
+
+Обнови из «О программе».
