@@ -1,0 +1,21 @@
+eViSTool 1.0.5: profile order and no more waiting for a server that is turned off.
+
+New
+- Profile order: above the list in Profiles you can now pick "As created", "By name" or "Last played"; the profile switcher in the header follows the same order. "Last played" counts launches from eViSTool and, for profiles on this computer, the game's own log, so games started from a shortcut count too.
+
+Fixes
+- With a remote server whose computer is turned off, installing mods made the window wait for a long time while it tried to reach the server. Now eViSTool gives up connecting after 5 seconds and remembers for a couple of minutes that the server did not answer: the next installs do not wait, and the server shows as "no connection" in the "Also install to" choice.
+
+Update from About.
+
+---
+
+eViSTool 1.0.5: порядок профилей и никакого ожидания выключенного сервера.
+
+Новое
+- Порядок профилей: над списком в «Профилях» можно выбрать «Как созданы», «По имени» или «Последняя игра», переключатель профиля в шапке идёт в том же порядке. «Последняя игра» учитывает запуски из eViSTool, а у профилей на этом компьютере ещё и лог самой игры, так что запуски с ярлыка тоже считаются.
+
+Исправления
+- Если компьютер с удалённым сервером выключен, при установке модов окно подолгу ждало, пытаясь до него достучаться. Теперь eViSTool бросает попытку подключиться через 5 секунд и пару минут помнит, что сервер не ответил: следующие установки не ждут, а в выборе «Установить также в» у сервера стоит «нет связи».
+
+Обнови из «О программе».
