@@ -24,4 +24,26 @@ public static class SafeFile
             }
         }
     }
+
+    /// <summary>
+    /// Переименовать папку, пока в ней что-то держат открытым ненадолго. На Windows папку, в которой открыт хоть один файл,
+    /// не переименовать — отказ в доступе. Только что скопированные файлы так держит антивирус, пока проверяет их (сотня
+    /// архивов модов — секунды), поэтому попытки идут до <paramref name="patience"/>, а не ошибка сразу.
+    /// </summary>
+    public static async Task MoveDirectoryAsync(string from, string to, TimeSpan patience, CancellationToken ct = default)
+    {
+        var until = DateTime.UtcNow + patience;
+        while (true)
+        {
+            try
+            {
+                Directory.Move(from, to);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && DateTime.UtcNow < until && Directory.Exists(from))
+            {
+                await Task.Delay(250, ct).ConfigureAwait(false);
+            }
+        }
+    }
 }

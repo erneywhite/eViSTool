@@ -238,6 +238,9 @@ public static class ProfileCloner
     }
 
     private const string StageMarker = ".evistool-clone-";
+
+    /// <summary>Сколько ждать, пока антивирус отпустит скопированные файлы, прежде чем сдаться с отказом в доступе.</summary>
+    internal static TimeSpan StagePatience = TimeSpan.FromSeconds(20);
     private const string StageLock = ".evistool-clone.lock";
 
     /// <summary>
@@ -271,7 +274,8 @@ public static class ProfileCloner
             if (File.Exists(to) || (Directory.Exists(to) && Directory.EnumerateFileSystemEntries(to).Any()))
                 throw new InvalidOperationException(Loc.T("clone.errAppeared", to));
             if (Directory.Exists(to)) Directory.Delete(to); // пустая; не пустая — упадёт, а не удалит чужое
-            Directory.Move(stage, to);
+            // только что скопированное проверяет антивирус и держит открытым: переименование ждёт, пока он отпустит
+            await Platform.SafeFile.MoveDirectoryAsync(stage, to, StagePatience).ConfigureAwait(false);
         }
         catch
         {
