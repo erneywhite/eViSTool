@@ -8,6 +8,10 @@ public sealed class AppSettings
     public List<GameProfile> Profiles { get; set; } = [];
     public string? ActiveProfileId { get; set; }
 
+    /// <summary>Порядок профилей в «Профилях» и в шапке.</summary>
+    [JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+    public ProfileSort ProfileSort { get; set; }
+
     /// <summary>Предлагать пре-релизы модов (rc/pre) даже тем, у кого стоит стабильная версия.</summary>
     public bool AllowUnstable { get; set; }
 

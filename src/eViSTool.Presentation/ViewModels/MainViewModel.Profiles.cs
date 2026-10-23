@@ -14,6 +14,45 @@ public sealed partial class MainViewModel
 {
     public ObservableCollection<ProfileViewModel> Profiles { get; } = [];
 
+    /// <summary>Профили в выбранном порядке — для списка в «Профилях» и переключателя в шапке; в настройках порядок прежний.</summary>
+    public FilteredList<ProfileViewModel> SortedProfiles => _sortedProfiles ??= new FilteredList<ProfileViewModel>(Profiles);
+
+    private FilteredList<ProfileViewModel>? _sortedProfiles;
+
+    /// <summary>Выбранный порядок (пункты списка — в разметке, по <see cref="ProfileSort"/>).</summary>
+    public int ProfileSortIndex
+    {
+        get => (int)_settings.ProfileSort;
+        set
+        {
+            if (value < 0 || value == (int)_settings.ProfileSort) return; // -1 — пункт перевыбирают при смене языка
+            _settings.ProfileSort = (ProfileSort)value;
+            OnPropertyChanged();
+            Save();
+            SortProfiles();
+        }
+    }
+
+    /// <summary>Пересортировать профили: сменили порядок, запустили игру или сервер. Время последней игры читается заново.</summary>
+    public void SortProfiles()
+    {
+        var played = new Dictionary<GameProfile, DateTime?>(ReferenceEqualityComparer.Instance);
+        var compare = ProfileOrder.For(_settings.ProfileSort, p =>
+        {
+            if (!played.TryGetValue(p, out var at)) played[p] = at = ProfileOrder.LastPlayed(p);
+            return at;
+        });
+        SortedProfiles.Sort = compare is null ? null : (a, b) => compare(a.Model, b.Model);
+    }
+
+    /// <summary>Из профиля запустили игру или сервер — отметить для порядка «Последняя игра».</summary>
+    public void MarkPlayed(GameProfile profile)
+    {
+        profile.LastPlayed = DateTime.Now;
+        Save();
+        if (_settings.ProfileSort == ProfileSort.LastPlayed) SortProfiles();
+    }
+
     /// <summary>Профиль, с которым сейчас работаем (переключатель в шапке).</summary>
     private ProfileViewModel? _activeProfile;
 

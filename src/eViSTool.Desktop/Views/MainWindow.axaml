@@ -377,7 +377,7 @@
                                    Foreground="{DynamicResource Forest.Muted}" FontSize="12" />
                         <!-- ширина — по имени, до 340 (длинное — многоточием); места меньше — уже, до 160. В широком окне код
                              окна держит список не уже 240 -->
-                        <ComboBox x:Name="ProfileCombo" ItemsSource="{Binding Profiles}" SelectedItem="{Binding ActiveProfile}" MinWidth="160" MaxWidth="340"
+                        <ComboBox x:Name="ProfileCombo" ItemsSource="{Binding SortedProfiles.Items}" SelectedItem="{Binding ActiveProfile}" MinWidth="160" MaxWidth="340"
                                   AutomationProperties.AutomationId="ProfileCombo" WindowDecorationProperties.ElementRole="User">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ProfileViewModel">

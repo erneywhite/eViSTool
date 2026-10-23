@@ -160,14 +160,19 @@ public sealed class ProfilesSettingsViewTests : IDisposable
         Assert.True(Named(settings, "AutoCheckUpdates").IsEffectivelyVisible);
         Assert.True(Named(settings, "AlsoWithoutAsking").IsEffectivelyVisible);
         // ничего про конкретный профиль
-        Assert.DoesNotContain(settings.GetVisualDescendants().OfType<ListBox>(), l => ReferenceEquals(l.ItemsSource, main.Profiles));
+        Assert.DoesNotContain(settings.GetVisualDescendants().OfType<ListBox>(), l => ReferenceEquals(l.ItemsSource, main.SortedProfiles.Items));
         Assert.False(HasText(settings, Loc.T("settings.profileCard")));
         Assert.False(Has(settings, "CleanupDisk"));
         settings.Close();
 
         var profiles = Show(new ProfilesView { DataContext = main });
         var list = (ListBox)Named(profiles, "ProfileList");
-        Assert.Same(main.Profiles, list.ItemsSource);
+        Assert.Same(main.SortedProfiles.Items, list.ItemsSource);
+        // выбор порядка над списком переставляет и его
+        Assert.True(Named(profiles, "ProfileSort").IsEffectivelyVisible);
+        main.ProfileSortIndex = (int)eViSTool.Core.Profiles.ProfileSort.Name;
+        Assert.Equal(main.Profiles.Select(p => p.Name).Order(StringComparer.CurrentCultureIgnoreCase), list.Items.Cast<ProfileViewModel>().Select(p => p.Name));
+        main.ProfileSortIndex = (int)eViSTool.Core.Profiles.ProfileSort.Created;
         Assert.Same(main.EditedProfile, list.SelectedItem);
         Assert.True(HasText(profiles, Loc.T("settings.profileCard")));
         Assert.Equal(main.EditedProfile!.KindText, ((TextBlock)Named(profiles, "ProfileKind")).Text);

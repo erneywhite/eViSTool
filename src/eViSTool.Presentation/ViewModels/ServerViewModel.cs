@@ -607,9 +607,11 @@ public sealed partial class ServerViewModel : ObservableObject, IServerMonitorHo
             // удалённый агент уже работает там — просто просим запустить сервер
             if (Client is null) throw new InvalidOperationException(Loc.T("server.stateOffline"));
             Apply(await Client.StartAsync());
+            _main.MarkPlayed(profile);
             return;
         }
         var client = await AgentLauncher.EnsureRunningAsync(profile, startServer: true);
+        _main.MarkPlayed(profile);
         if (!ReferenceEquals(client, Client))
         {
             if (Client is not null && Client.Endpoint.Pid == client.Endpoint.Pid) client.Dispose();

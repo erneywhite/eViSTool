@@ -91,6 +91,10 @@ public sealed class GameProfile
     /// </summary>
     public string? DefaultServer { get; set; }
 
+    /// <summary>Когда из окна последний раз запускали игру (клиент) или сервер; null — ни разу. Для сортировки списка.</summary>
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public DateTime? LastPlayed { get; set; }
+
     public bool IsLinkedTo(GameProfile other) =>
         LinkedProfiles.Contains(other.Id, StringComparer.Ordinal) || other.LinkedProfiles.Contains(Id, StringComparer.Ordinal);
 

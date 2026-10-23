@@ -55,6 +55,7 @@ public sealed partial class MainViewModel : ObservableObject
         Server.SetSectionActive(value == AppTab.Server); // лог сервера у хостера читается, только пока раздел открыт
         if (value == AppTab.Catalog) _ = Catalog.EnsureLoadedAsync(); // каталог грузим только когда он нужен
         if (value == AppTab.ModConfig) _ = ModConfig.LoadAsync();    // конфиги — тоже, и свежие при каждом заходе
+        if (value == AppTab.Profiles && _settings.ProfileSort == ProfileSort.LastPlayed) SortProfiles(); // играли и мимо окна
     }
 
     /// <summary>Каналы оповещений этого компьютера — блок в «Настройках».</summary>
@@ -176,6 +177,7 @@ public sealed partial class MainViewModel : ObservableObject
         HostedBackupFolders.Assign(_settings.Profiles, HostedBackupsRoot); // папки копий мира у хостера; на диск уйдёт с Save() ниже
         Loc.Instance.SetLanguage(_settings.Language); // до того, как VM начнут собирать тексты
         foreach (var p in _settings.Profiles) Profiles.Add(new ProfileViewModel(p, OnProfileChanged, _ => Save()));
+        SortProfiles();
 
         _allowUnstable = _settings.AllowUnstable;
         _alsoInstallWithoutAsking = _settings.AlsoInstallWithoutAsking;

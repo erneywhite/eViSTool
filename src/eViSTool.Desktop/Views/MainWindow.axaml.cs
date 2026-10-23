@@ -157,7 +157,7 @@ public partial class MainWindow : Window
         // смену профиля отменили (правки конфига) — вернуть список на текущий профиль, когда он закончит обработку выбора
         vm.ProfileSwitchDeclined += () => Dispatcher.UIThread.Post(() =>
         {
-            if (Vm.ActiveProfile is { } active) ProfileCombo.SelectedIndex = Vm.Profiles.IndexOf(active);
+            if (Vm.ActiveProfile is { } active) ProfileCombo.SelectedIndex = Vm.SortedProfiles.Items.IndexOf(active);
         }, DispatcherPriority.Background);
         ShowPage();
         UpdateBackdrop();

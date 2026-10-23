@@ -93,6 +93,7 @@ public sealed partial class MainViewModel
             Ui.Warn(Loc.T("play.failed", ex.Message));
             return;
         }
+        MarkPlayed(profile.Model);
 
         // процесс уже есть — дальше кнопку держит опрос («Игра запущена»)
         IsLaunching = true;
