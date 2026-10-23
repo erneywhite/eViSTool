@@ -56,9 +56,9 @@ internal sealed class AgentStats(AgentState state)
             // запуск сервера закрывает строку истории модов: всё, что поменяли до него, — одним сеансом
             ModHistory.MarkLaunch(ModHistory.FileFor(state.Options.ProfileId));
         }
-        // сам остановился после запуска — упал (как и для оповещения «сервер упал»)
+        // упал после запуска — падение; выключили изнутри (мод через Server API, /stop админа в игре) — обычная остановка
         else if (serverState == ServerState.Stopped)
-            Stat(new StatsEntry(DateTime.Now, host.LastExitOnItsOwn && state.ReachedRunning ? StatsKind.Crash : StatsKind.Down));
+            Stat(new StatsEntry(DateTime.Now, host.LastExitCrashed && state.ReachedRunning ? StatsKind.Crash : StatsKind.Down));
     }
 
     /// <summary>Из главного цикла: замер раз в минуту, старые дни — раз в сутки.</summary>

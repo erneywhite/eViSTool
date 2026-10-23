@@ -4,7 +4,7 @@ using eViSTool.Core.Notifications;
 using eViSTool.Core.Server;
 
 /// <summary>
-/// Сервер остановился сам (упал, выключился от ошибок) — разобрать его вывод за этот запуск: какой мод виноват.
+/// Сервер остановился сам (упал, выключился от ошибок или его выключили изнутри) — разобрать его вывод за этот запуск: какой мод виноват.
 /// Результат — в статусе (<see cref="LastCrash"/>): окна всех, кто следит за этим сервером, покажут оповещение.
 /// </summary>
 internal sealed class CrashWatch(AgentState state, AgentNotifications notify)
@@ -25,6 +25,12 @@ internal sealed class CrashWatch(AgentState state, AgentNotifications notify)
                 string? report = null;
                 if (CrashAnalyzer.CrashFilePath(lines) is { } path && File.Exists(path)) report = File.ReadAllText(path);
                 var finding = CrashAnalyzer.AnalyzeServer(GameLog.Parse(lines), report, crashed, ModFingerprints.Build(state.Mods.Locals()));
+                if (finding is null && !crashed)
+                {
+                    // тихая остановка изнутри (мод через Server API, /stop админа в игре): не падение
+                    notify.Notify(NotifyEvent.ServerStopped, Loc.T("notify.ev.stopped"));
+                    return;
+                }
                 var cause = finding?.Culprit is { } c
                     ? Loc.T("srv.crashCulprit", c.Mod?.Name ?? c.ModId, c.Version ?? "")
                     : Loc.T("srv.crashNoCulprit");

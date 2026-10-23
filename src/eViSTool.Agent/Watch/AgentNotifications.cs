@@ -41,7 +41,7 @@ internal sealed class AgentNotifications : IDisposable
     /// <summary>Проверочное оповещение по кнопке окна — во все каналы, включённые хоть для одного события.</summary>
     public Task<IReadOnlyList<string>> TestAsync(string title, params NotifyLine[] details) => _notifier.TestAsync(title, details);
 
-    /// <summary>Запуск и остановка сервера. Сам остановился — это падение, о нём скажет разбор вылета.</summary>
+    /// <summary>Запуск и остановка сервера. Сам остановился — разберёт CrashWatch: упал или выключили изнутри.</summary>
     public void OnServerState(ServerState state)
     {
         switch (state)
