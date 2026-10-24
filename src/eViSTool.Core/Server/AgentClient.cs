@@ -198,6 +198,34 @@ public sealed class AgentClient : IDisposable
     public Task<ModConfigContent> ResetModConfigAsync(string path, CancellationToken ct = default) =>
         Post<ModConfigContent>("modconfig/reset", new ModConfigPathRequest(path), ct);
 
+    // ---- постройки WorldEdit сервера (папка WorldEdit) — для карточки «Постройки» окна на другой машине
+
+    public Task<IReadOnlyList<SchematicEntry>> SchematicsAsync(CancellationToken ct = default) =>
+        Get<IReadOnlyList<SchematicEntry>>("schematics", ct);
+
+    /// <summary>Файл схемы как есть (схемы больших построек весят мегабайты — не в JSON, а телом ответа).</summary>
+    public async Task<byte[]> ReadSchematicAsync(string name, CancellationToken ct = default)
+    {
+        using var content = new StringContent(JsonConvert.SerializeObject(new SchematicNameRequest(name)), Encoding.UTF8, "application/json");
+        using var cts = Timed(ct, TimeSpan.FromMinutes(5));
+        using var resp = await _http.PostAsync("schematics/read", content, cts.Token).ConfigureAwait(false);
+        if (!resp.IsSuccessStatusCode) await Read<object>(resp, cts.Token).ConfigureAwait(false); // бросит с текстом агента
+        return await resp.Content.ReadAsByteArrayAsync(cts.Token).ConfigureAwait(false);
+    }
+
+    /// <summary>Записать схему в папку WorldEdit сервера (одноимённая — заменяется).</summary>
+    public async Task WriteSchematicAsync(string name, byte[] bytes, CancellationToken ct = default)
+    {
+        using var content = new ByteArrayContent(bytes);
+        content.Headers.Add(ModFileHeader, Uri.EscapeDataString(name));
+        using var cts = Timed(ct, TimeSpan.FromMinutes(5));
+        using var resp = await _http.PostAsync("schematics/write", content, cts.Token).ConfigureAwait(false);
+        await Read<object>(resp, cts.Token).ConfigureAwait(false);
+    }
+
+    public Task DeleteSchematicAsync(string name, CancellationToken ct = default) =>
+        Post<object>("schematics/delete", new SchematicNameRequest(name), ct);
+
     /// <summary>
     /// Отправить архив мода агенту — он поставит его в папку модов сервера (как установка на этой машине).
     /// <paramref name="release"/> — релиз ModDB, из которого архив скачан: агент по нему ставит отметку «файл релиза»

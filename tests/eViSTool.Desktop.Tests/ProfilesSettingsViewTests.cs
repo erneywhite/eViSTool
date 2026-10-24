@@ -109,6 +109,28 @@ public sealed class ProfilesSettingsViewTests : IDisposable
         return main;
     }
 
+    /// <summary>
+    /// Карточка «Постройки» на «Профилях»: схема из папки WorldEdit профиля видна по имени без «.json». Других профилей
+    /// нет — копировать некуда, кнопка неактивна; у профиля на этой машине есть «Открыть папку».
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Buildings_card_lists_the_profile_schematics()
+    {
+        var main = Main();
+        var worldEdit = Directory.CreateDirectory(Path.Combine(_dir, "data", "WorldEdit")).FullName;
+        File.WriteAllText(Path.Combine(worldEdit, "dom-u-reki.json"), "{}");
+        await main.Schematics!.LoadAsync();
+        var profiles = Show(new ProfilesView { DataContext = main });
+
+        var card = Named(profiles, "SchematicsCard");
+        Assert.True(card.IsEffectivelyVisible);
+        Assert.True(HasText(card, "dom-u-reki"));
+        Assert.True(HasText(card, Loc.T("schem.title")));
+        var copy = card.GetVisualDescendants().OfType<Button>().Single(b => Equals(b.Content, Loc.T("schem.copyTo")));
+        Assert.False(copy.IsEffectivelyEnabled);
+        Assert.Contains(card.GetVisualDescendants().OfType<Button>(), b => Equals(b.Content, Loc.T("schem.openFolder")) && b.IsEffectivelyVisible);
+    }
+
     private Window Show(Control content, double width = 1200, double height = 900)
     {
         _window = new Window { Width = width, Height = height, Content = content };

@@ -227,6 +227,34 @@ public sealed class AgentTests : IAsyncLifetime
         _client = null;
     }
 
+    /// <summary>Постройки WorldEdit сервера по сети: список, файл целиком, запись, удаление; путь из папки не выходит.</summary>
+    [Fact]
+    public async Task RemoteSchematics_ListReadWriteDelete()
+    {
+        var remote = eViSTool.Core.Server.Remote.RemoteAccess.Enable(_profile.Id, AgentsDir);
+        string fingerprint;
+        using (var cert = eViSTool.Core.Server.Remote.RemoteAccess.EnsureCertificate(_profile.Id, AgentsDir))
+            fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
+        _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
+        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
+        var source = new RemoteSchematicSource(new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint));
+
+        Assert.Empty(await source.ListAsync());
+        var house = new byte[300_000]; // схема побольше: идёт телом запроса, а не в JSON
+        Random.Shared.NextBytes(house);
+        await source.WriteAsync("dom.json", house);
+
+        Assert.Equal("dom.json", Assert.Single(await source.ListAsync()).Name);
+        Assert.Equal(house, await source.ReadAsync("dom.json"));
+        Assert.Equal(house, File.ReadAllBytes(Path.Combine(_profile.DataDir!, "WorldEdit", "dom.json")));
+
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => source.WriteAsync("../serverconfig.json", [1]));
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => source.ReadAsync("../serverconfig.json"));
+
+        await source.DeleteAsync("dom.json");
+        Assert.Empty(await source.ListAsync());
+    }
+
     [Fact]
     public async Task RemoteAccess_OverTls_WithPinnedCertificateAndOwnKey()
     {

@@ -47,6 +47,7 @@ internal sealed partial class AgentApi(
         MapMods(web);
         MapPlayers(web);
         MapModConfig(web);
+        MapSchematics(web);
         MapConfig(web);
         MapStats(web);
         MapSelfUpdate(web);

@@ -100,6 +100,9 @@ public sealed partial class MainViewModel
     /// <summary>Копии одиночных миров редактируемого профиля (только у игрового профиля).</summary>
     [ObservableProperty] private WorldCopiesViewModel? _worldCopies;
 
+    /// <summary>Постройки WorldEdit редактируемого профиля — перенести в другой профиль.</summary>
+    [ObservableProperty] private SchematicsViewModel? _schematics;
+
     /// <summary>
     /// Открыть «Профили» на этом профиле: кнопки «Подключение…», «Профили» на «Сервере» и в плашке «Моих модов» говорят
     /// о профиле, который сейчас активен, а «Профили» сами по себе показывают тот, что правили последним.
@@ -116,6 +119,8 @@ public sealed partial class MainViewModel
         RefreshLinks();
         CleanupDiskCommand.NotifyCanExecuteChanged();
         WorldCopies = value?.Model.Kind == ProfileKind.Client ? new WorldCopiesViewModel(value.Model) : null;
+        Schematics = value is null ? null : new SchematicsViewModel(value.Model, () => Profiles.Select(p => p.Model));
+        if (Schematics is not null) _ = Schematics.LoadAsync();
     }
 
     /// <summary>«Уборка диска» профиля (файлы на этой машине; у удалённого сервера и сервера у хостера — нет).</summary>
