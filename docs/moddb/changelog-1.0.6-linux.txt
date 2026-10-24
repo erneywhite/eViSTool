@@ -1,0 +1,19 @@
+eViSTool 1.0.6 for Linux: move your buildings between worlds.
+
+New
+- Buildings (WorldEdit): a new card in Profiles lists the schematics you saved with /we export in a profile's worlds and copies them to another profile, where /we import places them. Handy when you move from a shared server to a solo world, or restart a world for better generation and want to keep your house. Works with profiles on this computer, with a remote server through its agent, and with a server at a hosting provider. After copying, the /we import command is one click away on the clipboard, and the card has short steps on how to move a building.
+
+A remote server needs its agent updated for this: Server tab, Update there.
+
+Update from About.
+
+---
+
+eViSTool 1.0.6 для Linux: перенос построек между мирами.
+
+Новое
+- Постройки (WorldEdit): новая карточка в «Профилях» показывает схемы, сохранённые командой /we export в мирах профиля, и копирует их в другой профиль, где их ставит /we import. Пригодится, когда переезжаешь с общего сервера в одиночный мир или пересоздаёшь мир ради новой генерации и не хочешь терять дом. Работает с профилями на этом компьютере, с удалённым сервером через его агента и с сервером у хостера. После копирования команда /we import копируется в буфер одним кликом, а в карточке есть короткие шаги, как перенести постройку.
+
+Удалённому серверу для этого нужно обновить агента: вкладка «Сервер», «Обновить там».
+
+Обнови из «О программе».
