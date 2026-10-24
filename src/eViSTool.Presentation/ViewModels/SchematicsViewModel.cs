@@ -17,8 +17,17 @@ public sealed class SchematicRow(SchematicEntry entry, IReadOnlyList<SchematicTa
 {
     public SchematicEntry Entry { get; } = entry;
     public string Name => Path.GetFileNameWithoutExtension(Entry.Name);
-    public string Details => WorldCopiesViewModel.SizeText(Entry.Size)
-                             + (Entry.ModifiedUtc > DateTime.MinValue ? " · " + Dates.Stamp(Entry.ModifiedUtc.ToLocalTime()) : "");
+    public string Details => string.Join(" · ", new[]
+    {
+        Entry.Info is { SizeX: > 0 } i ? Loc.T("schem.blocks", i.SizeX, i.SizeY, i.SizeZ) : null,
+        WorldCopiesViewModel.SizeText(Entry.Size),
+        Entry.ModifiedUtc > DateTime.MinValue ? Dates.Stamp(Entry.ModifiedUtc.ToLocalTime()) : null,
+    }.Where(s => s is not null));
+
+    /// <summary>«Моды: millwright, primitivesurvival» — без них блоки этих модов не встанут; пусто — только блоки игры или не читали.</summary>
+    public string ModsText => Entry.Info is { Mods.Count: > 0 } i ? Loc.T("schem.mods", string.Join(", ", i.Mods)) : "";
+
+    public bool HasMods => ModsText.Length > 0;
     public IReadOnlyList<SchematicTarget> Targets { get; } = targets;
     public bool HasTargets => Targets.Count > 0;
 }
@@ -139,7 +148,20 @@ public sealed partial class SchematicsViewModel : ObservableObject
                 Status = "";
                 return;
             }
-            await SchematicSources.CopyAsync(_source, destination, entry.Name);
+            var content = await _source.ReadAsync(entry.Name);
+            // блоки модов, которых там нет, встанут пустотой — сказать до копирования, каких не хватает
+            if (SchematicInfo.Parse(content) is { Mods.Count: > 0 } info)
+            {
+                Status = Loc.T("schem.checkingMods", to.Name);
+                var (_, mods) = await ModTargets.ScanAsync(target);
+                if (info.MissingIn(mods) is { Count: > 0 } missing
+                    && !Ui.Confirm(Loc.T("schem.missingModsConfirm", name, to.Name, string.Join(", ", missing))))
+                {
+                    Status = "";
+                    return;
+                }
+            }
+            await destination.WriteAsync(entry.Name, content);
             Status = Loc.T("schem.copied", name, to.Name);
             ImportCommand = "/we import " + name;
         }

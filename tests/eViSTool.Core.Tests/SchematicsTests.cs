@@ -60,6 +60,51 @@ public sealed class SchematicsTests : IDisposable
     public void LooksLikeSchematic_OneJsonObject(string text, bool expected) =>
         Assert.Equal(expected, Schematics.LooksLikeSchematic(System.Text.Encoding.UTF8.GetBytes(text)));
 
+    /// <summary>Как у настоящей схемы: размер, коды блоков и предметов (в сундуках) — моды по доменам, игра не в счёт.</summary>
+    private const string House = """
+        {"GameVersion":"1.22.7","SizeX":61,"SizeY":66,"SizeZ":72,
+         "BlockCodes":{"1":"game:rock-andesite","2":"millwright:windmillrotor-north","3":"primitivesurvival:fishbasket-north"},
+         "ItemCodes":{"7":"game:rot","8":"butchering:bloodportion","9":"creative:x"},
+         "Indices":[0,1024,2048],"BlockIds":[1,1,2],"BlockEntities":{"22064130":"!<d@[F*O7u#64c"},"Entities":[],
+         "OriginalPos":{"X":510619,"Z":516031}}
+        """;
+
+    [Fact]
+    public void Info_SizeAndModsFromBlocksAndItems()
+    {
+        var info = SchematicInfo.Parse(System.Text.Encoding.UTF8.GetBytes(House))!;
+        Assert.Equal((61, 66, 72), (info.SizeX, info.SizeY, info.SizeZ));
+        Assert.Equal(["butchering", "millwright", "primitivesurvival"], info.Mods);
+        Assert.Null(SchematicInfo.Parse("not json"u8.ToArray()));
+        Assert.Null(SchematicInfo.Parse("[1,2]"u8.ToArray()));
+    }
+
+    [Fact]
+    public void Info_MissingMods_CountsTurnedOffModsAsMissing()
+    {
+        var info = SchematicInfo.Parse(System.Text.Encoding.UTF8.GetBytes(House))!;
+        static eViSTool.Core.Mods.LocalMod Mod(string id, bool off = false) =>
+            new($"{id}.zip", new eViSTool.Core.Mods.ModInfo { ModId = id, Name = id }, null) { IsDisabled = off };
+
+        Assert.Equal(["primitivesurvival"], info.MissingIn([Mod("MillWright"), Mod("butchering"), Mod("primitivesurvival", off: true)]));
+        Assert.Empty(info.MissingIn([Mod("millwright"), Mod("butchering"), Mod("primitivesurvival")]));
+        // форк держит прежний домен: блоки «millwright» даёт и millwrightfork
+        Assert.Empty(info.MissingIn([Mod("millwrightfork"), Mod("butchering"), Mod("primitivesurvival")]));
+    }
+
+    [Fact]
+    public void List_ShowsWhatIsInside()
+    {
+        var data = Data("client");
+        Directory.CreateDirectory(Schematics.DirFor(data));
+        File.WriteAllText(Path.Combine(Schematics.DirFor(data), "home1.json"), House);
+        File.WriteAllText(Path.Combine(Schematics.DirFor(data), "broken.json"), "{");
+
+        var list = Schematics.List(data).ToDictionary(e => e.Name);
+        Assert.Equal(61, list["home1.json"].Info!.SizeX);
+        Assert.Null(list["broken.json"].Info); // не разобрать — без сводки, но в списке
+    }
+
     [Fact]
     public async Task Copy_MovesTheFileIntoTheOtherProfile_AndReplacesTheSameName()
     {

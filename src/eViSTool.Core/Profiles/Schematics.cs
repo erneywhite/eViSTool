@@ -6,8 +6,76 @@ using eViSTool.Core.Server.Remote;
 
 namespace eViSTool.Core.Profiles;
 
-/// <summary>Схема WorldEdit: имя файла в папке WorldEdit, размер, когда сохранена.</summary>
-public sealed record SchematicEntry(string Name, long Size, DateTime ModifiedUtc);
+/// <summary>
+/// Схема WorldEdit: имя файла в папке WorldEdit, размер файла, когда сохранена; <paramref name="Info"/> — что внутри
+/// (размер постройки, нужные моды), null — не читали (у хостера ради списка схемы не качаем) или файл не разобрать.
+/// </summary>
+public sealed record SchematicEntry(string Name, long Size, DateTime ModifiedUtc, SchematicInfo? Info = null);
+
+/// <summary>Что внутри схемы: размер постройки в блоках и моды, чьи блоки и предметы в ней есть (по домену кода).</summary>
+public sealed record SchematicInfo(int SizeX, int SizeY, int SizeZ, IReadOnlyList<string> Mods)
+{
+    /// <summary>Домены самой игры: их блоки есть в любом мире.</summary>
+    private static readonly HashSet<string> GameDomains = new(StringComparer.OrdinalIgnoreCase) { "game", "creative", "survival" };
+
+    /// <summary>
+    /// Разобрать схему: размер и домены кодов из BlockCodes и ItemCodes (предметы в сундуках тоже из модов). Огромные
+    /// списки блоков пропускаются не читая. Не схема — null.
+    /// </summary>
+    public static SchematicInfo? Parse(Stream content)
+    {
+        try
+        {
+            using var reader = new Newtonsoft.Json.JsonTextReader(new StreamReader(content));
+            if (!reader.Read() || reader.TokenType != Newtonsoft.Json.JsonToken.StartObject) return null;
+            int x = 0, y = 0, z = 0;
+            var mods = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+            while (reader.Read() && reader.TokenType == Newtonsoft.Json.JsonToken.PropertyName)
+            {
+                var name = (string)reader.Value!;
+                if (!reader.Read()) break;
+                switch (name)
+                {
+                    case "SizeX": x = Convert.ToInt32(reader.Value); break;
+                    case "SizeY": y = Convert.ToInt32(reader.Value); break;
+                    case "SizeZ": z = Convert.ToInt32(reader.Value); break;
+                    case "BlockCodes" or "ItemCodes" when reader.TokenType == Newtonsoft.Json.JsonToken.StartObject:
+                        while (reader.Read() && reader.TokenType == Newtonsoft.Json.JsonToken.PropertyName)
+                        {
+                            if (reader.ReadAsString() is { } code && code.IndexOf(':') is var colon and > 0
+                                && code[..colon] is var domain && !GameDomains.Contains(domain))
+                                mods.Add(domain);
+                        }
+                        break;
+                    default:
+                        reader.Skip();
+                        break;
+                }
+            }
+            // обрезанный файл (оборвалась запись) кончается посреди объекта — это не схема
+            return reader.TokenType == Newtonsoft.Json.JsonToken.EndObject ? new SchematicInfo(x, y, z, [.. mods]) : null;
+        }
+        catch (Exception ex) when (ex is Newtonsoft.Json.JsonException or FormatException or InvalidCastException or OverflowException)
+        {
+            return null;
+        }
+    }
+
+    public static SchematicInfo? Parse(byte[] content) => Parse(new MemoryStream(content));
+
+    /// <summary>
+    /// Моды схемы, которых нет среди включённых модов профиля: их блоки встанут пустотой. Домен кода — обычно modid
+    /// мода, но форк или переименованный мод держит прежний домен («xlib» у xlibfork, «weaponpacka» у
+    /// weaponpackalphaunoff), поэтому подходит и modid, который с домена начинается.
+    /// </summary>
+    public IReadOnlyList<string> MissingIn(IEnumerable<Mods.LocalMod> mods)
+    {
+        // shortcut: домен мода сверяем с началом modid, а не по папке assets в архиве (её у модов удалённого сервера и
+        // хостера здесь не прочесть) — мод с похожим modid может скрыть недостающий; переделать, если агент начнёт отдавать домены
+        var have = mods.Where(m => !m.IsDisabled && m.Info is not null).Select(m => m.Info!.ModId).ToList();
+        return [.. Mods.Where(d => !have.Any(id => id.StartsWith(d, StringComparison.OrdinalIgnoreCase)))];
+    }
+}
 
 /// <summary>Имя схемы для запросов к агенту (чтение, удаление).</summary>
 public sealed record SchematicNameRequest(string Name);
@@ -30,9 +98,25 @@ public static class Schematics
         var dir = DirFor(dataDir);
         if (!Directory.Exists(dir)) return [];
         return [.. new DirectoryInfo(dir).EnumerateFiles("*" + Extension)
-            .Select(f => new SchematicEntry(f.Name, f.Length, f.LastWriteTimeUtc))
+            .Select(f => new SchematicEntry(f.Name, f.Length, f.LastWriteTimeUtc, InfoOf(f)))
             .OrderByDescending(e => e.ModifiedUtc)];
     }
+
+    // разобранные схемы по пути, размеру и времени: список перечитывают часто, а схема дома весит мегабайты
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<(string, long, DateTime), SchematicInfo?> Infos = new();
+
+    private static SchematicInfo? InfoOf(FileInfo file) => Infos.GetOrAdd((file.FullName, file.Length, file.LastWriteTimeUtc), _ =>
+    {
+        try
+        {
+            using var stream = file.OpenRead();
+            return SchematicInfo.Parse(stream);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    });
 
     /// <summary>Имя схемы → файл в папке WorldEdit; путь, «..», не .json — ошибка (имя может прийти по сети).</summary>
     public static string PathOf(string dataDir, string name) =>

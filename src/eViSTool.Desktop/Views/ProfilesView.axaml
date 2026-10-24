@@ -406,6 +406,8 @@
                                                             <StackPanel Margin="0,0,12,0">
                                                                 <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap" />
                                                                 <TextBlock Text="{Binding Details}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" />
+                                                                <TextBlock Text="{Binding ModsText}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap"
+                                                                           IsVisible="{Binding HasMods}" />
                                                             </StackPanel>
                                                         </DockPanel>
                                                     </Border>

@@ -84,6 +84,26 @@ public sealed class SchematicsViewModelTests : IDisposable
         Assert.Contains(picker.Warned, w => w.Contains("notes.json"));
     }
 
+    /// <summary>В схеме блоки мода, которого в целевом профиле нет: сначала вопрос со списком, отказались — не копируем.</summary>
+    [Fact]
+    public async Task Copy_ToAProfileWithoutTheMods_AsksFirst()
+    {
+        var server = Profile("srv", "Сервер", ProfileKind.Server);
+        var solo = Profile("solo", "Соло", ProfileKind.Client);
+        Schematics.Write(server.DataDir!, "dom.json",
+            """{"SizeX":2,"SizeY":2,"SizeZ":2,"BlockCodes":{"1":"game:rock-andesite","2":"millwright:axle"}}"""u8.ToArray());
+        using var dialogs = new ScriptedDialogs(Answer.No);
+
+        var vm = new SchematicsViewModel(server, () => [server, solo]);
+        await vm.LoadAsync();
+        Assert.Equal("2×2×2", vm.Rows[0].Details.Split(' ')[0]);
+        Assert.Contains("millwright", vm.Rows[0].ModsText);
+        await ((CommunityToolkit.Mvvm.Input.IAsyncRelayCommand)vm.Rows[0].Targets[0].Command).ExecuteAsync(null);
+
+        Assert.Contains("millwright", Assert.Single(dialogs.Asked));
+        Assert.False(File.Exists(Path.Combine(solo.DataDir!, "WorldEdit", "dom.json")));
+    }
+
     [Fact]
     public async Task Copy_OverTheSameName_AsksFirst()
     {
