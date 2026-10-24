@@ -411,6 +411,19 @@
                                         </ItemsControl>
                                         <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource Forest.Accent}" TextWrapping="Wrap" Margin="0,6,0,0"
                                                    IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        <!-- команда для мира, куда скопировали: клик — в буфер обмена -->
+                                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,6,0,0" IsVisible="{Binding HasImportCommand}">
+                                            <Button Command="{Binding CopyImportCommandCommand}" Padding="10,5" MinHeight="0"
+                                                    ToolTip.Tip="{local:Tr schem.copyCommandTip}" AutomationProperties.AutomationId="SchematicImportCommand"
+                                                    AutomationProperties.Name="{Binding ImportCommand}">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="{Binding ImportCommand}" Classes="mono" FontSize="12" VerticalAlignment="Center" />
+                                                    <Path Classes="icon" Data="{StaticResource Icon.Copy}" Width="12" Height="12" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                            <TextBlock Text="{local:Tr schem.commandCopied}" FontSize="12" Foreground="{DynamicResource Forest.Muted}"
+                                                       VerticalAlignment="Center" IsVisible="{Binding CommandCopied}" />
+                                        </StackPanel>
                                         <!-- как перенести постройку: шаги WorldEdit, чтобы не искать команды -->
                                         <Expander Header="{local:Tr schem.howTitle}" Margin="0,10,0,0" HorizontalAlignment="Stretch">
                                             <StackPanel Spacing="4">

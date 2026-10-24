@@ -54,6 +54,24 @@ public sealed partial class SchematicsViewModel : ObservableObject
 
     [ObservableProperty] private string _status = "";
 
+    /// <summary>Команда, которой поставить только что скопированную постройку («/we import дом»); клик — в буфер обмена.</summary>
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasImportCommand))] private string _importCommand = "";
+
+    public bool HasImportCommand => ImportCommand.Length > 0;
+
+    /// <summary>Команду только что скопировали — подпись «Скопировано» рядом на пару секунд.</summary>
+    [ObservableProperty] private bool _commandCopied;
+
+    [RelayCommand]
+    private async Task CopyImportCommandAsync()
+    {
+        if (!HasImportCommand) return;
+        Ui.Platform.SetClipboard(ImportCommand);
+        CommandCopied = true;
+        await Task.Delay(TimeSpan.FromSeconds(2));
+        CommandCopied = false;
+    }
+
     [RelayCommand]
     public async Task LoadAsync()
     {
@@ -106,6 +124,7 @@ public sealed partial class SchematicsViewModel : ObservableObject
             Ui.Warn(ModTarget.UnreadableText(to));
             return;
         }
+        ImportCommand = "";
         Status = Loc.T("schem.copying", name, to.Name);
         try
         {
@@ -119,6 +138,7 @@ public sealed partial class SchematicsViewModel : ObservableObject
             }
             await SchematicSources.CopyAsync(_source, destination, entry.Name);
             Status = Loc.T("schem.copied", name, to.Name);
+            ImportCommand = "/we import " + name;
         }
         catch (Exception ex) when (IsExpected(ex))
         {
@@ -136,6 +156,7 @@ public sealed partial class SchematicsViewModel : ObservableObject
         try
         {
             await _source.DeleteAsync(row.Entry.Name);
+            ImportCommand = "";
             Status = Loc.T("schem.deleted", row.Name);
         }
         catch (Exception ex) when (IsExpected(ex))
