@@ -402,6 +402,33 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False"
                               IsVisible="{Binding Tab, Converter={x:Static conv:EnumEqualsConverter.Instance}, ConverterParameter=World}">
                     <StackPanel Margin="0,14,14,0">
+                        <!-- какой мир запускать: миры из Saves и «Создать новый мир…»; прежние миры остаются в Saves -->
+                        <Border Classes="card cfgCard" Margin="0,0,0,14" IsVisible="{Binding WorldsAvailable}" AutomationProperties.AutomationId="WorldPicker">
+                            <StackPanel>
+                                <TextBlock Text="{local:Tr srvcfg.worldPick}" Classes="cardTitle" />
+                                <TextBlock Text="{local:Tr srvcfg.worldPickHint}" Classes="hint" />
+                                <ComboBox ItemsSource="{Binding WorldChoices}" SelectedItem="{Binding SelectedWorld}" IsEnabled="{Binding !IsReadOnly}"
+                                          HorizontalAlignment="Stretch" Margin="0,10,0,0" AutomationProperties.Name="{local:Tr srvcfg.worldPick}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:WorldChoice">
+                                            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <DockPanel Margin="0,10,0,0" IsVisible="{Binding IsCreatingWorld}">
+                                    <Button DockPanel.Dock="Right" Content="{local:Tr srvcfg.newWorldCancel}" Command="{Binding CancelCreateWorldCommand}"
+                                            Padding="12,5" MinHeight="0" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                    <Button DockPanel.Dock="Right" Classes="primary" Content="{local:Tr srvcfg.newWorldCreate}" Command="{Binding CreateWorldCommand}"
+                                            Padding="12,5" MinHeight="0" Margin="8,0,0,0" VerticalAlignment="Center" IsDefault="True" />
+                                    <TextBox Text="{Binding NewWorldName}" PlaceholderText="{local:Tr srvcfg.newWorldName}"
+                                             AutomationProperties.Name="{local:Tr srvcfg.newWorldName}" AutomationProperties.AutomationId="NewWorldName" />
+                                </DockPanel>
+                                <TextBlock Text="{Binding WorldError}" FontSize="12" Foreground="{DynamicResource Forest.Danger}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                           IsVisible="{Binding WorldError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                <TextBlock Text="{local:Tr srvcfg.worldModsNote}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="0,10,0,0" />
+                            </StackPanel>
+                        </Border>
+
                         <!-- мир уже создан: часть параметров больше ни на что не влияет -->
                         <Border Classes="warning" Margin="0,0,0,14" IsVisible="{Binding WorldExists}">
                             <DockPanel>

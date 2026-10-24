@@ -198,6 +198,9 @@ public sealed class AgentClient : IDisposable
     public Task<ModConfigContent> ResetModConfigAsync(string path, CancellationToken ct = default) =>
         Post<ModConfigContent>("modconfig/reset", new ModConfigPathRequest(path), ct);
 
+    /// <summary>Миры сервера (Saves/*.vcdbs) и папка, куда ляжет новый.</summary>
+    public Task<ServerWorldList> WorldsAsync(CancellationToken ct = default) => Get<ServerWorldList>("worlds", ct);
+
     // ---- постройки WorldEdit сервера (папка WorldEdit) — для карточки «Постройки» окна на другой машине
 
     public Task<IReadOnlyList<SchematicEntry>> SchematicsAsync(CancellationToken ct = default) =>

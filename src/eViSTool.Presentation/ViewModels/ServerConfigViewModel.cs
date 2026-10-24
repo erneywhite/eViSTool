@@ -487,6 +487,7 @@ public sealed partial class ServerConfigViewModel : ObservableObject
             _roleErrors = [];
             WorldExists = false;
             SearchEmpty = false;
+            ClearWorlds();
         }
         finally
         {
@@ -530,6 +531,7 @@ public sealed partial class ServerConfigViewModel : ObservableObject
             _building = false;
         }
         Recalculate();
+        _ = LoadWorldsAsync();
     }
 
     private IReadOnlyList<ConfigGroupViewModel> GroupsOf(Func<ConfigFieldViewModel, bool> inSection) =>
@@ -557,7 +559,11 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     private void OnFieldChanged(ConfigFieldViewModel field)
     {
         if (_building) return;
-        if (field.Path == SaveFilePath) UpdateWorldExists();
+        if (field.Path == SaveFilePath)
+        {
+            UpdateWorldExists();
+            if (!_choosing) RefreshWorldChoices(); // выбор в списке перестроит его сам, когда закончит
+        }
         if (field.Path == WelcomePath) OnPropertyChanged(nameof(WelcomeMessage));
         Touch();
     }
@@ -692,7 +698,8 @@ public sealed partial class ServerConfigViewModel : ObservableObject
     {
         if (IsRemote)
         {
-            WorldExists = _remoteWorldExists; // файл мира — на той машине, о нём знает агент
+            // файл мира — на той машине: по её списку миров, а без списка (старый агент) — как агент ответил о сохранённом
+            WorldExists = _worlds is { } worlds ? ServerWorlds.Find(worlds, CurrentSaveFile) is not null : _remoteWorldExists;
             return;
         }
         var file = _doc?.Get(SaveFilePath) is JValue { Value: string text } ? text.Trim() : "";

@@ -10,6 +10,8 @@ internal sealed partial class AgentApi
     private void MapSchematics(WebApplication web)
     {
         web.MapGet("/schematics", () => Guard(() => Schematics.List(Opts.DataPath)));
+        // миры сервера (Saves/*.vcdbs) — выбор мира и создание нового в редакторе конфига окна на другой машине
+        web.MapGet("/worlds", () => Guard(() => ServerWorlds.List(Opts.DataPath)));
         web.MapPost("/schematics/read", async (HttpContext ctx) =>
         {
             if (await ReadBody<SchematicNameRequest>(ctx) is not { } r) return Results.BadRequest();

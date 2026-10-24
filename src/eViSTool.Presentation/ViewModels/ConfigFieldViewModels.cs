@@ -86,6 +86,9 @@ public abstract partial class ConfigFieldViewModel : ObservableObject
             _ => new ConfigTextFieldViewModel(doc, spec, changed),
         };
 
+    /// <summary>Вернуть значение, с которым поле загружено (у служебных полей — нечего).</summary>
+    public virtual void ResetToOriginal() { }
+
     /// <summary>Сменился язык: подпись, подсказка и текст ошибки — заново.</summary>
     public virtual void RefreshTexts()
     {
@@ -131,6 +134,8 @@ public partial class ConfigTextFieldViewModel : ConfigFieldViewModel
     public ConfigTextFieldViewModel(ServerConfigDocument doc, ConfigFieldSpec spec, Action<ConfigFieldViewModel> changed)
         : base(doc, spec, changed) =>
         _text = ConfigValueCodec.ToText(Original, spec);
+
+    public override void ResetToOriginal() => Text = ConfigValueCodec.ToText(Original, Spec);
 
     partial void OnTextChanged(string value)
     {
@@ -202,6 +207,8 @@ public sealed partial class ConfigBoolFieldViewModel : ConfigFieldViewModel
         _value = Original is JValue { Value: true };
 
     partial void OnValueChanged(bool value) => Commit(new JValue(value));
+
+    public override void ResetToOriginal() => Value = Original is JValue { Value: true };
 }
 
 /// <summary>Вариант выпадающего списка: подпись и то, что запишется в файл.</summary>
@@ -255,6 +262,12 @@ public sealed class ConfigChoiceFieldViewModel : ConfigFieldViewModel
 
     /// <summary>Список не пересоздаётся: при замене ItemsSource выпадающий список сбросил бы выбор.</summary>
     public IReadOnlyList<ConfigChoiceOption> Options { get; }
+
+    public override void ResetToOriginal()
+    {
+        var original = ConfigValueCodec.ToText(Original, Spec);
+        if (Options.FirstOrDefault(o => o.Value == original) is { } option) Selected = option;
+    }
 
     public ConfigChoiceOption? Selected
     {
