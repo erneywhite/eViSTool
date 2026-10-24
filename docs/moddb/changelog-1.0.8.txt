@@ -1,0 +1,21 @@
+eViSTool 1.0.8: know which mods a building needs before you move it.
+
+New
+- Buildings: each schematic now shows the size of the building in blocks and the mods whose blocks and items it contains (chest contents included).
+- "Copy to…" checks those mods against the mods turned on in the target profile and asks first if some are missing: their blocks would be placed as empty space. A fork that keeps the original mod's blocks counts as installed.
+
+A remote server needs its agent updated to show this in the list: Server tab, Update there.
+
+Update from About.
+
+---
+
+eViSTool 1.0.8: какие моды нужны постройке, видно до переноса.
+
+Новое
+- Постройки: у каждой схемы теперь видно размер постройки в блоках и моды, чьи блоки и предметы в ней есть (включая содержимое сундуков).
+- «Копировать в…» сверяет эти моды с включёнными модами целевого профиля и спрашивает, если каких-то нет: их блоки встали бы пустотой. Форк, в котором остались блоки исходного мода, считается установленным.
+
+Чтобы это было видно в списке удалённого сервера, обнови его агента: вкладка «Сервер», «Обновить там».
+
+Обнови из «О программе».
