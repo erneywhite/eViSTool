@@ -153,6 +153,7 @@ public partial class MainWindow : Window
         base.OnDataContextChanged(e);
         if (DataContext is not MainViewModel vm) return;
         vm.PropertyChanged += OnVmPropertyChanged;
+        Controls.KeepSelection.Follow(ProfileCombo, vm.SortedProfiles, () => vm.ActiveProfile);
         if (OperatingSystem.IsLinux()) ApplyWindowFrame();
         // смену профиля отменили (правки конфига) — вернуть список на текущий профиль, когда он закончит обработку выбора
         vm.ProfileSwitchDeclined += () => Dispatcher.UIThread.Post(() =>

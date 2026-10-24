@@ -126,7 +126,7 @@
                         <Button Classes="danger" Content="{local:Tr settings.removeProfile}" Command="{Binding RemoveProfileCommand}"
                                 CommandParameter="{Binding EditedProfile}" HorizontalAlignment="Stretch" />
                     </StackPanel>
-                    <ListBox ItemsSource="{Binding SortedProfiles.Items}" SelectedItem="{Binding EditedProfile}" Background="Transparent" BorderThickness="0"
+                    <ListBox x:Name="ProfileList" ItemsSource="{Binding SortedProfiles.Items}" SelectedItem="{Binding EditedProfile}" Background="Transparent" BorderThickness="0"
                              ItemContainerTheme="{StaticResource Forest.NavItem}" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              AutomationProperties.AutomationId="ProfileList">
                         <ListBox.ItemTemplate>

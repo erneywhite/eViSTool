@@ -78,7 +78,7 @@ public sealed class ProfilesSettingsViewTests : IDisposable
     /// Главная модель над своими настройками: один серверный профиль «Стенд» во временной папке, фон из игры включён,
     /// без автопроверки модов (она ходила бы в модбазу; каталог, который тоже ходит туда, тесты не открывают).
     /// </summary>
-    private MainViewModel Main()
+    private MainViewModel Main(params GameProfile[] extra)
     {
         Assert.SkipUnless(AppPaths.IsPortable, "данные рядом с тестами недоступны для записи — настоящие данные пользователя не трогаем");
         AddTheme();
@@ -95,7 +95,7 @@ public sealed class ProfilesSettingsViewTests : IDisposable
         };
         new SettingsStore().Save(new AppSettings
         {
-            Profiles = [profile], ActiveProfileId = profile.Id, Language = _language,
+            Profiles = [profile, .. extra], ActiveProfileId = profile.Id, Language = _language,
             AutoCheckUpdates = false, GameBackground = true,
         });
 
@@ -129,6 +129,44 @@ public sealed class ProfilesSettingsViewTests : IDisposable
         var copy = card.GetVisualDescendants().OfType<Button>().Single(b => Equals(b.Content, Loc.T("schem.copyTo")));
         Assert.False(copy.IsEffectivelyEnabled);
         Assert.Contains(card.GetVisualDescendants().OfType<Button>(), b => Equals(b.Content, Loc.T("schem.openFolder")) && b.IsEffectivelyVisible);
+    }
+
+    /// <summary>
+    /// Порядок «Последняя игра»: запуск другого профиля поднимает его наверх — переключатель в шапке и список «Профилей»
+    /// при этом не теряют выбранный профиль (раньше сдвиг строк сбрасывал активный профиль в «не выбран»).
+    /// </summary>
+    [AvaloniaFact]
+    public void Reordering_profiles_keeps_the_active_and_the_edited_profile()
+    {
+        var other = new GameProfile { Id = "pages-other", Name = "Другой", Kind = ProfileKind.Server, DataDir = Path.Combine(_dir, "other") };
+        var main = Main(other);
+        main.ProfileSortIndex = (int)eViSTool.Core.Profiles.ProfileSort.LastPlayed;
+        var stand = main.ActiveProfile!;
+        main.MarkPlayed(main.Profiles.Single(p => p.Model.Id == other.Id).Model); // «Другой» — наверху, выбранный «Стенд» — под ним
+
+        // шапка: тот же переключатель, что в главном окне
+        var header = new ComboBox { ItemsSource = main.SortedProfiles.Items };
+        header.Bind(ComboBox.SelectedItemProperty, new Avalonia.Data.Binding(nameof(MainViewModel.ActiveProfile)) { Mode = Avalonia.Data.BindingMode.TwoWay });
+        eViSTool.Desktop.Controls.KeepSelection.Follow(header, main.SortedProfiles, () => main.ActiveProfile);
+        var panel = new DockPanel { DataContext = main };
+        DockPanel.SetDock(header, Dock.Top);
+        panel.Children.Add(header);
+        var view = new ProfilesView();
+        panel.Children.Add(view);
+        Show(panel);
+        var list = (ListBox)Named(view, "ProfileList");
+        Assert.Same(stand, header.SelectedItem);
+        Assert.Same(stand, list.SelectedItem);
+        Assert.Equal("pages-other", main.SortedProfiles.Items[0].Model.Id);
+
+        main.MarkPlayed(stand.Model); // запустили выбранный — он сам уезжает наверх
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(stand, main.SortedProfiles.Items[0]);
+        Assert.Same(stand, main.ActiveProfile);
+        Assert.Same(stand, main.EditedProfile);
+        Assert.Same(stand, header.SelectedItem);
+        Assert.Same(stand, list.SelectedItem);
     }
 
     private Window Show(Control content, double width = 1200, double height = 900)

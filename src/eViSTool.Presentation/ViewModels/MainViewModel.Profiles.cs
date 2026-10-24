@@ -15,9 +15,22 @@ public sealed partial class MainViewModel
     public ObservableCollection<ProfileViewModel> Profiles { get; } = [];
 
     /// <summary>Профили в выбранном порядке — для списка в «Профилях» и переключателя в шапке; в настройках порядок прежний.</summary>
-    public FilteredList<ProfileViewModel> SortedProfiles => _sortedProfiles ??= new FilteredList<ProfileViewModel>(Profiles);
+    public FilteredList<ProfileViewModel> SortedProfiles
+    {
+        get
+        {
+            return _sortedProfiles ??= new FilteredList<ProfileViewModel>(Profiles);
+        }
+    }
 
     private FilteredList<ProfileViewModel>? _sortedProfiles;
+
+    /// <summary>
+    /// «Ничего не выбрано» от списка, у которого просто переставили строки (выделенная уехала на другое место), — не
+    /// выбор пользователя: иначе запуск сервера при порядке «Последняя игра» сбрасывал активный профиль. Выделение
+    /// списку возвращает окно (Desktop.Controls.KeepSelection).
+    /// </summary>
+    private bool IsReorderGlitch(ProfileViewModel? value) => value is null && _sortedProfiles is { IsRefreshing: true };
 
     /// <summary>Выбранный порядок (пункты списка — в разметке, по <see cref="ProfileSort"/>).</summary>
     public int ProfileSortIndex
@@ -65,7 +78,7 @@ public sealed partial class MainViewModel
         get => _activeProfile;
         set
         {
-            if (value == _activeProfile) return;
+            if (value == _activeProfile || IsReorderGlitch(value)) return;
             if ((Server is not null && !Server.Config.ConfirmSwitch()) || (ModConfig is not null && !ModConfig.ConfirmLeave()))
             {
                 ProfileSwitchDeclined?.Invoke(); // список уже показывает новый выбор — окно вернёт его на прежний
@@ -75,8 +88,18 @@ public sealed partial class MainViewModel
         }
     }
 
+    private ProfileViewModel? _editedProfile;
+
     /// <summary>Профиль, открытый в редакторе на вкладке «Профили».</summary>
-    [ObservableProperty] private ProfileViewModel? _editedProfile;
+    public ProfileViewModel? EditedProfile
+    {
+        get => _editedProfile;
+        set
+        {
+            if (IsReorderGlitch(value)) return;
+            if (SetProperty(ref _editedProfile, value)) OnEditedProfileChanged(value);
+        }
+    }
 
     /// <summary>Связи редактируемого профиля: в какие профили ставить моды заодно.</summary>
     public System.Collections.ObjectModel.ObservableCollection<LinkChoice> LinkChoices { get; } = [];
@@ -113,7 +136,7 @@ public sealed partial class MainViewModel
         SelectedTab = AppTab.Profiles;
     }
 
-    partial void OnEditedProfileChanged(ProfileViewModel? value)
+    private void OnEditedProfileChanged(ProfileViewModel? value)
     {
         NotifyEditedDefaultServer();
         RefreshLinks();

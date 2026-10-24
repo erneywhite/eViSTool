@@ -32,6 +32,15 @@ public sealed class FilteredList<T> where T : class
 
     public int Count => _items.Count;
 
+    /// <summary>
+    /// Вид сейчас переставляет строки. Список окна, у которого выделена сдвигаемая строка, на время сдвига теряет
+    /// выделение и сообщает «ничего не выбрано» — модели в это время такой выбор принимать не надо.
+    /// </summary>
+    public bool IsRefreshing { get; private set; }
+
+    /// <summary>Строки переставлены (или не понадобилось): модель может вернуть выделение спискам окна.</summary>
+    public event Action? Refreshed;
+
     public Predicate<T>? Filter
     {
         get => _filter;
@@ -73,6 +82,20 @@ public sealed class FilteredList<T> where T : class
             ? wanted.Select((item, index) => (item, index)).OrderBy(x => x, new Stable(sort)).Select(x => x.item).ToList()
             : wanted.ToList();
 
+        IsRefreshing = true;
+        try
+        {
+            Apply(desired);
+        }
+        finally
+        {
+            IsRefreshing = false;
+        }
+        Refreshed?.Invoke();
+    }
+
+    private void Apply(List<T> desired)
+    {
         // оставшиеся — сдвигом на свои места; недостающий встаёт на место лишнего (замена), а нет такого — вставкой;
         // остальные лишние — вон в конце. Лишние не убираются заранее: исходную коллекцию построили заново (таблица
         // модов после операции — все строки новые), и вид, опустев хоть на миг, сбросил бы прокрутку таблицы к началу
