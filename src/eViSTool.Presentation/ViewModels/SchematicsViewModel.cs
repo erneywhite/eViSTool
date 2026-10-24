@@ -47,10 +47,13 @@ public sealed partial class SchematicsViewModel : ObservableObject
     /// <summary>Папка на этой машине есть — кнопка «Открыть папку» (у удалённого сервера и хостера её нет).</summary>
     public bool CanOpenFolder => _source?.LocalFolder is not null;
 
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsEmpty))] private bool _isLoading;
+    /// <summary>Список прочитан — можно добавлять файлы (пока читается или нет связи — некуда).</summary>
+    public bool CanAdd => _source is not null && !IsLoading && string.IsNullOrEmpty(Error);
+
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsEmpty), nameof(CanAdd))] private bool _isLoading;
 
     /// <summary>Список не прочитать: нет связи, старый агент, код не расшифровать.</summary>
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsEmpty))] private string _error = "";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsEmpty), nameof(CanAdd))] private string _error = "";
 
     [ObservableProperty] private string _status = "";
 
@@ -163,6 +166,44 @@ public sealed partial class SchematicsViewModel : ObservableObject
         {
             Ui.Warn(Loc.T("schem.deleteFailed", row.Name, Describe(_target, ex)));
         }
+        await LoadAsync();
+    }
+
+    /// <summary>
+    /// Схемы с диска (скачанные, присланные, из старой папки) — в этот профиль. Не JSON — не схема, пропускаем с
+    /// предупреждением; одноимённая в профиле — с вопросом.
+    /// </summary>
+    [RelayCommand]
+    private async Task AddFromFileAsync()
+    {
+        if (_source is null) return;
+        var files = Ui.Platform.PickFiles(Loc.T("schem.addPick"), [new FileFilter(Loc.T("schem.addFilter"), "*" + Schematics.Extension)], multiple: true);
+        if (files is not { Count: > 0 }) return;
+
+        ImportCommand = "";
+        var added = 0;
+        try
+        {
+            var there = (await _source.ListAsync()).Select(e => e.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in files)
+            {
+                var name = Path.GetFileName(file);
+                var bytes = await Task.Run(() => File.ReadAllBytes(file));
+                if (!Schematics.IsValidName(name) || !Schematics.LooksLikeSchematic(bytes))
+                {
+                    Ui.Warn(Loc.T("schem.notSchematic", name));
+                    continue;
+                }
+                if (there.Contains(name) && !Ui.Confirm(Loc.T("schem.replaceConfirm", Path.GetFileNameWithoutExtension(name), _profile.Name))) continue;
+                await _source.WriteAsync(name, bytes);
+                added++;
+            }
+        }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            Ui.Warn(Loc.T("schem.addFailed", Describe(_target, ex)));
+        }
+        if (added > 0) Status = Loc.T("schem.added", added);
         await LoadAsync();
     }
 

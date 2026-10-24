@@ -133,7 +133,7 @@ internal class TestUiPlatform : IUiPlatform
     public void Invoke(Action action) => UiQueue.Send(_ => action(), null);
     public IUiTimer CreateTimer(TimeSpan interval) => new QueueTimer(UiQueue, interval);
 
-    public IReadOnlyList<string>? PickFiles(string title, IReadOnlyList<FileFilter> filters, bool multiple) => null;
+    public virtual IReadOnlyList<string>? PickFiles(string title, IReadOnlyList<FileFilter> filters, bool multiple) => null;
     public string? PickSaveFile(string title, IReadOnlyList<FileFilter> filters, string suggestedName, string? folder = null, bool confirmOverwrite = true) => null;
     public string? PickFolder(string title, string? initialFolder) => null;
     public virtual void SetClipboard(string text) { }

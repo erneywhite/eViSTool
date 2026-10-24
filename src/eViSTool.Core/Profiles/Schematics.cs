@@ -43,6 +43,25 @@ public static class Schematics
     public static bool IsValidName(string? name) =>
         name is { Length: > 5 } && name.EndsWith(Extension, StringComparison.OrdinalIgnoreCase) && name.IndexOfAny(['/', '\\']) < 0;
 
+    /// <summary>
+    /// Похоже ли содержимое на схему: JSON-объект (WorldEdit пишет схему одним объектом). Проверка грубая — отсечь
+    /// случайно выбранный не тот файл, а не разбирать формат игры.
+    /// </summary>
+    public static bool LooksLikeSchematic(byte[] content)
+    {
+        try
+        {
+            using var reader = new Newtonsoft.Json.JsonTextReader(new StreamReader(new MemoryStream(content)));
+            if (!reader.Read() || reader.TokenType != Newtonsoft.Json.JsonToken.StartObject) return false;
+            reader.Skip();
+            return !reader.Read(); // за объектом ничего нет
+        }
+        catch (Newtonsoft.Json.JsonException)
+        {
+            return false;
+        }
+    }
+
     public static byte[] Read(string dataDir, string name)
     {
         var path = PathOf(dataDir, name);

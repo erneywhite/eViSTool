@@ -50,6 +50,16 @@ public sealed class SchematicsTests : IDisposable
         Assert.False(File.Exists(Path.Combine(data, "serverconfig.json")));
     }
 
+    [Theory]
+    [InlineData("{\"SizeX\":3,\"BlockCodes\":{}}", true)]
+    [InlineData("  {}  ", true)]
+    [InlineData("[1,2]", false)]
+    [InlineData("{} {}", false)]
+    [InlineData("hello", false)]
+    [InlineData("", false)]
+    public void LooksLikeSchematic_OneJsonObject(string text, bool expected) =>
+        Assert.Equal(expected, Schematics.LooksLikeSchematic(System.Text.Encoding.UTF8.GetBytes(text)));
+
     [Fact]
     public async Task Copy_MovesTheFileIntoTheOtherProfile_AndReplacesTheSameName()
     {

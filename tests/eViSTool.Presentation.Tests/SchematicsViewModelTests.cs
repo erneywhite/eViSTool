@@ -56,6 +56,34 @@ public sealed class SchematicsViewModelTests : IDisposable
         Assert.False(vm.CommandCopied); // «Скопировано» — на пару секунд
     }
 
+    /// <summary>Выбор файлов «пользователя» и что ему сказали.</summary>
+    private sealed class Picker(params string[] files) : TestUiPlatform
+    {
+        public List<string> Warned { get; } = [];
+        public override IReadOnlyList<string>? PickFiles(string title, IReadOnlyList<FileFilter> filters, bool multiple) => files;
+        public override void Notify(string text, NoticeKind kind) => Warned.Add(text);
+    }
+
+    [Fact]
+    public async Task AddFromFile_PutsSchematicsIntoTheProfile_AndSkipsWhatIsNotOne()
+    {
+        var solo = Profile("solo", "Соло", ProfileKind.Client);
+        var downloads = Directory.CreateDirectory(Path.Combine(_root, "downloads")).FullName;
+        File.WriteAllText(Path.Combine(downloads, "zamok.json"), "{\"SizeX\":3}");
+        File.WriteAllText(Path.Combine(downloads, "notes.json"), "not json at all");
+        var picker = new Picker(Path.Combine(downloads, "zamok.json"), Path.Combine(downloads, "notes.json"));
+        Ui.Platform = picker;
+
+        var vm = new SchematicsViewModel(solo, () => [solo]);
+        await vm.LoadAsync();
+        Assert.True(vm.CanAdd);
+        await vm.AddFromFileCommand.ExecuteAsync(null);
+
+        Assert.Equal(["zamok"], vm.Rows.Select(r => r.Name));
+        Assert.Equal("{\"SizeX\":3}", File.ReadAllText(Path.Combine(solo.DataDir!, "WorldEdit", "zamok.json")));
+        Assert.Contains(picker.Warned, w => w.Contains("notes.json"));
+    }
+
     [Fact]
     public async Task Copy_OverTheSameName_AsksFirst()
     {
