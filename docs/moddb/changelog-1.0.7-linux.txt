@@ -1,0 +1,21 @@
+eViSTool 1.0.7 for Linux: add buildings from a file, and the active profile no longer resets.
+
+New
+- Buildings: "Add from file…" puts schematic files (.json) from disk into a profile, for example one a friend sent you or one from an old game folder. A file that is not a schematic is skipped with a warning.
+
+Fixes
+- With the "Last played" profile order, starting the selected server moved it to the top of the list and the active profile in the header became empty ("no profile selected"), which was also saved that way. The selection now stays put when the list is reordered.
+
+Update from About.
+
+---
+
+eViSTool 1.0.7 для Linux: постройки из файла, и активный профиль больше не сбрасывается.
+
+Новое
+- Постройки: «Добавить из файла…» кладёт файлы схем (.json) с диска в профиль, например присланную другом или из старой папки игры. Файл, который не похож на схему, пропускается с предупреждением.
+
+Исправления
+- При порядке «Последняя игра» запуск выбранного сервера поднимал его наверх списка, и активный профиль в шапке становился пустым («профиль не выбран»), причём так и сохранялся. Теперь выбор остаётся на месте, когда список переставляется.
+
+Обнови из «О программе».
