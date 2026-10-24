@@ -1,0 +1,23 @@
+eViSTool 1.0.9 for Linux: switch server worlds and create new ones.
+
+New
+- Server worlds: the World tab of the server config now starts with a world list. Pick any world from the server's Saves folder, or "Create a new world…": give it a name and the server makes it on the next start, with an empty seed (a random one) and the creation settings below open for editing. The old world is not touched and stays in the list, so you can switch back at any time: each world keeps its own seed and settings in its file. Switching back also returns the creation settings to what they were.
+
+Mods are shared by all worlds of a server; if a world needs a different set of mods, make a separate server profile.
+
+A remote server needs its agent updated for the list: Server tab, Update there.
+
+Update from About.
+
+---
+
+eViSTool 1.0.9 для Linux: переключение миров сервера и создание новых.
+
+Новое
+- Миры сервера: вкладка «Мир» в конфиге сервера теперь начинается со списка миров. Выбери любой мир из папки Saves сервера или «Создать новый мир…»: дай ему имя, и сервер создаст его при следующем запуске, с пустым (случайным) сидом и открытыми для правки параметрами создания ниже. Старый мир не трогается и остаётся в списке, вернуться к нему можно в любой момент: у каждого мира свои сид и настройки в его файле. При возврате параметры создания тоже возвращаются, как были.
+
+Моды общие для всех миров сервера; если миру нужен другой набор модов, сделай отдельный серверный профиль.
+
+Удалённому серверу для списка нужно обновить агента: вкладка «Сервер», «Обновить там».
+
+Обнови из «О программе».
