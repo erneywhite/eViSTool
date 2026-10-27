@@ -224,6 +224,7 @@ public partial class ModsView : UserControl
         var source = Rows().FirstOrDefault(r => r.DataContext == row);
         source?.Classes.Add("dragSource");
         _dragPoint = null;
+        _scrollClock.Restart();
         _dragScroll.Start();
         try
         {
@@ -244,13 +245,17 @@ public partial class ModsView : UserControl
 
     // ---------- автопрокрутка при перетаскивании ----------
     // Пока мод «в руке», Windows держит мышь в своём цикле перетаскивания: колесо и полоса прокрутки до таблицы не
-    // доходят. Поэтому как в проводнике: курсор у верхнего или нижнего края таблицы (или за ним) — таблица едет сама,
-    // чем дальше за край, тем быстрее.
+    // доходят. Поэтому как в проводнике: курсор у верхнего или нижнего края таблицы (или за ним) — таблица плавно едет
+    // сама: у края медленно, ближе к кромке быстрее, за краем — ещё немного быстрее.
 
     /// <summary>Полоса у края таблицы, где начинается автопрокрутка.</summary>
     private const double ScrollEdge = 36;
 
-    private readonly DispatcherTimer _dragScroll = new() { Interval = TimeSpan.FromMilliseconds(60) };
+    /// <summary>Скорость, пикселей в секунду: на входе в полосу у края, у самой кромки и самая большая — далеко за краем.</summary>
+    internal const double ScrollSlow = 120, ScrollEdgeSpeed = 300, ScrollMax = 600;
+
+    private readonly DispatcherTimer _dragScroll = new() { Interval = TimeSpan.FromMilliseconds(16) };
+    private readonly System.Diagnostics.Stopwatch _scrollClock = new();
 
     /// <summary>Где курсор при перетаскивании — в координатах таблицы; null — ещё не знаем.</summary>
     private Point? _dragPoint;
@@ -267,32 +272,42 @@ public partial class ModsView : UserControl
         DragBadge.IsVisible = false;
     }
 
+    /// <summary>
+    /// Скорость автопрокрутки по тому, насколько курсор вошёл в полосу у края (<paramref name="depth"/>, 0…ScrollEdge) или
+    /// ушёл за край (больше ScrollEdge); 0 — курсор не у края.
+    /// </summary>
+    internal static double ScrollSpeed(double depth) =>
+        depth <= 0 ? 0
+        : depth <= ScrollEdge ? ScrollSlow + (ScrollEdgeSpeed - ScrollSlow) * depth / ScrollEdge
+        : Math.Min(ScrollMax, ScrollEdgeSpeed + (depth - ScrollEdge) * 4);
+
     private void AutoScroll()
     {
-        if (_dragPoint is not { } at || _vm is null) return;
-        var top = ScrollEdge + 34; // под строкой заголовков колонок
+        var dt = _scrollClock.Elapsed.TotalSeconds;
+        _scrollClock.Restart();
+        if (_dragPoint is not { } at || dt <= 0 || dt > 0.2) return; // первый тик и паузы — без рывка
+        var top = 34 + ScrollEdge; // полоса — под строкой заголовков колонок
         var bottom = Grid.Bounds.Height - ScrollEdge;
-        var beyond = at.Y < top ? top - at.Y : at.Y > bottom ? at.Y - bottom : 0;
-        if (beyond <= 0) return;
-        var step = Math.Min(5, 1 + (int)(beyond / 40)); // дальше за край — больше строк за шаг
-        ScrollBy(at.Y < top ? -step : step);
+        var depth = at.Y < top ? top - at.Y : at.Y > bottom ? at.Y - bottom : 0;
+        var speed = ScrollSpeed(depth);
+        if (speed > 0) ScrollPixels((at.Y < top ? -1 : 1) * speed * dt);
     }
 
-    /// <summary>Сдвинуть таблицу на столько строк (минус — вверх); строки свёрнутых групп не считаются — их не раскрываем.</summary>
-    internal void ScrollBy(int rows)
+    /// <summary>
+    /// Сдвинуть таблицу на столько пикселей (минус — вверх): дробным поворотом колеса — таблица прокручивается своей
+    /// обычной логикой, но плавно (своего «сдвинуть на N пикселей» у таблицы Avalonia нет).
+    /// </summary>
+    internal void ScrollPixels(double pixels)
     {
-        if (_vm is null) return;
-        var items = _vm.View.Items.Where(r => !_vm.GroupByCategory || !_vm.IsCategoryCollapsed(r.GroupName)).ToList();
-        var shown = Rows().Where(r => r.IsVisible && r.DataContext is ModRowViewModel)
-            .Select(r => (Row: (ModRowViewModel)r.DataContext!, Y: r.TranslatePoint(default, Grid)?.Y ?? double.NaN, H: r.Bounds.Height))
-            .Where(r => !double.IsNaN(r.Y) && r.Y + r.H > 0 && r.Y < Grid.Bounds.Height)
-            .ToList();
-        if (items.Count == 0 || shown.Count == 0) return;
-        var edge = rows < 0 ? shown.MinBy(r => r.Y).Row : shown.MaxBy(r => r.Y).Row;
-        var index = items.IndexOf(edge);
-        if (index < 0) return;
-        Grid.ScrollIntoView(items[Math.Clamp(index + rows, 0, items.Count - 1)], null);
+        var wheel = new PointerWheelEventArgs(Grid, WheelPointer, Grid, default, 0, new PointerPointProperties(), KeyModifiers.None,
+            new Vector(0, -pixels / WheelPixels)) { RoutedEvent = PointerWheelChangedEvent };
+        Grid.RaiseEvent(wheel);
     }
+
+    /// <summary>Столько пикселей таблица прокручивает за один щелчок колеса.</summary>
+    internal const double WheelPixels = 50;
+
+    private static readonly Pointer WheelPointer = new(Pointer.GetNextFreeId(), PointerType.Mouse, true);
 
     /// <summary>Плашка у курсора: какой мод тащат и в какую группу он ляжет.</summary>
     private void ShowDragBadge(DragEventArgs e, ModRowViewModel row, string? category)

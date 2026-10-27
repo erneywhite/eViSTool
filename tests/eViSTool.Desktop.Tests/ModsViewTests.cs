@@ -766,23 +766,35 @@ public sealed class ModsViewTests : IDisposable
     }
 
     /// <summary>
-    /// Автопрокрутка при перетаскивании (колесо в это время не работает): таблица сдвигается на строки вниз и обратно.
+    /// Автопрокрутка при перетаскивании (колесо в это время не работает): плавно, по пикселям — таблица сдвигается вниз
+    /// и обратно; скорость у края медленная и растёт к кромке и за ней, но с потолком.
     /// </summary>
     [AvaloniaFact]
-    public async Task Drag_auto_scroll_moves_the_table()
+    public async Task Drag_auto_scroll_moves_the_table_smoothly()
     {
         var mods = Main(new HangingModDb(), extra: 30).Mods;
         _window = new Window { Width = 1400, Height = 600, Content = new ModsView { DataContext = mods } };
         _window.Show();
         await Wait.Until(() => mods.Rows.Count == 32 && Rows(_window).Count > 0);
         var view = (ModsView)_window.Content!;
-        string Top() => Rows(_window).Where(r => r.TranslatePoint(default, (DataGrid)Named(_window, "ModsGrid"))?.Y >= 0)
-            .MinBy(r => r.TranslatePoint(default, (DataGrid)Named(_window, "ModsGrid"))!.Value.Y)?.DataContext is ModRowViewModel m ? m.ModId : "";
+        var grid = (DataGrid)Named(_window, "ModsGrid");
+        double FirstY() => Rows(_window).Select(r => r.TranslatePoint(default, grid)?.Y ?? 0).Min();
+        string Top() => Rows(_window).Where(r => r.TranslatePoint(default, grid)?.Y >= 0)
+            .MinBy(r => r.TranslatePoint(default, grid)!.Value.Y)?.DataContext is ModRowViewModel m ? m.ModId : "";
         var before = Top();
-        for (var i = 0; i < 6; i++) { view.ScrollBy(5); await Run(80); }
+        var y0 = FirstY();
+        view.ScrollPixels(20); // меньше строки — таблица сдвинулась на пиксели, а не прыгнула на строку
+        await Run(80);
+        Assert.InRange(y0 - FirstY(), 12, 28);
+        for (var i = 0; i < 10; i++) { view.ScrollPixels(60); await Run(40); }
         Assert.NotEqual(before, Top());
-        for (var i = 0; i < 12; i++) { view.ScrollBy(-5); await Run(80); }
+        for (var i = 0; i < 20; i++) { view.ScrollPixels(-60); await Run(40); }
         Assert.Equal(before, Top());
+
+        Assert.Equal(0, ModsView.ScrollSpeed(0));
+        Assert.Equal(ModsView.ScrollSlow, ModsView.ScrollSpeed(0.0001), 1);
+        Assert.True(ModsView.ScrollSpeed(30) > ModsView.ScrollSpeed(10));
+        Assert.Equal(ModsView.ScrollMax, ModsView.ScrollSpeed(1000));
     }
 
     /// <summary>
