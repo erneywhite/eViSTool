@@ -710,6 +710,19 @@ public sealed class ModsViewTests : IDisposable
         if (Environment.GetEnvironmentVariable("EVISTOOL_SHOT") is { } shot)
             Avalonia.Headless.HeadlessWindowExtensions.CaptureRenderedFrame(_window)!.Save(shot);
 
+        // куда ляжет перетаскиваемый мод: на заголовок — в его группу, на строку — в группу её мода, «Без категории» — пустая
+        var view = (ModsView)_window.Content!;
+        DataGridRowGroupHeader HeaderOf(string key) => _window.GetVisualDescendants().OfType<DataGridRowGroupHeader>()
+            .Single(h => h.IsVisible && (h.DataContext as Avalonia.Collections.DataGridCollectionViewGroup)?.Key as string == key);
+        Assert.Equal("Библиотеки", view.DropTarget(HeaderOf("Библиотеки").GetVisualDescendants().OfType<TextBlock>().First())?.Category);
+        Assert.Equal("", view.DropTarget(HeaderOf(ModsViewModel.NoCategoryLabel))?.Category);
+        Assert.Equal("Библиотеки", view.DropTarget(RowOf(_window, "mod01"))?.Category);
+        mods.GroupByCategory = false;
+        await Run(200);
+        Assert.Null(view.DropTarget(RowOf(_window, "mod01"))); // без групп перетаскивать некуда
+        mods.GroupByCategory = true;
+        await Run(200);
+
         // меню строки: «Без категории» убирает мод из группы
         mods.Selected = Row("mod01");
         mods.CategoryMenu.Single(c => c.Category == "").Command.Execute(null);

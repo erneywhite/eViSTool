@@ -16,6 +16,11 @@
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="MinHeight" Value="34" />
+        </Style>
+        <!-- над заголовком держат перетаскиваемый мод — он ляжет в эту группу -->
+        <Style Selector="DataGridRowGroupHeader.dropTarget">
+            <Setter Property="Background" Value="{DynamicResource Forest.Selected}" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
         </Style>        <!-- пометка «не нужен на этой стороне» в строке мода -->
         <Style Selector="TextBlock.note">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />

@@ -29,6 +29,10 @@ public partial class ModsView : UserControl
         // перетаскивание zip-архивов из Проводника (Nautilus, Dolphin) в список модов
         Grid.AddHandler(DragDrop.DragOverEvent, Grid_DragOver);
         Grid.AddHandler(DragDrop.DropEvent, Grid_Drop);
+        Grid.AddHandler(DragDrop.DragLeaveEvent, (_, _) => MarkDropTarget(null));
+        // «По категориям»: мод перетаскивают на заголовок группы или на строку в ней
+        Grid.AddHandler(PointerMovedEvent, Grid_PointerMoved, RoutingStrategies.Tunnel);
+        Grid.AddHandler(PointerReleasedEvent, (_, _) => _dragStart = null, RoutingStrategies.Tunnel);
         LeftPane.SizeChanged += (_, e) => ApplyCompact(e.NewSize.Width);
         // группы «По категориям»: подпись заголовка и свёрнутость, которую помнит профиль
         Grid.LoadingRowGroup += (_, e) => SetUpGroupHeader(e.RowGroupHeader);
@@ -123,6 +127,15 @@ public partial class ModsView : UserControl
 
     private void Grid_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        _dragStart = null;
+        if (e.GetCurrentPoint(Grid).Properties.IsLeftButtonPressed)
+        {
+            // нажатие на строку (не на переключатель «Вкл») — возможно, начало перетаскивания в группу
+            if (_vm is { GroupByCategory: true } && e.Source is Visual source && source.FindAncestorOfType<ToggleButton>(includeSelf: true) is null
+                && source.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext is ModRowViewModel dragged)
+                _dragStart = (e, dragged, e.GetPosition(Grid));
+            return;
+        }
         if (!e.GetCurrentPoint(Grid).Properties.IsRightButtonPressed) return;
         var row = (e.Source as Visual)?.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext as ModRowViewModel;
         _rightClickOnRow = row is not null;
@@ -139,14 +152,71 @@ public partial class ModsView : UserControl
 
     private void Grid_DragOver(object? sender, DragEventArgs e)
     {
-        e.DragEffects = e.DataTransfer.TryGetFiles() is { Length: > 0 } ? DragDropEffects.Copy : DragDropEffects.None;
+        if (e.DataTransfer.Contains(ModRowFormat))
+        {
+            var target = DropTarget(e.Source as Visual);
+            MarkDropTarget(target?.Header);
+            e.DragEffects = target is null ? DragDropEffects.None : DragDropEffects.Move;
+        }
+        else e.DragEffects = e.DataTransfer.TryGetFiles() is { Length: > 0 } ? DragDropEffects.Copy : DragDropEffects.None;
         e.Handled = true;
     }
 
     private void Grid_Drop(object? sender, DragEventArgs e)
     {
+        MarkDropTarget(null);
+        if (e.DataTransfer.TryGetValue(ModRowFormat) is { } row)
+        {
+            if (DropTarget(e.Source as Visual) is { } target) _vm?.SetCategory(row, target.Category);
+            return;
+        }
         var files = e.DataTransfer.TryGetFiles()?.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
         if (files is { Count: > 0 }) _ = _vm?.AddFilesAsync(files);
+    }
+
+    // ---------- перетаскивание мода в группу ----------
+
+    /// <summary>Перетаскиваемая строка — объектом внутри окна (наружу, в другие программы, не уходит).</summary>
+    private static readonly DataFormat<ModRowViewModel> ModRowFormat = DataFormat.CreateInProcessFormat<ModRowViewModel>("evistool-mod-row");
+
+    /// <summary>Сдвиг мыши, после которого нажатие на строку — уже перетаскивание, а не щелчок.</summary>
+    private const double DragThreshold = 6;
+
+    private (PointerPressedEventArgs Press, ModRowViewModel Row, Point At)? _dragStart;
+    private DataGridRowGroupHeader? _dropHeader;
+
+    private void Grid_PointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_dragStart is not { } start || !e.GetCurrentPoint(Grid).Properties.IsLeftButtonPressed) return;
+        var at = e.GetPosition(Grid);
+        if (Math.Abs(at.X - start.At.X) < DragThreshold && Math.Abs(at.Y - start.At.Y) < DragThreshold) return;
+        _dragStart = null;
+        var data = new DataTransfer();
+        data.Add(DataTransferItem.Create(ModRowFormat, start.Row));
+        _ = DragDrop.DoDragDropAsync(start.Press, data, DragDropEffects.Move);
+    }
+
+    /// <summary>
+    /// Куда упадёт мод: заголовок группы — её категория, строка — категория её мода («Без категории» — пустая). Не в
+    /// таблице «По категориям» — некуда.
+    /// </summary>
+    internal (string Category, DataGridRowGroupHeader? Header)? DropTarget(Visual? over)
+    {
+        if (_vm is not { GroupByCategory: true } || over is null) return null;
+        if (over.FindAncestorOfType<DataGridRowGroupHeader>(includeSelf: true) is { DataContext: DataGridCollectionViewGroup { Key: string key } } header)
+            return (key == ModsViewModel.NoCategoryLabel ? "" : key, header);
+        if (over.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext is ModRowViewModel row)
+            return (row.Category, null);
+        return null;
+    }
+
+    // заголовок группы, над которым держат мод, — подсвечен
+    private void MarkDropTarget(DataGridRowGroupHeader? header)
+    {
+        if (ReferenceEquals(header, _dropHeader)) return;
+        _dropHeader?.Classes.Remove("dropTarget");
+        _dropHeader = header;
+        _dropHeader?.Classes.Add("dropTarget");
     }
 
     /// <summary>
