@@ -51,6 +51,23 @@ public sealed class SchematicsTests : IDisposable
     }
 
     [Theory]
+    [InlineData("cat.libraries", "Utility", "Library")]  // библиотека с «Utility» — всё равно в библиотеки
+    [InlineData("cat.map", "QoL", "map")]                 // регистр не важен, общий «QoL» — после темы
+    [InlineData("cat.interface", "QoL")]
+    [InlineData(null, "Unicorns", "Fun")]                // ни одна тема не подошла
+    [InlineData(null)]
+    public void CategorySuggest_FirstMatchingThemeWins(string? expected, params string[] tags) =>
+        Assert.Equal(expected, eViSTool.Core.Mods.ModCategorySuggest.ThemeFor(tags));
+
+    [Fact]
+    public void CategorySuggest_UntaggedLibraryByModId()
+    {
+        Assert.Equal("cat.libraries", eViSTool.Core.Mods.ModCategorySuggest.ThemeFor([], "jsonpatcheslib"));
+        Assert.Equal("cat.map", eViSTool.Core.Mods.ModCategorySuggest.ThemeFor(["Map"], "maplib")); // теги важнее
+        Assert.Null(eViSTool.Core.Mods.ModCategorySuggest.ThemeFor([""], "sheltered"));
+    }
+
+    [Theory]
     [InlineData("{\"SizeX\":3,\"BlockCodes\":{}}", true)]
     [InlineData("  {}  ", true)]
     [InlineData("[1,2]", false)]

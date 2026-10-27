@@ -102,4 +102,51 @@ public sealed partial class ModsViewModel
     }
 
     private Comparison<ModRowViewModel> CurrentOrder() => ModListRules.Order(SortIndex, GroupByCategory);
+
+    /// <summary>
+    /// «Разложить по тегам»: модам без категории — категории по тегам ModDB (<see cref="Core.Mods.ModCategorySuggest"/>).
+    /// Теги — из каталога модбазы (кэш на диске, одна загрузка в несколько часов). Что принять — решает окно с галочками.
+    /// </summary>
+    [RelayCommand]
+    private async Task SuggestCategoriesAsync()
+    {
+        if (CategoryStore is not { } store) return;
+        var catalog = new Core.ModDb.CatalogService(_db);
+        try
+        {
+            await catalog.LoadAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or Newtonsoft.Json.JsonException)
+        {
+            Ui.Warn(Loc.T("catsuggest.noCatalog", ex.Message));
+            return;
+        }
+        var tags = new Dictionary<string, List<string?>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in catalog.Items)
+            foreach (var id in item.ModIdStrs.Where(s => !string.IsNullOrWhiteSpace(s)))
+                tags.TryAdd(id!, item.Tags);
+
+        var proposals = Rows.Where(r => r.Category.Length == 0 && r.ModId.Length > 0)
+            .Select(r => (Row: r, Theme: Core.Mods.ModCategorySuggest.ThemeFor(tags.GetValueOrDefault(r.ModId) ?? [], r.ModId)))
+            .Where(x => x.Theme is not null)
+            .GroupBy(x => Loc.T(x.Theme!))
+            .OrderBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+        if (proposals.Count == 0)
+        {
+            Ui.Info(Loc.T("catsuggest.nothing"));
+            return;
+        }
+        if (AppWindows.Current.ConfirmCategories([.. proposals.Select(g => new CategoryProposal(g.Key, [.. g.Select(x => x.Row.Name).Order(StringComparer.CurrentCultureIgnoreCase)]))])
+            is not { Accepted.Count: > 0 } answer)
+            return;
+
+        foreach (var group in proposals.Where(g => answer.Accepted.Contains(g.Key)))
+            foreach (var (row, _) in group)
+                store[CategoryKey(row)] = group.Key;
+        _main.SaveSettings();
+        ApplyCategories();
+        if (!GroupByCategory) GroupByCategory = true; // разложили — сразу видно по группам
+        else RefreshView();
+    }
 }

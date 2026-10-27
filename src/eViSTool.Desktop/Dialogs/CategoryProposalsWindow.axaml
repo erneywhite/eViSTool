@@ -1,0 +1,43 @@
+<dialogs:DialogWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:dialogs="using:eViSTool.Desktop.Dialogs"
+                      xmlns:vm="using:eViSTool.Presentation.ViewModels"
+                      xmlns:local="using:eViSTool.Desktop"
+                      x:Class="eViSTool.Desktop.Dialogs.CategoryProposalsWindow"
+                      x:DataType="vm:CategoryProposalsViewModel"
+                      Title="{local:Tr catsuggest.title}"
+                      Width="640" Height="560" MinWidth="460" MinHeight="340">
+    <DockPanel Margin="20">
+        <StackPanel DockPanel.Dock="Top">
+            <TextBlock Text="{local:Tr catsuggest.heading}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Text="{local:Tr catsuggest.hint}" Opacity="0.7" TextWrapping="Wrap" Margin="0,4,0,0" />
+        </StackPanel>
+
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,14,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Classes="primary" Content="{local:Tr catsuggest.apply}" IsDefault="True" Padding="16,6" Click="Apply_Click"
+                        AutomationProperties.AutomationId="CategoryProposalsApply" />
+                <Button Content="{local:Tr common.cancel}" Margin="8,0,0,0" Padding="16,6" Click="Cancel_Click" />
+            </StackPanel>
+            <TextBlock Text="{Binding Summary}" Opacity="0.8" VerticalAlignment="Center" TextWrapping="Wrap" />
+        </DockPanel>
+
+        <!-- предложенные категории: галочка, название с числом модов, сами моды -->
+        <ScrollViewer Margin="0,12,0,0" HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:CategoryProposalRow">
+                        <Border BorderBrush="{DynamicResource Forest.Line}" BorderThickness="0,0,0,1" Padding="0,8">
+                            <CheckBox IsChecked="{Binding IsChecked}" VerticalContentAlignment="Top" AutomationProperties.Name="{Binding Category}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource Forest.Text}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding ModsText}" FontSize="12" Foreground="{DynamicResource Forest.Muted}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </CheckBox>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</dialogs:DialogWindow>

@@ -71,6 +71,8 @@ public interface IAppWindows
     VersionOption? PickVersion(string heading, IReadOnlyList<VersionOption> options);
     PackExportOptions? ExportPack(string defaultName, int enabledCount, int disabledCount, bool hasModConfig);
     PackImportChoice? ConfirmPackImport(PackImportPlan plan);
+    /// <summary>«Разложить по категориям»: предложенные по тегам ModDB категории; ответ — принятые, null — отменили.</summary>
+    CategoryChoices? ConfirmCategories(IReadOnlyList<CategoryProposal> proposals);
     /// <summary>Вставить код набора модов («EV1-…»); null — закрыли. Ответ — разобранный код (моды, выпуски, версия игры).</summary>
     ModCodeSet? AskModCode();
     /// <summary>Показать готовый код набора: блоком, который копируется щелчком (в буфер он уже положен).</summary>

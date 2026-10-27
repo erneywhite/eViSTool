@@ -355,6 +355,9 @@
                         <CheckBox IsChecked="{Binding GroupByCategory}" Content="{local:Tr mods.byCategory}" FontSize="12" Margin="0,0,10,0" Foreground="{DynamicResource Forest.Text}"
                                   VerticalAlignment="Center" Classes.hidden="{Binding IsHistory}" ToolTip.Tip="{local:Tr mods.byCategoryTip}"
                                   AutomationProperties.AutomationId="GroupByCategory" />
+                        <Button Content="{local:Tr catsuggest.button}" Command="{Binding SuggestCategoriesCommand}" FontSize="12" Margin="0,0,8,0"
+                                ToolTip.Tip="{local:Tr catsuggest.buttonTip}" IsVisible="{Binding GroupByCategory}" IsEnabled="{Binding !IsBusy}"
+                                Classes.hidden="{Binding IsHistory}" AutomationProperties.AutomationId="SuggestCategories" />
                         <Button AutomationProperties.Name="{local:Tr mods.addShort}" Command="{Binding AddFromFileCommand}" ToolTip.Tip="{local:Tr mods.addTip}" IsEnabled="{Binding !IsBusy}">
                             <StackPanel Orientation="Horizontal">
                                 <Path Classes="icon btnIcon" Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
