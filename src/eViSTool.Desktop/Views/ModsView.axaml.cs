@@ -7,6 +7,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.LogicalTree;
 using Avalonia.VisualTree;
 using eViSTool.Desktop.Controls;
 using eViSTool.Presentation.ViewModels;
@@ -29,7 +30,11 @@ public partial class ModsView : UserControl
         // перетаскивание zip-архивов из Проводника (Nautilus, Dolphin) в список модов
         Grid.AddHandler(DragDrop.DragOverEvent, Grid_DragOver);
         Grid.AddHandler(DragDrop.DropEvent, Grid_Drop);
-        Grid.AddHandler(DragDrop.DragLeaveEvent, (_, _) => MarkDropTarget(null));
+        Grid.AddHandler(DragDrop.DragLeaveEvent, (_, _) =>
+        {
+            MarkDropTarget(null);
+            DragBadge.IsVisible = false;
+        });
         // «По категориям»: мод перетаскивают на заголовок группы или на строку в ней
         Grid.AddHandler(PointerMovedEvent, Grid_PointerMoved, RoutingStrategies.Tunnel);
         Grid.AddHandler(PointerReleasedEvent, (_, _) => _dragStart = null, RoutingStrategies.Tunnel);
@@ -110,19 +115,23 @@ public partial class ModsView : UserControl
             Dispatcher.UIThread.Post(() => Grid.CollapseRowGroup(g, collapseAllSubgroups: false));
     }
 
-    // категория в карточке: выбрали из списка или нажали Enter — записать сразу, не дожидаясь ухода из поля
-    private void CardCategory_DropDownClosed(object? sender, EventArgs e) => CommitCategory(sender);
+    // плашка категории в карточке: выбрали категорию — список закрывается
+    private void CategoryPick_Click(object? sender, RoutedEventArgs e) => CloseFlyout(sender as Control);
 
-    private void CardCategory_KeyDown(object? sender, KeyEventArgs e)
+    // новая категория: вписали и нажали Enter — мод в неё, список закрывается
+    private void CategoryNew_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter) return;
-        CommitCategory(sender);
+        if (e.Key != Key.Enter || sender is not TextBox { DataContext: ModCardViewModel card } box) return;
         e.Handled = true;
+        if (string.IsNullOrWhiteSpace(box.Text)) return;
+        card.Category = box.Text;
+        box.Text = "";
+        CloseFlyout(box);
     }
 
-    private static void CommitCategory(object? sender)
+    private static void CloseFlyout(Control? inside)
     {
-        if (sender is ComboBox { DataContext: ModCardViewModel card } box && box.Text is { } text && text != card.Category) card.Category = text;
+        if (inside?.FindLogicalAncestorOfType<Popup>() is { } popup) popup.IsOpen = false;
     }
 
     private void Grid_PointerPressed(object? sender, PointerPressedEventArgs e)
@@ -152,10 +161,12 @@ public partial class ModsView : UserControl
 
     private void Grid_DragOver(object? sender, DragEventArgs e)
     {
-        if (e.DataTransfer.Contains(ModRowFormat))
+        if (e.DataTransfer.TryGetValue(ModRowFormat) is { } dragged)
         {
             var target = DropTarget(e.Source as Visual);
-            MarkDropTarget(target?.Header);
+            // над строкой группы подсвечивается её заголовок: видно, куда ляжет мод
+            MarkDropTarget(target?.Header ?? (target is { } t ? HeaderOf(t.Category) : null));
+            ShowDragBadge(e, dragged, target?.Category);
             e.DragEffects = target is null ? DragDropEffects.None : DragDropEffects.Move;
         }
         else e.DragEffects = e.DataTransfer.TryGetFiles() is { Length: > 0 } ? DragDropEffects.Copy : DragDropEffects.None;
@@ -165,6 +176,7 @@ public partial class ModsView : UserControl
     private void Grid_Drop(object? sender, DragEventArgs e)
     {
         MarkDropTarget(null);
+        DragBadge.IsVisible = false;
         if (e.DataTransfer.TryGetValue(ModRowFormat) is { } row)
         {
             if (DropTarget(e.Source as Visual) is { } target) _vm?.SetCategory(row, target.Category);
@@ -191,9 +203,39 @@ public partial class ModsView : UserControl
         var at = e.GetPosition(Grid);
         if (Math.Abs(at.X - start.At.X) < DragThreshold && Math.Abs(at.Y - start.At.Y) < DragThreshold) return;
         _dragStart = null;
+        _ = DragAsync(start.Press, start.Row);
+    }
+
+    private async Task DragAsync(PointerPressedEventArgs press, ModRowViewModel row)
+    {
         var data = new DataTransfer();
-        data.Add(DataTransferItem.Create(ModRowFormat, start.Row));
-        _ = DragDrop.DoDragDropAsync(start.Press, data, DragDropEffects.Move);
+        data.Add(DataTransferItem.Create(ModRowFormat, row));
+        var source = Rows().FirstOrDefault(r => r.DataContext == row);
+        source?.Classes.Add("dragSource");
+        try
+        {
+            await DragDrop.DoDragDropAsync(press, data, DragDropEffects.Move);
+        }
+        finally
+        {
+            source?.Classes.Remove("dragSource");
+            Rows().FirstOrDefault(r => r.Classes.Contains("dragSource"))?.Classes.Remove("dragSource"); // строку могли переиспользовать
+            MarkDropTarget(null);
+            DragBadge.IsVisible = false;
+        }
+    }
+
+    private IEnumerable<DataGridRow> Rows() => Grid.GetVisualDescendants().OfType<DataGridRow>();
+
+    /// <summary>Плашка у курсора: какой мод тащат и в какую группу он ляжет.</summary>
+    private void ShowDragBadge(DragEventArgs e, ModRowViewModel row, string? category)
+    {
+        DragBadgeText.Text = category is null ? row.Name
+            : $"{row.Name}  →  {(category.Length == 0 ? ModsViewModel.NoCategoryLabel : category)}";
+        var at = e.GetPosition(DragLayer);
+        Canvas.SetLeft(DragBadge, at.X + 16);
+        Canvas.SetTop(DragBadge, at.Y + 12);
+        DragBadge.IsVisible = true;
     }
 
     /// <summary>
@@ -208,6 +250,14 @@ public partial class ModsView : UserControl
         if (over.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext is ModRowViewModel row)
             return (row.Category, null);
         return null;
+    }
+
+    /// <summary>Видимый заголовок группы этой категории («» — «Без категории»); группа свёрнута за краем — null.</summary>
+    private DataGridRowGroupHeader? HeaderOf(string category)
+    {
+        var key = category.Length == 0 ? ModsViewModel.NoCategoryLabel : category;
+        return Grid.GetVisualDescendants().OfType<DataGridRowGroupHeader>()
+            .FirstOrDefault(h => h.IsVisible && h.DataContext is DataGridCollectionViewGroup { Key: string k } && k == key);
     }
 
     // заголовок группы, над которым держат мод, — подсвечен

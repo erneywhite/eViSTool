@@ -5,8 +5,14 @@ using eViSTool.Presentation.ViewModels.Mods;
 
 namespace eViSTool.Presentation.ViewModels;
 
-/// <summary>Пункт меню «Категория ▸»: перенести выбранный мод в эту категорию («» — без категории).</summary>
-public sealed record CategoryChoice(string Label, string Category, IRelayCommand Command);
+/// <summary>
+/// Пункт меню «Категория ▸»: перенести выбранный мод в эту категорию («» — без категории). Пункт с подписью «-» —
+/// черта между «Без категории» и категориями (так её рисует меню Avalonia).
+/// </summary>
+public sealed record CategoryChoice(string Label, string Category, IRelayCommand? Command)
+{
+    public bool IsSeparator => Label == "-";
+}
 
 /// <summary>
 /// Свои категории модов: только для порядка в таблице (порядок загрузки модов в Vintage Story решают сами моды).
@@ -60,9 +66,11 @@ public sealed partial class ModsViewModel
             Categories.Clear();
             foreach (var name in names) Categories.Add(name);
         }
+        // «Без категории» — первым и отдельно: убрать из категорий, а не ещё одна категория
         CategoryMenu.Clear();
-        foreach (var name in names) CategoryMenu.Add(new CategoryChoice(name, name, new RelayCommand(() => MoveSelected(name))));
         CategoryMenu.Add(new CategoryChoice(NoCategoryLabel, "", new RelayCommand(() => MoveSelected(""))));
+        if (names.Count > 0) CategoryMenu.Add(new CategoryChoice("-", "", null));
+        foreach (var name in names) CategoryMenu.Add(new CategoryChoice(name, name, new RelayCommand(() => MoveSelected(name))));
     }
 
     private void MoveSelected(string category)

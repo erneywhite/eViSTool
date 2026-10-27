@@ -707,8 +707,20 @@ public sealed class ModsViewTests : IDisposable
         Assert.DoesNotContain(Rows(_window), r => (r.DataContext as ModRowViewModel)?.Category == "Карта");
         Assert.Contains(Rows(_window), r => (r.DataContext as ModRowViewModel)?.ModId == "mod01");
 
+        // «Без категории» — первым пунктом меню и отдельно от категорий
+        Assert.Equal(ModsViewModel.NoCategoryLabel, mods.CategoryMenu[0].Label);
+        Assert.True(mods.CategoryMenu[1].IsSeparator);
+
         if (Environment.GetEnvironmentVariable("EVISTOOL_SHOT") is { } shot)
+        {
+            // для снимка: выбран мод (плашка категории в карточке), заголовок группы подсвечен, как при перетаскивании
+            mods.Selected = Row("mod01");
+            await Run(300);
+            _window.GetVisualDescendants().OfType<DataGridRowGroupHeader>().First(h => h.IsVisible).Classes.Add("dropTarget");
+            await Run(100);
             Avalonia.Headless.HeadlessWindowExtensions.CaptureRenderedFrame(_window)!.Save(shot);
+            _window.GetVisualDescendants().OfType<DataGridRowGroupHeader>().First(h => h.IsVisible).Classes.Remove("dropTarget");
+        }
 
         // куда ляжет перетаскиваемый мод: на заголовок — в его группу, на строку — в группу её мода, «Без категории» — пустая
         var view = (ModsView)_window.Content!;
@@ -725,7 +737,7 @@ public sealed class ModsViewTests : IDisposable
 
         // меню строки: «Без категории» убирает мод из группы
         mods.Selected = Row("mod01");
-        mods.CategoryMenu.Single(c => c.Category == "").Command.Execute(null);
+        mods.CategoryMenu.Single(c => c.Category == "" && !c.IsSeparator).Command!.Execute(null);
         Assert.Equal("", Row("mod01").Category);
         Assert.Equal(["Карта"], mods.Categories);
         Assert.False(main.Profiles[0].Model.ModCategories.ContainsKey("mod01"));

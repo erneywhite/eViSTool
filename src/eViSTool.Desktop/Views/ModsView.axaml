@@ -11,7 +11,7 @@
     <UserControl.Styles>
         <!-- заголовок группы «По категориям»: название и число модов, строка-разделитель в цветах темы -->
         <Style Selector="DataGridRowGroupHeader">
-            <Setter Property="Background" Value="{DynamicResource Forest.Surface2}" />
+            <Setter Property="Background" Value="{DynamicResource Forest.CardHover}" />
             <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="FontSize" Value="13" />
@@ -21,6 +21,10 @@
         <Style Selector="DataGridRowGroupHeader.dropTarget">
             <Setter Property="Background" Value="{DynamicResource Forest.Selected}" />
             <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
+        </Style>
+        <!-- строка, которую тащат в другую группу -->
+        <Style Selector="DataGridRow.dragSource">
+            <Setter Property="Opacity" Value="0.45" />
         </Style>        <!-- пометка «не нужен на этой стороне» в строке мода -->
         <Style Selector="TextBlock.note">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
@@ -351,13 +355,22 @@
                             <ComboBoxItem Content="{local:Tr mods.sortImportant}" />
                             <ComboBoxItem Content="{local:Tr mods.sortName}" />
                         </ComboBox>
-                        <!-- свои категории: таблица — сворачиваемыми группами -->
-                        <CheckBox IsChecked="{Binding GroupByCategory}" Content="{local:Tr mods.byCategory}" FontSize="12" Margin="0,0,10,0" Foreground="{DynamicResource Forest.Text}"
-                                  VerticalAlignment="Center" Classes.hidden="{Binding IsHistory}" ToolTip.Tip="{local:Tr mods.byCategoryTip}"
-                                  AutomationProperties.AutomationId="GroupByCategory" />
-                        <Button Content="{local:Tr catsuggest.button}" Command="{Binding SuggestCategoriesCommand}" FontSize="12" Margin="0,0,8,0"
-                                ToolTip.Tip="{local:Tr catsuggest.buttonTip}" IsVisible="{Binding GroupByCategory}" IsEnabled="{Binding !IsBusy}"
-                                Classes.hidden="{Binding IsHistory}" AutomationProperties.AutomationId="SuggestCategories" />
+                        <!-- свои категории: таблица группами и раскладка по тегам ModDB — одной кнопкой-меню, чтобы не теснить сортировку -->
+                        <Button AutomationProperties.Name="{local:Tr mods.categories}" Margin="0,0,8,0" ToolTip.Tip="{local:Tr mods.byCategoryTip}"
+                                Classes.hidden="{Binding IsHistory}" AutomationProperties.AutomationId="CategoriesMenu">
+                            <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                                    <MenuItem Header="{local:Tr mods.byCategory}" ToggleType="CheckBox" IsChecked="{Binding GroupByCategory}"
+                                              AutomationProperties.AutomationId="GroupByCategory" />
+                                    <MenuItem Header="{local:Tr catsuggest.button}" Command="{Binding SuggestCategoriesCommand}" IsEnabled="{Binding !IsBusy}"
+                                              ToolTip.Tip="{local:Tr catsuggest.buttonTip}" AutomationProperties.AutomationId="SuggestCategories" />
+                                </MenuFlyout>
+                            </Button.Flyout>
+                            <StackPanel Orientation="Horizontal">
+                                <Path Classes="icon btnIcon" Data="{StaticResource Icon.Folder}" Width="13" Height="13" />
+                                <TextBlock Classes="btnLabel" Text="{local:Tr mods.categories}" />
+                            </StackPanel>
+                        </Button>
                         <Button AutomationProperties.Name="{local:Tr mods.addShort}" Command="{Binding AddFromFileCommand}" ToolTip.Tip="{local:Tr mods.addTip}" IsEnabled="{Binding !IsBusy}">
                             <StackPanel Orientation="Horizontal">
                                 <Path Classes="icon btnIcon" Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
@@ -429,7 +442,7 @@
                     </Border></Border>
 
                     <!-- таблица -->
-                    <Border Classes="card" IsVisible="{Binding !IsHistory}"><Border Classes="cardClip">
+                    <Border Classes="card" IsVisible="{Binding !IsHistory}"><Border Classes="cardClip"><Panel>
                         <DataGrid x:Name="Grid" ItemsSource="{Binding View.Items}" SelectedItem="{Binding Selected}" AutoGenerateColumns="False" IsReadOnly="True"
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{DynamicResource Forest.Line}"
                                   SelectionMode="Single" RowHeight="54" Background="Transparent" RowBackground="Transparent" BorderThickness="0"
@@ -558,7 +571,14 @@
                                 </DataGridTemplateColumn>
                             </DataGrid.Columns>
                         </DataGrid>
-                    </Border></Border>
+                        <!-- перетаскивают мод: плашка у курсора — какой мод и в какую группу ляжет -->
+                        <Canvas x:Name="DragLayer" IsHitTestVisible="False">
+                            <Border x:Name="DragBadge" IsVisible="False" Padding="10,4" CornerRadius="6" Background="{DynamicResource Forest.Raised}"
+                                    BorderBrush="{DynamicResource Forest.Accent}" BorderThickness="1">
+                                <TextBlock x:Name="DragBadgeText" FontSize="12" Foreground="{DynamicResource Forest.Text}" />
+                            </Border>
+                        </Canvas>
+                    </Panel></Border></Border>
                 </Panel>
             </DockPanel>
 
@@ -721,6 +741,36 @@
                                                 </StackPanel>
                                                 <Image x:Name="Logo1" ctl:RemoteImage.Source="{Binding Logo}" Stretch="Uniform"
                                                        RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                                <!-- своя категория мода: плашка-кнопка, по щелчку — категории, «Без категории» и поле для новой -->
+                                                <Button HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,12,0,0" Padding="8,2" MinHeight="0" CornerRadius="4"
+                                                        Background="{DynamicResource Forest.SideVeil}" BorderThickness="0" ToolTip.Tip="{local:Tr mcard.categoryTip}"
+                                                        AutomationProperties.Name="{local:Tr mcard.category}" AutomationProperties.AutomationId="CardCategory">
+                                                    <Panel>
+                                                        <TextBlock Text="{Binding Row.Category}" FontSize="11" Foreground="{DynamicResource Forest.Accent}"
+                                                                   IsVisible="{Binding Row.Category, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                                        <TextBlock Text="{local:Tr mcard.categoryAdd}" FontSize="11" Foreground="{DynamicResource Forest.Muted}"
+                                                                   IsVisible="{Binding Row.Category, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                                                    </Panel>
+                                                    <Button.Flyout>
+                                                        <Flyout Placement="BottomEdgeAlignedLeft">
+                                                            <StackPanel Width="230">
+                                                                <TextBox PlaceholderText="{local:Tr mcard.categoryNew}" KeyDown="CategoryNew_KeyDown" FontSize="12"
+                                                                         AutomationProperties.Name="{local:Tr mcard.categoryNew}" AutomationProperties.AutomationId="CardCategoryNew" />
+                                                                <ItemsControl ItemsSource="{Binding Owner.CategoryMenu}" Margin="0,6,0,0">
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate x:DataType="vm:CategoryChoice">
+                                                                            <Panel>
+                                                                                <Border Height="1" Background="{DynamicResource Forest.Line}" Margin="0,4" IsVisible="{Binding IsSeparator}" />
+                                                                                <Button Theme="{StaticResource Forest.LinkButton}" Content="{Binding Label}" Command="{Binding Command}"
+                                                                                        Click="CategoryPick_Click" HorizontalAlignment="Stretch" Padding="4,5" IsVisible="{Binding !IsSeparator}" />
+                                                                            </Panel>
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
+                                                            </StackPanel>
+                                                        </Flyout>
+                                                    </Button.Flyout>
+                                                </Button>
                                                 <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,12,0" Padding="8,2" CornerRadius="4"
                                                         Background="{DynamicResource Forest.SideVeil}" IsVisible="{Binding Tag, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                                                     <TextBlock Text="{Binding Tag}" FontSize="11" Foreground="{DynamicResource Forest.Accent}" />
@@ -791,17 +841,6 @@
                                                             </StackPanel>
                                                         </DockPanel>
                                                     </Border>
-
-                                                    <!-- своя категория: выбрать из списка или вписать новую (запишется, когда уйдёшь из поля или нажмёшь Enter) -->
-                                                    <DockPanel Margin="0,12,0,0">
-                                                        <TextBlock DockPanel.Dock="Left" Text="{local:Tr mcard.category}" Foreground="{DynamicResource Forest.Text}" FontSize="13"
-                                                                   VerticalAlignment="Center" Margin="0,0,12,0" />
-                                                        <ComboBox x:Name="CardCategory" IsEditable="True" ItemsSource="{Binding Owner.Categories}"
-                                                                  Text="{Binding Category, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" HorizontalAlignment="Stretch"
-                                                                  PlaceholderText="{local:Tr mcard.categoryHint}" DropDownClosed="CardCategory_DropDownClosed"
-                                                                  KeyDown="CardCategory_KeyDown" AutomationProperties.Name="{local:Tr mcard.category}"
-                                                                  AutomationProperties.AutomationId="CardCategory" />
-                                                    </DockPanel>
 
                                                     <!-- действия -->
                                                     <Button AutomationProperties.Name="{Binding UpdateText}" Classes="primary" Margin="0,14,0,0" HorizontalAlignment="Stretch"
