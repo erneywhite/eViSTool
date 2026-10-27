@@ -236,7 +236,9 @@ public sealed class AgentTests : IAsyncLifetime
         using (var cert = eViSTool.Core.Server.Remote.RemoteAccess.EnsureCertificate(_profile.Id, AgentsDir))
             fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
-        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
+        // агент перечитывает удалённый доступ раз в 5 с; под нагрузкой (CI на Linux) подъём сетевого входа с выпуском
+        // сертификата занимал больше 15 с — запас как у TestServers
+        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port, timeoutMs: 60000);
         var source = new RemoteSchematicSource(new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint));
 
         Assert.Empty(await source.ListAsync());
@@ -264,7 +266,7 @@ public sealed class AgentTests : IAsyncLifetime
         using (var cert = eViSTool.Core.Server.Remote.RemoteAccess.EnsureCertificate(_profile.Id, AgentsDir))
             fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: true, AgentExe, AgentsDir);
-        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
+        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port, timeoutMs: 60000);
 
         // по коду подключения: HTTPS, сертификат сверяется с отпечатком
         var code = new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint);
@@ -308,7 +310,7 @@ public sealed class AgentTests : IAsyncLifetime
         using (var cert = eViSTool.Core.Server.Remote.RemoteAccess.EnsureCertificate(_profile.Id, AgentsDir))
             fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: true, AgentExe, AgentsDir);
-        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
+        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port, timeoutMs: 60000);
         await Until(async () => (await _client.StatusAsync()).State == ServerState.Running);
         var code = new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint);
 
@@ -349,7 +351,7 @@ public sealed class AgentTests : IAsyncLifetime
         using (var cert = eViSTool.Core.Server.Remote.RemoteAccess.EnsureCertificate(_profile.Id, AgentsDir))
             fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
-        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
+        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port, timeoutMs: 60000);
         using var client = AgentClient.ForRemote(new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint));
         IServerData data = new RemoteServerData(() => client);
 
@@ -406,7 +408,7 @@ public sealed class AgentTests : IAsyncLifetime
         using (var cert = eViSTool.Core.Server.Remote.RemoteAccess.EnsureCertificate(_profile.Id, AgentsDir))
             fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
-        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
+        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port, timeoutMs: 60000);
         using var client = AgentClient.ForRemote(new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint));
 
         var file = await client.GetConfigAsync();
@@ -472,7 +474,7 @@ public sealed class AgentTests : IAsyncLifetime
         using (var cert = eViSTool.Core.Server.Remote.RemoteAccess.EnsureCertificate(_profile.Id, AgentsDir))
             fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
-        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
+        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port, timeoutMs: 60000);
         var code = new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint);
         using var client = AgentClient.ForRemote(code);
         var backups = Path.Combine(Path.GetDirectoryName(AgentExe)!, "data", "ModBackups", _profile.Id);
@@ -726,7 +728,7 @@ public sealed class AgentTests : IAsyncLifetime
         using (var cert = eViSTool.Core.Server.Remote.RemoteAccess.EnsureCertificate(_profile.Id, AgentsDir))
             fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
-        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
+        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port, timeoutMs: 60000);
         var code = new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint);
         var target = new ModTarget(new GameProfile { Id = "remote-pack", Name = "Remote", Kind = ProfileKind.Server }, code);
         var appData = Path.Combine(Path.GetDirectoryName(AgentExe)!, "data");
@@ -779,7 +781,7 @@ public sealed class AgentTests : IAsyncLifetime
         using (var cert = eViSTool.Core.Server.Remote.RemoteAccess.EnsureCertificate(_profile.Id, AgentsDir))
             fingerprint = eViSTool.Core.Server.Remote.RemoteAccess.Fingerprint(cert);
         _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
-        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port);
+        await Until(async () => (await _client.StatusAsync()).RemotePort == remote.Port, timeoutMs: 60000);
         var source = new RemoteModConfigSource(new eViSTool.Core.Server.Remote.ConnectionCode("127.0.0.1", remote.Port, remote.Key, fingerprint));
         var backups = Path.Combine(Path.GetDirectoryName(AgentExe)!, "data", "ModConfigBackups", _profile.Id);
         try
