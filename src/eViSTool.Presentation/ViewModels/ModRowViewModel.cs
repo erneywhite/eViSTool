@@ -159,6 +159,21 @@ public sealed class ModRowViewModel : ObservableObject
     /// операции, оставляет прежнюю строку: окно её не пересобирает, и переключение одного мода меняет в таблице одну
     /// строку (замена всех сбивала таблице прокрутку). Тексты сравниваются готовыми — смена языка тоже даёт новую строку.
     /// </summary>
+    private string _category = "";
+
+    /// <summary>Своя категория мода («» — без категории); задаёт вкладка из профиля, строку при этом не пересоздают.</summary>
+    public string Category
+    {
+        get => _category;
+        set
+        {
+            if (SetProperty(ref _category, value)) OnPropertyChanged(nameof(GroupName));
+        }
+    }
+
+    /// <summary>Заголовок группы в таблице «По категориям».</summary>
+    public string GroupName => Category.Length > 0 ? Category : ModsViewModel.NoCategoryLabel;
+
     public bool SameAs(ModRowViewModel other) =>
         FilePath == other.FilePath && SameLocal(Local, other.Local)
         && Kind == other.Kind && IsDuplicate == other.IsDuplicate && Result.Message == other.Result.Message

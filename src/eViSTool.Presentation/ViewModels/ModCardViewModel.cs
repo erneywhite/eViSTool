@@ -15,6 +15,17 @@ public sealed partial class ModCardViewModel : ObservableObject
     public ModRowViewModel Row { get; }
     public ModsViewModel Owner { get; }
 
+    /// <summary>Категория мода в поле карточки; новое значение (выбрали из списка, вписали и ушли из поля) — мод туда.</summary>
+    public string Category
+    {
+        get => Row.Category;
+        set
+        {
+            Owner.SetCategory(Row, value);
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>Коротко о моде (из modinfo.json; нет — начало описания с модбазы).</summary>
     [ObservableProperty] private string _summary;
 

@@ -8,7 +8,15 @@
              x:DataType="vm:ModsViewModel"
              ctl:BackGesture.Command="{Binding ClearSelectionCommand}">
     <!-- Esc и кнопка «Назад» мыши снимают выбор мода: справа снова сводка профиля (ctl:BackGesture) -->
-    <UserControl.Styles>        <!-- пометка «не нужен на этой стороне» в строке мода -->
+    <UserControl.Styles>
+        <!-- заголовок группы «По категориям»: название и число модов, строка-разделитель в цветах темы -->
+        <Style Selector="DataGridRowGroupHeader">
+            <Setter Property="Background" Value="{DynamicResource Forest.Surface2}" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Text}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="MinHeight" Value="34" />
+        </Style>        <!-- пометка «не нужен на этой стороне» в строке мода -->
         <Style Selector="TextBlock.note">
             <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
         </Style>
@@ -338,6 +346,10 @@
                             <ComboBoxItem Content="{local:Tr mods.sortImportant}" />
                             <ComboBoxItem Content="{local:Tr mods.sortName}" />
                         </ComboBox>
+                        <!-- свои категории: таблица — сворачиваемыми группами -->
+                        <CheckBox IsChecked="{Binding GroupByCategory}" Content="{local:Tr mods.byCategory}" FontSize="12" Margin="0,0,10,0" Foreground="{DynamicResource Forest.Text}"
+                                  VerticalAlignment="Center" Classes.hidden="{Binding IsHistory}" ToolTip.Tip="{local:Tr mods.byCategoryTip}"
+                                  AutomationProperties.AutomationId="GroupByCategory" />
                         <Button AutomationProperties.Name="{local:Tr mods.addShort}" Command="{Binding AddFromFileCommand}" ToolTip.Tip="{local:Tr mods.addTip}" IsEnabled="{Binding !IsBusy}">
                             <StackPanel Orientation="Horizontal">
                                 <Path Classes="icon btnIcon" Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
@@ -427,6 +439,15 @@
                                     <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.rollback}" Command="{Binding RollbackCommand}" CommandParameter="{Binding Selected}" />
                                     <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.pin}" Command="{Binding TogglePinCommand}" CommandParameter="{Binding Selected}" />
                                     <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.skip}" Command="{Binding SkipVersionCommand}" CommandParameter="{Binding Selected}" />
+                                    <!-- своя категория: существующие и «Без категории»; новую — в карточке или перетаскиванием -->
+                                    <MenuItem Header="{local:Tr menu.category}" ItemsSource="{Binding CategoryMenu}" AutomationProperties.AutomationId="RowCategoryMenu">
+                                        <MenuItem.ItemContainerTheme>
+                                            <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:CategoryChoice">
+                                                <Setter Property="Header" Value="{Binding Label}" />
+                                                <Setter Property="Command" Value="{Binding Command}" />
+                                            </ControlTheme>
+                                        </MenuItem.ItemContainerTheme>
+                                    </MenuItem>
                                     <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.unskip}" Command="{Binding ClearSkippedCommand}" CommandParameter="{Binding Selected}" />
                                     <Separator />
                                     <MenuItem IsEnabled="{Binding Selected.CanFindInCatalog, FallbackValue=False}" Header="{local:Tr menu.showInCatalog}" Command="{Binding ShowInCatalogCommand}" CommandParameter="{Binding Selected}" />
@@ -762,6 +783,17 @@
                                                             </StackPanel>
                                                         </DockPanel>
                                                     </Border>
+
+                                                    <!-- своя категория: выбрать из списка или вписать новую (запишется, когда уйдёшь из поля или нажмёшь Enter) -->
+                                                    <DockPanel Margin="0,12,0,0">
+                                                        <TextBlock DockPanel.Dock="Left" Text="{local:Tr mcard.category}" Foreground="{DynamicResource Forest.Text}" FontSize="13"
+                                                                   VerticalAlignment="Center" Margin="0,0,12,0" />
+                                                        <ComboBox x:Name="CardCategory" IsEditable="True" ItemsSource="{Binding Owner.Categories}"
+                                                                  Text="{Binding Category, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" HorizontalAlignment="Stretch"
+                                                                  PlaceholderText="{local:Tr mcard.categoryHint}" DropDownClosed="CardCategory_DropDownClosed"
+                                                                  KeyDown="CardCategory_KeyDown" AutomationProperties.Name="{local:Tr mcard.category}"
+                                                                  AutomationProperties.AutomationId="CardCategory" />
+                                                    </DockPanel>
 
                                                     <!-- действия -->
                                                     <Button AutomationProperties.Name="{Binding UpdateText}" Classes="primary" Margin="0,14,0,0" HorizontalAlignment="Stretch"

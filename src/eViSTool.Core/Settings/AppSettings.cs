@@ -8,6 +8,9 @@ public sealed class AppSettings
     public List<GameProfile> Profiles { get; set; } = [];
     public string? ActiveProfileId { get; set; }
 
+    /// <summary>«Мои моды» разбиты на группы по категориям.</summary>
+    public bool GroupModsByCategory { get; set; }
+
     /// <summary>Порядок профилей в «Профилях» и в шапке.</summary>
     [JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
     public ProfileSort ProfileSort { get; set; }

@@ -234,6 +234,8 @@ public static class ProfileCloner
             DataDir = to,
             PinnedMods = new(plan.Source.PinnedMods, StringComparer.OrdinalIgnoreCase),
             BlockedVersions = plan.Source.BlockedVersions.ToDictionary(kv => kv.Key, kv => kv.Value.ToList(), StringComparer.OrdinalIgnoreCase),
+            ModCategories = new(plan.Source.ModCategories, StringComparer.OrdinalIgnoreCase),
+            CollapsedModCategories = [.. plan.Source.CollapsedModCategories],
         };
     }
 

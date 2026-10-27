@@ -80,6 +80,15 @@ public sealed class GameProfile
     public Mods.ModPolicy ToPolicy() => new(PinnedMods, BlockedVersions);
 
     /// <summary>
+    /// Свои категории модов: modid (у мода без modid — имя файла) → категория. Только для порядка в «Моих модах»: порядок
+    /// загрузки модов в Vintage Story решают сами моды. Живут здесь, на этой машине, и у удалённого сервера тоже.
+    /// </summary>
+    public Dictionary<string, string> ModCategories { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Свёрнутые группы категорий в «Моих модах».</summary>
+    public List<string> CollapsedModCategories { get; set; } = [];
+
+    /// <summary>
     /// Связанные профили (id): моды, нужные обоим, предлагается ставить заодно — например, сервер и клиентский
     /// профиль, из которого на нём играют. Связь двусторонняя: хватает записи у одного из двух (см. <see cref="IsLinkedTo"/>).
     /// </summary>

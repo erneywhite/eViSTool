@@ -669,6 +669,55 @@ public sealed class ModsViewTests : IDisposable
         Assert.Same(card, mods.Card);
     }
 
+    private static List<string> GroupHeaders(Visual root) =>
+        [.. root.GetVisualDescendants().OfType<DataGridRowGroupHeader>().Where(h => h.IsVisible)
+            .Select(h => (h.DataContext as Avalonia.Collections.DataGridCollectionViewGroup)?.Key as string ?? "?")];
+
+    /// <summary>
+    /// «По категориям»: таблица — группами по своим категориям (по алфавиту, «Без категории» в конце). Свёрнутую группу
+    /// помнит профиль: перестройка таблицы (смена порядка) её не раскрывает. Категория — из меню строки или карточки.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task By_category_groups_the_table_and_remembers_collapsed_groups()
+    {
+        var main = Main(new HangingModDb(), extra: 3);
+        var mods = main.Mods;
+        _window = new Window { Width = 1400, Height = 860, Content = new ModsView { DataContext = mods } };
+        _window.Show();
+        await Wait.Until(() => mods.Rows.Count == 5 && Rows(_window).Count == 5);
+        ModRowViewModel Row(string id) => mods.Rows.Single(r => r.ModId == id);
+        mods.SetCategory(Row("alpha"), "Карта");
+        mods.SetCategory(Row("mod00"), "карта"); // тот же регистр не плодит вторую группу
+        mods.SetCategory(Row("mod01"), "Библиотеки");
+        Assert.Equal("Карта", Row("mod00").Category);
+        Assert.Equal(["Библиотеки", "Карта"], mods.Categories);
+
+        mods.GroupByCategory = true;
+        await Run(300);
+        Assert.Equal(["Библиотеки", "Карта", ModsViewModel.NoCategoryLabel], GroupHeaders(_window));
+
+        // свернули «Карта» щелчком по заголовку — профиль помнит; смена порядка перестраивает таблицу, а группа свёрнута
+        var header = _window.GetVisualDescendants().OfType<DataGridRowGroupHeader>()
+            .Single(h => h.IsVisible && (h.DataContext as Avalonia.Collections.DataGridCollectionViewGroup)?.Key as string == "Карта");
+        header.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.ToggleButton>().First().IsChecked = false;
+        await Run(200);
+        Assert.True(mods.IsCategoryCollapsed("Карта"));
+        mods.SortIndex = 1;
+        await Run(400);
+        Assert.DoesNotContain(Rows(_window), r => (r.DataContext as ModRowViewModel)?.Category == "Карта");
+        Assert.Contains(Rows(_window), r => (r.DataContext as ModRowViewModel)?.ModId == "mod01");
+
+        if (Environment.GetEnvironmentVariable("EVISTOOL_SHOT") is { } shot)
+            Avalonia.Headless.HeadlessWindowExtensions.CaptureRenderedFrame(_window)!.Save(shot);
+
+        // меню строки: «Без категории» убирает мод из группы
+        mods.Selected = Row("mod01");
+        mods.CategoryMenu.Single(c => c.Category == "").Command.Execute(null);
+        Assert.Equal("", Row("mod01").Category);
+        Assert.Equal(["Карта"], mods.Categories);
+        Assert.False(main.Profiles[0].Model.ModCategories.ContainsKey("mod01"));
+    }
+
     /// <summary>
     /// «Сначала важное»: выключенный мод уезжает к выключенным — в таблице тоже, без потерянных и лишних строк; включённый
     /// обратно возвращается на место.

@@ -89,6 +89,19 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private void OpenDataFolder() => Ui.OpenFolder(Core.AppPaths.Root);
 
+    /// <summary>«Мои моды» разбиты на группы по категориям.</summary>
+    public bool GroupModsByCategory
+    {
+        get => _settings?.GroupModsByCategory ?? false; // модель, собранная в тестах без настроек, — без групп
+        set
+        {
+            if (_settings.GroupModsByCategory == value) return;
+            _settings.GroupModsByCategory = value;
+            OnPropertyChanged();
+            SaveSettings();
+        }
+    }
+
     partial void OnAllowUnstableChanged(bool value)
     {
         _settings.AllowUnstable = value;

@@ -1,4 +1,7 @@
 using System.ComponentModel;
+using Avalonia.Collections;
+using Avalonia.Controls.Primitives;
+using Avalonia.Threading;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -27,6 +30,9 @@ public partial class ModsView : UserControl
         Grid.AddHandler(DragDrop.DragOverEvent, Grid_DragOver);
         Grid.AddHandler(DragDrop.DropEvent, Grid_Drop);
         LeftPane.SizeChanged += (_, e) => ApplyCompact(e.NewSize.Width);
+        // группы «По категориям»: подпись заголовка и свёрнутость, которую помнит профиль
+        Grid.LoadingRowGroup += (_, e) => SetUpGroupHeader(e.RowGroupHeader);
+        Grid.Loaded += (_, _) => ApplyGrouping();
         Split.SizeChanged += (_, _) => FitCard();
         // ширину карточки запоминает только сдвинутый разделитель, не щелчок по нему
         SplitterMemory.Remember(Splitter, CardColumn, width =>
@@ -58,12 +64,61 @@ public partial class ModsView : UserControl
         if (_vm is null) return;
         _vm.PropertyChanged += OnVmChanged;
         FitCard(); // ширина карточки — как в прошлый раз, если помещается
+        Dispatcher.UIThread.Post(ApplyGrouping); // вид таблицы создаётся вместе с её строками
     }
 
     // выбрали порядок в списке «Сначала важное / По имени» — сортировка кликом по заголовку колонки уступает ему
     private void OnVmChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(ModsViewModel.SortIndex)) Grid.CollectionView?.SortDescriptions.Clear();
+        if (e.PropertyName == nameof(ModsViewModel.GroupByCategory)) ApplyGrouping();
+    }
+
+    /// <summary>
+    /// «По категориям» — группы таблицы по <see cref="ModRowViewModel.GroupName"/>. Порядок групп и строк в них задаёт
+    /// порядок строк модели (сперва по категории), сам вид таблицы не сортирует.
+    /// </summary>
+    private void ApplyGrouping()
+    {
+        if (_vm is null || Grid.CollectionView is not DataGridCollectionView view) return;
+        var grouped = view.GroupDescriptions.Count > 0;
+        if (grouped == _vm.GroupByCategory) return;
+        view.GroupDescriptions.Clear();
+        if (_vm.GroupByCategory) view.GroupDescriptions.Add(new DataGridPathGroupDescription(nameof(ModRowViewModel.GroupName)));
+    }
+
+    // заголовки групп таблица переиспользует для разных групп: подписка — один раз на заголовок, группа — на момент щелчка
+    private readonly HashSet<DataGridRowGroupHeader> _groupHeaders = [];
+
+    private void SetUpGroupHeader(DataGridRowGroupHeader header)
+    {
+        header.IsPropertyNameVisible = false;
+        header.ItemCountFormat = "({0})";
+        header.IsItemCountVisible = true;
+        if (_groupHeaders.Add(header))
+            header.AddHandler(ToggleButton.IsCheckedChangedEvent, (_, e) =>
+            {
+                if (e.Source is ToggleButton toggle && header.DataContext is DataGridCollectionViewGroup { Key: string key })
+                    _vm?.SetCategoryCollapsed(key, toggle.IsChecked != true);
+            });
+        // таблица перестроена (операция с модами, смена порядка) — свёрнутая группа остаётся свёрнутой
+        if (header.DataContext is DataGridCollectionViewGroup { Key: string group } g && _vm?.IsCategoryCollapsed(group) == true)
+            Dispatcher.UIThread.Post(() => Grid.CollapseRowGroup(g, collapseAllSubgroups: false));
+    }
+
+    // категория в карточке: выбрали из списка или нажали Enter — записать сразу, не дожидаясь ухода из поля
+    private void CardCategory_DropDownClosed(object? sender, EventArgs e) => CommitCategory(sender);
+
+    private void CardCategory_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        CommitCategory(sender);
+        e.Handled = true;
+    }
+
+    private static void CommitCategory(object? sender)
+    {
+        if (sender is ComboBox { DataContext: ModCardViewModel card } box && box.Text is { } text && text != card.Category) card.Category = text;
     }
 
     private void Grid_PointerPressed(object? sender, PointerPressedEventArgs e)

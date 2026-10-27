@@ -408,7 +408,7 @@ public sealed partial class ModsViewModel : ObservableObject
     }
 
     // по названию — с учётом языка системы; «Важность» (проблемы, обновления…) — сначала
-    private void ApplySort() => View.Sort = ModListRules.Order(SortIndex);
+    private void ApplySort() => View.Sort = CurrentOrder();
 
     // ---------- профиль и откуда берутся моды ----------
 
@@ -627,6 +627,7 @@ public sealed partial class ModsViewModel : ObservableObject
                         modId is null ? null : _cardLogos.GetValueOrDefault(modId));
                     Rows.Add(previous.TryGetValue(fresh.FilePath, out var was) && was.SameAs(fresh) ? was : fresh);
                 }
+                ApplyCategories(); // до обновления вида: строки сразу встают в свои группы
             }
         }
         finally
