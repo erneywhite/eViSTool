@@ -1,0 +1,25 @@
+eViSTool 1.0.10: your own mod categories.
+
+New
+- Mod categories in My mods. The new Categories button turns on "By category": the table is split into collapsible groups of your own categories, sorted by name, with "No category" last. Collapsed groups stay collapsed.
+- Put a mod into a category by dragging it onto a group (the table scrolls by itself when you hold the mod near its top or bottom edge), from the badge in the corner of the mod card, or from the right-click menu.
+- "Sort by tags…" suggests categories for mods without one, from their ModDB tags: libraries, map, animals, food and farming, world generation and so on. A window with checkboxes lets you choose what to apply.
+- Mods with an available update are gathered in an "Update available" group at the top, like with "Important first"; their own category stays and is shown in the row.
+
+Categories only organize the list: Vintage Story mods decide their load order themselves. They are kept per profile on this computer, also for remote and hosted servers.
+
+Update from About.
+
+---
+
+eViSTool 1.0.10: свои категории модов.
+
+Новое
+- Категории модов в «Моих модах». Кнопка «Категории» включает «По категориям»: таблица делится на сворачиваемые группы твоих категорий, по алфавиту, «Без категории» в конце. Свёрнутые группы остаются свёрнутыми.
+- Положить мод в категорию можно перетаскиванием на группу (у верхнего и нижнего края таблица сама прокручивается), плашкой в углу карточки мода или через меню правой кнопки.
+- «Разложить по тегам…» предлагает категории модам без категории по их тегам на ModDB: библиотеки, карта, животные, еда и фермерство, генерация мира и так далее. В окне с галочками выбираешь, что применить.
+- Моды с доступным обновлением собираются в группу «Есть обновление» наверху, как при «Сначала важное»; их своя категория остаётся и видна в строке.
+
+Категории нужны только для порядка в списке: порядок загрузки модов в Vintage Story решают сами моды. Они хранятся по профилю на этом компьютере, в том числе для удалённого сервера и сервера у хостера.
+
+Обнови из «О программе».
