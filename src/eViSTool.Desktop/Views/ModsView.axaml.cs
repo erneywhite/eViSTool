@@ -35,6 +35,10 @@ public partial class ModsView : UserControl
             MarkDropTarget(null);
             DragBadge.IsVisible = false;
         });
+        // перетаскивание: где курсор — и над таблицей, и выше неё (панель кнопок, чипы): по этому таблица едет сама
+        DragDrop.SetAllowDrop(this, true);
+        AddHandler(DragDrop.DragOverEvent, TrackDragPoint, handledEventsToo: true);
+        _dragScroll.Tick += (_, _) => AutoScroll();
         // «По категориям»: мод перетаскивают на заголовок группы или на строку в ней
         Grid.AddHandler(PointerMovedEvent, Grid_PointerMoved, RoutingStrategies.Tunnel);
         Grid.AddHandler(PointerReleasedEvent, (_, _) => _dragStart = null, RoutingStrategies.Tunnel);
@@ -219,12 +223,16 @@ public partial class ModsView : UserControl
         data.Add(DataTransferItem.Create(ModRowFormat, row));
         var source = Rows().FirstOrDefault(r => r.DataContext == row);
         source?.Classes.Add("dragSource");
+        _dragPoint = null;
+        _dragScroll.Start();
         try
         {
             await DragDrop.DoDragDropAsync(press, data, DragDropEffects.Move);
         }
         finally
         {
+            _dragScroll.Stop();
+            _dragPoint = null;
             source?.Classes.Remove("dragSource");
             Rows().FirstOrDefault(r => r.Classes.Contains("dragSource"))?.Classes.Remove("dragSource"); // строку могли переиспользовать
             MarkDropTarget(null);
@@ -233,6 +241,58 @@ public partial class ModsView : UserControl
     }
 
     private IEnumerable<DataGridRow> Rows() => Grid.GetVisualDescendants().OfType<DataGridRow>();
+
+    // ---------- автопрокрутка при перетаскивании ----------
+    // Пока мод «в руке», Windows держит мышь в своём цикле перетаскивания: колесо и полоса прокрутки до таблицы не
+    // доходят. Поэтому как в проводнике: курсор у верхнего или нижнего края таблицы (или за ним) — таблица едет сама,
+    // чем дальше за край, тем быстрее.
+
+    /// <summary>Полоса у края таблицы, где начинается автопрокрутка.</summary>
+    private const double ScrollEdge = 36;
+
+    private readonly DispatcherTimer _dragScroll = new() { Interval = TimeSpan.FromMilliseconds(60) };
+
+    /// <summary>Где курсор при перетаскивании — в координатах таблицы; null — ещё не знаем.</summary>
+    private Point? _dragPoint;
+
+    private void TrackDragPoint(object? sender, DragEventArgs e)
+    {
+        var outside = e.Source is not Visual over || over.FindAncestorOfType<DataGrid>(includeSelf: true) is null;
+        // вне таблицы бросить нельзя ничего (ни мод, ни архив из Проводника) — только видно, куда ехать таблице
+        if (outside) e.DragEffects = DragDropEffects.None;
+        if (!e.DataTransfer.Contains(ModRowFormat)) return;
+        _dragPoint = e.GetPosition(Grid);
+        if (!outside) return;
+        MarkDropTarget(null);
+        DragBadge.IsVisible = false;
+    }
+
+    private void AutoScroll()
+    {
+        if (_dragPoint is not { } at || _vm is null) return;
+        var top = ScrollEdge + 34; // под строкой заголовков колонок
+        var bottom = Grid.Bounds.Height - ScrollEdge;
+        var beyond = at.Y < top ? top - at.Y : at.Y > bottom ? at.Y - bottom : 0;
+        if (beyond <= 0) return;
+        var step = Math.Min(5, 1 + (int)(beyond / 40)); // дальше за край — больше строк за шаг
+        ScrollBy(at.Y < top ? -step : step);
+    }
+
+    /// <summary>Сдвинуть таблицу на столько строк (минус — вверх); строки свёрнутых групп не считаются — их не раскрываем.</summary>
+    internal void ScrollBy(int rows)
+    {
+        if (_vm is null) return;
+        var items = _vm.View.Items.Where(r => !_vm.GroupByCategory || !_vm.IsCategoryCollapsed(r.GroupName)).ToList();
+        var shown = Rows().Where(r => r.IsVisible && r.DataContext is ModRowViewModel)
+            .Select(r => (Row: (ModRowViewModel)r.DataContext!, Y: r.TranslatePoint(default, Grid)?.Y ?? double.NaN, H: r.Bounds.Height))
+            .Where(r => !double.IsNaN(r.Y) && r.Y + r.H > 0 && r.Y < Grid.Bounds.Height)
+            .ToList();
+        if (items.Count == 0 || shown.Count == 0) return;
+        var edge = rows < 0 ? shown.MinBy(r => r.Y).Row : shown.MaxBy(r => r.Y).Row;
+        var index = items.IndexOf(edge);
+        if (index < 0) return;
+        Grid.ScrollIntoView(items[Math.Clamp(index + rows, 0, items.Count - 1)], null);
+    }
 
     /// <summary>Плашка у курсора: какой мод тащат и в какую группу он ляжет.</summary>
     private void ShowDragBadge(DragEventArgs e, ModRowViewModel row, string? category)

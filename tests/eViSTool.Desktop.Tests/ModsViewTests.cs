@@ -766,6 +766,26 @@ public sealed class ModsViewTests : IDisposable
     }
 
     /// <summary>
+    /// Автопрокрутка при перетаскивании (колесо в это время не работает): таблица сдвигается на строки вниз и обратно.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Drag_auto_scroll_moves_the_table()
+    {
+        var mods = Main(new HangingModDb(), extra: 30).Mods;
+        _window = new Window { Width = 1400, Height = 600, Content = new ModsView { DataContext = mods } };
+        _window.Show();
+        await Wait.Until(() => mods.Rows.Count == 32 && Rows(_window).Count > 0);
+        var view = (ModsView)_window.Content!;
+        string Top() => Rows(_window).Where(r => r.TranslatePoint(default, (DataGrid)Named(_window, "ModsGrid"))?.Y >= 0)
+            .MinBy(r => r.TranslatePoint(default, (DataGrid)Named(_window, "ModsGrid"))!.Value.Y)?.DataContext is ModRowViewModel m ? m.ModId : "";
+        var before = Top();
+        for (var i = 0; i < 6; i++) { view.ScrollBy(5); await Run(80); }
+        Assert.NotEqual(before, Top());
+        for (var i = 0; i < 12; i++) { view.ScrollBy(-5); await Run(80); }
+        Assert.Equal(before, Top());
+    }
+
+    /// <summary>
     /// «Сначала важное»: выключенный мод уезжает к выключенным — в таблице тоже, без потерянных и лишних строк; включённый
     /// обратно возвращается на место.
     /// </summary>
