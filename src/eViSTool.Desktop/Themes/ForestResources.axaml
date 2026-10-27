@@ -299,6 +299,8 @@
     <StreamGeometry x:Key="Icon.Edit">M21.174 6.812 a1 1 0 0 0 -3.986 -3.987 L3.842 16.174 a2 2 0 0 0 -.5 .83 l-1.321 4.352 a.5 .5 0 0 0 .623 .622 l4.353 -1.32 a2 2 0 0 0 .83 -.497 z M15 5 l4 4</StreamGeometry>
     <StreamGeometry x:Key="Icon.Search">M21 21 l-4.34 -4.34 M3 11 A8 8 0 1 0 19 11 A8 8 0 1 0 3 11 Z</StreamGeometry>
     <StreamGeometry x:Key="Icon.Folder">M20 20 a2 2 0 0 0 2 -2 V8 a2 2 0 0 0 -2 -2 h-7.9 a2 2 0 0 1 -1.69 -.9 L9.6 3.9 A2 2 0 0 0 7.93 3 H4 a2 2 0 0 0 -2 2 v13 a2 2 0 0 0 2 2 Z</StreamGeometry>
+    <!-- список группами (Lucide list-tree): кнопка «Категории» в «Моих модах» -->
+    <StreamGeometry x:Key="Icon.ListTree">M21 12 h-8 M21 6 H8 M21 18 h-8 M3 6 v4 c0 1.1 0.9 2 2 2 h3 M3 10 v6 c0 1.1 0.9 2 2 2 h3</StreamGeometry>
     <StreamGeometry x:Key="Icon.Package">M11 21.73 a2 2 0 0 0 2 0 l7 -4 A2 2 0 0 0 21 16 V8 a2 2 0 0 0 -1 -1.73 l-7 -4 a2 2 0 0 0 -2 0 l-7 4 A2 2 0 0 0 3 8 v8 a2 2 0 0 0 1 1.73 z m1 .27 V12 M3.29 7 L12 12 l8.71 -5 M7.5 4.27 l9 5.15</StreamGeometry>
     <StreamGeometry x:Key="Icon.Close">M18 6 L6 18 M6 6 l12 12</StreamGeometry>
     <!-- профили: двое людей -->

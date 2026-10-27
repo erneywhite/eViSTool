@@ -372,7 +372,7 @@
                                 </MenuFlyout>
                             </Button.Flyout>
                             <StackPanel Orientation="Horizontal">
-                                <Path Classes="icon btnIcon" Data="{StaticResource Icon.Folder}" Width="13" Height="13" />
+                                <Path Classes="icon btnIcon" Data="{StaticResource Icon.ListTree}" Width="14" Height="14" />
                                 <TextBlock Classes="btnLabel" Text="{local:Tr mods.categories}" />
                             </StackPanel>
                         </Button>
