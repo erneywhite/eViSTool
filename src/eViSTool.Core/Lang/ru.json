@@ -1052,6 +1052,7 @@
   "cat.interface": "Интерфейс и удобство",
   "cat.fixes": "Исправления и твики",
   "mods.noCategory": "Без категории",
+  "mods.groupUpdates": "Есть обновление",
   "mods.byCategory": "По категориям",
   "mods.byCategoryTip": "Разбить таблицу на свои категории. Они только для порядка в списке: порядок загрузки модов в Vintage Story решают сами моды.",
   "menu.category": "Категория",

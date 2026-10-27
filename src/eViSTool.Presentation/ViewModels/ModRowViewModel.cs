@@ -167,12 +167,28 @@ public sealed class ModRowViewModel : ObservableObject
         get => _category;
         set
         {
-            if (SetProperty(ref _category, value)) OnPropertyChanged(nameof(GroupName));
+            if (!SetProperty(ref _category, value)) return;
+            OnPropertyChanged(nameof(GroupName));
+            OnPropertyChanged(nameof(GroupRank));
+            OnPropertyChanged(nameof(CategoryNote));
         }
     }
 
+    /// <summary>
+    /// Мод в группе «Есть обновление»: пока обновление доступно, он там (первая группа — как «Сначала важное»), а своя
+    /// категория у него остаётся и видна в строке. Обновили — строка новая, мод снова в своей группе.
+    /// </summary>
+    public bool InUpdatesGroup => Kind == ModStatus.UpdateAvailable;
+
+    /// <summary>Порядок групп: «Есть обновление», категории, «Без категории».</summary>
+    public int GroupRank => InUpdatesGroup ? 0 : Category.Length > 0 ? 1 : 2;
+
     /// <summary>Заголовок группы в таблице «По категориям».</summary>
-    public string GroupName => Category.Length > 0 ? Category : ModsViewModel.NoCategoryLabel;
+    public string GroupName => InUpdatesGroup ? ModsViewModel.UpdatesGroupLabel
+        : Category.Length > 0 ? Category : ModsViewModel.NoCategoryLabel;
+
+    /// <summary>Своя категория мода в группе «Есть обновление» — в строке после modid.</summary>
+    public string CategoryNote => InUpdatesGroup && Category.Length > 0 ? " · " + Category : "";
 
     public bool SameAs(ModRowViewModel other) =>
         FilePath == other.FilePath && SameLocal(Local, other.Local)

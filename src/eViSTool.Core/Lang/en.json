@@ -1052,6 +1052,7 @@
   "cat.interface": "Interface and comfort",
   "cat.fixes": "Fixes and tweaks",
   "mods.noCategory": "No category",
+  "mods.groupUpdates": "Update available",
   "mods.byCategory": "By category",
   "mods.byCategoryTip": "Split the table into your own categories. They only organize the list: Vintage Story mods decide their load order themselves.",
   "menu.category": "Category",

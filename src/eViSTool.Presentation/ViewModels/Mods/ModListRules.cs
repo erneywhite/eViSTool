@@ -31,10 +31,11 @@ internal static class ModListRules
             ? (a, b) => a.Importance != b.Importance ? a.Importance.CompareTo(b.Importance) : string.Compare(a.Name, b.Name, StringComparison.CurrentCulture)
             : (a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCulture);
         if (!byCategory) return inside;
+        // группы: «Есть обновление» (ранг 0), категории по алфавиту (1), «Без категории» (2)
         return (a, b) =>
         {
-            if ((a.Category.Length == 0) != (b.Category.Length == 0)) return a.Category.Length == 0 ? 1 : -1;
-            var c = string.Compare(a.Category, b.Category, StringComparison.CurrentCultureIgnoreCase);
+            if (a.GroupRank != b.GroupRank) return a.GroupRank.CompareTo(b.GroupRank);
+            var c = a.GroupRank == 1 ? string.Compare(a.Category, b.Category, StringComparison.CurrentCultureIgnoreCase) : 0;
             return c != 0 ? c : inside(a, b);
         };
     }

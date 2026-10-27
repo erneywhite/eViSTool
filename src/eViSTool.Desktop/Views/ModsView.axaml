@@ -525,6 +525,8 @@
                                                     <StackPanel Orientation="Horizontal" ClipToBounds="True">
                                                         <TextBlock Text="{Binding ModId}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" />
                                                         <TextBlock Text="{Binding SideNote}" FontSize="11" Classes="note" Classes.warn="{Binding IsUnneeded}" />
+                                                        <!-- в группе «Есть обновление» — своя категория мода -->
+                                                        <TextBlock Text="{Binding CategoryNote}" FontSize="11" Foreground="{DynamicResource Forest.Muted}" />
                                                     </StackPanel>
                                                 </StackPanel>
                                             </DockPanel>
@@ -761,7 +763,8 @@
                                                             <StackPanel Width="230">
                                                                 <TextBox PlaceholderText="{local:Tr mcard.categoryNew}" KeyDown="CategoryNew_KeyDown" FontSize="12"
                                                                          AutomationProperties.Name="{local:Tr mcard.categoryNew}" AutomationProperties.AutomationId="CardCategoryNew" />
-                                                                <ItemsControl ItemsSource="{Binding Owner.CategoryMenu}" Margin="0,6,0,0">
+                                                                <ScrollViewer MaxHeight="320" HorizontalScrollBarVisibility="Disabled" Margin="0,6,0,0">
+                                                                <ItemsControl ItemsSource="{Binding Owner.CategoryMenu}">
                                                                     <ItemsControl.ItemTemplate>
                                                                         <DataTemplate x:DataType="vm:CategoryChoice">
                                                                             <Panel>
@@ -773,6 +776,7 @@
                                                                         </DataTemplate>
                                                                     </ItemsControl.ItemTemplate>
                                                                 </ItemsControl>
+                                                                </ScrollViewer>
                                                             </StackPanel>
                                                         </Flyout>
                                                     </Button.Flyout>

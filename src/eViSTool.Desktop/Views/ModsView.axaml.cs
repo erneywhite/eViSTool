@@ -252,9 +252,10 @@ public partial class ModsView : UserControl
     internal (string Category, DataGridRowGroupHeader? Header)? DropTarget(Visual? over)
     {
         if (_vm is not { GroupByCategory: true } || over is null) return null;
+        // «Есть обновление» — не категория: туда мод не кладут, он сам там, пока есть обновление
         if (over.FindAncestorOfType<DataGridRowGroupHeader>(includeSelf: true) is { DataContext: DataGridCollectionViewGroup { Key: string key } } header)
-            return (key == ModsViewModel.NoCategoryLabel ? "" : key, header);
-        if (over.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext is ModRowViewModel row)
+            return key == ModsViewModel.UpdatesGroupLabel ? null : (key == ModsViewModel.NoCategoryLabel ? "" : key, header);
+        if (over.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext is ModRowViewModel { InUpdatesGroup: false } row)
             return (row.Category, null);
         return null;
     }

@@ -102,4 +102,27 @@ public sealed class ModListRulesTests
 
         Assert.Equal(["Alpha", "Bravo", "Charlie"], rows.Select(r => r.Name));
     }
+
+    /// <summary>
+    /// «По категориям»: первой — группа «Есть обновление» (мод в ней со своей категорией), потом категории по алфавиту,
+    /// «Без категории» — последней; внутри группы — выбранный порядок.
+    /// </summary>
+    [Fact]
+    public void ByCategory_UpdatesFirst_ThenCategories_ThenUncategorized()
+    {
+        var rows = new[]
+        {
+            Row("map2", "Zeta map"), Row("lib", "Lib"), Row("upd", "Updatable", ModStatus.UpdateAvailable, canUpdate: true),
+            Row("loose", "Loose"), Row("map1", "Alpha map"),
+        };
+        rows[0].Category = rows[4].Category = "Карта";
+        rows[1].Category = "Библиотеки";
+        rows[2].Category = "Карта";
+
+        var order = rows.Order(Comparer<ModRowViewModel>.Create(ModListRules.Order(1, byCategory: true))).Select(r => r.ModId);
+        Assert.Equal(["upd", "lib", "map1", "map2", "loose"], order);
+        Assert.Equal(ViewModels.ModsViewModel.UpdatesGroupLabel, rows[2].GroupName);
+        Assert.Equal(" · Карта", rows[2].CategoryNote); // своя категория видна в строке
+        Assert.Equal("", rows[0].CategoryNote);
+    }
 }

@@ -43,6 +43,9 @@ public sealed partial class ModsViewModel
     /// <summary>Подпись группы модов без категории (она всегда последняя).</summary>
     public static string NoCategoryLabel => Loc.T("mods.noCategory");
 
+    /// <summary>Подпись группы модов, для которых есть обновление (она всегда первая; своей категории мода не меняет).</summary>
+    public static string UpdatesGroupLabel => Loc.T("mods.groupUpdates");
+
     /// <summary>Ключ мода в словаре категорий: modid, а у мода без modid — имя файла.</summary>
     private static string CategoryKey(ModRowViewModel row) => row.ModId.Length > 0 ? row.ModId : row.FileName;
 
