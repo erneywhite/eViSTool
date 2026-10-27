@@ -9,7 +9,7 @@ namespace eViSTool.Presentation.ViewModels;
 /// Пункт меню «Категория ▸»: перенести выбранный мод в эту категорию («» — без категории). Пункт с подписью «-» —
 /// черта между «Без категории» и категориями (так её рисует меню Avalonia).
 /// </summary>
-public sealed record CategoryChoice(string Label, string Category, IRelayCommand? Command)
+public sealed record CategoryChoice(string Label, string Category, IRelayCommand? Command, bool IsCurrent = false)
 {
     public bool IsSeparator => Label == "-";
 }
@@ -66,11 +66,27 @@ public sealed partial class ModsViewModel
             Categories.Clear();
             foreach (var name in names) Categories.Add(name);
         }
-        // «Без категории» — первым и отдельно: убрать из категорий, а не ещё одна категория
+        // «Без категории» — первым и отдельно: убрать из категорий, а не ещё одна категория. У каждой — сколько в ней модов
         CategoryMenu.Clear();
-        CategoryMenu.Add(new CategoryChoice(NoCategoryLabel, "", new RelayCommand(() => MoveSelected(""))));
+        var current = Selected?.Category ?? "";
+        CategoryMenu.Add(new CategoryChoice(Labelled(NoCategoryLabel, Rows.Count(r => r.Category.Length == 0)), "",
+            new RelayCommand(() => MoveSelected("")), current.Length == 0));
         if (names.Count > 0) CategoryMenu.Add(new CategoryChoice("-", "", null));
-        foreach (var name in names) CategoryMenu.Add(new CategoryChoice(name, name, new RelayCommand(() => MoveSelected(name))));
+        foreach (var name in names)
+            CategoryMenu.Add(new CategoryChoice(Labelled(name, Rows.Count(r => r.Category == name)), name,
+                new RelayCommand(() => MoveSelected(name)), current == name));
+    }
+
+    private static string Labelled(string name, int count) => Loc.T("catsuggest.row", name, count);
+
+    /// <summary>Пункт «По категориям» в меню «Категории»: переключить группы.</summary>
+    [RelayCommand]
+    private void ToggleGroupByCategory() => GroupByCategory = !GroupByCategory;
+
+    /// <summary>Выбрали другой мод — в списках категорий отметить его категорию.</summary>
+    partial void OnSelectedChanged(ModRowViewModel? oldValue, ModRowViewModel? newValue)
+    {
+        if (oldValue?.Category != newValue?.Category) RefreshCategoryLists();
     }
 
     private void MoveSelected(string category)

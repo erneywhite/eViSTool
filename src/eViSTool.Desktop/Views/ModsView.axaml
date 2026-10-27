@@ -22,6 +22,11 @@
             <Setter Property="Background" Value="{DynamicResource Forest.Selected}" />
             <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
         </Style>
+        <!-- в списке категорий карточки — та, в которой мод сейчас -->
+        <Style Selector="Button.current">
+            <Setter Property="BorderBrush" Value="{DynamicResource Forest.Accent}" />
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
+        </Style>
         <!-- строка, которую тащат в другую группу -->
         <Style Selector="DataGridRow.dragSource">
             <Setter Property="Opacity" Value="0.45" />
@@ -360,8 +365,8 @@
                                 Classes.hidden="{Binding IsHistory}" AutomationProperties.AutomationId="CategoriesMenu">
                             <Button.Flyout>
                                 <MenuFlyout Placement="BottomEdgeAlignedLeft">
-                                    <MenuItem Header="{local:Tr mods.byCategory}" ToggleType="CheckBox" IsChecked="{Binding GroupByCategory}"
-                                              AutomationProperties.AutomationId="GroupByCategory" />
+                                    <MenuItem Header="{local:Tr mods.byCategory}" ToggleType="CheckBox" IsChecked="{Binding GroupByCategory, Mode=OneWay}"
+                                              Command="{Binding ToggleGroupByCategoryCommand}" AutomationProperties.AutomationId="GroupByCategory" />
                                     <MenuItem Header="{local:Tr catsuggest.button}" Command="{Binding SuggestCategoriesCommand}" IsEnabled="{Binding !IsBusy}"
                                               ToolTip.Tip="{local:Tr catsuggest.buttonTip}" AutomationProperties.AutomationId="SuggestCategories" />
                                 </MenuFlyout>
@@ -761,8 +766,9 @@
                                                                         <DataTemplate x:DataType="vm:CategoryChoice">
                                                                             <Panel>
                                                                                 <Border Height="1" Background="{DynamicResource Forest.Line}" Margin="0,4" IsVisible="{Binding IsSeparator}" />
-                                                                                <Button Theme="{StaticResource Forest.LinkButton}" Content="{Binding Label}" Command="{Binding Command}"
-                                                                                        Click="CategoryPick_Click" HorizontalAlignment="Stretch" Padding="4,5" IsVisible="{Binding !IsSeparator}" />
+                                                                                <Button Content="{Binding Label}" Click="CategoryPick_Click" HorizontalAlignment="Stretch"
+                                                                                        HorizontalContentAlignment="Left" Padding="10,5" Margin="0,2" FontSize="12"
+                                                                                        Classes.current="{Binding IsCurrent}" IsVisible="{Binding !IsSeparator}" />
                                                                             </Panel>
                                                                         </DataTemplate>
                                                                     </ItemsControl.ItemTemplate>

@@ -56,7 +56,7 @@ public partial class ModsView : UserControl
     /// Левая часть уже этого — кнопки над таблицей теряют подписи (остаются иконки с подсказками), колонка «Сторона»
     /// прячется: иначе при сильно суженном окне поле поиска и название мода сжимались почти в ноль.
     /// </summary>
-    internal const double CompactBelow = 640;
+    internal const double CompactBelow = 760; // кнопки над таблицей (с «Категориями») ~560 + поиск не уже 150
 
     private void ApplyCompact(double width)
     {
@@ -115,8 +115,15 @@ public partial class ModsView : UserControl
             Dispatcher.UIThread.Post(() => Grid.CollapseRowGroup(g, collapseAllSubgroups: false));
     }
 
-    // плашка категории в карточке: выбрали категорию — список закрывается
-    private void CategoryPick_Click(object? sender, RoutedEventArgs e) => CloseFlyout(sender as Control);
+    // плашка категории в карточке: выбрали категорию — список закрывается, мод — в неё. Команда — из самого пункта, не из
+    // привязки кнопки: закрытый список отвязан от модели, а смена категории перестраивает его пункты
+    private void CategoryPick_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: CategoryChoice choice } button) return;
+        e.Handled = true;
+        CloseFlyout(button);
+        choice.Command?.Execute(null);
+    }
 
     // новая категория: вписали и нажали Enter — мод в неё, список закрывается
     private void CategoryNew_KeyDown(object? sender, KeyEventArgs e)

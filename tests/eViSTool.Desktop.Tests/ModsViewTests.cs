@@ -707,9 +707,31 @@ public sealed class ModsViewTests : IDisposable
         Assert.DoesNotContain(Rows(_window), r => (r.DataContext as ModRowViewModel)?.Category == "Карта");
         Assert.Contains(Rows(_window), r => (r.DataContext as ModRowViewModel)?.ModId == "mod01");
 
-        // «Без категории» — первым пунктом меню и отдельно от категорий
-        Assert.Equal(ModsViewModel.NoCategoryLabel, mods.CategoryMenu[0].Label);
+        // «Без категории» — первым пунктом меню и отдельно от категорий; у пунктов — сколько в них модов
+        Assert.StartsWith(ModsViewModel.NoCategoryLabel, mods.CategoryMenu[0].Label);
         Assert.True(mods.CategoryMenu[1].IsSeparator);
+        Assert.Contains(mods.CategoryMenu, c => c.Label == Loc.T("catsuggest.row", "Карта", 2));
+
+        // плашка категории в карточке: открыть список, выбрать «Карта» — мод туда, список закрыт
+        mods.Selected = Row("mod02");
+        await Run(300);
+        var chip = (Button)Named(_window, "CardCategory");
+        chip.Flyout!.ShowAt(chip);
+        await Run(200);
+        var pick = TopLevel.GetTopLevel(_window)!.GetVisualDescendants().Concat(Avalonia.Controls.Primitives.OverlayLayer.GetOverlayLayer(_window)?.GetVisualDescendants() ?? [])
+            .OfType<Button>().FirstOrDefault(b => (b.DataContext as CategoryChoice)?.Category == "Карта")
+            ?? throw new InvalidOperationException("в списке карточки нет «Карта»");
+        pick.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        await Run(200);
+        Assert.Equal("Карта", Row("mod02").Category);
+        Assert.False(chip.Flyout.IsOpen);
+        mods.SetCategory(Row("mod02"), "");
+
+        // «По категориям» в меню — командой: снимается и ставится
+        mods.ToggleGroupByCategoryCommand.Execute(null);
+        Assert.False(mods.GroupByCategory);
+        mods.ToggleGroupByCategoryCommand.Execute(null);
+        Assert.True(mods.GroupByCategory);
 
         if (Environment.GetEnvironmentVariable("EVISTOOL_SHOT") is { } shot)
         {
