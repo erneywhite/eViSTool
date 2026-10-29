@@ -11,7 +11,7 @@ using Row = eViSTool.Presentation.ViewModels.ModErrorRow;
 
 /// <summary>
 /// Окно «Ошибки модов»: сводка и строки, какие моды можно выключить, выключение (удачно, после выхода из игры, с
-/// ошибкой, несколько строк сразу), страница мода и «Скрыть» (закрывают окно), копирование. Отчёты выдуманные;
+/// ошибкой, несколько строк сразу), страница мода (закрывает окно), игнор и возврат, копирование. Отчёты выдуманные;
 /// программа вокруг окна (каталог, отчёт профиля, буфер) и выключатель подменены — диск и игра не трогаются.
 /// </summary>
 public sealed class ModErrorsViewModelTests
@@ -25,7 +25,7 @@ public sealed class ModErrorsViewModelTests
     {
         public List<string> Calls { get; } = [];
         public List<string> Copied { get; } = [];
-        public List<(GameProfile Profile, ModErrorReport Report)> Dismissed { get; } = [];
+        public List<GameProfile> Saved { get; } = [];
         /// <summary>Буфер обмена занят: чем он ответит.</summary>
         public Exception? ClipboardFails { get; set; }
 
@@ -35,10 +35,10 @@ public sealed class ModErrorsViewModelTests
             return Task.CompletedTask;
         }
 
-        public void DismissErrorReport(GameProfile profile, ModErrorReport report)
+        public void SaveErrorIgnores(GameProfile profile, ModErrorIgnores ignores)
         {
-            Calls.Add("dismiss");
-            Dismissed.Add((profile, report));
+            Calls.Add("ignores");
+            Saved.Add(profile);
         }
 
         public void SetClipboard(string text)
@@ -89,8 +89,9 @@ public sealed class ModErrorsViewModelTests
         };
     }
 
-    private static ModErrorsViewModel Model(ModErrorReport? report = null, GameProfile? profile = null, Disables? disables = null, Host? host = null) =>
-        new(profile ?? Client, report ?? Report(), (disables ?? new Disables()).Disabler(), host ?? new Host());
+    private static ModErrorsViewModel Model(ModErrorReport? report = null, GameProfile? profile = null, Disables? disables = null, Host? host = null,
+        ModErrorIgnores? ignores = null) =>
+        new(profile ?? Client, report ?? Report(), ignores ?? new ModErrorIgnores(), (disables ?? new Disables()).Disabler(), host ?? new Host());
 
     // ---- сводка и строки
 
@@ -273,7 +274,7 @@ public sealed class ModErrorsViewModelTests
         Assert.False(vm.DisableCommand.CanExecute(vm.Rows[0]));
     }
 
-    // ---- страница мода, «Скрыть»
+    // ---- страница мода
 
     [Fact]
     public void Catalog_OpensModPage_AndClosesWindow()
@@ -309,21 +310,58 @@ public sealed class ModErrorsViewModelTests
         Assert.True(vm.CatalogCommand.CanExecute(vm.Rows[0]));
     }
 
+    // ---- «Игнорировать» и «Вернуть»
+
+    // ошибки игры (без признаков мода) — последней строкой: ни выключить, ни страницы мода
     [Fact]
-    public void Dismiss_HidesReportOfProfile_AndClosesWindow()
+    public void Unattributed_IsLastRow_WithoutDisableOrCatalog()
+    {
+        var report = Report(5, Line()) with { UnattributedExample = "Exception: boom" };
+        var vm = Model(report);
+        var game = vm.Rows[^1];
+        Assert.Equal(2, vm.Rows.Count);
+        Assert.True(game.IsGame);
+        Assert.False(game.CanDisable);
+        Assert.False(game.HasCatalog);
+        Assert.Equal(Loc.T("errs.count", 5), game.CountText);
+        Assert.Equal("Exception: boom", game.Line.Example);
+    }
+
+    [Fact]
+    public void Ignore_MovesRowDown_SavesForProfile_Restore_BringsItBack()
     {
         var host = new Host();
-        var report = Report(3, Line());
-        var vm = Model(report, Server, host: host);
-        var closed = 0;
-        vm.CloseRequested += () => closed++;
+        var ignores = new ModErrorIgnores();
+        var report = Report(4, Line("a", "A", count: 30), Line("b", "B", count: 7)) with { UnattributedExample = "game boom" };
+        var vm = Model(report, Server, host: host, ignores: ignores);
+        var (a, b, game) = (vm.Rows[0], vm.Rows[1], vm.Rows[2]);
+        Assert.False(vm.HasIgnored);
 
-        vm.DismissCommand.Execute(null);
+        vm.IgnoreCommand.Execute(a);
+        vm.IgnoreCommand.Execute(game);
 
-        var (profile, dismissed) = Assert.Single(host.Dismissed);
-        Assert.Same(Server, profile);
-        Assert.Same(report, dismissed);
-        Assert.Equal(1, closed);
+        Assert.Equal([b], vm.Rows);
+        Assert.Equal([a, game], vm.Ignored); // порядок отчёта
+        Assert.Equal(Loc.T("errs.ignoredHeader", 2), vm.IgnoredHeader);
+        Assert.Equal([Server, Server], host.Saved);
+        Assert.Equal(7, ignores.Active(report)); // «!» считает только B
+
+        vm.RestoreCommand.Execute(a);
+        Assert.Equal([a, b], vm.Rows);
+        Assert.Equal([game], vm.Ignored);
+        Assert.Equal(37, ignores.Active(report));
+    }
+
+    // окно открыли с уже запомненным игнором — строка сразу внизу; всё в игноре — список пуст
+    [Fact]
+    public void AlreadyIgnored_StartsInIgnoredList()
+    {
+        var ignores = new ModErrorIgnores();
+        var line = Line(example: "[carryon] boom 12");
+        ignores.Add("carryon", line.KindList);
+        var vm = Model(Report(0, line with { Example = "[carryon] boom 99" }), ignores: ignores); // число другое — вид тот же
+        Assert.False(vm.HasRows);
+        Assert.Single(vm.Ignored);
     }
 
     // ---- копирование

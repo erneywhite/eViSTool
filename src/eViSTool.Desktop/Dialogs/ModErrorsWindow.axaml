@@ -7,7 +7,7 @@
                       x:Class="eViSTool.Desktop.Dialogs.ModErrorsWindow"
                       x:DataType="vm:ModErrorsViewModel"
                       Title="{local:Tr errs.title}"
-                      Width="664" MinWidth="504" MaxHeight="721" SizeToContent="Height">
+                      Width="760" MinWidth="560" MaxHeight="721" SizeToContent="Height">
     <!-- размеры — содержимого окна, без рамки и заголовка. Высота — под список, модов много — прокрутка -->
     <DockPanel Margin="24,20,24,20">
         <StackPanel DockPanel.Dock="Top">
@@ -21,41 +21,61 @@
             <DockPanel>
                 <Button DockPanel.Dock="Left" Content="{local:Tr crash.copy}" Command="{Binding CopyCommand}" Padding="14,8"
                         AutomationProperties.AutomationId="ErrsCopy" />
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Content="{local:Tr errs.dismiss}" Command="{Binding DismissCommand}" Padding="14,8" ToolTip.Tip="{local:Tr errs.dismissTip}"
-                            AutomationProperties.AutomationId="ErrsDismiss" />
-                    <!-- Escape закрывает окно в DialogWindow -->
-                    <Button Content="{local:Tr common.close}" Click="Close_Click" Margin="8,0,0,0" Padding="16,8"
-                            AutomationProperties.AutomationId="ErrsClose" />
-                </StackPanel>
+                <!-- Escape закрывает окно в DialogWindow -->
+                <Button Content="{local:Tr common.close}" Click="Close_Click" HorizontalAlignment="Right" Padding="16,8"
+                        AutomationProperties.AutomationId="ErrsClose" />
             </DockPanel>
         </StackPanel>
 
-        <!-- моды, от самого шумного; много — прокрутка -->
+        <!-- моды, от самого шумного, ошибки игры последними; ниже — свёрнутый список того, что в игноре -->
         <ScrollViewer Margin="0,14,0,0" VerticalScrollBarVisibility="Auto" MaxHeight="520">
-            <ItemsControl ItemsSource="{Binding Rows}" AutomationProperties.AutomationId="ErrsRows">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:ModErrorRow">
-                        <Border Background="{DynamicResource Forest.Surface}" CornerRadius="6" Padding="14,10" Margin="0,0,0,6">
-                            <DockPanel>
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,0,0,0">
-                                    <Button Content="{local:Tr crash.disable}" Padding="10,5" MinHeight="0"
-                                            Command="{Binding $parent[ItemsControl].((vm:ModErrorsViewModel)DataContext).DisableCommand}"
-                                            CommandParameter="{Binding}" AutomationProperties.AutomationId="ErrsDisable" />
-                                    <Button Content="{local:Tr crash.catalog}" Padding="10,5" MinHeight="0" Margin="6,0,0,0"
-                                            Command="{Binding $parent[ItemsControl].((vm:ModErrorsViewModel)DataContext).CatalogCommand}"
-                                            CommandParameter="{Binding}" AutomationProperties.AutomationId="ErrsCatalog" />
-                                </StackPanel>
-                                <StackPanel>
-                                    <TextBlock FontSize="13" TextWrapping="Wrap"><Run Text="{Binding Line.Name}" FontWeight="SemiBold" /><Run Text=" " /><Run Text="{Binding Line.Version}" Foreground="{DynamicResource Forest.Muted}" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding CountText}" Foreground="{DynamicResource Forest.Warn}" /></TextBlock>
-                                    <TextBlock Classes="mono" Text="{Binding Line.Example}" FontSize="11" Foreground="{DynamicResource Forest.Muted}"
-                                               TextWrapping="Wrap" Margin="0,4,0,0" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <StackPanel>
+                <TextBlock Classes="hint" Text="{local:Tr errs.noneActive}" IsVisible="{Binding !HasRows}" Margin="0,0,0,8"
+                           AutomationProperties.AutomationId="ErrsNoneActive" />
+                <ItemsControl ItemsSource="{Binding Rows}" AutomationProperties.AutomationId="ErrsRows">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ModErrorRow">
+                            <Border Background="{DynamicResource Forest.Surface}" CornerRadius="6" Padding="14,10" Margin="0,0,0,6">
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,0,0,0">
+                                        <Button Content="{local:Tr crash.disable}" Padding="10,5" MinHeight="0" IsVisible="{Binding !IsGame}"
+                                                Command="{Binding $parent[ItemsControl].((vm:ModErrorsViewModel)DataContext).DisableCommand}"
+                                                CommandParameter="{Binding}" AutomationProperties.AutomationId="ErrsDisable" />
+                                        <Button Content="{local:Tr crash.catalog}" Padding="10,5" MinHeight="0" Margin="6,0,0,0" IsVisible="{Binding HasCatalog}"
+                                                Command="{Binding $parent[ItemsControl].((vm:ModErrorsViewModel)DataContext).CatalogCommand}"
+                                                CommandParameter="{Binding}" AutomationProperties.AutomationId="ErrsCatalog" />
+                                        <Button Content="{local:Tr errs.ignore}" Padding="10,5" MinHeight="0" Margin="6,0,0,0" ToolTip.Tip="{local:Tr errs.ignoreTip}"
+                                                Command="{Binding $parent[ItemsControl].((vm:ModErrorsViewModel)DataContext).IgnoreCommand}"
+                                                CommandParameter="{Binding}" AutomationProperties.AutomationId="ErrsIgnore" />
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock FontSize="13" TextWrapping="Wrap"><Run Text="{Binding Line.Name}" FontWeight="SemiBold" /><Run Text=" " /><Run Text="{Binding Line.Version}" Foreground="{DynamicResource Forest.Muted}" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding CountText}" Foreground="{DynamicResource Forest.Warn}" /></TextBlock>
+                                        <TextBlock Classes="mono" Text="{Binding Line.Example}" FontSize="11" Foreground="{DynamicResource Forest.Muted}"
+                                                   TextWrapping="Wrap" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Expander Header="{Binding IgnoredHeader}" IsVisible="{Binding HasIgnored}" Margin="0,4,0,0" HorizontalAlignment="Stretch"
+                          AutomationProperties.AutomationId="ErrsIgnored">
+                    <ItemsControl ItemsSource="{Binding Ignored}" AutomationProperties.AutomationId="ErrsIgnoredRows">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ModErrorRow">
+                                <DockPanel Margin="0,2,0,2">
+                                    <Button DockPanel.Dock="Right" Content="{local:Tr errs.restore}" Padding="10,4" MinHeight="0" Margin="12,0,0,0"
+                                            ToolTip.Tip="{local:Tr errs.restoreTip}"
+                                            Command="{Binding $parent[ItemsControl].((vm:ModErrorsViewModel)DataContext).RestoreCommand}"
+                                            CommandParameter="{Binding}" AutomationProperties.AutomationId="ErrsRestore" />
+                                    <TextBlock FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Line.Example}"><Run Text="{Binding Line.Name}" /><Run Text=" " /><Run Text="{Binding Line.Version}" Foreground="{DynamicResource Forest.Muted}" /><Run Text=" · " Foreground="{DynamicResource Forest.Muted}" /><Run Text="{Binding CountText}" Foreground="{DynamicResource Forest.Muted}" /></TextBlock>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Expander>
+            </StackPanel>
         </ScrollViewer>
     </DockPanel>
 </dialogs:DialogWindow>

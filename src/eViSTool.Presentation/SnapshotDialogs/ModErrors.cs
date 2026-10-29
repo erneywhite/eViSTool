@@ -8,7 +8,7 @@ namespace eViSTool.Presentation.SnapshotDialogs;
 /// Окно «Ошибки модов»: три шумных мода, один из них не нашёлся среди установленных — его не выключить, и ошибки без
 /// признаков мода (dialog.moderrors); модов много — список прокручивается, окно не растёт выше предела
 /// (dialog.moderrors.many). Отчёты выдуманные, логи пользователя не читаются; пути — к модам стенда (или выдуманные
-/// рядом с ними). Окно только открывается: «Выключить мод» и «Скрыть» на снимке никто не нажимает.
+/// рядом с ними). Окно только открывается: «Выключить мод» и «Игнорировать» на снимке никто не нажимает.
 /// </summary>
 internal static class ModErrors
 {
@@ -23,6 +23,7 @@ internal static class ModErrors
             At = At,
             Total = 58,
             Unattributed = 5,
+            UnattributedExample = "Exception: System.NullReferenceException: Object reference not set to an instance of an object.",
             Mods =
             [
                 new("primitivesurvival", "Primitive Survival", "3.7.6", ModPath(profile, "primitivesurvival_3.7.6.zip"), 37,

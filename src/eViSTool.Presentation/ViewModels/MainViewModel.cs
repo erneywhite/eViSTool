@@ -107,36 +107,54 @@ public sealed partial class MainViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasErrorBadge), nameof(ErrorBadgeTip))]
     private Core.Diagnostics.ModErrorReport? _errorReport;
 
-    public bool HasErrorBadge => ErrorReport is { IsNoisy: true, Dismissed: false };
+    /// <summary>Что игрок в отчётах активного профиля решил не замечать («Игнорировать» в окне ошибок).</summary>
+    public Core.Diagnostics.ModErrorIgnores ErrorIgnores { get; private set; } = new();
 
-    public string ErrorBadgeTip => ErrorReport is { } r ? Loc.T("errs.badgeTip", r.Mods.Count, r.Total) : "";
+    /// <summary>Ошибок последнего запуска не в игноре — от этого «!» у профиля и строка в сводке «Моих модов».</summary>
+    public int ActiveErrorCount => ErrorReport is { } r ? ErrorIgnores.Active(r) : 0;
 
-    /// <summary>Отчёт профиля: из прошлых запусков (с диска).</summary>
-    private void LoadErrorReport() =>
-        ErrorReport = ActiveProfile is { } p ? Core.Diagnostics.ModErrorReport.Load(p.Model.Id) : null;
+    public bool HasErrorBadge => ActiveErrorCount >= Core.Diagnostics.ModErrorReport.NoisyFrom;
 
-    /// <summary>Свежий отчёт запуска: сохраняем; «скрыто» держится до конца этого запуска (мод шумит постоянно —
-    /// «!» иначе возвращалась бы каждые полминуты), следующий запуск с ошибками покажет её снова.</summary>
+    public string ErrorBadgeTip => ErrorReport is { } r ? Loc.T("errs.badgeTip", ErrorIgnores.ActiveMods(r), ActiveErrorCount) : "";
+
+    partial void OnErrorReportChanged(Core.Diagnostics.ModErrorReport? value) => Mods.OnErrorReportChanged();
+
+    /// <summary>Отчёт профиля из прошлых запусков (с диска) и его игнор.</summary>
+    private void LoadErrorReport()
+    {
+        ErrorIgnores = ActiveProfile is { } p ? Core.Diagnostics.ModErrorIgnores.Load(p.Model.Id) : new();
+        ErrorReport = ActiveProfile is { } q ? Core.Diagnostics.ModErrorReport.Load(q.Model.Id) : null;
+        RefreshPlayTime();
+    }
+
+    /// <summary>Свежий отчёт запуска: сохраняем; «!» — если ошибок не в игноре набралось на «шумно».</summary>
     private void UpdateErrorReport(GameProfile profile, Core.Diagnostics.ModErrorReport report)
     {
-        var old = Core.Diagnostics.ModErrorReport.Load(profile.Id);
-        if (old is { Dismissed: true } && Math.Abs((old.At - report.At).TotalSeconds) < 1) report = report with { Dismissed = true };
-        if (report.Total > 0 || old is not null) report.Save(profile.Id);
-        if (ActiveProfile?.Model.Id == profile.Id) ErrorReport = report;
+        if (report.Total > 0 || File.Exists(Core.Diagnostics.ModErrorReport.FileFor(profile.Id))) report.Save(profile.Id);
+        if (ActiveProfile?.Model.Id != profile.Id) return;
+        ErrorReport = report;
+        RefreshPlayTime(); // отчёт приходит, пока идёт игра и когда она закрылась, — тогда же дописывается время в игре
     }
 
-    /// <summary>«Скрыть»: игрок посмотрел — «!» уходит до новых ошибок.</summary>
-    public void DismissErrorReport(GameProfile profile, Core.Diagnostics.ModErrorReport report)
+    /// <summary>«Время в игре» активного профиля: логи читаются в фоне.</summary>
+    private void RefreshPlayTime() => _ = Mods.PlayTime.RefreshAsync(ActiveProfile?.Model, [.. Profiles.Select(p => p.Model)]);
+
+    /// <summary>«Игнорировать» / «Вернуть» в окне ошибок: игнор профиля сохранён, «!» и сводка пересчитываются.</summary>
+    public void SaveErrorIgnores(GameProfile profile, Core.Diagnostics.ModErrorIgnores ignores)
     {
-        var dismissed = report with { Dismissed = true };
-        dismissed.Save(profile.Id);
-        if (ActiveProfile?.Model.Id == profile.Id) ErrorReport = dismissed;
+        ignores.Save(profile.Id);
+        if (ActiveProfile?.Model.Id != profile.Id) return;
+        ErrorIgnores = ignores;
+        OnPropertyChanged(nameof(HasErrorBadge));
+        OnPropertyChanged(nameof(ErrorBadgeTip));
+        Mods.OnErrorReportChanged();
     }
 
+    /// <summary>Окно ошибок последнего запуска: по «!» у профиля и из сводки «Моих модов» (там и всё, что в игноре).</summary>
     [RelayCommand]
     private void ShowErrors()
     {
-        if (ActiveProfile is not { } p || ErrorReport is not { } r) return;
+        if (ActiveProfile is not { } p || ErrorReport is not { Total: > 0 } r) return;
         AppWindows.Current.ShowModErrors(this, p.Model, r);
     }
 

@@ -152,6 +152,26 @@
             <Setter Property="Foreground" Value="{DynamicResource Forest.Warn}" />
         </Style>
 
+        <!-- значение сводки, которое открывает окно: просто текст строки без рамки и фона, под мышью — подчёркнут цветом ссылки -->
+        <Style Selector="Button.summaryLink">
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ContentPresenter Content="{TemplateBinding Content}" Background="Transparent" />
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Button.summaryLink TextBlock.chevron">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Muted}" />
+        </Style>
+        <Style Selector="Button.summaryLink:pointerover TextBlock.cardValue">
+            <Setter Property="Foreground" Value="{DynamicResource Forest.Accent}" />
+        </Style>
+        <Style Selector="Button.summaryLink:pointerover TextBlock.cardValue:not(.chevron)">
+            <Setter Property="TextDecorations" Value="Underline" />
+        </Style>
+
     </UserControl.Styles>
 
     <DockPanel Margin="10,4,10,0">
@@ -659,18 +679,32 @@
             <Border Grid.Column="2" Classes="card" IsVisible="{Binding !IsHistory}">
                 <Panel>
                     <!-- ===== мод не выбран: сводка профиля — сколько включено, проблемы, когда проверялись обновления ===== -->
-                    <StackPanel Margin="18,16,18,16" IsVisible="{Binding Card, Converter={x:Static ObjectConverters.IsNull}}"
-                                AutomationProperties.AutomationId="ModsSummary">
+                    <!-- прокрутка — на случай длинного «по серверам» в невысоком окне -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                  IsVisible="{Binding Card, Converter={x:Static ObjectConverters.IsNull}}">
+                    <StackPanel Margin="18,16,18,16" AutomationProperties.AutomationId="ModsSummary">
                         <TextBlock Classes="cardTitle" Text="{Binding SummaryTitle}" TextWrapping="Wrap" />
-                        <Grid Margin="0,10,0,0" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto">
+                        <Grid Margin="0,10,0,0" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
                             <TextBlock Grid.Row="0" Classes="cardKey" Text="{local:Tr mods.summaryEnabled}" />
                             <TextBlock Grid.Row="0" Grid.Column="1" Classes="cardValue" Text="{Binding SummaryEnabledText}"
                                        AutomationProperties.AutomationId="ModsSummaryEnabled" />
                             <TextBlock Grid.Row="1" Classes="cardKey" Text="{local:Tr mods.summaryProblems}" />
                             <TextBlock Grid.Row="1" Grid.Column="1" Classes="cardValue" Classes.warn="{Binding HasProblems}"
                                        Text="{Binding SummaryProblemsText}" AutomationProperties.AutomationId="ModsSummaryProblems" />
-                            <TextBlock Grid.Row="2" Classes="cardKey" Text="{local:Tr mods.summaryUpdates}" />
-                            <TextBlock Grid.Row="2" Grid.Column="1" Classes="cardValue" Text="{Binding SummaryCheckedText}"
+                            <!-- ошибки модов за последний запуск: есть отчёт — ссылка на окно ошибок (там же и то, что в игноре) -->
+                            <TextBlock Grid.Row="2" Classes="cardKey" Text="{local:Tr mods.summaryErrors}" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Classes="cardValue" Text="{Binding SummaryErrorsText}"
+                                       IsVisible="{Binding !HasErrorReport}" />
+                            <Button Grid.Row="2" Grid.Column="1" Classes="summaryLink" Command="{Binding ShowErrorsCommand}"
+                                    IsVisible="{Binding HasErrorReport}" AutomationProperties.Name="{local:Tr errs.title}"
+                                    AutomationProperties.AutomationId="ModsSummaryErrors">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Classes="cardValue" Classes.warn="{Binding HasNoisyErrors}" Text="{Binding SummaryErrorsText}" />
+                                    <TextBlock Classes="cardValue chevron" Text="›" Margin="6,4,0,4" />
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Grid.Row="3" Classes="cardKey" Text="{local:Tr mods.summaryUpdates}" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Classes="cardValue" Text="{Binding SummaryCheckedText}"
                                        AutomationProperties.AutomationId="ModsSummaryChecked" />
                         </Grid>
                         <!-- та же команда, что «Проверить» вверху; главная, пока нет «Обновить всё» -->
@@ -683,7 +717,39 @@
                         </Button>
                         <TextBlock Classes="hint" Margin="0,10,0,0" Text="{local:Tr mods.summaryHint}"
                                    IsVisible="{Binding ModCount, Converter={x:Static conv:Counts.Positive}}" />
+
+                        <!-- ===== время в игре (клиентский профиль): из логов игры, копится программой ===== -->
+                        <StackPanel DataContext="{Binding PlayTime}" x:DataType="vm:PlayTimeViewModel" IsVisible="{Binding IsVisible}"
+                                    Margin="0,18,0,0" AutomationProperties.AutomationId="ModsPlayTime">
+                            <Border Height="1" Background="{DynamicResource Forest.Line}" Margin="0,0,0,14" />
+                            <TextBlock Classes="cardTitle" FontSize="14" Text="{local:Tr play.title}" />
+                            <TextBlock Classes="hint" Margin="0,8,0,0" Text="{local:Tr play.none}" TextWrapping="Wrap" IsVisible="{Binding !HasSessions}" />
+                            <StackPanel IsVisible="{Binding HasSessions}">
+                                <Grid Margin="0,8,0,0" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto">
+                                    <TextBlock Grid.Row="0" Classes="cardKey" Text="{local:Tr play.total}" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Classes="cardValue" FontWeight="SemiBold" Text="{Binding TotalText}"
+                                               AutomationProperties.AutomationId="ModsPlayTotal" />
+                                    <TextBlock Grid.Row="1" Classes="cardKey" Text="{local:Tr play.last}" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Classes="cardValue" Text="{Binding LastText}" />
+                                    <TextBlock Grid.Row="2" Classes="cardKey" Text="{local:Tr play.all}" IsVisible="{Binding HasAllProfiles}" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Classes="cardValue" Text="{Binding AllProfilesText}" IsVisible="{Binding HasAllProfiles}" />
+                                </Grid>
+                                <TextBlock Classes="cardKey" Margin="0,10,0,2" Text="{local:Tr play.byServer}" />
+                                <ItemsControl ItemsSource="{Binding Servers}" AutomationProperties.AutomationId="ModsPlayServers">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:PlayServerRow">
+                                            <Grid ColumnDefinitions="*,Auto" Margin="10,0,0,0">
+                                                <TextBlock Classes="cardKey" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Grid.Column="1" Classes="cardValue" Text="{Binding Time}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Classes="hint" Margin="0,10,0,0" Text="{Binding SinceText}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </StackPanel>
                     </StackPanel>
+                    </ScrollViewer>
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                                   IsVisible="{Binding Card, Converter={x:Static ObjectConverters.IsNotNull}}">
                         <ContentControl Content="{Binding Card}">

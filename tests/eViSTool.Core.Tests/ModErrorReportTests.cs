@@ -15,6 +15,7 @@ public sealed class ModErrorReportTests : IDisposable
     {
         Directory.Delete(_root, recursive: true);
         if (File.Exists(ModErrorReport.FileFor(_profileId))) File.Delete(ModErrorReport.FileFor(_profileId));
+        if (File.Exists(ModErrorIgnores.FileFor(_profileId))) File.Delete(ModErrorIgnores.FileFor(_profileId));
     }
 
     private ModFingerprints Mods(params string[] extra)
@@ -47,7 +48,54 @@ public sealed class ModErrorReportTests : IDisposable
         Assert.True(line.Count >= 6);
         Assert.Contains("boom in a tick listener", line.Example);
         Assert.EndsWith("CrashTest_1.0.0.zip", line.Path); // по нему окно выключит мод
-        Assert.True(report.IsNoisy == report.Total >= ModErrorReport.NoisyFrom);
+        Assert.NotEmpty(line.Kinds!); // виды ошибок — для «Игнорировать»
+    }
+
+    // вид ошибки: имена в кавычках, числа и хеши не важны, текст — важен
+    [Fact]
+    public void Kind_IgnoresQuotedNamesAndNumbers()
+    {
+        var a = ModErrorKind.Of("[PlayerModelLib] Shape 'fseraph:entity/humanoid/seraph_l/clothing/collar' that replaces shape 'game:x' was not found, skipping.");
+        var b = ModErrorKind.Of("[PlayerModelLib] Shape 'fseraph:entity/other' that replaces shape 'game:y/z'   was not found, skipping.");
+        Assert.Equal(a, b);
+        Assert.Equal("[PlayerModelLib] Shape '*' that replaces shape '*' was not found, skipping.", a);
+        Assert.Equal(ModErrorKind.Of("Chunk at 512000, 110, 512064 not loaded for player 7f3a9c0d"),
+            ModErrorKind.Of("Chunk at 3, 4, 5 not loaded for player 0b11e2ff"));
+        Assert.NotEqual(a, ModErrorKind.Of("[PlayerModelLib] Model 'x' has no textures"));
+    }
+
+    // игнор: мод в игноре, пока все его виды знакомы; новый вид — снова в счёте; у старых агентов вид — по примеру
+    [Fact]
+    public void Ignores_HoldUntilANewKindAppears_AndSurviveARestart()
+    {
+        var known = new ModErrorLine("pml", "PML", "1.0", null, 4, "x", CulpritSource.Message, ["kind a"]);
+        var report = new ModErrorReport { Total = 4 + 73, Unattributed = 73, UnattributedKinds = ["game a", "game b"], Mods = [known] };
+        var ignores = new ModErrorIgnores();
+        Assert.Equal(77, ignores.Active(report));
+
+        ignores.Add("PML", known.KindList); // modid без учёта регистра
+        ignores.Add(ModErrorIgnores.Game, report.UnattributedKindList);
+        Assert.Equal(0, ignores.Active(report));
+        Assert.Equal(0, ignores.ActiveMods(report));
+
+        var newKind = known with { Kinds = ["kind a", "kind b"] };
+        Assert.Equal(4, ignores.Active(report with { Mods = [newKind] }));
+        Assert.Equal(73, ignores.Active(report with { UnattributedKinds = ["game c"] }));
+
+        var oldAgent = new ModErrorLine("old", "Old", null, null, 2, "[old] boom at 15", CulpritSource.Message);
+        ignores.Add("old", oldAgent.KindList);
+        Assert.True(ignores.Has(oldAgent with { Example = "[old] boom at 99" }));
+
+        ignores.Save(_profileId);
+        var back = ModErrorIgnores.Load(_profileId);
+        Assert.True(back.Has(known with { ModId = "pml" }));
+        Assert.True(back.HasGame(report));
+        back.Remove(ModErrorIgnores.Game);
+        Assert.Equal(73, back.Active(report));
+
+        Assert.True(ModErrorIgnores.Load("нет-такого-профиля").IsEmpty);
+        new ModErrorIgnores().Save(_profileId); // пустой игнор — файла нет
+        Assert.False(File.Exists(ModErrorIgnores.FileFor(_profileId)));
     }
 
     [Fact]
@@ -87,15 +135,16 @@ public sealed class ModErrorReportTests : IDisposable
     {
         var report = new ModErrorReport
         {
-            At = new DateTime(2026, 10, 7, 1, 2, 3), Total = 42, Unattributed = 2, Dismissed = true,
-            Mods = [new ModErrorLine("carryon", "Carry On", "1.0.0", @"C:\Mods\carryon.zip", 40, "boom", CulpritSource.Stack)],
+            At = new DateTime(2026, 10, 7, 1, 2, 3), Total = 42, Unattributed = 2, UnattributedKinds = ["game"],
+            Mods = [new ModErrorLine("carryon", "Carry On", "1.0.0", @"C:\Mods\carryon.zip", 40, "boom", CulpritSource.Stack, ["k1", "k2"])],
         };
         report.Save(_profileId);
 
         var back = ModErrorReport.Load(_profileId)!;
         Assert.Equal(42, back.Total);
-        Assert.True(back.Dismissed);
+        Assert.Equal(["game"], back.UnattributedKinds!);
         Assert.Equal("carryon", back.Mods[0].ModId);
+        Assert.Equal(["k1", "k2"], back.Mods[0].Kinds!);
         Assert.Null(ModErrorReport.Load("нет-такого-профиля"));
     }
 }

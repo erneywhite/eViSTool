@@ -171,6 +171,39 @@ public sealed partial class ModsViewModel : ObservableObject
 
     partial void OnCheckedAtChanged(DateTime? value) => OnPropertyChanged(nameof(SummaryCheckedText));
 
+    /// <summary>Ошибки модов за последний запуск профиля: «нет», «77» или «77, в игноре 73».</summary>
+    public string SummaryErrorsText
+    {
+        get
+        {
+            if (_main.ErrorReport is not { Total: > 0 } r) return Loc.T("mods.summaryNone");
+            var ignored = r.Total - _main.ActiveErrorCount;
+            return ignored == 0 ? r.Total.ToString(Loc.Culture)
+                : ignored == r.Total ? Loc.T("mods.summaryErrorsAllIgnored", r.Total)
+                : Loc.T("mods.summaryErrorsIgnored", r.Total, ignored);
+        }
+    }
+
+    /// <summary>«Время в игре» в сводке (у клиентских профилей).</summary>
+    public PlayTimeViewModel PlayTime { get; } = new();
+
+    /// <summary>Есть что открыть: строка в сводке — ссылка на окно ошибок (и на то, что в игноре).</summary>
+    public bool HasErrorReport => _main.ErrorReport is { Total: > 0 };
+
+    /// <summary>Ошибок не в игноре столько, что у профиля «!»: строка подсвечена так же.</summary>
+    public bool HasNoisyErrors => _main.HasErrorBadge;
+
+    /// <summary>Отчёт об ошибках или игнор поменялся (главная модель зовёт сама).</summary>
+    internal void OnErrorReportChanged()
+    {
+        OnPropertyChanged(nameof(SummaryErrorsText));
+        OnPropertyChanged(nameof(HasErrorReport));
+        OnPropertyChanged(nameof(HasNoisyErrors));
+    }
+
+    [RelayCommand]
+    private void ShowErrors() => _main.ShowErrorsCommand.Execute(null);
+
     /// <summary>Сменился язык: подписи счётчиков сами пересчитываются только при смене числа.</summary>
     public void OnLanguageChanged()
     {
@@ -180,7 +213,7 @@ public sealed partial class ModsViewModel : ObservableObject
         SortIndex = sort;
         foreach (var name in new[] { nameof(InstalledLabel), nameof(UpdatesLabel), nameof(ProblemsLabel), nameof(DisabledLabel),
                      nameof(PinnedLabel), nameof(UnneededLabel), nameof(ShownText), nameof(UpdateAllText), nameof(DependencyText),
-                     nameof(SummaryTitle), nameof(SummaryEnabledText), nameof(SummaryProblemsText), nameof(SummaryCheckedText) })
+                     nameof(SummaryTitle), nameof(SummaryEnabledText), nameof(SummaryProblemsText), nameof(SummaryCheckedText), nameof(SummaryErrorsText) })
             OnPropertyChanged(name);
         WorldJobText = _worldJob.Text;
         RefreshSaidJob();

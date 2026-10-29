@@ -2,8 +2,17 @@ using Newtonsoft.Json;
 
 namespace eViSTool.Core.Diagnostics;
 
-/// <summary>Мод и его ошибки за запуск: сколько, пример (последняя), как узнали мод, путь (чтобы выключить).</summary>
-public sealed record ModErrorLine(string ModId, string Name, string? Version, string? Path, int Count, string Example, CulpritSource Source);
+/// <summary>
+/// Мод и его ошибки за запуск: сколько, пример (последняя), как узнали мод, путь (чтобы выключить) и виды ошибок
+/// (<see cref="ModErrorKind"/>) — по ним «Игнорировать» узнаёт, что ошибка новая.
+/// </summary>
+/// <param name="Kinds">Нет у отчётов старых агентов: тогда вид — по примеру (<see cref="KindList"/>).</param>
+public sealed record ModErrorLine(string ModId, string Name, string? Version, string? Path, int Count, string Example, CulpritSource Source,
+    IReadOnlyList<string>? Kinds = null)
+{
+    [JsonIgnore]
+    public IReadOnlyList<string> KindList => Kinds is { Count: > 0 } k ? k : [ModErrorKind.Of(Example)];
+}
 
 /// <summary>
 /// «Ошибки модов» за запуск игры или сервера: игра их проглатывает и работает дальше, но лог пухнет и бывают фризы.
@@ -11,19 +20,27 @@ public sealed record ModErrorLine(string ModId, string Name, string? Version, st
 /// </summary>
 public sealed record ModErrorReport
 {
-    /// <summary>Сколько ошибок за запуск — от этого «!» у профиля.</summary>
+    /// <summary>Сколько ошибок за запуск (не в игноре) — от этого «!» у профиля.</summary>
     public const int NoisyFrom = 10;
+
+    /// <summary>
+    /// Больше видов у одного мода не храним. shortcut: у мода с сотней разных ошибок часть видов не запомнится, и
+    /// игнор может слететь на следующем запуске; если такое встретится — хранить виды по частоте.
+    /// </summary>
+    private const int MaxKinds = 100;
 
     public DateTime At { get; init; }
     public int Total { get; init; }
     public int Unattributed { get; init; }
     public IReadOnlyList<ModErrorLine> Mods { get; init; } = [];
 
-    /// <summary>Игрок посмотрел и скрыл «!» — до следующего запуска с ошибками.</summary>
-    public bool Dismissed { get; init; }
+    /// <summary>Пример и виды ошибок без признаков мода (код самой игры).</summary>
+    public string? UnattributedExample { get; init; }
+    public IReadOnlyList<string>? UnattributedKinds { get; init; }
 
     [JsonIgnore]
-    public bool IsNoisy => Total >= NoisyFrom;
+    public IReadOnlyList<string> UnattributedKindList =>
+        UnattributedKinds is { Count: > 0 } k ? k : UnattributedExample is { } e ? [ModErrorKind.Of(e)] : [];
 
     public static ModErrorReport Build(IReadOnlyList<LogEntry> entries, ModFingerprints mods, DateTime at)
     {
@@ -34,18 +51,25 @@ public sealed record ModErrorReport
             .Select(g =>
             {
                 var c = g.Last().Culprit!;
-                return new ModErrorLine(c.ModId, c.Mod?.Name ?? c.ModId, c.Version, c.Mod?.Path, g.Count(), Example(g.Last().Error), c.Source);
+                return new ModErrorLine(c.ModId, c.Mod?.Name ?? c.ModId, c.Version, c.Mod?.Path, g.Count(), Example(g.Last().Error), c.Source,
+                    KindsOf(g.Select(a => a.Error)));
             })
             .OrderByDescending(l => l.Count)
             .ToList();
+        var game = attributed.Where(a => a.Culprit is null).Select(a => a.Error).ToList();
         return new ModErrorReport
         {
             At = at,
             Total = errors.Count,
-            Unattributed = attributed.Count(a => a.Culprit is null),
+            Unattributed = game.Count,
             Mods = lines,
+            UnattributedExample = game.Count > 0 ? Example(game[^1]) : null,
+            UnattributedKinds = game.Count > 0 ? KindsOf(game) : null,
         };
     }
+
+    private static List<string> KindsOf(IEnumerable<CrashAnalyzer.ErrorEntry> errors) =>
+        errors.Select(e => ModErrorKind.Of(e.Entry.Message)).Distinct(StringComparer.Ordinal).Take(MaxKinds).ToList();
 
     /// <summary>Пример ошибки для показа: сообщение, а у ошибки перевода — и сама строка.</summary>
     private static string Example(CrashAnalyzer.ErrorEntry e)

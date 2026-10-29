@@ -17,7 +17,8 @@ namespace eViSTool.Desktop.Tests;
 
 /// <summary>
 /// Окно «Ошибки модов»: обычное (не поверх всех, не в панели задач), кнопка «Выключить мод» по строке модели и после
-/// нажатия, «Скрыть» и «Страница мода» закрывают окно по просьбе модели, Escape и «Закрыть», длинный список не растит окно.
+/// нажатия, «Страница мода» закрывает окно по просьбе модели, «Игнорировать» и «Вернуть» переносят строку, Escape и
+/// «Закрыть», длинный список не растит окно.
 /// </summary>
 public sealed class ModErrorsWindowTests
 {
@@ -31,7 +32,7 @@ public sealed class ModErrorsWindowTests
             Calls.Add("catalog " + modId);
             return Task.CompletedTask;
         }
-        public void DismissErrorReport(GameProfile profile, ModErrorReport report) => Calls.Add("dismiss");
+        public void SaveErrorIgnores(GameProfile profile, ModErrorIgnores ignores) => Calls.Add("ignores");
         public void SetClipboard(string text) => Calls.Add("copy");
     }
 
@@ -52,7 +53,7 @@ public sealed class ModErrorsWindowTests
     private static (ModErrorsWindow Window, Host Host) Open(ModErrorReport report)
     {
         var host = new Host();
-        var window = new ModErrorsWindow { DataContext = new ModErrorsViewModel(Server, report, Disabler(), host) };
+        var window = new ModErrorsWindow { DataContext = new ModErrorsViewModel(Server, report, new ModErrorIgnores(), Disabler(), host) };
         window.Show();
         Dispatcher.UIThread.RunJobs();
         return (window, host);
@@ -93,13 +94,48 @@ public sealed class ModErrorsWindowTests
         window.Close();
     }
 
+    // «Игнорировать» уносит строку в свёрнутый список внизу, «Вернуть» — обратно; окно остаётся открытым
     [AvaloniaFact]
-    public void Dismiss_ClosesWindow()
+    public void Ignore_MovesRowDown_Restore_BringsItBack()
     {
-        var (window, host) = Open(Report(Line("a", @"C:\Mods\a.zip")));
-        Mouse.Click(window, All<Button>(window, "ErrsDismiss").Single());
-        Assert.Equal(["dismiss"], host.Calls);
-        Assert.False(window.IsVisible);
+        var (window, host) = Open(Report(Line("a", @"C:\Mods\a.zip"), Line("b", @"C:\Mods\b.zip")));
+        var ignored = All<Expander>(window, "ErrsIgnored").Single();
+        Assert.False(ignored.IsVisible);
+
+        Mouse.Click(window, All<Button>(window, "ErrsIgnore")[0]);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Single(All<Button>(window, "ErrsIgnore"));
+        Assert.True(ignored.IsVisible);
+        Assert.True(window.IsVisible);
+
+        ignored.IsExpanded = true;
+        Dispatcher.UIThread.RunJobs();
+        Mouse.Click(window, All<Button>(window, "ErrsRestore").Single());
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(2, All<Button>(window, "ErrsIgnore").Count);
+        Assert.False(ignored.IsVisible);
+        Assert.Equal(["ignores", "ignores"], host.Calls);
+        window.Close();
+    }
+
+    // всё в игноре — вместо списка строка «новых ошибок нет»; у ошибок самой игры нет «Выключить» и «Страницы мода»
+    [AvaloniaFact]
+    public void GameRow_OnlyIgnore_AndAllIgnored_SaysSo()
+    {
+        var report = Report(Line("a", @"C:\Mods\a.zip")) with { Total = 17, Unattributed = 5, UnattributedExample = "boom" };
+        var (window, _) = Open(report);
+        Assert.Equal(2, All<Button>(window, "ErrsIgnore").Count);
+        Assert.Equal(1, All<Button>(window, "ErrsDisable").Count(b => b.IsVisible));
+        Assert.Equal(1, All<Button>(window, "ErrsCatalog").Count(b => b.IsVisible));
+        var none = All<TextBlock>(window, "ErrsNoneActive").Single();
+        Assert.False(none.IsVisible);
+
+        Mouse.Click(window, All<Button>(window, "ErrsIgnore")[1]);
+        Dispatcher.UIThread.RunJobs();
+        Mouse.Click(window, All<Button>(window, "ErrsIgnore")[0]);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(none.IsVisible);
+        window.Close();
     }
 
     [AvaloniaFact]
@@ -130,7 +166,7 @@ public sealed class ModErrorsWindowTests
     public void ManyMods_ListScrolls_WindowStaysBounded()
     {
         var (window, _) = Open(Report([.. Enumerable.Range(1, 20).Select(i => Line("mod" + i, $@"C:\Mods\mod{i}.zip", 30 - i))]));
-        var scroll = window.GetVisualDescendants().OfType<ScrollViewer>().First(s => s.Content is ItemsControl);
+        var scroll = window.GetVisualDescendants().OfType<ScrollViewer>().First(s => s.Content is StackPanel p && p.Children.OfType<ItemsControl>().Any());
         Assert.True(scroll.Bounds.Height <= 520, $"список {scroll.Bounds.Height}");
         Assert.True(scroll.Extent.Height > scroll.Viewport.Height, "список не прокручивается");
         Assert.True(window.Bounds.Height <= window.MaxHeight, $"окно {window.Bounds.Height}");
