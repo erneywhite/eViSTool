@@ -169,6 +169,52 @@ public sealed class ProfilesSettingsViewTests : IDisposable
         Assert.Same(stand, list.SelectedItem);
     }
 
+    /// <summary>
+    /// Сервер по умолчанию (булавка в меню «Играть») держится, пока ходишь по «Профилям»: поле «Сервер по умолчанию»
+    /// пересобирает варианты при смене профиля и при открытии списка, и выпадающий список на миг терял выбор — пустой
+    /// выбор уходил в профиль как «без сервера», и булавка слетала.
+    /// </summary>
+    [AvaloniaFact]
+    public void Default_server_survives_switching_profiles_and_opening_the_list()
+    {
+        var clientData = Directory.CreateDirectory(Path.Combine(_dir, "client")).FullName;
+        File.WriteAllText(Path.Combine(clientData, "clientsettings.json"),
+            """{ "stringListSettings": { "multiplayerservers": [ "home,192.168.31.31," ] } }""");
+        const string key = "fav:home|192.168.31.31";
+        var main = Main(new GameProfile
+        {
+            Id = "pages-client", Name = "Клиент", Kind = ProfileKind.Client, GameDir = Path.Combine(_dir, "game"), DataDir = clientData,
+            DefaultServer = key,
+        });
+        var client = main.Profiles.Single(p => p.Model.Id == "pages-client");
+        var server = main.Profiles.Single(p => p.Model.Id == "pages-test");
+        var window = Show(new ProfilesView { DataContext = main });
+
+        for (var i = 0; i < 3; i++)
+        {
+            main.EditedProfile = client;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(key, main.EditedDefaultServer);
+            var field = (ComboBox)Named(window, "DefaultServer");
+            Assert.Equal(key, field.SelectedValue); // поле показывает сервер, а не пустоту
+            main.NotifyEditedDefaultServer(); // открыли список
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(key, field.SelectedValue);
+            Dispatcher.UIThread.RunJobs();
+            main.EditedProfile = server;
+            Dispatcher.UIThread.RunJobs();
+        }
+        Assert.Equal(key, client.Model.DefaultServer);
+        Assert.Equal(key, new SettingsStore().Load().Profiles.Single(p => p.Id == "pages-client").DefaultServer);
+
+        // «Без сервера», выбранное человеком, булавку по-прежнему снимает
+        main.EditedProfile = client;
+        Dispatcher.UIThread.RunJobs();
+        ((ComboBox)Named(window, "DefaultServer")).SelectedIndex = 0;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Null(client.Model.DefaultServer);
+    }
+
     private Window Show(Control content, double width = 1200, double height = 900)
     {
         _window = new Window { Width = width, Height = height, Content = content };

@@ -178,14 +178,19 @@ public sealed partial class MainViewModel
     public IReadOnlyList<DefaultServerOption> EditedDefaultServerOptions =>
         EditedProfile?.Model is not { Kind: ProfileKind.Client } client ? [] : PlayMenu.DefaultServerOptions(client, Profiles);
 
-    /// <summary>Выбранный ключ (выбор по ключу: варианты пересоздаются, а выбор должен узнаваться).</summary>
-    public string EditedDefaultServer
+    /// <summary>
+    /// Выбранный ключ (выбор по ключу: варианты пересоздаются, а выбор должен узнаваться). «Без сервера» — "", а null
+    /// пишет сам выпадающий список, когда варианты пересобираются (смена профиля, открытие списка) и он на миг теряет
+    /// выбор: такое не выбор человека — пропускаем, иначе сервер по умолчанию слетал от захода на «Профили».
+    /// </summary>
+    public string? EditedDefaultServer
     {
         get => EditedProfile?.Model.DefaultServer ?? "";
         set
         {
-            if (EditedProfile?.Model is not { Kind: ProfileKind.Client } client) return;
-            var key = string.IsNullOrEmpty(value) ? null : value;
+            // выбор в самом списке возвращает окно (ProfilesView): привязка не переотдаёт списку то же значение
+            if (value is null || EditedProfile?.Model is not { Kind: ProfileKind.Client } client) return;
+            var key = value.Length == 0 ? null : value;
             if (client.DefaultServer == key) return;
             client.DefaultServer = key;
             Save();
