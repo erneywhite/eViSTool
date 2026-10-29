@@ -1,0 +1,25 @@
+eViSTool 1.0.11: time in game and ignoring mod errors.
+
+New
+- Time in game. When no mod is selected, the summary in My mods shows how long you have played in the profile, your last session, time per server (names come from your favorites and your own servers; singleplayer is split by world) and the total across all profiles. The time is read from the game logs. The game keeps only the last few of them, so the count starts from what is still there.
+- "Ignore" in the Mod errors window. An ignored mod no longer counts towards the "!" next to the profile. If it starts throwing a different kind of error, it shows up again. Errors from the game's own code can be ignored too. Ignored mods are listed at the bottom of the window with a "Restore" button. The "Hide" button is gone.
+- The summary in My mods has a new "Errors last run" line. Click it to open the Mod errors window, even when everything is ignored and there is no "!".
+
+Fixed
+- The default server pinned in the Play menu got reset after visiting Profiles.
+
+Update from About.
+
+---
+
+eViSTool 1.0.11: время в игре и игнор ошибок модов.
+
+Новое
+- Время в игре. Когда мод не выбран, в сводке «Моих модов» видно, сколько наиграно в профиле, последнюю сессию, время по серверам (имена берутся из избранного и твоих серверов, одиночная игра делится по мирам) и сколько всего во всех профилях. Время берётся из логов игры. Игра хранит только несколько последних, поэтому счёт начинается с того, что в них ещё есть.
+- «Игнорировать» в окне «Ошибки модов». Мод в игноре больше не зажигает «!» у профиля. Если он начнёт сыпать ошибкой другого вида, то появится снова. Игнорировать можно и ошибки самой игры. Игнорируемые моды собраны внизу окна, там же кнопка «Вернуть». Кнопки «Скрыть» больше нет.
+- В сводке «Моих модов» появилась строка «Ошибки за запуск». По ней открывается окно ошибок, даже когда всё игнорируется и «!» нет.
+
+Исправлено
+- Сервер по умолчанию, закреплённый в меню «Играть», сбрасывался после захода на «Профили».
+
+Обнови из «О программе».
