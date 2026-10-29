@@ -82,6 +82,11 @@ public sealed class ModErrorReportTests : IDisposable
         Assert.Equal(4, ignores.Active(report with { Mods = [newKind] }));
         Assert.Equal(73, ignores.Active(report with { UnattributedKinds = ["game c"] }));
 
+        // отчёт прошлой версии: у ошибок игры нет ни видов, ни примера — игнорировать всё равно можно
+        var oldReport = new ModErrorReport { Total = 116, Unattributed = 116 };
+        ignores.Add(ModErrorIgnores.Game, oldReport.UnattributedKindList);
+        Assert.Equal(0, ignores.Active(oldReport));
+
         var oldAgent = new ModErrorLine("old", "Old", null, null, 2, "[old] boom at 15", CulpritSource.Message);
         ignores.Add("old", oldAgent.KindList);
         Assert.True(ignores.Has(oldAgent with { Example = "[old] boom at 99" }));

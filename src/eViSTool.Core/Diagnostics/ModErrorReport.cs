@@ -38,9 +38,17 @@ public sealed record ModErrorReport
     public string? UnattributedExample { get; init; }
     public IReadOnlyList<string>? UnattributedKinds { get; init; }
 
+    /// <summary>
+    /// Вид ошибок игры в отчёте, где их видов нет (отчёт прошлых версий программы): игнорировать такие тоже можно, а
+    /// первый же новый отчёт со своими видами снова покажет строку.
+    /// </summary>
+    public const string UnknownKind = "?";
+
     [JsonIgnore]
     public IReadOnlyList<string> UnattributedKindList =>
-        UnattributedKinds is { Count: > 0 } k ? k : UnattributedExample is { } e ? [ModErrorKind.Of(e)] : [];
+        UnattributedKinds is { Count: > 0 } k ? k
+        : UnattributedExample is { } e ? [ModErrorKind.Of(e)]
+        : Unattributed > 0 ? [UnknownKind] : [];
 
     public static ModErrorReport Build(IReadOnlyList<LogEntry> entries, ModFingerprints mods, DateTime at)
     {
