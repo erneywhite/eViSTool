@@ -97,6 +97,7 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
                 return;
             }
             if (AppWindows.Current.ConfirmPackImport(plan) is not { } packChoice) return;
+            if (packChoice.Plan is { } chosen) plan = chosen; // ответ про клиентские моды на сервере
             if (!await installer.ConfirmIfRunningAsync(target)) return;
 
             owner.IsBusy = true;

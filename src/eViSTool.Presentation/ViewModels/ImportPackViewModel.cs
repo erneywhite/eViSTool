@@ -9,20 +9,22 @@ public sealed record PackItemRow(string Name, string PackVersion, string MineVer
 
 /// <summary>
 /// Предпросмотр импорта модпака (окно «Импорт модпака»): сведения о паке, предупреждение о версии игры, что будет с
-/// каждым модом, режим («добавить к моим» или «сделать как в паке») и настройки модов. Ответ окна — <see cref="Choice"/>.
+/// каждым модом, режим («добавить к моим» или «сделать как в паке»), настройки модов и — у серверного профиля —
+/// клиентские моды (по умолчанию пропускаются: выделенный сервер их не загружает). Ответ окна — <see cref="Choice"/>.
 /// </summary>
 public sealed partial class ImportPackViewModel : ObservableObject
 {
+    private readonly PackImportPlan _plan;
+
     public ImportPackViewModel(PackImportPlan plan)
     {
+        _plan = plan;
         var m = plan.Manifest;
 
         PackName = m.Name;
         Info = Loc.T("packi.info", m.Mods.Count, m.GameVersion ?? "?", Dates.Day(m.Created.ToLocalTime()), m.CreatedWith ?? "?");
         Description = m.Description ?? "";
         Warning = plan.GameVersionWarning;
-
-        Items = Rows(plan);
 
         MirrorText = Loc.T("packi.modeMirror", plan.NotInPack.Count);
         CanMirror = plan.NotInPack.Count > 0;
@@ -32,9 +34,10 @@ public sealed partial class ImportPackViewModel : ObservableObject
         HasModConfig = m.IncludesModConfig;
         _applyConfig = HasModConfig;
 
-        var changes = plan.Items.Count(Changes);
-        var downloads = plan.Items.Count(i => Changes(i) && !i.Mod.Bundled);
-        Summary = Loc.T("packi.summary", changes, downloads);
+        var clientOnly = plan.Items.Count(i => i.ClientOnly && Changes(i));
+        HasClientOnly = plan.ForServer && clientOnly > 0;
+        ClientOnlyText = Loc.T("packi.clientOnly", clientOnly);
+        Refresh();
     }
 
     public string PackName { get; }
@@ -50,7 +53,7 @@ public sealed partial class ImportPackViewModel : ObservableObject
     public bool HasWarning => Warning is not null;
 
     /// <summary>Что произойдёт с каждым модом: сначала то, что изменится, потом по имени.</summary>
-    public IReadOnlyList<PackItemRow> Items { get; }
+    [ObservableProperty] private IReadOnlyList<PackItemRow> _items = [];
 
     /// <summary>«Сделать как в паке — … (N, не удаляются)».</summary>
     public string MirrorText { get; }
@@ -64,33 +67,53 @@ public sealed partial class ImportPackViewModel : ObservableObject
     /// <summary>В паке лежат настройки модов — показать галочку «Применить настройки».</summary>
     public bool HasModConfig { get; }
 
-    public string Summary { get; }
+    /// <summary>Пак ставится на сервер, а в нём есть клиентские моды — показать галочку «Всё равно поставить».</summary>
+    public bool HasClientOnly { get; }
+
+    /// <summary>«Клиентских модов: 3 — сервер их не загружает, поэтому они пропускаются. Всё равно поставить».</summary>
+    public string ClientOnlyText { get; }
+
+    [ObservableProperty] private string _summary = "";
 
     /// <summary>Режим «как в паке»: ещё и выключить моды профиля, которых в нём нет. Выключено — режим «добавить».</summary>
     [ObservableProperty] private bool _mirror;
 
     [ObservableProperty] private bool _applyConfig;
 
+    /// <summary>Поставить на сервер и клиентские моды (сторона у мода бывает указана неверно).</summary>
+    [ObservableProperty] private bool _installClientOnly;
+
+    partial void OnInstallClientOnlyChanged(bool value) => Refresh();
+
+    /// <summary>План с учётом галочки «Всё равно поставить» — его и ставим.</summary>
+    public PackImportPlan Plan => _plan with { SkipClientOnly = _plan.ForServer && !InstallClientOnly };
+
     /// <summary>Ответ окна. Режим и настройки учитываются, только если они были доступны на экране.</summary>
-    public PackImportChoice Choice => new(CanMirror && Mirror, HasModConfig && ApplyConfig);
+    public PackImportChoice Choice => new(CanMirror && Mirror, HasModConfig && ApplyConfig, Plan);
 
     private static bool Changes(PackItemPlan item) => item.Action is not (PackItemAction.Same or PackItemAction.Duplicate);
 
-    private static List<PackItemRow> Rows(PackImportPlan plan) => plan.Items
-        .OrderBy(i => !Changes(i)) // сначала то, что изменится
-        .ThenBy(i => i.Mod.Name, StringComparer.OrdinalIgnoreCase)
-        .Select(i => new PackItemRow(
-            i.Mod.Name + (i.Mod.Enabled ? "" : " " + Loc.T("packi.disabledMark")),
-            i.Mod.Version ?? "?",
-            i.Installed?.Info?.Version ?? "—",
-            Loc.T(i.Action switch
-            {
-                PackItemAction.Install => "packi.actInstall",
-                PackItemAction.Update => "packi.actUpdate",
-                PackItemAction.Downgrade => "packi.actDowngrade",
-                PackItemAction.Duplicate => "packi.actDuplicate",
-                _ => "packi.actSame",
-            }),
-            Changes(i) ? Loc.T(i.Mod.Bundled ? "packi.srcInside" : "packi.srcModDb") : ""))
-        .ToList();
+    private void Refresh()
+    {
+        var plan = Plan;
+        Items = plan.Items
+            .OrderBy(i => !plan.Installs(i)) // сначала то, что изменится
+            .ThenBy(i => i.Mod.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(i => new PackItemRow(
+                i.Mod.Name + (i.Mod.Enabled ? "" : " " + Loc.T("packi.disabledMark")),
+                i.Mod.Version ?? "?",
+                i.Installed?.Info?.Version ?? "—",
+                Changes(i) && !plan.Installs(i) ? Loc.T("packi.actClientSkip")
+                : Loc.T(i.Action switch
+                {
+                    PackItemAction.Install => "packi.actInstall",
+                    PackItemAction.Update => "packi.actUpdate",
+                    PackItemAction.Downgrade => "packi.actDowngrade",
+                    PackItemAction.Duplicate => "packi.actDuplicate",
+                    _ => "packi.actSame",
+                }),
+                plan.Installs(i) ? Loc.T(i.Mod.Bundled ? "packi.srcInside" : "packi.srcModDb") : ""))
+            .ToList();
+        Summary = Loc.T("packi.summary", plan.Items.Count(plan.Installs), plan.Items.Count(i => plan.Installs(i) && !i.Mod.Bundled));
+    }
 }

@@ -127,7 +127,7 @@ internal sealed class ModCodeActions(ModsViewModel owner, ModPackActions packs, 
                 manifest.Mods.Add(new PackMod
                 {
                     ModId = release.ModIdStr, Name = mod.Name ?? release.ModIdStr, Version = release.ModVersion,
-                    FileName = release.FileName ?? "", Bundled = false,
+                    FileName = release.FileName ?? "", Bundled = false, Side = mod.Side,
                 });
             }
         }

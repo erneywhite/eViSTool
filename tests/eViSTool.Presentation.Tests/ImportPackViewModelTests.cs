@@ -155,11 +155,11 @@ public sealed class ImportPackViewModelTests
 
         var withConfig = new ImportPackViewModel(Plan(items, [Local("Extra")], m => m.IncludesModConfig = true));
         Assert.True(withConfig.HasModConfig);
-        Assert.Equal(new PackImportChoice(Mirror: false, ApplyConfig: true), withConfig.Choice);
+        Assert.Equal((false, true), (withConfig.Choice.Mirror, withConfig.Choice.ApplyConfig));
 
         var without = new ImportPackViewModel(Plan(items, [Local("Extra")]));
         Assert.False(without.HasModConfig);
-        Assert.Equal(new PackImportChoice(Mirror: false, ApplyConfig: false), without.Choice);
+        Assert.Equal((false, false), (without.Choice.Mirror, without.Choice.ApplyConfig));
     }
 
     [Fact]
@@ -170,7 +170,30 @@ public sealed class ImportPackViewModelTests
         model.Mirror = true;
         model.ApplyConfig = false;
 
-        Assert.Equal(new PackImportChoice(Mirror: true, ApplyConfig: false), model.Choice);
+        Assert.Equal((true, false), (model.Choice.Mirror, model.Choice.ApplyConfig));
+    }
+
+    // пак на сервер: клиентский мод по умолчанию пропускается (строка, сводка, план ответа), галочка ставит и его
+    [Fact]
+    public void ClientOnly_OnServer_SkippedByDefault_CheckboxInstallsAnyway()
+    {
+        var items = new[] { Item(PackMod("A"), PackItemAction.Install), new PackItemPlan(PackMod("Hud"), null, PackItemAction.Install, ClientOnly: true) };
+        var manifest = new PackManifest { Name = "x", Mods = [.. items.Select(i => i.Mod)] };
+        var model = new ImportPackViewModel(new PackImportPlan(manifest, items, [], null, ForServer: true, SkipClientOnly: true));
+
+        Assert.True(model.HasClientOnly);
+        Assert.Equal(Loc.T("packi.clientOnly", 1), model.ClientOnlyText);
+        Assert.Equal(Loc.T("packi.actClientSkip"), model.Items.Single(r => r.Name == "Hud").ActionText);
+        Assert.Equal(Loc.T("packi.summary", 1, 1), model.Summary);
+        Assert.True(model.Choice.Plan!.SkipClientOnly);
+
+        model.InstallClientOnly = true;
+        Assert.Equal(Loc.T("packi.actInstall"), model.Items.Single(r => r.Name == "Hud").ActionText);
+        Assert.Equal(Loc.T("packi.summary", 2, 2), model.Summary);
+        Assert.False(model.Choice.Plan!.SkipClientOnly);
+
+        // клиентскому профилю галочка не нужна
+        Assert.False(new ImportPackViewModel(new PackImportPlan(manifest, items, [], null)).HasClientOnly);
     }
 
     [Fact]
@@ -182,7 +205,7 @@ public sealed class ImportPackViewModelTests
         model.Mirror = true;
         model.ApplyConfig = true;
 
-        Assert.Equal(new PackImportChoice(Mirror: false, ApplyConfig: false), model.Choice);
+        Assert.Equal((false, false), (model.Choice.Mirror, model.Choice.ApplyConfig));
     }
 
     [Fact]

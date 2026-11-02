@@ -74,6 +74,7 @@ public static class PackBuilder
                     FileName = fileName,
                     Sha256 = sha,
                     Bundled = bundle,
+                    Side = info.Side,
                 });
             }
 

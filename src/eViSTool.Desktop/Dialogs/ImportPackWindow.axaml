@@ -33,6 +33,11 @@
             </RadioButton>
             <CheckBox Margin="0,10,0,0" Content="{local:Tr packi.applyConfig}" IsChecked="{Binding ApplyConfig}"
                       IsVisible="{Binding HasModConfig}" AutomationProperties.AutomationId="ImportPackApplyConfig" />
+            <!-- пак ставится на сервер: клиентские моды пропускаются, галочкой — поставить всё равно -->
+            <CheckBox Margin="0,10,0,0" IsChecked="{Binding InstallClientOnly}" IsVisible="{Binding HasClientOnly}"
+                      AutomationProperties.AutomationId="ImportPackClientOnly">
+                <TextBlock Text="{Binding ClientOnlyText}" TextWrapping="Wrap" />
+            </CheckBox>
             <DockPanel Margin="0,14,0,0">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                     <Button Classes="primary" Content="{local:Tr packi.import}" IsDefault="True" Padding="16,6" Click="Import_Click"

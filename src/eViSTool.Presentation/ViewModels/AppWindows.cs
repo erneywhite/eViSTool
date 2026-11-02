@@ -27,7 +27,8 @@ public sealed record BanChoice(int Amount, string Unit, string Reason);
 public sealed record RoleCopyChoice(string Code, string Name);
 
 /// <summary>Ответ окна предпросмотра импорта модпака.</summary>
-public sealed record PackImportChoice(bool Mirror, bool ApplyConfig);
+/// <param name="Plan">План с ответом про клиентские моды (на сервер); null — ставить план как был.</param>
+public sealed record PackImportChoice(bool Mirror, bool ApplyConfig, Core.Packs.PackImportPlan? Plan = null);
 
 /// <summary>Ответ окна «Установить также в»: Tag отмеченных профилей и «запомнить как связь».</summary>
 public sealed record AlsoInstallAnswer(IReadOnlyList<object> Chosen, bool Remember);

@@ -74,9 +74,20 @@ public enum PackItemAction
     Duplicate,
 }
 
-public sealed record PackItemPlan(PackMod Mod, LocalMod? Installed, PackItemAction Action);
+/// <param name="ClientOnly">Мод только для игрока, а ставим на сервер: выделенный сервер его не загружает.</param>
+public sealed record PackItemPlan(PackMod Mod, LocalMod? Installed, PackItemAction Action, bool ClientOnly = false);
 
-public sealed record PackImportPlan(PackManifest Manifest, IReadOnlyList<PackItemPlan> Items, IReadOnlyList<LocalMod> NotInPack, string? GameVersionWarning);
+/// <param name="SkipClientOnly">
+/// Пропускать клиентские моды (по умолчанию — да, если цель серверная): и отмеченные в плане, и те, у кого сторона
+/// узналась только из файла (пак старой версии без стороны).
+/// </param>
+public sealed record PackImportPlan(PackManifest Manifest, IReadOnlyList<PackItemPlan> Items, IReadOnlyList<LocalMod> NotInPack, string? GameVersionWarning,
+    bool ForServer = false, bool SkipClientOnly = false)
+{
+    /// <summary>Ставится ли пункт: всё, что меняет профиль, кроме пропущенных клиентских модов.</summary>
+    public bool Installs(PackItemPlan item) =>
+        item.Action is not (PackItemAction.Same or PackItemAction.Duplicate) && !(SkipClientOnly && item.ClientOnly);
+}
 
 public sealed record PackImportResult(IReadOnlyList<string> Done, IReadOnlyList<string> Problems);
 
@@ -99,11 +110,13 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
             .GroupBy(l => l.Info!.ModId, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
+        var forServer = profile.Profile.Kind == ProfileKind.Server;
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var items = manifest.Mods.Select(m =>
         {
             byId.TryGetValue(m.ModId, out var have);
             if (!seen.Add(m.ModId)) return new PackItemPlan(m, have, PackItemAction.Duplicate);
+            var clientOnly = m.Side is not null && ModSides.IsUnneeded(ModSides.Parse(m.Side), profile.Profile.Kind);
             var action = PackItemAction.Install;
             if (have is not null)
             {
@@ -120,7 +133,7 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
                     && !string.Equals(PackBuilder.Sha256Of(have.Path), m.Sha256, StringComparison.OrdinalIgnoreCase))
                     action = PackItemAction.Update;
             }
-            return new PackItemPlan(m, have, action);
+            return new PackItemPlan(m, have, action, clientOnly);
         }).ToList();
 
         var inPack = manifest.Mods.Select(m => m.ModId).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -131,7 +144,7 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
         if (packGame is not null && profile.GameVersion is { } game && !packGame.SameBranch(game))
             warning = Loc.T("pack.gameMismatch", manifest.GameVersion, game);
 
-        return new PackImportPlan(manifest, items, notInPack, warning);
+        return new PackImportPlan(manifest, items, notInPack, warning, forServer, SkipClientOnly: forServer);
     }
 
     /// <summary>
@@ -269,7 +282,9 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
             // ---- 1. получить и проверить всё — цель пока не трогаем
             var ready = new List<(PackItemPlan Item, string File, ModInfo Info)>();
             var changed = new List<(PackItemPlan Item, string File, ModInfo Info)>();
-            foreach (var item in plan.Items.Where(i => i.Action is not (PackItemAction.Same or PackItemAction.Duplicate)))
+            var skippedClient = plan.Items.Where(i => i.Action is not (PackItemAction.Same or PackItemAction.Duplicate) && !plan.Installs(i))
+                .Select(i => $"{i.Mod.Name} {i.Mod.Version}").ToList();
+            foreach (var item in plan.Items.Where(plan.Installs))
             {
                 ct.ThrowIfCancellationRequested();
                 var m = item.Mod;
@@ -292,6 +307,12 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
                 if (info is null || !string.Equals(info.ModId, m.ModId, StringComparison.OrdinalIgnoreCase) || !SameVersion(info.Version, m.Version))
                 {
                     problems.Add(Loc.T("pack.wrongMod", m.Name, m.Version, info is null ? "?" : $"{info.ModId} {info.Version}"));
+                    continue;
+                }
+                // у пака старой версии стороны в описании нет — она видна только в самом файле
+                if (plan.ForServer && plan.SkipClientOnly && m.Side is null && ModSides.Parse(info.Side) == ModSide.Client)
+                {
+                    skippedClient.Add($"{m.Name} {m.Version}");
                     continue;
                 }
                 if (!string.IsNullOrEmpty(m.Sha256) && !string.Equals(PackBuilder.Sha256Of(file), m.Sha256, StringComparison.OrdinalIgnoreCase))
@@ -331,6 +352,8 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
             }
             foreach (var dup in plan.Items.Where(i => i.Action == PackItemAction.Duplicate))
                 problems.Add(Loc.T("pack.duplicate", dup.Mod.Name, dup.Mod.Version));
+            // не ошибка — так и задумано: строкой в отчёте, что поставлено
+            if (skippedClient.Count > 0) done.Add(Loc.T("pack.clientSkipped", string.Join(", ", skippedClient)));
 
             // включено/выключено — как в паке; при зеркалировании лишние выключаются
             var mods = await target.Scan(ct).ConfigureAwait(false);

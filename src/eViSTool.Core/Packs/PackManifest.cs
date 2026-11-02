@@ -49,4 +49,10 @@ public sealed class PackMod
 
     /// <summary>Лежит внутри пака (mods/FileName) или качается из модбазы.</summary>
     public bool Bundled { get; set; }
+
+    /// <summary>
+    /// Где мод работает (как в modinfo.json или на модбазе: client / server / both). Импорт в серверный профиль по нему
+    /// пропускает клиентские моды. Нет (пак старой версии) — сторону узнаём из самого файла при установке.
+    /// </summary>
+    public string? Side { get; set; }
 }
