@@ -1,0 +1,25 @@
+eViSTool 1.0.12: select several mods, copy them to another profile.
+
+New
+- Select several mods at once in My mods: Ctrl+click adds a mod, Shift+click selects everything up to it. The panel on the right then shows how many are selected and acts on all of them: enable, disable, category, pin, update, copy to profile, modpack from the selected mods (as a file or as a mod set code) and delete. The right-click menu does the same.
+- Copy to profile puts the selected mods into another profile on this computer or connected to it, for example from your game into your server.
+- Client-side mods are not installed on a server. A dedicated server doesn't load them, so importing a modpack or a mod set code into a server profile, and copying mods to it, skips them. The import window lets you install them anyway, in case a mod's side is set wrong.
+
+Fixed
+- "Ignore" did nothing for the game's own errors in an error report saved by an older version.
+
+Update from About.
+
+---
+
+eViSTool 1.0.12: выбор нескольких модов и копирование в другой профиль.
+
+Новое
+- Выбор нескольких модов в «Моих модах»: Ctrl+щелчок добавляет мод, Shift+щелчок выбирает все моды до него. Панель справа показывает, сколько выбрано, и действует сразу на все: включить, выключить, категория, закрепить, обновить, скопировать в профиль, модпак из выбранных (файлом или кодом набора) и удалить. То же есть в меню по правому щелчку.
+- «Скопировать в профиль» ставит выбранные моды в другой профиль на этом компьютере или подключённый к нему, например из игры в свой сервер.
+- Клиентские моды не ставятся на сервер. Выделенный сервер их не загружает, поэтому импорт модпака и кода набора в серверный профиль и копирование модов туда их пропускают. В окне импорта можно поставить их всё равно, если у мода неверно указана сторона.
+
+Исправлено
+- «Игнорировать» не срабатывало для ошибок самой игры в отчёте, сохранённом прошлой версией.
+
+Обнови из «О программе».
