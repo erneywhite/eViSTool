@@ -71,9 +71,12 @@ public sealed partial class ModsViewModel
         }
         // «Без категории» — первым и отдельно: убрать из категорий, а не ещё одна категория. У каждой — сколько в ней модов
         CategoryMenu.Clear();
-        var current = Selected?.Category ?? "";
+        // выбрано несколько — отмечена категория, только если она у всех одна
+        var current = IsMulti
+            ? SelectedRows.Select(r => r.Category).Distinct().Count() == 1 ? SelectedRows[0].Category : null
+            : Selected?.Category ?? "";
         CategoryMenu.Add(new CategoryChoice(Labelled(NoCategoryLabel, Rows.Count(r => r.Category.Length == 0)), "",
-            new RelayCommand(() => MoveSelected("")), current.Length == 0));
+            new RelayCommand(() => MoveSelected("")), current is { Length: 0 }));
         if (names.Count > 0) CategoryMenu.Add(new CategoryChoice("-", "", null));
         foreach (var name in names)
             CategoryMenu.Add(new CategoryChoice(Labelled(name, Rows.Count(r => r.Category == name)), name,
@@ -92,9 +95,12 @@ public sealed partial class ModsViewModel
         if (oldValue?.Category != newValue?.Category) RefreshCategoryLists();
     }
 
+    /// <summary>Пункт меню «Категория»: выбрано несколько модов — все в неё, иначе — выбранный.</summary>
     private void MoveSelected(string category)
     {
-        if (Selected is { } row) SetCategory(row, category);
+        if (IsMulti)
+            foreach (var row in SelectedRows.ToList()) SetCategory(row, category);
+        else if (Selected is { } row) SetCategory(row, category);
     }
 
     /// <summary>

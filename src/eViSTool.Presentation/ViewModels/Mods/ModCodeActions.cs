@@ -18,10 +18,11 @@ internal sealed class ModCodeActions(ModsViewModel owner, ModPackActions packs, 
     /// Код набора включённых модов — в буфер обмена. В код попадает мод, у которого на модбазе есть ровно эта версия;
     /// остальные (поставлены из zip, версии там нет) перечисляются в сообщении.
     /// </summary>
-    public async Task CopyAsync()
+    /// <param name="only">Только эти моды (выбранные в таблице — все, и выключенные: их выбрали руками); null — включённые моды профиля.</param>
+    public async Task CopyAsync(IReadOnlyList<LocalMod>? only = null)
     {
         if (owner.Profile is null || owner.IsBusy) return;
-        var mods = owner.Locals.Where(l => l.Info is not null && !l.IsDisabled).ToList();
+        var mods = (only ?? owner.Locals).Where(l => l.Info is not null && (only is not null || !l.IsDisabled)).ToList();
         if (mods.Count == 0)
         {
             Error(Loc.T("modcode.noMods"));
@@ -33,7 +34,7 @@ internal sealed class ModCodeActions(ModsViewModel owner, ModPackActions packs, 
         {
             // модбазу могли спрашивать раньше, до установки части модов: про них дозапрашиваем, иначе они выпали бы
             // из кода как «нет на модбазе»
-            var unknown = owner.Locals.Where(l => l.Info is not null && !owner.ModDbAnswers.ContainsKey(l.Info.ModId)).ToList();
+            var unknown = mods.Where(l => !owner.ModDbAnswers.ContainsKey(l.Info!.ModId)).ToList();
             if (unknown.Count > 0)
             {
                 owner.StatusText = Loc.T("check.querying", 0, unknown.Count);

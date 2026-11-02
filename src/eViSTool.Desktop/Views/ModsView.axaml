@@ -470,7 +470,7 @@
                     <Border Classes="card" IsVisible="{Binding !IsHistory}"><Border Classes="cardClip"><Panel>
                         <DataGrid x:Name="Grid" ItemsSource="{Binding View.Items}" SelectedItem="{Binding Selected}" AutoGenerateColumns="False" IsReadOnly="True"
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{DynamicResource Forest.Line}"
-                                  SelectionMode="Single" RowHeight="54" Background="Transparent" RowBackground="Transparent" BorderThickness="0"
+                                  SelectionMode="Extended" RowHeight="54" Background="Transparent" RowBackground="Transparent" BorderThickness="0"
                                   ColumnHeaderTheme="{StaticResource Forest.ColumnHeader}"
                                   ctl:DoubleTap.Command="{Binding OpenPageCommand}" ctl:DoubleTap.CommandParameter="{Binding Selected}"
                                   Classes.checking="{Binding IsChecking}" ctl:GridOrder.FollowMoves="True"
@@ -478,13 +478,33 @@
                             <!-- контекстное меню строки: всё, что умеет вкладка; строка под курсором выделяется до открытия меню -->
                             <DataGrid.ContextMenu>
                                 <ContextMenu Opening="RowMenu_Opening">
-                                    <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.toggle}" Command="{Binding ToggleEnabledCommand}" CommandParameter="{Binding Selected}" />
-                                    <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.delete}" Command="{Binding DeleteCommand}" CommandParameter="{Binding Selected}" />
-                                    <Separator />
-                                    <MenuItem Header="{local:Tr menu.update}" Command="{Binding UpdateOneCommand}" CommandParameter="{Binding Selected}" />
-                                    <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.rollback}" Command="{Binding RollbackCommand}" CommandParameter="{Binding Selected}" />
-                                    <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.pin}" Command="{Binding TogglePinCommand}" CommandParameter="{Binding Selected}" />
-                                    <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.skip}" Command="{Binding SkipVersionCommand}" CommandParameter="{Binding Selected}" />
+                                    <!-- выбрано несколько модов: действия над всеми выбранными, как в панели справа -->
+                                    <MenuItem IsVisible="{Binding IsMulti}" Header="{Binding MultiTitle}" IsEnabled="False" />
+                                    <MenuItem IsVisible="{Binding IsMulti}" Header="{local:Tr multi.enable}" Command="{Binding EnableSelectedCommand}" />
+                                    <MenuItem IsVisible="{Binding IsMulti}" Header="{local:Tr multi.disable}" Command="{Binding DisableSelectedCommand}" />
+                                    <MenuItem IsVisible="{Binding IsMulti}" Header="{Binding MultiUpdateText}" Command="{Binding UpdateSelectedCommand}" IsEnabled="{Binding MultiCanUpdate}" />
+                                    <MenuItem IsVisible="{Binding IsMulti}" Header="{Binding MultiPinText}" Command="{Binding PinSelectedCommand}" />
+                                    <MenuItem IsVisible="{Binding IsMulti}" Header="{local:Tr multi.copyTo}" ItemsSource="{Binding CopyTargets}" IsEnabled="{Binding HasCopyTargets}">
+                                        <MenuItem.ItemContainerTheme>
+                                            <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:CopyTargetChoice">
+                                                <Setter Property="Header" Value="{Binding Label}" />
+                                                <Setter Property="Command" Value="{Binding Command}" />
+                                            </ControlTheme>
+                                        </MenuItem.ItemContainerTheme>
+                                    </MenuItem>
+                                    <MenuItem IsVisible="{Binding IsMulti}" Header="{local:Tr multi.export}">
+                                        <MenuItem Header="{local:Tr multi.exportFile}" Command="{Binding ExportSelectedCommand}" IsVisible="{Binding IsLocalProfile}" />
+                                        <MenuItem Header="{local:Tr multi.exportCode}" Command="{Binding CopySelectedCodeCommand}" />
+                                    </MenuItem>
+                                    <MenuItem IsVisible="{Binding IsMulti}" Header="{local:Tr multi.delete}" Command="{Binding DeleteSelectedCommand}" />
+                                    <!-- один мод -->
+                                    <MenuItem IsVisible="{Binding !IsMulti}" IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.toggle}" Command="{Binding ToggleEnabledCommand}" CommandParameter="{Binding Selected}" />
+                                    <MenuItem IsVisible="{Binding !IsMulti}" IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.delete}" Command="{Binding DeleteCommand}" CommandParameter="{Binding Selected}" />
+                                    <Separator IsVisible="{Binding !IsMulti}" />
+                                    <MenuItem IsVisible="{Binding !IsMulti}" Header="{local:Tr menu.update}" Command="{Binding UpdateOneCommand}" CommandParameter="{Binding Selected}" />
+                                    <MenuItem IsVisible="{Binding !IsMulti}" IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.rollback}" Command="{Binding RollbackCommand}" CommandParameter="{Binding Selected}" />
+                                    <MenuItem IsVisible="{Binding !IsMulti}" IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.pin}" Command="{Binding TogglePinCommand}" CommandParameter="{Binding Selected}" />
+                                    <MenuItem IsVisible="{Binding !IsMulti}" IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.skip}" Command="{Binding SkipVersionCommand}" CommandParameter="{Binding Selected}" />
                                     <!-- своя категория: существующие и «Без категории»; новую — в карточке или перетаскиванием -->
                                     <MenuItem Header="{local:Tr menu.category}" ItemsSource="{Binding CategoryMenu}" AutomationProperties.AutomationId="RowCategoryMenu">
                                         <MenuItem.ItemContainerTheme>
@@ -494,12 +514,18 @@
                                             </ControlTheme>
                                         </MenuItem.ItemContainerTheme>
                                     </MenuItem>
-                                    <MenuItem IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.unskip}" Command="{Binding ClearSkippedCommand}" CommandParameter="{Binding Selected}" />
-                                    <Separator />
-                                    <MenuItem IsEnabled="{Binding Selected.CanFindInCatalog, FallbackValue=False}" Header="{local:Tr menu.showInCatalog}" Command="{Binding ShowInCatalogCommand}" CommandParameter="{Binding Selected}" />
-                                    <MenuItem Header="{local:Tr menu.openPage}" Command="{Binding OpenPageCommand}" CommandParameter="{Binding Selected}" />
-                                    <MenuItem Header="{local:Tr menu.showFile}" Command="{Binding ShowFileCommand}" CommandParameter="{Binding Selected}"
-                                              IsVisible="{Binding IsLocalProfile}" />
+                                    <MenuItem IsVisible="{Binding !IsMulti}" IsEnabled="{Binding CanChangeSelected}" Header="{local:Tr menu.unskip}" Command="{Binding ClearSkippedCommand}" CommandParameter="{Binding Selected}" />
+                                    <Separator IsVisible="{Binding !IsMulti}" />
+                                    <MenuItem IsVisible="{Binding !IsMulti}" IsEnabled="{Binding Selected.CanFindInCatalog, FallbackValue=False}" Header="{local:Tr menu.showInCatalog}" Command="{Binding ShowInCatalogCommand}" CommandParameter="{Binding Selected}" />
+                                    <MenuItem IsVisible="{Binding !IsMulti}" Header="{local:Tr menu.openPage}" Command="{Binding OpenPageCommand}" CommandParameter="{Binding Selected}" />
+                                    <MenuItem Header="{local:Tr menu.showFile}" Command="{Binding ShowFileCommand}" CommandParameter="{Binding Selected}">
+                                        <MenuItem.IsVisible>
+                                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                <Binding Path="IsLocalProfile" />
+                                                <Binding Path="!IsMulti" />
+                                            </MultiBinding>
+                                        </MenuItem.IsVisible>
+                                    </MenuItem>
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
                             <DataGrid.Columns>
@@ -678,6 +704,66 @@
             <!-- ===== карточка выбранного мода ===== -->
             <Border Grid.Column="2" Classes="card" IsVisible="{Binding !IsHistory}">
                 <Panel>
+                <!-- ===== выбрано несколько модов: панель «Выбрано: N» с действиями сразу над всеми ===== -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding IsMulti}">
+                    <StackPanel Margin="18,16,18,16" AutomationProperties.AutomationId="ModsMulti">
+                        <TextBlock Classes="cardTitle" Text="{Binding MultiTitle}" TextWrapping="Wrap" AutomationProperties.AutomationId="ModsMultiTitle" />
+                        <TextBlock Classes="hint" Margin="0,6,0,0" Text="{Binding MultiStateText}" TextWrapping="Wrap" />
+                        <TextBlock Classes="hint" Margin="0,2,0,0" Text="{Binding MultiSideText}" TextWrapping="Wrap" />
+                        <Grid Margin="0,14,0,0" ColumnDefinitions="*,8,*" RowDefinitions="Auto,8,Auto,8,Auto">
+                            <Button Grid.Column="0" HorizontalAlignment="Stretch" Content="{local:Tr multi.enable}" Command="{Binding EnableSelectedCommand}"
+                                    AutomationProperties.AutomationId="ModsMultiEnable" />
+                            <Button Grid.Column="2" HorizontalAlignment="Stretch" Content="{local:Tr multi.disable}" Command="{Binding DisableSelectedCommand}"
+                                    AutomationProperties.AutomationId="ModsMultiDisable" />
+                            <Button Grid.Row="2" Grid.Column="0" HorizontalAlignment="Stretch" Content="{local:Tr multi.category}"
+                                    AutomationProperties.AutomationId="ModsMultiCategory">
+                                <Button.Flyout>
+                                    <MenuFlyout ItemsSource="{Binding CategoryMenu}">
+                                        <MenuFlyout.ItemContainerTheme>
+                                            <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:CategoryChoice">
+                                                <Setter Property="Header" Value="{Binding Label}" />
+                                                <Setter Property="Command" Value="{Binding Command}" />
+                                            </ControlTheme>
+                                        </MenuFlyout.ItemContainerTheme>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
+                            <Button Grid.Row="2" Grid.Column="2" HorizontalAlignment="Stretch" Content="{Binding MultiPinText}" Command="{Binding PinSelectedCommand}"
+                                    AutomationProperties.AutomationId="ModsMultiPin" />
+                            <Button Grid.Row="4" Grid.ColumnSpan="3" HorizontalAlignment="Stretch" Content="{Binding MultiUpdateText}" Command="{Binding UpdateSelectedCommand}"
+                                    IsEnabled="{Binding MultiCanUpdate}" Classes.primary="{Binding MultiCanUpdate}" AutomationProperties.AutomationId="ModsMultiUpdate" />
+                        </Grid>
+                        <Button Margin="0,8,0,0" HorizontalAlignment="Stretch" Content="{local:Tr multi.copyTo}" IsVisible="{Binding HasCopyTargets}"
+                                AutomationProperties.AutomationId="ModsMultiCopy">
+                            <Button.Flyout>
+                                <MenuFlyout ItemsSource="{Binding CopyTargets}">
+                                    <MenuFlyout.ItemContainerTheme>
+                                        <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:CopyTargetChoice">
+                                            <Setter Property="Header" Value="{Binding Label}" />
+                                            <Setter Property="Command" Value="{Binding Command}" />
+                                        </ControlTheme>
+                                    </MenuFlyout.ItemContainerTheme>
+                                </MenuFlyout>
+                            </Button.Flyout>
+                        </Button>
+                        <!-- модпак из выбранных: файлом (моды с этой машины) или кодом набора (только моды с модбазы) -->
+                        <Button Margin="0,8,0,0" HorizontalAlignment="Stretch" Content="{local:Tr multi.export}"
+                                AutomationProperties.AutomationId="ModsMultiExport">
+                            <Button.Flyout>
+                                <MenuFlyout>
+                                    <MenuItem Header="{local:Tr multi.exportFile}" Command="{Binding ExportSelectedCommand}" IsVisible="{Binding IsLocalProfile}" />
+                                    <MenuItem Header="{local:Tr multi.exportCode}" Command="{Binding CopySelectedCodeCommand}" />
+                                </MenuFlyout>
+                            </Button.Flyout>
+                        </Button>
+                        <Button Margin="0,8,0,0" HorizontalAlignment="Stretch" Classes="danger" Content="{local:Tr multi.delete}" Command="{Binding DeleteSelectedCommand}"
+                                AutomationProperties.AutomationId="ModsMultiDelete" />
+                        <TextBlock Classes="hint" Margin="0,14,0,0" Text="{local:Tr multi.hint}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ===== один мод или ничего: карточка или сводка ===== -->
+                <Panel IsVisible="{Binding !IsMulti}">
                     <!-- ===== мод не выбран: сводка профиля — сколько включено, проблемы, когда проверялись обновления ===== -->
                     <!-- прокрутка — на случай длинного «по серверам» в невысоком окне -->
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
@@ -1043,6 +1129,7 @@
                             </ContentControl.ContentTemplate>
                         </ContentControl>
                     </ScrollViewer>
+                </Panel>
                 </Panel>
             </Border>
         </Grid>

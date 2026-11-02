@@ -24,6 +24,7 @@ using eViSTool.Desktop.Platform;
 using eViSTool.Desktop.Views;
 using eViSTool.Presentation;
 using eViSTool.Presentation.ViewModels;
+using Newtonsoft.Json.Linq;
 
 namespace eViSTool.Desktop.Tests;
 
@@ -172,13 +173,14 @@ public sealed class ModsViewTests : IDisposable
     }
 
     /// <summary>Архив мода; <paramref name="icon"/> — modicon.png в корне (иконка мода) или null.</summary>
-    private static byte[] Zip(string modId, byte[]? icon = null)
+    private static byte[] Zip(string modId, byte[]? icon = null, string? side = null)
     {
         using var ms = new MemoryStream();
         using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
         {
+            var sideJson = side is null ? "" : $", \"side\": \"{side}\"";
             using (var w = new StreamWriter(zip.CreateEntry("modinfo.json").Open()))
-                w.Write($"{{ \"type\": \"code\", \"modid\": \"{modId}\", \"name\": \"{modId}\", \"version\": \"1.0.0\" }}");
+                w.Write($"{{ \"type\": \"code\", \"modid\": \"{modId}\", \"name\": \"{modId}\", \"version\": \"1.0.0\"{sideJson} }}");
             if (icon is not null)
                 using (var s = zip.CreateEntry("modicon.png").Open())
                     s.Write(icon);
@@ -199,16 +201,30 @@ public sealed class ModsViewTests : IDisposable
     {
         public List<string> Notices { get; } = [];
 
+        /// <summary>Что отвечать на вопросы окна; заданные вопросы — в <see cref="Asked"/>.</summary>
+        public Answer Answer { get; set; } = Answer.No;
+        public List<string> Asked { get; } = [];
+
         public override void Notify(string text, NoticeKind kind) => Notices.Add(text);
 
-        public override Answer Ask(string text, AskButtons buttons, Answer? byDefault = null, bool warning = false) => Answer.No;
+        public override Answer Ask(string text, AskButtons buttons, Answer? byDefault = null, bool warning = false)
+        {
+            Asked.Add(text);
+            return Answer;
+        }
+
+        public override void MoveToTrash(string path)
+        {
+            if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+            else File.Delete(path);
+        }
     }
 
     /// <summary>
     /// Главная модель над своими настройками: один клиентский профиль, без автопроверки, модбаза — <paramref name="db"/>;
     /// <paramref name="ui"/> — свои сообщения и вопросы окна вместо настоящих.
     /// </summary>
-    private MainViewModel Main(HttpMessageHandler db, int extra = 0, AvaloniaUiPlatform? ui = null)
+    private MainViewModel Main(HttpMessageHandler db, int extra = 0, AvaloniaUiPlatform? ui = null, params GameProfile[] more)
     {
         Assert.SkipUnless(AppPaths.IsPortable, "данные рядом с тестами недоступны для записи — настоящие данные пользователя не трогаем");
         _timers = CleanupWindowTests.TimerSpy.Wrap(ui ?? new AvaloniaUiPlatform());
@@ -226,7 +242,7 @@ public sealed class ModsViewTests : IDisposable
         var profile = new GameProfile { Id = "mods-view-test", Name = "Игрок", Kind = ProfileKind.Client, GameDir = game, DataDir = data };
         new SettingsStore().Save(new AppSettings
         {
-            Profiles = [profile], ActiveProfileId = profile.Id, Language = _language, AutoCheckUpdates = false, GameBackground = false,
+            Profiles = [profile, .. more], ActiveProfileId = profile.Id, Language = _language, AutoCheckUpdates = false, GameBackground = false,
         });
 
         // адрес релизов читается ещё в конструкторе, до первого ожидания: потом переменную можно вернуть
@@ -822,6 +838,90 @@ public sealed class ModsViewTests : IDisposable
         await Run(200);
         Assert.Equal(["alpha", "mod00", "mod01", "mod02", "beta"], GridOrderOf(grid));
         Assert.Equal(5, Rows(_window).Count);
+    }
+
+    /// <summary>
+    /// Выбор нескольких модов: Ctrl+щелчок добавляет строку, справа вместо карточки — «Выбрано: N»; «Выключить» выключает
+    /// все выбранные одной операцией, а выбор после перестройки таблицы остаётся на тех же модах; правый щелчок по одному
+    /// из выбранных выбор не сбрасывает; обычный щелчок возвращает один мод и его карточку.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Several_mods_are_selected_with_ctrl_and_changed_together()
+    {
+        var ui = new QuietUi();
+        var mods = Main(new HangingModDb(), extra: 3, ui: ui).Mods;
+        _window = new Window { Width = 1400, Height = 860, Content = new ModsView { DataContext = mods } };
+        _window.Show();
+        await Wait.Until(() => mods.Rows.Count == 5 && Rows(_window).Count == 5);
+        Mouse.Click(_window, RowOf(_window, "mod00"), x: 300);
+        Assert.False(mods.IsMulti);
+        Mouse.ClickWith(_window, RowOf(_window, "mod01"), RawInputModifiers.Control, x: 300);
+        Mouse.ClickWith(_window, RowOf(_window, "alpha"), RawInputModifiers.Control, x: 300);
+        Mouse.Prepare(_window);
+        Assert.True(mods.IsMulti);
+        var multi = Named(_window, "ModsMulti"); // панель строится, когда её впервые показывают
+        Assert.Equal(["alpha", "mod00", "mod01"], mods.SelectedRows.Select(r => r.ModId).Order());
+        Assert.True(multi.IsEffectivelyVisible);
+        Assert.False(Named(_window, "ModsSummary").IsEffectivelyVisible);
+        Assert.Equal(Loc.T("multi.title", 3, Loc.Plural("multi.mods", 3)), ((TextBlock)Named(_window, "ModsMultiTitle")).Text);
+
+        Mouse.Click(_window, Named(_window, "ModsMultiDisable"));
+        await Wait.Until(() => mods.Rows.Where(r => r.ModId is "alpha" or "mod00" or "mod01").All(r => !r.IsEnabled));
+        await Run(200);
+        var disabled = JObject.Parse(File.ReadAllText(Path.Combine(_dir, "data", "clientsettings.json")))["stringListSettings"]!["disabledMods"]!
+            .Values<string>().Order();
+        Assert.Equal(["alpha", "beta", "mod00", "mod01"], disabled);
+        // строки построены заново, а выбор — на тех же модах
+        await Wait.Until(() => mods.SelectedRows.Count == 3);
+        Assert.Equal(["alpha", "mod00", "mod01"], mods.SelectedRows.Select(r => r.ModId).Order());
+        Assert.True(mods.SelectedRows.All(r => mods.Rows.Contains(r)));
+
+        // правый щелчок по одному из выбранных — меню для всех, выбор прежний
+        var point = Mouse.Center(_window, RowOf(_window, "mod00"));
+        _window.MouseDown(point, MouseButton.Right);
+        _window.MouseUp(point, MouseButton.Right);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(3, mods.SelectedRows.Count);
+        _window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null); // закрыть меню
+        Dispatcher.UIThread.RunJobs();
+
+        // обычный щелчок — снова один мод с карточкой
+        Mouse.Click(_window, RowOf(_window, "mod02"), x: 300);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(mods.IsMulti);
+        Assert.False(multi.IsEffectivelyVisible);
+        await Wait.Until(() => mods.Card?.Row.ModId == "mod02");
+    }
+
+    /// <summary>
+    /// «Скопировать в профиль»: выбранные моды встают в серверный профиль, клиентский среди них — нет (выделенный сервер
+    /// его не загружает), об этом — в вопросе.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Selected_mods_are_copied_to_a_server_profile_without_client_ones()
+    {
+        var ui = new QuietUi { Answer = Answer.Yes };
+        var srvData = Directory.CreateDirectory(Path.Combine(_dir, "srv", "Mods")).Parent!.FullName;
+        var server = new GameProfile { Id = "mods-view-srv", Name = "Сервер", Kind = ProfileKind.Server, DataDir = srvData,
+            GameDir = Path.Combine(_dir, "game") };
+        var main = Main(new HangingModDb(), extra: 1, ui: ui, server);
+        File.WriteAllBytes(Path.Combine(_dir, "data", "Mods", "hud_1.0.0.zip"), Zip("hud", side: "Client"));
+        var mods = main.Mods;
+        _window = new Window { Width = 1400, Height = 860, Content = new ModsView { DataContext = mods } };
+        _window.Show();
+        await Wait.Until(() => mods.Rows.Count == 4 && Rows(_window).Count == 4);
+
+        Mouse.Click(_window, RowOf(_window, "alpha"), x: 300);
+        Mouse.ClickWith(_window, RowOf(_window, "hud"), RawInputModifiers.Control, x: 300);
+        Mouse.ClickWith(_window, RowOf(_window, "mod00"), RawInputModifiers.Control, x: 300);
+        Dispatcher.UIThread.RunJobs();
+        var target = Assert.Single(mods.CopyTargets);
+        Assert.Equal("mods-view-srv", target.Profile.Model.Id);
+
+        await mods.CopySelectedToAsync(target.Profile);
+
+        Assert.Equal(["alpha_1.0.0.zip", "mod00_1.0.0.zip"], Directory.GetFiles(Path.Combine(srvData, "Mods")).Select(Path.GetFileName).Order());
+        Assert.Contains(ui.Asked, q => q.Contains("hud") && q.Contains(Loc.T("multi.copyClientSkipped", 1, "hud")));
     }
 
     /// <summary>Переключатель «Включён в профиле» в карточке мода.</summary>

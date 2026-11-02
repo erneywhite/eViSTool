@@ -125,7 +125,8 @@ public class AvaloniaUiPlatform : IUiPlatform
     public void OpenUrl(string url) => SystemShell.OpenUrl(url);
     public void OpenFolder(string dir) => SystemShell.OpenFolder(dir);
     public void ShowInFolder(string path) => SystemShell.ShowInFolder(path);
-    public void MoveToTrash(string path) => SystemShell.MoveToTrash(path);
+    // virtual — тесты удаляют файлы сразу, не засоряя Корзину пользователя
+    public virtual void MoveToTrash(string path) => SystemShell.MoveToTrash(path);
     public void OpenTrash() => SystemShell.OpenTrash();
 
     // ---- программа

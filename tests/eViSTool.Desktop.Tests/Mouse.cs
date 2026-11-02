@@ -41,6 +41,16 @@ internal static class Mouse
         Press(window, At(window, visual, x), count);
     }
 
+    /// <summary>Щелчок с зажатой клавишей (Ctrl, Shift) — выбор нескольких строк.</summary>
+    public static void ClickWith(Window window, Visual visual, RawInputModifiers modifiers, double? x = null)
+    {
+        Prepare(window);
+        var point = At(window, visual, x);
+        window.MouseDown(point, MouseButton.Left, modifiers);
+        window.MouseUp(point, MouseButton.Left, modifiers);
+        Dispatcher.UIThread.RunJobs();
+    }
+
     /// <summary>Щелчок левой кнопкой в точке окна (пустое место или заранее посчитанная точка).</summary>
     public static void ClickAt(Window window, Point point, int count = 1)
     {

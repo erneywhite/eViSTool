@@ -27,6 +27,8 @@ public partial class ModsView : UserControl
         InitializeComponent();
         // правый клик выделяет строку под курсором до открытия меню — меню действует на неё
         Grid.AddHandler(PointerPressedEvent, Grid_PointerPressed, RoutingStrategies.Tunnel);
+        // выбор нескольких модов (Ctrl/Shift+щелчок) — в модель: панель «Выбрано: N» и действия над всеми
+        Grid.SelectionChanged += Grid_SelectionChanged;
         // перетаскивание zip-архивов из Проводника (Nautilus, Dolphin) в список модов
         Grid.AddHandler(DragDrop.DragOverEvent, Grid_DragOver);
         Grid.AddHandler(DragDrop.DropEvent, Grid_Drop);
@@ -159,7 +161,48 @@ public partial class ModsView : UserControl
         if (!e.GetCurrentPoint(Grid).Properties.IsRightButtonPressed) return;
         var row = (e.Source as Visual)?.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext as ModRowViewModel;
         _rightClickOnRow = row is not null;
-        if (row is not null) Grid.SelectedItem = row;
+        // правый щелчок по одному из выбранных — меню для всех выбранных, выбор не сбрасывается
+        if (row is not null && !(Grid.SelectedItems.Count > 1 && Grid.SelectedItems.Contains(row))) Grid.SelectedItem = row;
+    }
+
+    // ---------- выбор нескольких модов ----------
+
+    /// <summary>
+    /// Какие моды выбрал человек (по файлам): таблицу перестраивают после каждой операции, и строки выбранных модов
+    /// заменяются новыми — выбор нескольких возвращается по этим путям, чтобы можно было сделать с ними ещё что-то.
+    /// </summary>
+    private HashSet<string> _keepPaths = [];
+    private bool _restoring;
+
+    private void Grid_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_vm is null) return;
+        // выбор поменялся оттого, что строки заменили или убрали (перестройка таблицы), — это не выбор человека
+        var rebuilt = _vm.View.IsRefreshing || e.RemovedItems.OfType<ModRowViewModel>().Any(r => !_vm.View.Items.Contains(r));
+        if (!_restoring)
+        {
+            if (!rebuilt) _keepPaths = [.. Grid.SelectedItems.OfType<ModRowViewModel>().Select(r => r.FilePath)];
+            else if (_keepPaths.Count > 1) Dispatcher.UIThread.Post(RestoreMulti);
+        }
+        _vm.SetSelection(Grid.SelectedItems.OfType<ModRowViewModel>());
+    }
+
+    private void RestoreMulti()
+    {
+        if (_vm is null || _keepPaths.Count < 2) return;
+        var want = _vm.View.Items.Where(r => _keepPaths.Contains(r.FilePath)).ToList();
+        if (want.Count < 2) return;
+        _restoring = true;
+        try
+        {
+            foreach (var row in want)
+                if (!Grid.SelectedItems.Contains(row)) Grid.SelectedItems.Add(row);
+        }
+        finally
+        {
+            _restoring = false;
+        }
+        _vm.SetSelection(Grid.SelectedItems.OfType<ModRowViewModel>());
     }
 
     // меню действий с модом — только над строкой мода: над заголовком колонки или пустым местом оно действовало бы на

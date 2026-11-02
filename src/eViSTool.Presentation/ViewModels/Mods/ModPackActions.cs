@@ -19,11 +19,13 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
         typeof(ModsViewModel).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
             .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion.Split('+')[0] ?? "";
 
-    public async Task ExportAsync()
+    /// <param name="only">Собрать только из этих модов (выбранные в таблице); null — из всех модов профиля.</param>
+    public async Task ExportAsync(IReadOnlyList<LocalMod>? only = null)
     {
         if (owner.Profile is not { } profile || owner.IsBusy || !owner.IsLocalProfile) return;
-        var enabled = owner.Locals.Count(l => l.Info is not null && !l.IsDisabled);
-        var disabled = owner.Locals.Count(l => l.Info is not null && l.IsDisabled);
+        var source = only ?? owner.Locals;
+        var enabled = source.Count(l => l.Info is not null && !l.IsDisabled);
+        var disabled = source.Count(l => l.Info is not null && l.IsDisabled);
         if (enabled + disabled == 0)
         {
             Error(Loc.T("packx.noMods"));
@@ -51,7 +53,7 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
             var onModDb = owner.ModDbAnswers.Where(r => r.Value.Mod is not null).Select(r => r.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             owner.StatusText = Loc.T("packx.building");
-            var locals = owner.Locals;
+            var locals = source;
             var manifest = await Task.Run(() => PackBuilder.Build(profile, locals, options, onModDb, savePath, $"eViSTool {AppVersion}"));
             var size = new FileInfo(savePath).Length / 1024.0 / 1024.0;
             owner.StatusText = Loc.T("packx.done", manifest.Mods.Count, size.ToString("0.0"), savePath);
