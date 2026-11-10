@@ -39,14 +39,41 @@ public static class RemoteAccess
     public static string CertFile(string profileId, string? agentsDir = null) =>
         Path.Combine(agentsDir ?? AgentProtocol.DefaultAgentsDir, $"{profileId}.remote.pfx");
 
+    /// <summary>Назначение шифрования ключа и сертификата (см. <see cref="Platform.SecretProtector"/>).</summary>
+    private static readonly byte[] KeyPurpose = Encoding.UTF8.GetBytes("eViSTool.remote-key.v1");
+    private static readonly byte[] CertPurpose = Encoding.UTF8.GetBytes("eViSTool.remote-cert.v1");
+
+    /// <summary>Поле файла настроек с зашифрованным ключом (Windows).</summary>
+    private const string ProtectedKeyField = "KeyProtected";
+
+    /// <summary>Начало файла сертификата, зашифрованного DPAPI (Windows); без него — обычный PFX.</summary>
+    private const string ProtectedCertPrefix = "evis-pfx1:";
+
+    /// <summary>
+    /// Ключ и сертификат на Windows шифруются DPAPI для текущего пользователя, как токены оповещений и пароли хостера:
+    /// скопированная или утёкшая папка данных (стилер, который уносит файлы) их не раскроет. Окно и агент там работают от
+    /// одного пользователя. На Linux — как было: файл только владельцу (600), потому что служба агента и окно там бывают
+    /// разными пользователями, а ключ шифрования у каждого свой.
+    /// </summary>
+    private static bool Protects => OperatingSystem.IsWindows();
+
     public static RemoteSettings Load(string profileId, string? agentsDir = null)
     {
         var path = FileFor(profileId, agentsDir);
         try
         {
-            return File.Exists(path) ? JsonConvert.DeserializeObject<RemoteSettings>(File.ReadAllText(path)) ?? new() : new();
+            if (!File.Exists(path)) return new();
+            var json = JObject.Parse(File.ReadAllText(path));
+            var settings = json.ToObject<RemoteSettings>() ?? new();
+            if (json.Value<string>(ProtectedKeyField) is { Length: > 0 } stored)
+                return settings with { Key = Platform.SecretProtector.Unprotect(stored, KeyPurpose) ?? "" };
+            // файл прошлой версии с ключом открытым текстом — переписываем зашифрованным (код подключения не меняется)
+            if (Protects && settings.Key.Length > 0)
+                try { Save(profileId, settings, agentsDir); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            return settings;
         }
-        catch (Exception ex) when (ex is IOException or JsonException)
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {
             return new();
         }
@@ -54,9 +81,15 @@ public static class RemoteAccess
 
     public static void Save(string profileId, RemoteSettings settings, string? agentsDir = null)
     {
+        var json = JObject.FromObject(settings);
+        if (Protects && settings.Key.Length > 0)
+        {
+            json[nameof(RemoteSettings.Key)] = "";
+            json[ProtectedKeyField] = Platform.SecretProtector.Protect(settings.Key, KeyPurpose);
+        }
         // на Linux ключ удалённого доступа и сертификат — только владельцу (rw-------), как ключ профиля: папку data
         // может создать и сам человек, с правами, открытыми всем пользователям машины
-        Platform.OwnerOnlyFile.WriteText(FileFor(profileId, agentsDir), JsonConvert.SerializeObject(settings, Formatting.Indented));
+        Platform.OwnerOnlyFile.WriteText(FileFor(profileId, agentsDir), json.ToString(Formatting.Indented));
     }
 
     /// <summary>Включить: при первом включении — случайный свободный порт, ключ и сертификат; дальше они те же.</summary>
@@ -117,10 +150,13 @@ public static class RemoteAccess
     public static X509Certificate2 EnsureCertificate(string profileId, string? agentsDir = null)
     {
         var path = CertFile(profileId, agentsDir);
-        if (File.Exists(path))
+        if (File.Exists(path) && ReadCertificate(path) is { } existing)
         {
-            try { return X509CertificateLoader.LoadPkcs12FromFile(path, null); }
-            catch (CryptographicException) { /* испорчен — создаём заново */ }
+            // сертификат прошлой версии открытым PFX — переписываем зашифрованным (отпечаток тот же, код подключения тоже)
+            if (Protects && !IsProtectedCert(path))
+                try { WriteCertificate(path, File.ReadAllBytes(path)); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            return existing;
         }
 
         using var rsa = RSA.Create(2048);
@@ -128,8 +164,52 @@ public static class RemoteAccess
         request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, critical: false));
         request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid("1.3.6.1.5.5.7.3.1")], critical: false)); // проверка подлинности сервера
         using var created = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(20));
-        Platform.OwnerOnlyFile.Write(path, created.Export(X509ContentType.Pfx));
-        return X509CertificateLoader.LoadPkcs12FromFile(path, null);
+        var pfx = created.Export(X509ContentType.Pfx);
+        WriteCertificate(path, pfx);
+        return X509CertificateLoader.LoadPkcs12(pfx, null);
+    }
+
+    /// <summary>Сертификат профиля только для чтения (ничего не создаёт и не переписывает); null — нет, испорчен или не расшифровать.</summary>
+    public static X509Certificate2? ReadCertificate(string profileId, string? agentsDir = null) =>
+        CertFile(profileId, agentsDir) is var path && File.Exists(path) ? ReadCertificate(path) : null;
+
+    /// <summary>Сертификат из файла (обычный PFX или зашифрованный DPAPI); null — испорчен или не расшифровать.</summary>
+    private static X509Certificate2? ReadCertificate(string path)
+    {
+        try
+        {
+            if (!IsProtectedCert(path)) return X509CertificateLoader.LoadPkcs12FromFile(path, null);
+            var text = File.ReadAllText(path)[ProtectedCertPrefix.Length..];
+            return Platform.SecretProtector.Unprotect(text, CertPurpose) is { } base64
+                ? X509CertificateLoader.LoadPkcs12(Convert.FromBase64String(base64), null)
+                : null;
+        }
+        catch (Exception ex) when (ex is CryptographicException or FormatException or IOException)
+        {
+            return null; // испорчен — создадим заново
+        }
+    }
+
+    private static bool IsProtectedCert(string path)
+    {
+        try
+        {
+            using var reader = new StreamReader(path);
+            var head = new char[ProtectedCertPrefix.Length];
+            return reader.ReadBlock(head) == head.Length && new string(head) == ProtectedCertPrefix;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    private static void WriteCertificate(string path, byte[] pfx)
+    {
+        if (Protects)
+            Platform.OwnerOnlyFile.WriteText(path, ProtectedCertPrefix + Platform.SecretProtector.Protect(Convert.ToBase64String(pfx), CertPurpose));
+        else
+            Platform.OwnerOnlyFile.Write(path, pfx);
     }
 
     /// <summary>Отпечаток сертификата (SHA-256, hex) — по нему клиент узнаёт «свой» агент.</summary>

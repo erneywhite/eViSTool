@@ -175,8 +175,15 @@ internal static class RemoteCommand
         }
         // сертификат только читаем: испорченный пересоздаст enable (команда code ничего не пишет — её можно и от root)
         string fingerprint;
-        using (var cert = X509CertificateLoader.LoadPkcs12FromFile(RemoteAccess.CertFile(profile, dir), null))
+        using (var cert = RemoteAccess.ReadCertificate(profile, dir))
+        {
+            if (cert is null)
+            {
+                Console.Error.WriteLine(Loc.T("remote.cli.codeOff"));
+                return Commands.Failed;
+            }
             fingerprint = RemoteAccess.Fingerprint(cert);
+        }
         Console.Error.WriteLine(Loc.T("remote.cli.codeWarn"));
         Console.WriteLine(new ConnectionCode(host.Trim(), s.Port, s.Key, fingerprint).ToString());
         return Commands.Ok;

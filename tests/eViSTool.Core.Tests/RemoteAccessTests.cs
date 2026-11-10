@@ -29,6 +29,37 @@ public sealed class RemoteAccessTests : IDisposable
         Assert.False(ConnectionCode.TryParse((code with { Fingerprint = "abc" }).ToString(), out _));
     }
 
+    // на Windows ключ и сертификат на диске зашифрованы (DPAPI): копия папки данных их не раскроет. Файлы прошлой
+    // версии (ключ открытым текстом, обычный PFX) читаются и переписываются зашифрованными — код подключения прежний
+    [Fact]
+    public void OnWindows_KeyAndCertificateAreNotStoredInTheClear_AndOldFilesAreMigrated()
+    {
+        if (!OperatingSystem.IsWindows()) return; // на Linux — файл только владельцу, без шифрования (пропуск — аудит, п. 6.12)
+        var s = RemoteAccess.Enable("p", _dir);
+        Assert.DoesNotContain(s.Key, File.ReadAllText(RemoteAccess.FileFor("p", _dir)));
+        Assert.StartsWith("evis-pfx1:", File.ReadAllText(RemoteAccess.CertFile("p", _dir)));
+        Assert.Equal(s.Key, RemoteAccess.Load("p", _dir).Key);
+        using (var cert = RemoteAccess.ReadCertificate("p", _dir)) Assert.NotNull(cert);
+
+        // как в прошлой версии: ключ открытым текстом и обычный PFX рядом (свежий самоподписанный, как его делала она)
+        string fingerprint;
+        using (var rsa = System.Security.Cryptography.RSA.Create(2048))
+        using (var made = new System.Security.Cryptography.X509Certificates.CertificateRequest("CN=old", rsa,
+                   System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pkcs1)
+                   .CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(1)))
+        {
+            File.WriteAllBytes(RemoteAccess.CertFile("old", _dir), made.Export(System.Security.Cryptography.X509Certificates.X509ContentType.Pfx));
+            fingerprint = RemoteAccess.Fingerprint(made);
+        }
+        File.WriteAllText(RemoteAccess.FileFor("old", _dir), $$"""{ "Enabled": true, "Port": 30000, "Key": "{{s.Key}}" }""");
+
+        Assert.Equal(s.Key, RemoteAccess.Load("old", _dir).Key);
+        Assert.DoesNotContain(s.Key, File.ReadAllText(RemoteAccess.FileFor("old", _dir))); // переписан зашифрованным
+        using (var migrated = RemoteAccess.EnsureCertificate("old", _dir)) Assert.Equal(fingerprint, RemoteAccess.Fingerprint(migrated));
+        Assert.StartsWith("evis-pfx1:", File.ReadAllText(RemoteAccess.CertFile("old", _dir)));
+        Assert.Equal(30000, RemoteAccess.Load("old", _dir).Port);
+    }
+
     [Fact]
     public void Enable_PicksPortKeyAndCertificateOnce()
     {
