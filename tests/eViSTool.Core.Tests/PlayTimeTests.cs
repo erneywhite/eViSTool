@@ -149,4 +149,21 @@ public sealed class PlayTimeTests : IDisposable
             foreach (var f in Directory.GetFiles(Path.GetDirectoryName(path)!, Path.GetFileName(path) + ".*")) File.Delete(f);
         }
     }
+
+    [Fact]
+    public void Session_ThroughTheRepeatedAutumnHour_KeepsItsRealLength()
+    {
+        // аудит 4.3: Рига, 2026-10-25 в 04:00 часы назад на 03:00. Вход в 03:40 (летнее), выход в 03:10 (уже зимнее):
+        // на самом деле 30 минут, а не минус полчаса
+        var riga = TimeZoneInfo.FindSystemTimeZoneById("Europe/Riga");
+        var s = PlaySessions.FromLog(
+        [
+            "25.10.2026 03:40:00 [Notification] Received level finalize",
+            "25.10.2026 03:55:00 [Notification] Saving",
+            "25.10.2026 03:10:00 [Notification] Destroying game session, waiting up to 200ms for client threads to exit",
+        ], Ru, riga);
+        Assert.Single(s);
+        Assert.Equal(new DateTime(2026, 10, 25, 0, 40, 0, DateTimeKind.Utc), s[0].StartUtc);
+        Assert.Equal(TimeSpan.FromMinutes(30), s[0].Length);
+    }
 }

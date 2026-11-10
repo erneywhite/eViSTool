@@ -19,7 +19,8 @@ public sealed record PlaySession(DateTime StartUtc, DateTime EndUtc, string? Ser
 public static class PlaySessions
 {
     /// <param name="culture">Дата в логе — в формате системы игрока: читаем в том же (тесты задают свой).</param>
-    public static IReadOnlyList<PlaySession> FromLog(IEnumerable<string> lines, CultureInfo? culture = null)
+    /// <param name="zone">Пояс, в котором игра писала время (по умолчанию — этого компьютера; тесты задают свой).</param>
+    public static IReadOnlyList<PlaySession> FromLog(IEnumerable<string> lines, CultureInfo? culture = null, TimeZoneInfo? zone = null)
     {
         culture ??= CultureInfo.CurrentCulture;
         var result = new List<PlaySession>();
@@ -27,8 +28,8 @@ public static class PlaySessions
         DateTime? start = null, last = null;
         foreach (var e in GameLog.Parse(lines))
         {
-            if (!DateTime.TryParse(e.Time, culture, DateTimeStyles.AssumeLocal, out var local)) continue;
-            var at = local.ToUniversalTime();
+            if (!DateTime.TryParse(e.Time, culture, DateTimeStyles.None, out var local)) continue;
+            var at = ToUtc(local, last, zone);
             last = at;
             var msg = e.Message;
             if (msg.StartsWith("Connecting to ", StringComparison.Ordinal) && start is null)
@@ -53,20 +54,39 @@ public static class PlaySessions
     /// <summary>
     /// Миры одиночной игры из server-main.log того же запуска: «Savegame …\Saves\имя.vcdbs loaded» — когда и какой.
     /// </summary>
-    public static IReadOnlyList<(DateTime Utc, string Name)> Worlds(IEnumerable<string> lines, CultureInfo? culture = null)
+    public static IReadOnlyList<(DateTime Utc, string Name)> Worlds(IEnumerable<string> lines, CultureInfo? culture = null, TimeZoneInfo? zone = null)
     {
         culture ??= CultureInfo.CurrentCulture;
         var result = new List<(DateTime, string)>();
+        DateTime? last = null;
         foreach (var e in GameLog.Parse(lines))
         {
             if (!e.Message.StartsWith("Savegame ", StringComparison.Ordinal) || !e.Message.EndsWith(" loaded", StringComparison.Ordinal)) continue;
-            if (!DateTime.TryParse(e.Time, culture, DateTimeStyles.AssumeLocal, out var local)) continue;
+            if (!DateTime.TryParse(e.Time, culture, DateTimeStyles.None, out var local)) continue;
+            var utc = ToUtc(local, last, zone);
+            last = utc;
             var path = e.Message["Savegame ".Length..^" loaded".Length];
             var file = path[(path.LastIndexOfAny(['/', '\\']) + 1)..]; // путь бывает виндовый и на Linux
             var name = file.EndsWith(".vcdbs", StringComparison.OrdinalIgnoreCase) ? file[..^".vcdbs".Length] : file;
-            if (name.Length > 0) result.Add((local.ToUniversalTime(), name));
+            if (name.Length > 0) result.Add((utc, name));
         }
         return result;
+    }
+
+    /// <summary>
+    /// Время из лога (по часам, без пояса) → UTC. В «повторный» осенний час одно и то же время бывает дважды: берём то из
+    /// двух, что не раньше прошлой записи — в логе время идёт только вперёд. Иначе сессия через перевод часов получала
+    /// лишний час или нулевую длину, и это оставалось в учёте навсегда.
+    /// </summary>
+    internal static DateTime ToUtc(DateTime wall, DateTime? previousUtc, TimeZoneInfo? zone)
+    {
+        if (wall.Kind == DateTimeKind.Utc) return wall; // в строке был пояс
+        zone ??= TimeZoneInfo.Local;
+        wall = DateTime.SpecifyKind(wall, DateTimeKind.Unspecified);
+        if (!zone.IsAmbiguousTime(wall)) return WallClock.ToUtc(wall, zone);
+        var options = zone.GetAmbiguousTimeOffsets(wall)
+            .Select(o => DateTime.SpecifyKind(wall - o, DateTimeKind.Utc)).Order().ToList();
+        return previousUtc is { } p ? options.FirstOrDefault(o => o >= p, options[^1]) : options[0];
     }
 
     /// <summary>Одиночным сессиям — мир, загруженный последним перед входом.</summary>
