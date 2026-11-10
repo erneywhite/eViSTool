@@ -125,6 +125,40 @@ public sealed class ModManagementTests : IDisposable
         Assert.Equal(["1.2.12", "1.2.13"], store.List("footprints").Select(f => ModScanner.ReadZip(f).Info!.Version).Order());
     }
 
+    // мод-папки в хранилище тоже вытесняются старшие: раньше чистились только файлы, и папки копились без конца
+    [Fact]
+    public void BackupStore_PrunesFolderModsToo()
+    {
+        var store = new ModBackupStore(Path.Combine(_root, "backups"), keepPerMod: 2);
+        for (var i = 0; i < 4; i++)
+        {
+            var dir = Directory.CreateDirectory(Path.Combine(_mods, "devmod")).FullName;
+            File.WriteAllText(Path.Combine(dir, "modinfo.json"), $$"""{ "modid": "devmod", "version": "0.{{i}}.0" }""");
+            store.Keep(new LocalMod(dir, new ModInfo { ModId = "devmod", Version = $"0.{i}.0" }, null) { });
+            Assert.False(Directory.Exists(dir));
+        }
+        Assert.Equal(2, store.List("devmod").Count);
+    }
+
+    // modinfo.json мода-папки не прочитать (его держат открытым) — этот мод с ошибкой, остальные на месте
+    [Fact]
+    public void Scan_UnreadableFolderMod_DoesNotBreakTheScan()
+    {
+        if (!OperatingSystem.IsWindows()) return; // монопольное открытие файла есть только на Windows (пропуск — аудит, п. 6.12)
+        var p = Server("""{ "ModPaths": [] }""");
+        MakeZip(_mods, "carryon_1.0.0.zip", "carryon", "1.0.0");
+        var dir = Directory.CreateDirectory(Path.Combine(_mods, "devmod")).FullName;
+        var info = Path.Combine(dir, "modinfo.json");
+        File.WriteAllText(info, """{ "modid": "devmod", "version": "0.1.0" }""");
+
+        using (new FileStream(info, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            var mods = ModUpdateService.ScanLocal(p);
+            Assert.Contains(mods, m => m.Info?.ModId == "carryon");
+            Assert.Contains(mods, m => m.Path == dir && m.Error is not null);
+        }
+    }
+
     [Theory]
     [InlineData("1.22.7", "1.22.8")] // игра старее, чем нужно моду, — план это видит
     [InlineData("1.22.8", null)]

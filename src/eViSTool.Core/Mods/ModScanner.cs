@@ -104,7 +104,7 @@ public static class ModScanner
         {
             return new LocalMod(zipPath, null, Loc.T("scan.corrupt"));
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return new LocalMod(zipPath, null, Loc.T("scan.readFailed", ex.Message));
         }
@@ -139,6 +139,11 @@ public static class ModScanner
         catch (Newtonsoft.Json.JsonException ex)
         {
             return new LocalMod(path, null, Loc.T("scan.badModInfo", ex.Message));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // modinfo.json мода-папки не прочитать (занят, нет прав) — этот мод с ошибкой, а не обрыв всего сканирования
+            return new LocalMod(path, null, Loc.T("scan.readFailed", ex.Message));
         }
     }
 }

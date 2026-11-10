@@ -152,7 +152,7 @@ public static class ModInstaller
             {
                 if (File.Exists(mod.Path) || Directory.Exists(mod.Path)) continue;
                 if (File.Exists(stored)) File.Move(stored, mod.Path);
-                else if (Directory.Exists(stored)) Directory.Move(stored, mod.Path);
+                else if (Directory.Exists(stored)) ModBackupStore.MoveDir(stored, mod.Path);
             }
             throw;
         }
@@ -208,11 +208,12 @@ public sealed class ModBackupStore(string root, int keepPerMod = 3, string? hist
         var dir = DirFor(mod.Info?.ModId ?? "_unknown");
         Directory.CreateDirectory(dir);
         var dest = Path.Combine(dir, mod.FileName);
-        if (File.Exists(dest))
-            dest = Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(mod.FileName)}_{DateTime.Now:yyyyMMdd-HHmmss}{Path.GetExtension(mod.FileName)}");
+        // имя занято (и папкой тоже: мод-папку кладут в хранилище под тем же именем) — с временем, а то и с номером
+        for (var n = 0; File.Exists(dest) || Directory.Exists(dest); n++)
+            dest = Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(mod.FileName)}_{DateTime.Now:yyyyMMdd-HHmmss}{(n > 0 ? $"-{n}" : "")}{Path.GetExtension(mod.FileName)}");
 
         if (File.Exists(mod.Path)) File.Move(mod.Path, dest);
-        else if (Directory.Exists(mod.Path)) Directory.Move(mod.Path, dest);
+        else if (Directory.Exists(mod.Path)) MoveDir(mod.Path, dest);
         // время попадания в хранилище — по нему порядок и чистка (дата изменения у файла остаётся авторская)
         if (File.Exists(dest)) File.SetCreationTimeUtc(dest, DateTime.UtcNow);
         else Directory.SetCreationTimeUtc(dest, DateTime.UtcNow);
@@ -247,9 +248,47 @@ public sealed class ModBackupStore(string root, int keepPerMod = 3, string? hist
             : [];
     }
 
+    /// <summary>Лишние версии — прочь; мод-папка тоже версия (раньше чистились только файлы, и папки копились без конца).</summary>
     private void Prune(string dir)
     {
-        foreach (var old in Directory.EnumerateFiles(dir).OrderByDescending(File.GetCreationTimeUtc).Skip(keepPerMod))
-            File.Delete(old);
+        foreach (var old in Directory.EnumerateFileSystemEntries(dir).OrderByDescending(Created).Skip(keepPerMod))
+        {
+            if (Directory.Exists(old)) Directory.Delete(old, recursive: true);
+            else File.Delete(old);
+        }
+    }
+
+    private static DateTime Created(string path) =>
+        Directory.Exists(path) ? Directory.GetCreationTimeUtc(path) : File.GetCreationTimeUtc(path);
+
+    /// <summary>
+    /// Перенести мод-папку. Хранилище версий лежит рядом с программой и может быть на другом диске, чем папка модов, а
+    /// Directory.Move между дисками не умеет — тогда копируем и удаляем исходную.
+    /// </summary>
+    internal static void MoveDir(string from, string to)
+    {
+        if (string.Equals(Path.GetPathRoot(Path.GetFullPath(from)), Path.GetPathRoot(Path.GetFullPath(to)), StringComparison.OrdinalIgnoreCase))
+        {
+            Directory.Move(from, to);
+            return;
+        }
+        try
+        {
+            CopyDir(from, to);
+        }
+        catch
+        {
+            try { if (Directory.Exists(to)) Directory.Delete(to, recursive: true); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            throw;
+        }
+        Directory.Delete(from, recursive: true);
+    }
+
+    private static void CopyDir(string from, string to)
+    {
+        Directory.CreateDirectory(to);
+        foreach (var file in Directory.EnumerateFiles(from)) File.Copy(file, Path.Combine(to, Path.GetFileName(file)));
+        foreach (var dir in Directory.EnumerateDirectories(from)) CopyDir(dir, Path.Combine(to, Path.GetFileName(dir)));
     }
 }
