@@ -1,6 +1,9 @@
 {
   "backup.noSpaceCopy": "Not enough space on drive {0}: the world copy needs about {1} MB, {2} MB is free.",
   "dl.tooBig": "The file is too big for a mod ({0} MB); the download was cancelled.",
+  "exit.busyAsk": "In progress:\n{0}\n\nClosing eViSTool now will cut it off halfway. Close anyway?",
+  "exit.busyMods": "installing or updating mods",
+  "exit.busyWorld": "a world copy on the hosted server",
   "icon.color.none": "No colour",
   "icon.color.moss": "moss",
   "icon.color.pine": "pine",

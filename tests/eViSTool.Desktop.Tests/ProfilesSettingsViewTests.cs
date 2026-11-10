@@ -109,6 +109,17 @@ public sealed class ProfilesSettingsViewTests : IDisposable
         return main;
     }
 
+    /// <summary>Аудит 5.1: закрытие окна во время установки модов — есть что спросить; без дела — нечего.</summary>
+    [AvaloniaFact]
+    public void Exit_KnowsWhatWouldBeCutOff()
+    {
+        var main = Main();
+        Assert.Empty(main.ExitBusyReasons());
+        main.Mods.IsBusy = true;
+        Assert.Equal([Loc.T("exit.busyMods")], main.ExitBusyReasons());
+        main.Mods.IsBusy = false;
+    }
+
     /// <summary>«Ошибки модов»: одно окно на профиль, и оно следует за свежим отчётом.</summary>
     [AvaloniaFact]
     public void ModErrors_OneWindowPerProfile_FollowsTheFreshReport()

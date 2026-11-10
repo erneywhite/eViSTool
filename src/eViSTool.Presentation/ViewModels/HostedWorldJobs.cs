@@ -147,6 +147,9 @@ public sealed class HostedWorldJobs(TimeProvider? time = null, Func<ModTarget, C
     /// <summary>Идёт хоть одна операция по расписанию.</summary>
     public bool AnyScheduled => _running.Values.Any(j => j.Scheduled);
 
+    /// <summary>Идёт хоть одна операция с копией мира (окно спрашивает перед закрытием).</summary>
+    public bool AnyRunning => _running.Count > 0;
+
     /// <summary>Чем кончилась последняя операция профиля в этом окне; не было — null.</summary>
     public HostedWorldOutcome? Last(string profileId) => _last.GetValueOrDefault(profileId);
 

@@ -279,7 +279,23 @@ public sealed partial class MainViewModel : ObservableObject
     /// «Сохранить? Да / Нет / Отмена». false — остаться (отменили или сохранить не удалось). Раньше окна подписывались
     /// на закрытие каждое само; теперь окно спрашивает один раз здесь.
     /// </summary>
-    public bool ConfirmExit() => Server.Config.ConfirmClose() && ModConfig.ConfirmLeave();
+    public bool ConfirmExit()
+    {
+        // идёт установка, очередь или копия мира у хостера — закрытие оборвёт её на полпути: спросить
+        if (ExitBusyReasons() is { Count: > 0 } busy
+            && !Ui.Confirm(Loc.T("exit.busyAsk", string.Join("\n", busy.Select(b => "• " + b))), byDefault: Answer.No, warning: true))
+            return false;
+        return Server.Config.ConfirmClose() && ModConfig.ConfirmLeave();
+    }
+
+    /// <summary>Что сейчас оборвётся, если закрыть окно; пусто — ничего.</summary>
+    public IReadOnlyList<string> ExitBusyReasons()
+    {
+        var busy = new List<string>();
+        if (Mods.IsBusy || Mods.IsQueueRunning) busy.Add(Loc.T("exit.busyMods"));
+        if (HostedWorldJobs.AnyRunning) busy.Add(Loc.T("exit.busyWorld"));
+        return busy;
+    }
 }
 
 /// <summary>
