@@ -9,6 +9,27 @@ public static class SafeFile
     /// несколько попыток с паузой, а не ошибка «не удалось сохранить» (файл ненадолго держит и антивирус); не вышло
     /// за секунду — ошибка как есть.
     /// </summary>
+    /// <summary>
+    /// Записать текст целиком так, чтобы на диске всегда был либо прежний файл, либо новый: во временный рядом (своё имя у
+    /// каждой записи — два писателя не мешают друг другу), потом подмена. Оборвалась запись (кончилось место, выключили
+    /// свет) — прежний файл цел, недописанный временный убирается.
+    /// </summary>
+    public static void WriteAllText(string path, string text)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        var tmp = $"{path}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            File.WriteAllText(tmp, text);
+            Replace(tmp, path);
+        }
+        finally
+        {
+            try { if (File.Exists(tmp)) File.Delete(tmp); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
+    }
+
     public static void Replace(string tmp, string target)
     {
         for (var attempt = 1; ; attempt++)

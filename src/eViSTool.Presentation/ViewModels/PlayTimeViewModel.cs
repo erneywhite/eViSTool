@@ -29,8 +29,15 @@ public sealed partial class PlayTimeViewModel : ObservableObject
     [ObservableProperty] private string _allProfilesText = "";
     [ObservableProperty] private string _sinceText = "";
 
-    /// <summary>Перечитать логи профиля (в фоне) и показать; ответ на устаревший запрос (профиль сменили) — отбрасывается.</summary>
-    public async Task RefreshAsync(GameProfile? profile, IReadOnlyList<GameProfile> all)
+    /// <summary>Проходы по логам — по одному: два сразу читали и писали один учёт, и один затирал другой.</summary>
+    private readonly SemaphoreSlim _gate = new(1, 1);
+
+    /// <summary>
+    /// Перечитать логи (в фоне) и показать; ответ на устаревший запрос (профиль сменили) — отбрасывается.
+    /// <paramref name="allProfiles"/> — читать логи и остальных клиентских профилей (при открытии профиля); пока идёт
+    /// игра (раз в полминуты) — только активного, учёт остальных берётся с диска.
+    /// </summary>
+    public async Task RefreshAsync(GameProfile? profile, IReadOnlyList<GameProfile> all, bool allProfiles = true)
     {
         var generation = ++_generation;
         if (profile is not { Kind: ProfileKind.Client })
@@ -40,15 +47,30 @@ public sealed partial class PlayTimeViewModel : ObservableObject
         }
         var clients = all.Where(p => p.Kind == ProfileKind.Client).ToList();
         if (!clients.Any(p => p.Id == profile.Id)) clients.Add(profile);
-        var ledgers = await Task.Run(() => clients.ToDictionary(p => p.Id, Scan));
-        if (generation != _generation) return;
-        Show(profile, ledgers[profile.Id], ledgers.Values.ToList(), Names(profile, all));
-        IsVisible = true;
+
+        await _gate.WaitAsync();
+        try
+        {
+            if (generation != _generation) return; // пока ждали очереди, пришёл запрос новее — он и прочитает
+            var (ledgers, names) = await Task.Run(() =>
+                (clients.ToDictionary(p => p.Id, p => allProfiles || p.Id == profile.Id ? Scan(p) : PlayLedger.Load(p.Id)),
+                 Names(profile, all)));
+            if (generation != _generation) return;
+            // учёт активного профиля сейчас не прочитать — оставляем то, что уже показано
+            if (ledgers[profile.Id] is not { } own) return;
+            Show(profile, own, [.. ledgers.Values.OfType<PlayLedger>()], names);
+            IsVisible = true;
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
-    private static PlayLedger Scan(GameProfile p)
+    /// <summary>Учёт профиля с новыми сессиями из его логов; null — учёт сейчас не прочитать (тогда и не пишем поверх).</summary>
+    private static PlayLedger? Scan(GameProfile p)
     {
-        var ledger = PlayLedger.Load(p.Id);
+        if (PlayLedger.Load(p.Id) is not { } ledger) return null;
         try
         {
             if (ledger.Scan(DataDirOf(p))) ledger.Save(p.Id);

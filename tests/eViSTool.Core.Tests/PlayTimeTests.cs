@@ -109,10 +109,25 @@ public sealed class PlayTimeTests : IDisposable
         Assert.Equal(Utc("26.10.2026 22:40:11"), ledger.SinceUtc);
 
         ledger.Save(_profileId);
-        var back = PlayLedger.Load(_profileId);
+        var back = PlayLedger.Load(_profileId)!;
         Assert.Equal(ledger.Total, back.Total);
         Assert.False(back.Scan(_root, Ru)); // прочитанный архив запомнен и после перезапуска
-        Assert.Empty(PlayLedger.Load("нет-такого-профиля").All);
+        Assert.Empty(PlayLedger.Load("нет-такого-профиля")!.All);
+        Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(PlayLedger.FileFor(_profileId))!, Path.GetFileName(PlayLedger.FileFor(_profileId)) + ".*.tmp"));
+    }
+
+    // учёт есть, но сейчас не читается (его держит другой процесс) — не «пустой»: Load говорит null, и поверх не пишут.
+    // Раньше такой учёт считался пустым, и следующее сохранение затирало всё накопленное время
+    [Fact]
+    public void LockedLedger_IsNotTreatedAsEmpty()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "монопольное открытие файла есть только на Windows");
+        var ledger = new PlayLedger();
+        ledger.Merge([new PlaySession(Utc("26.10.2026 22:40:11"), Utc("26.10.2026 23:40:11"), null)]);
+        ledger.Save(_profileId);
+        using (new FileStream(PlayLedger.FileFor(_profileId), FileMode.Open, FileAccess.Read, FileShare.None))
+            Assert.Null(PlayLedger.Load(_profileId));
+        Assert.Equal(TimeSpan.FromHours(1), PlayLedger.Load(_profileId)!.Total);
     }
 
     // испорченный учёт не затирается: откладывается рядом, а новый начинается с чистого
@@ -124,7 +139,7 @@ public sealed class PlayTimeTests : IDisposable
         File.WriteAllText(path, "{ \"Sessions\": [ { \"StartUtc\": ");
         try
         {
-            Assert.Empty(PlayLedger.Load(_profileId).All);
+            Assert.Empty(PlayLedger.Load(_profileId)!.All);
             Assert.False(File.Exists(path));
             var aside = Assert.Single(Directory.GetFiles(Path.GetDirectoryName(path)!, Path.GetFileName(path) + ".*.broken"));
             Assert.StartsWith("{ \"Sessions\"", File.ReadAllText(aside));

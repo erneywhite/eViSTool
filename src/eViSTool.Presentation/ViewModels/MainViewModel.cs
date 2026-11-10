@@ -133,11 +133,12 @@ public sealed partial class MainViewModel : ObservableObject
         if (report.Total > 0 || File.Exists(Core.Diagnostics.ModErrorReport.FileFor(profile.Id))) report.Save(profile.Id);
         if (ActiveProfile?.Model.Id != profile.Id) return;
         ErrorReport = report;
-        RefreshPlayTime(); // отчёт приходит, пока идёт игра и когда она закрылась, — тогда же дописывается время в игре
+        RefreshPlayTime(allProfiles: false); // отчёт приходит, пока идёт игра и когда она закрылась, — тогда же дописывается время в игре
     }
 
     /// <summary>«Время в игре» активного профиля: логи читаются в фоне.</summary>
-    private void RefreshPlayTime() => _ = Mods.PlayTime.RefreshAsync(ActiveProfile?.Model, [.. Profiles.Select(p => p.Model)]);
+    private void RefreshPlayTime(bool allProfiles = true) =>
+        _ = Mods.PlayTime.RefreshAsync(ActiveProfile?.Model, [.. Profiles.Select(p => p.Model)], allProfiles);
 
     /// <summary>«Игнорировать» / «Вернуть» в окне ошибок: игнор профиля сохранён, «!» и сводка пересчитываются.</summary>
     public void SaveErrorIgnores(GameProfile profile, Core.Diagnostics.ModErrorIgnores ignores)

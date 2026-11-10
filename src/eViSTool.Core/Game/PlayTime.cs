@@ -177,31 +177,27 @@ public sealed class PlayLedger
 
     public static string FileFor(string profileId) => System.IO.Path.Combine(AppPaths.Root, "playtime", profileId + ".json");
 
-    /// <summary>Записать через временный файл: оборвётся запись (выключили свет) — прежний файл цел.</summary>
-    public void Save(string profileId)
-    {
-        var path = FileFor(profileId);
-        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
-        var temp = path + ".tmp";
-        File.WriteAllText(temp, JsonConvert.SerializeObject(this, Formatting.Indented));
-        File.Move(temp, path, overwrite: true);
-    }
+    /// <summary>Записать через временный файл (<see cref="Platform.SafeFile.WriteAllText"/>): оборвётся запись — прежний файл цел.</summary>
+    public void Save(string profileId) =>
+        Platform.SafeFile.WriteAllText(FileFor(profileId), JsonConvert.SerializeObject(this, Formatting.Indented));
 
     /// <summary>
-    /// Учёт профиля. Файл испорчен — он откладывается рядом (.broken), а не затирается новым учётом: накопленное
-    /// время логи уже не вернут, а из отложенного его можно достать руками.
+    /// Учёт профиля; файла нет — пустой. Файл испорчен — он откладывается рядом (.broken), а не затирается новым учётом:
+    /// накопленное время логи уже не вернут, а из отложенного его можно достать руками. Файл есть, но сейчас не читается
+    /// (занят, нет прав) — null: такой учёт не пустой, и сохранять поверх него нельзя — так терялось всё накопленное.
     /// </summary>
-    public static PlayLedger Load(string profileId)
+    public static PlayLedger? Load(string profileId)
     {
         var path = FileFor(profileId);
         try
         {
-            if (File.Exists(path) && JsonConvert.DeserializeObject<PlayLedger>(File.ReadAllText(path)) is { Sessions: not null } ledger)
+            if (!File.Exists(path)) return new PlayLedger();
+            if (JsonConvert.DeserializeObject<PlayLedger>(File.ReadAllText(path)) is { Sessions: not null } ledger)
             {
                 ledger.ScannedArchives = new HashSet<string>(ledger.ScannedArchives ?? [], StringComparer.OrdinalIgnoreCase);
                 return ledger;
             }
-            if (File.Exists(path)) PutAside(path);
+            PutAside(path);
         }
         catch (JsonException)
         {
@@ -209,6 +205,7 @@ public sealed class PlayLedger
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            return null;
         }
         return new PlayLedger();
     }
