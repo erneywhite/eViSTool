@@ -147,14 +147,20 @@ public static class ModHistory
     {
         try
         {
+            // окно и агент пишут один файл: обрезка (прочитать — переписать) без замка теряла бы чужую дозапись,
+            // сделанную посередине. Повтор — только вокруг дозаписи: раньше он охватывал и обрезку, и упавшая обрезка
+            // дописывала ту же строку ещё раз
+            using var gate = Profiles.ConfigFileLock.Take(file);
             Retry(() =>
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(file)!);
                 using (var stream = new FileStream(file, FileMode.Append, FileAccess.Write, FileShare.Read))
                 using (var writer = new StreamWriter(stream))
                     writer.WriteLine(JsonConvert.SerializeObject(entry, Settings));
-                PruneIfOld(file);
+                return true;
             });
+            try { PruneIfOld(file); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } // обрежем в следующий раз
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -248,9 +254,8 @@ public static class ModHistory
         if (entries.Count == 0 || kept.Count == 0) return;
         var from = kept.Min(s => s.Start);
         if (entries[0].At >= from.AddDays(-7)) return;
-        var tmp = file + ".tmp";
-        File.WriteAllLines(tmp, entries.Where(e => e.At >= from).Select(e => JsonConvert.SerializeObject(e, Settings)));
-        Platform.SafeFile.Replace(tmp, file);
+        Platform.SafeFile.WriteAllText(file,
+            string.Concat(entries.Where(e => e.At >= from).Select(e => JsonConvert.SerializeObject(e, Settings) + Environment.NewLine)));
     }
 
     /// <summary>Файл может быть занят второй копией (окно и агент на одной машине) — несколько попыток.</summary>

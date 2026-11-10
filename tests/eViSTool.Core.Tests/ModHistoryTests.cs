@@ -168,6 +168,20 @@ public sealed class ModHistoryTests : IDisposable
     }
 
     [Fact]
+    public void ParallelWriters_LoseNothing_WhilePruning()
+    {
+        // аудит 4.5: окно и агент пишут разом, а обрезка переписывает файл — чужая дозапись не теряется и не двоится
+        ModHistory.Record(_file, "s1", null, "1", "2", DateTime.UtcNow.AddDays(-200));
+        ModHistory.Record(_file, "s2", null, "1", "2", DateTime.UtcNow.AddDays(-150));
+        ModHistory.Record(_file, "s3", null, "1", "2", DateTime.UtcNow.AddDays(-120));
+        ModHistory.Record(_file, "s4", null, "1", "2", DateTime.UtcNow.AddDays(-100));
+        Parallel.For(0, 40, i => ModHistory.Record(_file, "new" + i, null, "1", "2"));
+        var ids = ModHistory.ReadEntries(_file).Select(e => e.ModId).Where(id => id.StartsWith("new")).ToList();
+        Assert.Equal(40, ids.Count);
+        Assert.Equal(40, ids.Distinct().Count());
+    }
+
+    [Fact]
     public void Installer_WritesUpdatesAndNewMods_IntoTheProfileHistory()
     {
         var data = Directory.CreateDirectory(Path.Combine(_root, "data")).FullName;
