@@ -439,9 +439,14 @@ public sealed class ServerHost : IAsyncDisposable
     private readonly SemaphoreSlim _commandLock = new(1, 1);
     private DateTime _lastCommandAt = DateTime.MinValue;
 
-    /// <summary>Команда в консоль сервера (как если бы её набрали в окне сервера). Команды уходят по одной, с паузой.</summary>
+    /// <summary>
+    /// Команда в консоль сервера (как если бы её набрали в окне сервера). Команды уходят по одной, с паузой. Переносы
+    /// строк заменяются пробелом: консоль читает построчно, и объявление или причина бана из нескольких строк ушли бы
+    /// несколькими командами (вставленная строка «/stop» остановила бы сервер).
+    /// </summary>
     public async Task SendCommandAsync(string command)
     {
+        command = OneLine(command);
         await _commandLock.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -458,6 +463,13 @@ public sealed class ServerHost : IAsyncDisposable
             _commandLock.Release();
         }
     }
+
+    /// <summary>Текст одной строкой: переводы строк (и прочие разделители строк) — пробелом.</summary>
+    public static string OneLine(string text) =>
+        text.IndexOfAny(LineBreaks) < 0 ? text
+        : string.Join(' ', text.Split(LineBreaks, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
+    private static readonly char[] LineBreaks = ['\r', '\n', (char)0x85, (char)0x2028, (char)0x2029];
 
     /// <summary>Корректная остановка: /stop, ждём реального завершения; не вышел — Ctrl+C (Linux — SIGTERM); не помогло — kill.</summary>
     public async Task StopAsync(CancellationToken ct = default)

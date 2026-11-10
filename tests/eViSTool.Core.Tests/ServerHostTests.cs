@@ -63,6 +63,22 @@ public sealed class ServerHostTests : IAsyncLifetime
         await host.StopAsync();
     }
 
+    // текст из нескольких строк (объявление, причина бана) уходит одной командой: вторая строка «/stop» не выполнится
+    [Fact]
+    public async Task MultiLineCommand_GoesAsOneLine()
+    {
+        Assert.Equal("/announce Правила: без гриферства /stop", ServerHost.OneLine("/announce Правила:\r\n без гриферства\n/stop"));
+        Assert.Equal("/time", ServerHost.OneLine("/time"));
+
+        var host = Host();
+        await host.StartAsync();
+        await Until(() => host.State == ServerState.Running);
+        await host.SendCommandAsync("/announce one\n/stop");
+        await Until(() => host.Console.GetSince(0).Any(l => l.Text.Contains("Handling Console Command /announce one /stop")));
+        Assert.Equal(ServerState.Running, host.State);
+        await host.StopAsync();
+    }
+
     [Fact]
     public async Task StartsSendsCommandAndStopsGracefully()
     {
