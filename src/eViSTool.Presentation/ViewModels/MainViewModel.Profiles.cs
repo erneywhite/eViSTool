@@ -229,15 +229,23 @@ public sealed partial class MainViewModel
     {
         if (profile is null || Profiles.Count <= 1) return; // последний профиль не удаляем
         var model = profile.Model;
-        // удаляем активный — сначала правки его конфига (отмена — профиль не удаляем)
-        if (profile == ActiveProfile && !Server.Config.ConfirmSwitch()) return;
+        // удаляем активный — сначала правки его конфига сервера и настроек модов (отмена — профиль не удаляем). Раньше
+        // настройки модов спрашивались только при смене активного, уже после удаления: «Отмена» оставляла окно на профиле,
+        // которого больше нет
+        if (profile == ActiveProfile && (!Server.Config.ConfirmSwitch() || !ModConfig.ConfirmLeave())) return;
 
         // работающий сервер, вопрос о папке данных, Корзина и файлы агента — там; отменили или не вышло — профиль остаётся
         if (!await _profileActions.PrepareRemoveAsync(profile)) return;
 
         _settings.Profiles.Remove(profile.Model);
         Profiles.Remove(profile);
-        if (ActiveProfile == profile) ActiveProfile = Profiles[0];
+        if (ActiveProfile == profile)
+        {
+            ActiveProfile = Profiles[0];
+            // правки решены выше; если смена всё же не прошла — профиля больше нет, оставаться на нём нельзя
+            if (ActiveProfile == profile && SetProperty(ref _activeProfile, Profiles[0], nameof(ActiveProfile)))
+                OnActiveProfileChanged(Profiles[0]);
+        }
         if (EditedProfile == profile) EditedProfile = ActiveProfile;
         if (model.IsHosted) HostedWatch?.Refresh(); // сторож оповещений его отпускает сразу (и замок), не дожидаясь прохода
         if (model.IsHosted) HostedWorldJobs.Cancel(model.Id); // профиль убрали — его копию мира не доделываем
