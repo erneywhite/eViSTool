@@ -236,38 +236,48 @@ public sealed partial class ModsViewModel
             Error(ModTarget.UnreadableText(to.Model));
             return;
         }
-        var skippedClient = to.Model.Kind == ProfileKind.Server
-            ? rows.Where(r => ModSides.IsUnneeded(ModSides.Parse(r.Local.Info!.Side), ProfileKind.Server)).ToList() : [];
-        var folders = rows.Where(r => Directory.Exists(r.FilePath)).ToList(); // мод папкой — не архив, поставить нечем
-        var todo = rows.Except(skippedClient).Except(folders).ToList();
+        if (target.IsHosted && RejectWorldJob(target)) return; // идёт копия мира у хостера — соединение занято ею
 
-        var lines = new List<string>();
-        if (skippedClient.Count > 0) lines.Add(Loc.T("multi.copyClientSkipped", skippedClient.Count, string.Join(", ", skippedClient.Select(r => r.Name))));
-        if (folders.Count > 0) lines.Add(Loc.T("multi.copyFolders", string.Join(", ", folders.Select(r => r.Name))));
-        if (todo.Count == 0)
-        {
-            Error(Loc.T("multi.copyNothing", to.Name) + (lines.Count > 0 ? "\n\n" + string.Join("\n", lines) : ""));
-            return;
-        }
-        var list = string.Join("\n", todo.Take(15).Select(r => $"• {r.Name} {r.Installed}")) + (todo.Count > 15 ? "\n" + Loc.T("multi.andMore", todo.Count - 15) : "");
-        if (!Confirm(Loc.T("multi.copyConfirm", todo.Count, to.Name, list) + (lines.Count > 0 ? "\n\n" + string.Join("\n", lines) : ""))) return;
-        if (!await _installer.ConfirmIfRunningAsync(target)) return;
-
-        IsBusy = true;
+        IsBusy = true; // до первого ожидания: пока читаем цель, вторая операция не начинается
         var done = new List<string>();
         var problems = new List<string>();
         try
         {
+            // что уже стоит в цели: копия не должна молча понижать версии
+            IReadOnlyList<LocalMod> there;
+            try
+            {
+                (_, there) = await ModTargets.ScanAsync(target);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException or IOException
+                                           or UnauthorizedAccessException)
+            {
+                Error(Loc.T("mods.readFailed", ex.Message));
+                return;
+            }
+            var plan = CopyPlan.For(rows.Select(r => r.Local).ToList(), there, to.Model.Kind, l => Directory.Exists(l.Path));
+            var lines = plan.Notes(r => r.Info?.Name ?? r.FileName);
+            if (plan.Install.Count == 0)
+            {
+                Error(Loc.T("multi.copyNothing", to.Name) + (lines.Count > 0 ? "\n\n" + string.Join("\n", lines) : ""));
+                return;
+            }
+            var list = string.Join("\n", plan.Install.Take(15).Select(i => $"• {i.Mod.Info!.Name} {i.Mod.Info.Version}"
+                                                                           + (i.Replaces is { } old ? $" ({old} → {i.Mod.Info.Version})" : "")))
+                       + (plan.Install.Count > 15 ? "\n" + Loc.T("multi.andMore", plan.Install.Count - 15) : "");
+            if (!Confirm(Loc.T("multi.copyConfirm", plan.Install.Count, to.Name, list) + (lines.Count > 0 ? "\n\n" + string.Join("\n", lines) : ""))) return;
+            if (!await _installer.ConfirmIfRunningAsync(target)) return;
+
             using (ModHistory.Begin(ModHistorySource.Manual))
-                foreach (var row in todo)
-                    await _installer.InstallZipAsync(target, row.FilePath, interactive: false, done, problems);
+                foreach (var item in plan.Install)
+                    await _installer.InstallZipAsync(target, item.Mod.Path, interactive: false, done, problems);
+            // не ошибка, а решение: в итог, что пропущено
+            done.AddRange(lines);
         }
         finally
         {
             IsBusy = false;
         }
-        // не ошибка, а решение: в итог, что поставлено
-        if (skippedClient.Count > 0) done.Add(lines[0]);
         await ReportAsync(Loc.T("multi.copyReport", to.Name), done, problems);
     }
 
