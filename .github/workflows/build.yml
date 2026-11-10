@@ -144,7 +144,8 @@ jobs:
         shell: pwsh
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb libice6 libsm6 libfontconfig1
+          # окну на X11 нужны клиентские библиотеки X и fontconfig; на голом раннере их часть не стоит
+          sudo apt-get install -y -qq xvfb libice6 libsm6 libfontconfig1 libx11-6 libx11-xcb1 libxcursor1 libxrandr2 libxi6 libxext6 libxrender1
           xvfb-run -a pwsh build/snapshot.ps1 -Screens mods,server,settings -AppDir release -Out snapshots
           if ($LASTEXITCODE) { throw "окно из архива не сняло себя: $LASTEXITCODE" }
 
@@ -152,7 +153,11 @@ jobs:
         if: always()
         with:
           name: linux-release-snapshots
-          path: snapshots
+          # снимки и журнал ошибок окна (data/logs рядом с ним) — без него падение окна в CI не разобрать
+          path: |
+            snapshots
+            release/data/logs
+          if-no-files-found: ignore
           retention-days: 14
 
   release:

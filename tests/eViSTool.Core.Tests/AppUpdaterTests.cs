@@ -170,7 +170,8 @@ public sealed class AppUpdaterTests : IDisposable
             AppUpdater.Install(TarGz((AppUpdater.MainExe, "old build", exec)), _app, v)); // без .version — старый архив
         Assert.Throws<InvalidOperationException>(() =>
             AppUpdater.Install(TarGz((AppUpdater.MainExe, "old build", exec), (AppUpdater.VersionFile, "1.1.0", exec)), _app, v));
-        Assert.NotEqual("old build", File.ReadAllText(Path.Combine(_app, AppUpdater.MainExe)));
+        var main = Path.Combine(_app, AppUpdater.MainExe); // в заготовке на Linux его нет — тогда и подменять было нечего
+        Assert.False(File.Exists(main) && File.ReadAllText(main) == "old build");
         Assert.False(Directory.Exists(Path.Combine(_app, ".update")));
 
         AppUpdater.Install(TarGz((AppUpdater.MainExe, "new main", exec), (AppUpdater.VersionFile, "1.2.0\n", exec)), _app, v);

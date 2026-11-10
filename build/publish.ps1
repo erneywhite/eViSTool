@@ -48,8 +48,9 @@ Get-ChildItem (Join-Path $root 'src') -Directory | ForEach-Object {
 }
 
 # нативная библиотека SQLite (копии мира) вшивается в exe: в релиз попадают только сами программы
+# у publish свой lock-файл пакетов в obj (почему — в Directory.Build.props); версии в проектах и так точные
 $common = @('-c', 'Release', '-r', 'win-x64', "-p:Version=$Version", '-p:PublishSingleFile=true', '-p:DebugType=None', '-p:DebugSymbols=false',
-    '-p:IncludeNativeLibrariesForSelfExtract=true')
+    '-p:IncludeNativeLibrariesForSelfExtract=true', '-p:ReleasePublish=true')
 
 dotnet publish (Join-Path $root 'src/eViSTool.Desktop') @common --self-contained false -o $out
 if ($LASTEXITCODE) { throw "publish eViSTool.Desktop: $LASTEXITCODE" }
@@ -88,12 +89,14 @@ Remove-Item -Recurse -Force $linuxOut, $tgz, "$tgz.sha256", $lzip, "$lzip.sha256
 
 dotnet publish (Join-Path $root 'src/eViSTool.Agent') -c Release -r linux-x64 "-p:Version=$Version" `
     '-p:PublishSingleFile=true' '-p:DebugType=None' '-p:DebugSymbols=false' '-p:IncludeNativeLibrariesForSelfExtract=true' `
+    '-p:ReleasePublish=true' `
     --self-contained true '-p:EnableCompressionInSingleFile=true' `
     '-p:PublishTrimmed=true' '-p:TrimMode=full' '-p:EnableTrimAnalyzer=false' -o $linuxOut
 if ($LASTEXITCODE) { throw "publish eViSTool.Agent linux-x64: $LASTEXITCODE" }
 
 dotnet publish (Join-Path $root 'src/eViSTool.Desktop') -c Release -r linux-x64 "-p:Version=$Version" `
     '-p:PublishSingleFile=true' '-p:DebugType=None' '-p:DebugSymbols=false' '-p:IncludeNativeLibrariesForSelfExtract=true' `
+    '-p:ReleasePublish=true' `
     --self-contained true '-p:EnableCompressionInSingleFile=true' `
     '-p:PublishTrimmed=true' '-p:TrimMode=partial' '-p:EnableTrimAnalyzer=false' '-p:SuppressTrimAnalysisWarnings=true' -o $linuxOut
 if ($LASTEXITCODE) { throw "publish eViSTool.Desktop linux-x64: $LASTEXITCODE" }
