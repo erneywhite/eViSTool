@@ -865,8 +865,18 @@ public sealed class ModsViewTests : IDisposable
         Assert.False(Named(_window, "ModsSummary").IsEffectivelyVisible);
         Assert.Equal(Loc.T("multi.title", 3, Loc.Plural("multi.mods", 3)), ((TextBlock)Named(_window, "ModsMultiTitle")).Text);
 
+        // пока идёт другая операция (очередь установки), массовое действие не начинается — иначе обе брались бы за те же файлы
+        mods.IsBusy = true;
+        await mods.DisableSelectedCommand.ExecuteAsync(null);
+        await mods.DeleteSelectedCommand.ExecuteAsync(null);
+        Assert.True(mods.Rows.Single(r => r.ModId == "alpha").IsEnabled);
+        Assert.Equal(5, mods.Rows.Count);
+        mods.IsBusy = false;
+        Mouse.Prepare(_window);
+
         Mouse.Click(_window, Named(_window, "ModsMultiDisable"));
         await Wait.Until(() => mods.Rows.Where(r => r.ModId is "alpha" or "mod00" or "mod01").All(r => !r.IsEnabled));
+        Assert.False(mods.IsBusy);
         await Run(200);
         var disabled = JObject.Parse(File.ReadAllText(Path.Combine(_dir, "data", "clientsettings.json")))["stringListSettings"]!["disabledMods"]!
             .Values<string>().Order();

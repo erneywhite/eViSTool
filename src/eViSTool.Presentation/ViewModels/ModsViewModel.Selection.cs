@@ -88,7 +88,7 @@ public sealed partial class ModsViewModel
     private async Task SetEnabledSelectedAsync(bool enabled)
     {
         var rows = Changeable.Where(r => r.IsEnabled != enabled).ToList();
-        if (rows.Count == 0 || CurrentTarget() is not { } target) return;
+        if (IsBusy || rows.Count == 0 || CurrentTarget() is not { } target) return;
         if (target.IsHosted)
         {
             if (RejectWorldJob(target) || !await _installer.ConfirmIfRunningAsync(target)) return;
@@ -99,7 +99,10 @@ public sealed partial class ModsViewModel
             if (!Confirm(Loc.T(enabled ? "multi.enableAnyway" : "multi.disableAnyway", what, rows.Count))) return;
         }
 
+        // занято на всю операцию: иначе слежение за папкой (у хостера — опрос по FTP) замечало наши же изменения и
+        // перечитывало моды посреди операции, а очередь обновлений могла взяться за те же файлы
         var owner = _main.ActiveProfile;
+        IsBusy = true;
         await _toggleGate.WaitAsync();
         var failed = new List<string>();
         try
@@ -125,6 +128,7 @@ public sealed partial class ModsViewModel
         finally
         {
             _toggleGate.Release();
+            IsBusy = false;
         }
         StatusText = WithStartHint(_installer.WithWorldCopies(Loc.T(enabled ? "multi.enabledOk" : "multi.disabledOk", rows.Count - failed.Count)),
             target.IsHosted);
@@ -166,27 +170,41 @@ public sealed partial class ModsViewModel
     private async Task DeleteSelectedAsync()
     {
         var rows = Changeable;
-        if (rows.Count == 0 || Profile is null || ChangeTarget() is not { } target) return;
+        if (IsBusy || rows.Count == 0 || Profile is null || ChangeTarget() is not { } target) return;
+        if (target.IsHosted && RejectWorldJob(target)) return; // идёт копия мира у хостера — соединение занято ею
         var list = string.Join("\n", rows.Take(15).Select(r => $"• {r.Name} {r.Installed}")) + (rows.Count > 15 ? "\n" + Loc.T("multi.andMore", rows.Count - 15) : "");
         var question = Loc.T(target.IsHosted ? "multi.deleteConfirmHosted" : "multi.deleteConfirm", rows.Count, list)
                        + (!target.IsHosted && _installer.IsRunning(target) ? "\n\n" + Loc.T("mods.deleteRunning") : "");
         if (!Confirm(question)) return;
         if (target.IsHosted && !await _installer.ConfirmIfRunningAsync(target)) return;
-        var side = rows.All(r => ModSides.Parse(r.Local.Info!.Side) == ModSide.Client) ? ModSide.Client : ModSide.Both;
-        await _installer.CopyWorldsAsync(target, side: side);
 
+        // занято и под той же очередью, что переключатели: см. SetEnabledSelectedAsync
+        var owner = _main.ActiveProfile;
+        IsBusy = true;
+        await _toggleGate.WaitAsync();
         var failed = new List<string>();
-        using (ModHistory.Begin(ModHistorySource.Manual)) // все удаления — одно действие в истории
-            foreach (var row in rows)
-                try
-                {
-                    await ModTargets.DeleteAsync(target, row.Local, Ui.Platform.MoveToTrash);
-                }
-                catch (Exception ex) when (ex is IOException or OperationCanceledException or UnauthorizedAccessException
-                                               or HttpRequestException or InvalidOperationException)
-                {
-                    failed.Add(Loc.T("mods.deleteFailed", row.Name, ErrorText(target, ex)));
-                }
+        try
+        {
+            if (_main.ActiveProfile != owner) return;
+            var side = rows.All(r => ModSides.Parse(r.Local.Info!.Side) == ModSide.Client) ? ModSide.Client : ModSide.Both;
+            await _installer.CopyWorldsAsync(target, side: side);
+            using (ModHistory.Begin(ModHistorySource.Manual)) // все удаления — одно действие в истории
+                foreach (var row in rows)
+                    try
+                    {
+                        await ModTargets.DeleteAsync(target, row.Local, Ui.Platform.MoveToTrash);
+                    }
+                    catch (Exception ex) when (ex is IOException or OperationCanceledException or UnauthorizedAccessException
+                                                   or HttpRequestException or InvalidOperationException)
+                    {
+                        failed.Add(Loc.T("mods.deleteFailed", row.Name, ErrorText(target, ex)));
+                    }
+        }
+        finally
+        {
+            _toggleGate.Release();
+            IsBusy = false;
+        }
         StatusText = WithStartHint(_installer.WithWorldCopies(Loc.T("multi.deletedOk", rows.Count - failed.Count)), target.IsHosted);
         if (failed.Count > 0) Error(string.Join("\n", failed));
         await ReloadAsync();
