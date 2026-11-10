@@ -20,7 +20,7 @@ public sealed class GameProfile
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = "";
-    [JsonConverter(typeof(StringEnumConverter))]
+    [JsonConverter(typeof(Settings.TolerantEnumConverter))] // значение из более новой версии не сбрасывает весь файл
     public ProfileKind Kind { get; set; }
 
     /// <summary>Папка игры/сервера (Vintagestory.exe / VintagestoryServer.exe).</summary>

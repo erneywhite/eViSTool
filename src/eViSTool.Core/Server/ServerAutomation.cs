@@ -47,7 +47,7 @@ public sealed record ServerAutomation
 
     // ---- перезапуски
 
-    [JsonConverter(typeof(StringEnumConverter))]
+    [JsonConverter(typeof(Settings.TolerantEnumConverter))] // значение из более новой версии не сбрасывает весь файл
     public RestartMode RestartMode { get; init; }
 
     /// <summary>Для <see cref="RestartMode.Interval"/>: через сколько часов работы перезапускать.</summary>

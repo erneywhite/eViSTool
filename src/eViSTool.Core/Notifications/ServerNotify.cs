@@ -6,7 +6,7 @@ using Newtonsoft.Json.Converters;
 namespace eViSTool.Core.Notifications;
 
 /// <summary>О чём сервер может оповещать.</summary>
-[JsonConverter(typeof(StringEnumConverter))]
+[JsonConverter(typeof(Settings.TolerantEnumConverter))]
 public enum NotifyEvent
 {
     ServerCrashed,
@@ -35,7 +35,8 @@ public sealed record ServerNotifySettings
 
     public List<NotifyChannel> Channels { get; init; } = [];
 
-    /// <summary>Событие → ID каналов.</summary>
+    /// <summary>Событие → ID каналов. Событие из более новой версии — пропускается, а не роняет чтение.</summary>
+    [JsonConverter(typeof(Settings.TolerantEnumKeysConverter<NotifyEvent, List<string>>))]
     public Dictionary<NotifyEvent, List<string>> Routes { get; init; } = [];
 
     /// <summary>Чат игры → этот канал Discord (ID из <see cref="Channels"/>); null — выключено.</summary>

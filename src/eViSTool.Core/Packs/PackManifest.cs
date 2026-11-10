@@ -27,7 +27,7 @@ public sealed class PackManifest
     /// <summary>Версия игры, на которой собирали (для предупреждения при импорте).</summary>
     public string? GameVersion { get; set; }
 
-    [JsonConverter(typeof(StringEnumConverter))]
+    [JsonConverter(typeof(Settings.TolerantEnumConverter))] // значение из более новой версии не сбрасывает весь файл
     public ProfileKind Kind { get; set; }
 
     public bool IncludesModConfig { get; set; }

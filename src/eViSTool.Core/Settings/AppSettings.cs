@@ -12,7 +12,7 @@ public sealed class AppSettings
     public bool GroupModsByCategory { get; set; }
 
     /// <summary>Порядок профилей в «Профилях» и в шапке.</summary>
-    [JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+    [JsonConverter(typeof(TolerantEnumConverter))]
     public ProfileSort ProfileSort { get; set; }
 
     /// <summary>Предлагать пре-релизы модов (rc/pre) даже тем, у кого стоит стабильная версия.</summary>
