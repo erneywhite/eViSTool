@@ -18,8 +18,7 @@ internal sealed partial class AgentApi
             if (request.Version == version) return Problem(Loc.T("selfupd.same"), StatusCodes.Status400BadRequest);
             if (!request.AllowDowngrade && ModVersion.TryParse(version, out var current) && target < current)
                 return Problem(Loc.T("selfupd.downgrade", target, version), StatusCodes.Status400BadRequest);
-            if (selfUpdate.Busy) return Problem(Loc.T("selfupd.busy"));
-            selfUpdate.Begin(target);
+            if (!selfUpdate.TryBegin(target)) return Problem(Loc.T("selfupd.busy"));
             return Json(Status());
         });
     }

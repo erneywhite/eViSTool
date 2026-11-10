@@ -17,14 +17,21 @@ internal sealed class AgentSelfUpdate(AgentState state)
     public string? Error { get; private set; }
 
     /// <summary>Обновление уже идёт — второе не начинать.</summary>
-    public bool Busy => Stage is not (null or "failed");
+    public bool Busy => Volatile.Read(ref _running) != 0;
 
-    /// <summary>Начать обновление до <paramref name="target"/> в фоне; статус сразу говорит «download».</summary>
-    public void Begin(ModVersion target)
+    private int _running;
+
+    /// <summary>
+    /// Начать обновление до <paramref name="target"/> в фоне; статус сразу говорит «download». false — уже идёт:
+    /// проверка и захват одним шагом, два запроса подряд не запустят два обновления.
+    /// </summary>
+    public bool TryBegin(ModVersion target)
     {
+        if (Interlocked.CompareExchange(ref _running, 1, 0) != 0) return false;
         Stage = "download";
         Error = null;
         _ = Task.Run(() => RunAsync(target));
+        return true;
     }
 
     private async Task RunAsync(ModVersion target)
@@ -34,6 +41,7 @@ internal sealed class AgentSelfUpdate(AgentState state)
         var opts = state.Options;
         var appDir = AppContext.BaseDirectory;
         var wasRunning = false; // сервер работал до обновления — при сбое его надо поднять обратно
+        string? zip = null;
         try
         {
             host.Console.Add(ConsoleLineKind.System, Loc.T("selfupd.started", state.Version, target));
@@ -42,7 +50,9 @@ internal sealed class AgentSelfUpdate(AgentState state)
             var release = await updater.FindReleaseAsync(target)
                           ?? throw new InvalidOperationException(Loc.T("selfupd.noRelease", target));
             // архив с проверкой отпечатка — тем же путём, что и самообновление окна
-            var zip = await updater.DownloadAsync(release, Path.Combine(Path.GetTempPath(), "eViSTool-update"));
+            // в своей папке агента, а не в общей %TEMP%: туда может писать кто угодно на машине
+            zip = await updater.DownloadAsync(release, Path.Combine(opts.AgentsDir ?? AgentProtocol.DefaultAgentsDir, "update", opts.ProfileId));
+            var hash = AppUpdater.Sha256Of(zip); // подпись проверена на этих байтах
 
             // работающий сервер держит консоль агента — останавливаем (мир сохранится) и потом запускаем снова
             wasRunning = host.State != ServerState.Stopped;
@@ -56,7 +66,10 @@ internal sealed class AgentSelfUpdate(AgentState state)
             }
 
             Stage = "install";
-            AppUpdater.Install(zip, appDir);
+            // между проверкой и установкой сервер останавливался — архив за это время не должен был измениться
+            if (AppUpdater.Sha256Of(zip) != hash) throw new InvalidOperationException(Loc.T("update.badHash"));
+            AppUpdater.Install(zip, appDir, target);
+            DeleteQuietly(zip);
 
             // под systemd новую версию поднимает служба: своя дочерняя копия погибла бы вместе с этой. Выходим с кодом 75
             // (в юните — «не сбой, перезапустить»), а что было с сервером, новая версия узнает из отметки
@@ -92,6 +105,8 @@ internal sealed class AgentSelfUpdate(AgentState state)
             // остановленный ради обновления, поднимаем: иначе на Linux-службе он стоял бы до ручного вмешательства
             Stage = "failed";
             Error = ex.Message;
+            if (zip is not null) DeleteQuietly(zip);
+            Volatile.Write(ref _running, 0); // после успеха не сбрасываем: агент уже уходит, второе обновление ни к чему
             host.Console.Add(ConsoleLineKind.Error, Loc.T("selfupd.failed", ex.Message));
             if (wasRunning && host.State == ServerState.Stopped && !state.Shutdown.IsCancellationRequested)
             {
@@ -99,5 +114,11 @@ internal sealed class AgentSelfUpdate(AgentState state)
                 host.StartAfterStop(); // мир занят — подождёт его, другая ошибка — в консоль и оповещением
             }
         }
+    }
+
+    private static void DeleteQuietly(string path)
+    {
+        try { File.Delete(path); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 }
