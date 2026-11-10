@@ -417,14 +417,24 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
         return await updater.DownloadReleaseAsync(release, m.ModId, null, ct).ConfigureAwait(false);
     }
 
+    /// <summary>Папка в хранилище версий профиля, где лежат прежние настройки модов (архивом) перед импортом пака.</summary>
+    public const string ModConfigBackupFolder = "_ModConfig";
+
+    /// <summary>Сколько таких архивов хранить.</summary>
+    public const int ModConfigBackupsKept = 5;
+
     /// <summary>Прежний ModConfig — в архив в хранилище профиля, затем файлы из пака поверх.</summary>
     private static void ApplyModConfig(PackFile pack, string configDir, ModBackupStore backups)
     {
         if (Directory.Exists(configDir) && Directory.EnumerateFileSystemEntries(configDir).Any())
         {
-            var dir = System.IO.Path.Combine(backups.Root, "_ModConfig");
+            var dir = System.IO.Path.Combine(backups.Root, ModConfigBackupFolder);
             Directory.CreateDirectory(dir);
             ZipFile.CreateFromDirectory(configDir, System.IO.Path.Combine(dir, $"ModConfig-{DateTime.Now:yyyyMMdd-HHmmss}.zip"));
+            // хранятся последние несколько: каждый импорт с настройками клал ещё один архив, и они копились без конца
+            foreach (var old in new DirectoryInfo(dir).GetFiles("ModConfig-*.zip").OrderByDescending(f => f.Name).Skip(ModConfigBackupsKept))
+                try { old.Delete(); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         }
 
         var root = System.IO.Path.GetFullPath(configDir) + System.IO.Path.DirectorySeparatorChar;

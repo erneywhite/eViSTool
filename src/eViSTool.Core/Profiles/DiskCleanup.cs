@@ -90,7 +90,10 @@ public static partial class DiskCleanup
                 .Select(f => Item(CleanupKind.OrphanConfigs, f.RelativePath, [f.Path], dflt: false)));
 
         // --- что копит eViSTool для этого профиля
-        var versions = Subfolders(Path.Combine(appRoot, "ModBackups", profile.Id)).ToList();
+        // архивы прежних настроек модов (перед импортом пака) — не «версии удалённого мода»: их не предлагаем удалить по
+        // умолчанию, они в «Копиях настроек модов» ниже
+        var versions = Subfolders(Path.Combine(appRoot, "ModBackups", profile.Id))
+            .Where(d => !string.Equals(Path.GetFileName(d), Packs.PackImporter.ModConfigBackupFolder, StringComparison.OrdinalIgnoreCase)).ToList();
         Add(CleanupKind.RemovedModVersions, CleanupSafety.Safe, versions
             .Where(d => !installed.Contains(Path.GetFileName(d)))
             .Select(d => Item(CleanupKind.RemovedModVersions, Path.GetFileName(d), [d], dflt: true)));
@@ -98,7 +101,9 @@ public static partial class DiskCleanup
             .Where(d => installed.Contains(Path.GetFileName(d)))
             .Select(d => Item(CleanupKind.InstalledModVersions, Path.GetFileName(d), [d], dflt: false)));
         Add(CleanupKind.ConfigVersions, CleanupSafety.Careful,
-            Folder(CleanupKind.ConfigVersions, Path.Combine(appRoot, "ModConfigBackups", profile.Id), "ModConfigBackups", false));
+            Folder(CleanupKind.ConfigVersions, Path.Combine(appRoot, "ModConfigBackups", profile.Id), "ModConfigBackups", false)
+                .Concat(Folder(CleanupKind.ConfigVersions, Path.Combine(appRoot, "ModBackups", profile.Id, Packs.PackImporter.ModConfigBackupFolder),
+                    "ModBackups\\" + Packs.PackImporter.ModConfigBackupFolder, false)));
         Add(CleanupKind.Downloads, CleanupSafety.Safe, Directory.Exists(Path.Combine(appRoot, "Downloads"))
             ? Directory.EnumerateFileSystemEntries(Path.Combine(appRoot, "Downloads"))
                 .Select(p => Item(CleanupKind.Downloads, Path.GetFileName(p), [p], dflt: true))

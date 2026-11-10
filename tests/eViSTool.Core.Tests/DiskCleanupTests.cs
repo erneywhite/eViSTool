@@ -56,6 +56,7 @@ public sealed class DiskCleanupTests : IDisposable
         Put("ModBackups/main/oldmod/oldmod_1.0.zip", 600, root: _app);
         Put("ModBackups/main/carryon/carryon_0.9.zip", 700, root: _app);
         Put("ModBackups/other/oldmod/x.zip", 99, root: _app); // чужой профиль — не трогаем
+        Put("ModBackups/main/_ModConfig/ModConfig-20261101-120000.zip", 40, root: _app); // прежние настройки перед импортом пака
         Put("Downloads/stuck.zip", 90, root: _app);
 
         var groups = Scan().ToDictionary(g => g.Kind);
@@ -77,8 +78,10 @@ public sealed class DiskCleanupTests : IDisposable
         Assert.Equal([WorldA], groups[CleanupKind.WorldModData].Items.Select(i => i.Title));
         Assert.Equal(["imgui.ini"], groups[CleanupKind.OrphanConfigs].Items.Select(i => i.Title));
 
-        var removed = groups[CleanupKind.RemovedModVersions].Items.Single();
+        var removed = groups[CleanupKind.RemovedModVersions].Items.Single(); // «_ModConfig» — не версии удалённого мода
         Assert.Equal(("oldmod", 600L, true), (removed.Title, removed.Size, removed.Default));
+        var configs = groups[CleanupKind.ConfigVersions].Items.Single(); // а копии настроек — по умолчанию не выбраны
+        Assert.Equal((40L, false), (configs.Size, configs.Default));
         Assert.False(groups[CleanupKind.InstalledModVersions].Items.Single().Default);
         Assert.True(groups[CleanupKind.Downloads].Items.Single().Default);
     }
