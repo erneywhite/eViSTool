@@ -29,7 +29,7 @@ public static partial class ServerBrowser
     {
         try
         {
-            var file = Path.Combine(string.IsNullOrWhiteSpace(dataDir) ? GameInstall.DefaultDataDir : dataDir, "clientsettings.json");
+            var file = Profiles.ProfileResolver.ClientSettingsFile(dataDir);
             if (File.Exists(file) && JObject.Parse(File.ReadAllText(file))["stringSettings"]?["masterserverUrl"]?.Value<string>() is { Length: > 0 } url
                 && Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "http")
                 return url;
@@ -110,8 +110,7 @@ public static partial class ServerBrowser
 /// </summary>
 public static class GameFavorites
 {
-    private static string FileOf(string? dataDir) =>
-        Path.Combine(string.IsNullOrWhiteSpace(dataDir) ? GameInstall.DefaultDataDir : dataDir, "clientsettings.json");
+    private static string FileOf(string? dataDir) => Profiles.ProfileResolver.ClientSettingsFile(dataDir);
 
     /// <summary>Добавить (такой адрес уже есть — заменить: новое имя и пароль). Запятые в имени игра не поймёт — заменяем.</summary>
     public static void Add(string? dataDir, string name, string address, string? password) =>
@@ -150,16 +149,19 @@ public static class GameFavorites
             t.Remove();
     }
 
+    /// <summary>
+    /// Прочитать, поменять и записать настройки игры тем же путём, что и включение модов: под замком файла (иначе
+    /// одновременная запись из окна затёрла бы одну из правок), с копией прежнего рядом, даты и дроби — как были.
+    /// </summary>
     private static void Edit(string? dataDir, Action<JArray> change)
     {
         var file = FileOf(dataDir);
         if (!File.Exists(file)) throw new InvalidOperationException(Loc.T("browse.noSettings"));
-        var root = JObject.Parse(File.ReadAllText(file));
+        using var held = Profiles.ConfigFileLock.Take(file);
+        var root = Profiles.ModConfigEditor.Load(file);
         var lists = root["stringListSettings"] as JObject ?? (JObject)(root["stringListSettings"] = new JObject());
         var list = lists["multiplayerservers"] as JArray ?? (JArray)(lists["multiplayerservers"] = new JArray());
         change(list);
-        var tmp = file + ".evistool.tmp";
-        File.WriteAllText(tmp, root.ToString(Formatting.Indented));
-        Platform.SafeFile.Replace(tmp, file);
+        Profiles.ModConfigEditor.SaveLocked(file, root);
     }
 }

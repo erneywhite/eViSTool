@@ -83,6 +83,24 @@ public static class ProfileResolver
         };
     }
 
+    /// <summary>
+    /// Настройки клиента в папке данных (пусто — стандартная папка игры): файл «*clientsettings.json», который игра
+    /// трогала последней (у сборок с приставкой имя другое). Файла нет — путь к обычному «clientsettings.json» в этой папке.
+    /// Одно место на всех: язык игры, избранное, адрес списка серверов раньше читались только из «clientsettings.json».
+    /// </summary>
+    public static string ClientSettingsFile(string? dataDir)
+    {
+        var dir = string.IsNullOrWhiteSpace(dataDir) ? Game.GameInstall.DefaultDataDir : dataDir;
+        try
+        {
+            if (Directory.Exists(dir)
+                && Directory.EnumerateFiles(dir, ClientSettingsPattern).OrderByDescending(File.GetLastWriteTimeUtc).FirstOrDefault() is { } found)
+                return found;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        return Path.Combine(dir, "clientsettings.json");
+    }
+
     public static string? FindConfig(GameProfile profile)
     {
         if (string.IsNullOrWhiteSpace(profile.DataDir) || !Directory.Exists(profile.DataDir)) return null;

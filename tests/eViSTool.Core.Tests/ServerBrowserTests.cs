@@ -72,4 +72,32 @@ public sealed class ServerBrowserTests : IDisposable
         GameFavorites.Add(_root, "a,b", "5.6.7.8", null);
         Assert.Equal("a b", PlayTargets.Favorites(_root).Last().Name); // запятая в имени сломала бы строку
     }
+
+    // сборка с приставкой у файла настроек: избранное, адрес списка серверов и правка — из её файла. Правка не трогает
+    // остальное (дата остаётся строкой как была, дробное — как было) и оставляет копию прежнего рядом
+    [Fact]
+    public void Favorites_InAPrefixedSettingsFile_KeepTheRestAsIs()
+    {
+        var file = Path.Combine(_root, "fplayclientsettings.json");
+        File.WriteAllText(file, """
+            {
+              "stringSettings": { "masterserverUrl": "https://example.org/api/" },
+              "dateSettings": { "lastLogin": "2026-10-25T03:30:00" },
+              "floatSettings": { "gamma": 1.10 },
+              "stringListSettings": { "multiplayerservers": [ "home,192.168.31.31," ] }
+            }
+            """);
+
+        Assert.Equal("https://example.org/api/", ServerBrowser.MasterUrl(_root));
+        Assert.Equal(["home"], PlayTargets.Favorites(_root).Select(f => f.Name));
+
+        GameFavorites.Add(_root, "Oldwood", "1.2.3.4", null);
+
+        Assert.False(File.Exists(Path.Combine(_root, "clientsettings.json"))); // не завёл второй файл
+        var text = File.ReadAllText(file);
+        Assert.Contains("\"2026-10-25T03:30:00\"", text);
+        Assert.Contains("1.10", text);
+        Assert.Equal(["home", "Oldwood"], PlayTargets.Favorites(_root).Select(f => f.Name));
+        Assert.True(File.Exists(file + ".evistool.bak"));
+    }
 }

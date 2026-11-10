@@ -30,7 +30,7 @@ public static class PlayTargets
     /// <summary>Избранное игры профиля (его папки данных). Файла нет или он испорчен — пусто.</summary>
     public static IReadOnlyList<PlayTarget> Favorites(string? dataDir)
     {
-        var file = Path.Combine(string.IsNullOrWhiteSpace(dataDir) ? GameInstall.DefaultDataDir : dataDir, "clientsettings.json");
+        var file = ProfileResolver.ClientSettingsFile(dataDir);
         try
         {
             if (!File.Exists(file)) return [];

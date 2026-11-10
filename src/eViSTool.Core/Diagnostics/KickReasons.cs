@@ -61,7 +61,7 @@ public sealed class KickReasons
     {
         try
         {
-            var file = dataDir is null ? null : Path.Combine(dataDir, "clientsettings.json");
+            var file = dataDir is null ? null : Profiles.ProfileResolver.ClientSettingsFile(dataDir);
             if (file is not null && File.Exists(file)
                 && JObject.Parse(File.ReadAllText(file)) is var settings
                 && (settings["stringSettings"]?["language"] ?? settings["language"])?.Value<string>() is { Length: > 0 and < 12 } code
