@@ -59,7 +59,10 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
             owner.StatusText = Loc.T("packx.done", manifest.Mods.Count, size.ToString("0.0"), savePath);
             Ui.ShowInFolder(savePath);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException)
+        // модбаза не ответила вовремя (TaskCanceledException), мод — битый архив (InvalidDataException) — тоже понятной
+        // ошибкой, а не в общий обработчик
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException or TaskCanceledException
+                                       or TimeoutException or InvalidDataException)
         {
             Error(Loc.T("packx.failed", ex.Message));
         }

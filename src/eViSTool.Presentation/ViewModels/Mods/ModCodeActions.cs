@@ -70,8 +70,15 @@ internal sealed class ModCodeActions(ModsViewModel owner, ModPackActions packs, 
             }
 
             var code = ModCode.Encode(entries, owner.Profile?.GameVersion);
-            Ui.Platform.SetClipboard(code);
-            owner.StatusText = Loc.Plural("modcode.copiedStatus", entries.Count);
+            try
+            {
+                Ui.Platform.SetClipboard(code);
+                owner.StatusText = Loc.Plural("modcode.copiedStatus", entries.Count);
+            }
+            catch (Exception ex) when (ex is System.Runtime.InteropServices.ExternalException or TimeoutException)
+            {
+                // буфер занят другой программой — код всё равно в окне ниже, оттуда его можно скопировать
+            }
             AppWindows.Current.ShowModCode(new ModCodeShare(code, entries.Count, missing));
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
