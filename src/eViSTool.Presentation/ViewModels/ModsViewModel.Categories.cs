@@ -98,28 +98,37 @@ public sealed partial class ModsViewModel
     /// <summary>Пункт меню «Категория»: выбрано несколько модов — все в неё, иначе — выбранный.</summary>
     private void MoveSelected(string category)
     {
-        if (IsMulti)
-            foreach (var row in SelectedRows.ToList()) SetCategory(row, category);
+        if (IsMulti) SetCategory(SelectedRows.ToList(), category);
         else if (Selected is { } row) SetCategory(row, category);
     }
 
     /// <summary>
     /// Мод — в категорию (пустая — без категории). Регистр не плодит дублей: «карта» к уже существующей «Карта» — в неё же.
     /// </summary>
-    public void SetCategory(ModRowViewModel row, string? category)
+    public void SetCategory(ModRowViewModel row, string? category) => SetCategory([row], category);
+
+    /// <summary>
+    /// Несколько модов — в одну категорию одним разом: одна запись настроек и одна перестройка таблицы (раньше на каждый
+    /// мод — своя запись и своя перестройка, на 150 выбранных модов это было заметно).
+    /// </summary>
+    public void SetCategory(IReadOnlyList<ModRowViewModel> rows, string? category)
     {
         if (CategoryStore is not { } store) return;
         category = category?.Trim() ?? "";
         if (category.Length > 0 && Categories.FirstOrDefault(c => string.Equals(c, category, StringComparison.CurrentCultureIgnoreCase)) is { } same)
             category = same;
-        if (category == row.Category) return;
-        var key = CategoryKey(row);
-        if (category.Length == 0) store.Remove(key);
-        else store[key] = category;
+        var changed = rows.Where(r => r.Category != category).ToList();
+        if (changed.Count == 0) return;
+        foreach (var row in changed)
+        {
+            var key = CategoryKey(row);
+            if (category.Length == 0) store.Remove(key);
+            else store[key] = category;
+            row.Category = category;
+        }
         _main.SaveSettings();
-        row.Category = category;
         RefreshCategoryLists();
-        RefreshView(); // строка встаёт в свою группу
+        RefreshView(); // строки встают в свою группу
     }
 
     /// <summary>Группа свёрнута (запоминается в профиле, чтобы перестройка таблицы её не раскрывала).</summary>
@@ -143,17 +152,21 @@ public sealed partial class ModsViewModel
     [RelayCommand]
     private async Task SuggestCategoriesAsync()
     {
-        if (CategoryStore is not { } store) return;
+        if (CategoryStore is null) return;
+        var owner = _main.ActiveProfile;
         var catalog = new Core.ModDb.CatalogService(_db);
         try
         {
             await catalog.LoadAsync();
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or Newtonsoft.Json.JsonException)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException
+                                       or Newtonsoft.Json.JsonException)
         {
             Ui.Warn(Loc.T("catsuggest.noCatalog", ex.Message));
             return;
         }
+        // пока грузился каталог, профиль сменили: предложения по модам нового профиля легли бы в категории прежнего
+        if (_main.ActiveProfile != owner || CategoryStore is not { } store) return;
         var tags = new Dictionary<string, List<string?>>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in catalog.Items)
             foreach (var id in item.ModIdStrs.Where(s => !string.IsNullOrWhiteSpace(s)))

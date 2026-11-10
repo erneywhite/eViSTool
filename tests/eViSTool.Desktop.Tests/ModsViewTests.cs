@@ -865,6 +865,11 @@ public sealed class ModsViewTests : IDisposable
         Assert.False(Named(_window, "ModsSummary").IsEffectivelyVisible);
         Assert.Equal(Loc.T("multi.title", 3, Loc.Plural("multi.mods", 3)), ((TextBlock)Named(_window, "ModsMultiTitle")).Text);
 
+        // категория — всем выбранным разом
+        mods.SetCategory(mods.SelectedRows, "Набор");
+        Assert.All(mods.SelectedRows, r => Assert.Equal("Набор", r.Category));
+        Assert.Equal(3, mods.Rows.Count(r => r.Category == "Набор"));
+
         // пока идёт другая операция (очередь установки), массовое действие не начинается — иначе обе брались бы за те же файлы
         mods.IsBusy = true;
         await mods.DisableSelectedCommand.ExecuteAsync(null);
