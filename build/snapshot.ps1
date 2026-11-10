@@ -118,7 +118,9 @@ foreach ($screen in $Screens) {
         $png = Join-Path $Out "$screen.png"
         if (Test-Path $png) { Remove-Item $png }
         $env:EVISTOOL_SNAPSHOT = "screen=$screen;out=$png;size=$Size;wait=$Wait;profile=$Profile"
-        $p = Start-Process (Join-Path $app.Dir $app.Exe) -WorkingDirectory $app.Dir -PassThru
+        # вывод окна — в файл рядом со снимком: упало раньше, чем завело свой журнал, — причина здесь
+        $p = Start-Process (Join-Path $app.Dir $app.Exe) -WorkingDirectory $app.Dir -PassThru `
+            -RedirectStandardOutput (Join-Path $Out "$screen.out.txt") -RedirectStandardError (Join-Path $Out "$screen.err.txt")
         if (-not $p.WaitForExit([int](($Wait + 60) * 1000))) {
             $p.Kill() # завис — закрыть именно этот процесс (по нему, не по имени: рядом может работать настоящий eViSTool)
             Write-Warning "$($app.Name) $screen — окно не закрылось само, снято принудительно"

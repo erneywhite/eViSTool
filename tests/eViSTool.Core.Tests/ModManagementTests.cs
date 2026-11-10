@@ -229,7 +229,8 @@ public sealed class ModManagementTests : IDisposable
         // файл; на Linux открытый файл переносу не мешает, и сбой делаем иначе: вторая копия — в папке модов только для
         // чтения, её оттуда не унести (занятое место в хранилище больше не мешает: Keep берёт другое имя)
         var extra = Directory.CreateDirectory(Path.Combine(_root, "extra")).FullName;
-        var p = Server(OperatingSystem.IsWindows() ? """{ "ModPaths": [] }""" : $$"""{ "ModPaths": ["{{extra}}"] }""");
+        // со списком папок игра читает только их — стандартная Mods тоже в нём
+        var p = Server(OperatingSystem.IsWindows() ? """{ "ModPaths": [] }""" : $$"""{ "ModPaths": ["{{_mods}}", "{{extra}}"] }""");
         MakeZip(_mods, "alpha_1.0.0.zip", "alpha", "1.0.0");
         MakeZip(OperatingSystem.IsWindows() ? _mods : extra, "alpha_0.9.0.zip", "alpha", "0.9.0"); // две копии одного мода — обе будут убраны
         var before = Directory.GetFiles(_mods).Concat(Directory.GetFiles(extra)).ToDictionary(f => f, File.ReadAllBytes);
