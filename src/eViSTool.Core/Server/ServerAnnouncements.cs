@@ -75,6 +75,7 @@ public sealed class AnnouncementScheduler
     /// </summary>
     public static readonly TimeSpan TimedWindow = TimeSpan.FromMinutes(5);
 
+    // всё время внутри — UTC: при переводе часов местное прыгает на час, и интервалы замолкали бы или частили
     // объявления на заданный час: когда какое время уже сказано (по тексту и времени суток)
     private readonly Dictionary<(string, TimeSpan), DateTime> _timedSaid = [];
 
@@ -82,10 +83,15 @@ public sealed class AnnouncementScheduler
     private readonly Dictionary<(string, int), DateTime> _last = [];
     private DateTime? _startedAt;
     private DateTime _lastAny = DateTime.MinValue;
+    private TimeZoneInfo? _zone;
 
     /// <summary>Вызывать регулярно. Возвращает текст, который пора сказать, или null.</summary>
-    public string? Tick(ServerAnnouncements settings, DateTime now, ServerState state, DateTime? startedAt, int playersOnline)
+    public string? Tick(ServerAnnouncements settings, DateTime now, ServerState state, DateTime? startedAt, int playersOnline,
+        TimeZoneInfo? zone = null)
     {
+        _zone = zone;
+        var wall = now; // «в 03:00» — по часам
+        now = WallClock.ToUtc(now, zone);
         if (state != ServerState.Running || startedAt is not { } started)
         {
             _startedAt = null;
@@ -99,7 +105,7 @@ public sealed class AnnouncementScheduler
         }
 
         // на заданный час — раньше интервальных: у них нет запаса, а интервальные подождут минуту
-        if (TimedDue(settings, now, playersOnline) is { } timed) return timed;
+        if (TimedDue(settings, wall, now, playersOnline) is { } timed) return timed;
 
         var active = settings.Items.Where(a => a.IsActive && !a.IsTimed).ToList();
         // объявления, которых больше нет, забываем; новое (или после запуска сервера) начинает отсчёт с этой минуты,
@@ -126,14 +132,16 @@ public sealed class AnnouncementScheduler
     private static (string, int) Key(Announcement a) => (a.Text.Trim(), a.IntervalMinutes);
 
     /// <summary>Объявление на заданный час, которое пора сказать: час наступил, не опоздали и сегодня его ещё не было.</summary>
-    private string? TimedDue(ServerAnnouncements settings, DateTime now, int playersOnline)
+    private string? TimedDue(ServerAnnouncements settings, DateTime wall, DateTime now, int playersOnline)
     {
+        var today = WallClock.DateOf(wall, _zone);
         if (now - _lastAny < Gap) return null;
         foreach (var a in settings.Items.Where(a => a.IsActive && a.IsTimed))
             foreach (var text in a.Times!)
             {
                 if (!ServerAutomation.TryTimeOfDay(text, out var time)) continue;
-                var at = now.Date + time;
+                // в 03:30 в «повторный» осенний час — один раз, первый: второй раз опоздание уже час
+                var at = WallClock.UtcAt(today, time, _zone);
                 if (now < at || now - at > TimedWindow) continue;
                 var key = (a.Text.Trim(), time);
                 if (_timedSaid.TryGetValue(key, out var said) && said >= at) continue;

@@ -417,13 +417,18 @@ public sealed class BackupScheduler
     }
 
     /// <summary>Когда ждать следующую копию (null — расписание выключено или сервер не работает).</summary>
-    public DateTime? NextAt(ServerAutomation settings, ServerState state, DateTime? startedAt) =>
-        settings.BackupEnabled && state == ServerState.Running && startedAt is { } started ? Base(started) + settings.BackupInterval : null;
+    /// <remarks>Интервал — настоящее время: при переводе часов копия не опаздывает и не спешит на час.</remarks>
+    public DateTime? NextAt(ServerAutomation settings, ServerState state, DateTime? startedAt, TimeZoneInfo? zone = null) =>
+        NextUtc(settings, state, startedAt, zone) is { } next && startedAt is { } started ? WallClock.FromUtc(next, started, zone) : null;
+
+    private DateTime? NextUtc(ServerAutomation settings, ServerState state, DateTime? startedAt, TimeZoneInfo? zone) =>
+        settings.BackupEnabled && state == ServerState.Running && startedAt is { } started
+            ? WallClock.ToUtc(Base(started, zone), zone) + settings.BackupInterval : null;
 
     /// <summary>Пора делать копию.</summary>
-    public bool IsDue(ServerAutomation settings, DateTime now, ServerState state, DateTime? startedAt)
+    public bool IsDue(ServerAutomation settings, DateTime now, ServerState state, DateTime? startedAt, TimeZoneInfo? zone = null)
     {
-        if (NextAt(settings, state, startedAt) is not { } next || now < next) return false;
+        if (NextUtc(settings, state, startedAt, zone) is not { } next || WallClock.ToUtc(now, zone) < next) return false;
         if (settings.BackupOnlyWhenPlayed && !_played)
         {
             _base = now; // никто не заходил — пропускаем, ждём следующий интервал
@@ -455,9 +460,9 @@ public sealed class BackupScheduler
         _played = playersOnline > 0; // кто остался на сервере — продолжает менять мир
     }
 
-    private DateTime Base(DateTime startedAt)
+    private DateTime Base(DateTime startedAt, TimeZoneInfo? zone)
     {
-        var last = _base is { } b && (LastBackupAt is not { } l || b > l) ? b : LastBackupAt;
-        return last is { } t && t > startedAt ? t : startedAt;
+        var last = _base is { } b && (LastBackupAt is not { } l || WallClock.ToUtc(b, zone) > WallClock.ToUtc(l, zone)) ? b : LastBackupAt;
+        return last is { } t && WallClock.ToUtc(t, zone) > WallClock.ToUtc(startedAt, zone) ? t : startedAt;
     }
 }

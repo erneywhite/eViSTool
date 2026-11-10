@@ -351,8 +351,9 @@ public sealed class ServerHost : IAsyncDisposable
     /// </summary>
     private CancellationToken? PlanRestartLocked()
     {
-        _crashes.RemoveAll(t => DateTime.Now - t > TimeSpan.FromHours(1));
-        _crashes.Add(DateTime.Now);
+        // по UTC: при переводе часов «за последний час» не растягивается до двух и не сжимается до нуля
+        _crashes.RemoveAll(t => DateTime.UtcNow - t > TimeSpan.FromHours(1));
+        _crashes.Add(DateTime.UtcNow);
         if (_crashes.Count > _options.MaxRestartsPerHour) return null;
         _restartCts = new CancellationTokenSource();
         RestartScheduledAt = DateTime.Now + _options.RestartDelay;
