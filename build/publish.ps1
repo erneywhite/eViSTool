@@ -47,6 +47,9 @@ Get-ChildItem $out -Directory | Remove-Item -Recurse -Force
 foreach ($doc in 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'README.md', 'README.ru.md') {
     if (Test-Path (Join-Path $root $doc)) { Copy-Item (Join-Path $root $doc) $out }
 }
+# версия внутри подписанного архива: обновление сверяет её с версией релиза — старый подписанный архив, приложенный
+# к новому тегу, не поставится (подпись сама по себе версию не знает)
+[IO.File]::WriteAllText((Join-Path $out '.version'), $Version)
 
 Compress-Archive -Path (Join-Path $out '*') -DestinationPath $zip
 # ModDB принимает файлы до 40 МБ
@@ -84,6 +87,7 @@ Get-ChildItem $linuxOut -Directory | Remove-Item -Recurse -Force
 foreach ($doc in 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'README.md', 'README.ru.md') {
     if (Test-Path (Join-Path $root $doc)) { Copy-Item (Join-Path $root $doc) $linuxOut }
 }
+[IO.File]::WriteAllText((Join-Path $linuxOut '.version'), $Version) # см. Windows выше
 
 # tar собираем сами (System.Formats.Tar из .NET, на котором работает pwsh), с правами Unix в каждой записи: программы —
 # rwxr-xr-x, остальное — rw-r--r--. У файлов на Windows этих прав нет, и ни Compress-Archive, ни tar.exe их не поставят,

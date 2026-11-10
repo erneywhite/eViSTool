@@ -135,6 +135,8 @@ if (!OperatingSystem.IsWindows())
 var local = new LocalEntry(state, key, remote, api);
 var port = await local.StartAsync();
 
+// установку обновления оборвали (убили процесс, выключили свет) — доделать, пока ничего не открыто
+eViSTool.Core.AppUpdate.AppUpdater.RecoverInterrupted(AppContext.BaseDirectory);
 var stateFile = AgentProtocol.StateFile(opts.ProfileId, opts.AgentsDir);
 Directory.CreateDirectory(Path.GetDirectoryName(stateFile)!);
 File.WriteAllText(stateFile, JsonConvert.SerializeObject(new AgentEndpoint(Environment.ProcessId, port, DateTime.Now, version)));

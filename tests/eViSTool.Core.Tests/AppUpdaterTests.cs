@@ -160,6 +160,57 @@ public sealed class AppUpdaterTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => AppUpdater.Install(TarGz(("other", "x", exec)), _app));
     }
 
+    [Fact]
+    public void Install_ChecksTheVersionInsideTheArchive()
+    {
+        // аудит 3.5: подпись — только на байтах, старый подписанный архив под новым тегом не ставится
+        const UnixFileMode exec = (UnixFileMode)0b111_101_101;
+        var v = ModVersion.ParseOrNull("1.2.0")!;
+        Assert.Throws<InvalidOperationException>(() =>
+            AppUpdater.Install(TarGz((AppUpdater.MainExe, "old build", exec)), _app, v)); // без .version — старый архив
+        Assert.Throws<InvalidOperationException>(() =>
+            AppUpdater.Install(TarGz((AppUpdater.MainExe, "old build", exec), (AppUpdater.VersionFile, "1.1.0", exec)), _app, v));
+        Assert.NotEqual("old build", File.ReadAllText(Path.Combine(_app, AppUpdater.MainExe)));
+        Assert.False(Directory.Exists(Path.Combine(_app, ".update")));
+
+        AppUpdater.Install(TarGz((AppUpdater.MainExe, "new main", exec), (AppUpdater.VersionFile, "1.2.0\n", exec)), _app, v);
+        Assert.Equal("new main", File.ReadAllText(Path.Combine(_app, AppUpdater.MainExe)));
+    }
+
+    [Fact]
+    public void RecoverInterrupted_FinishesTheInstall()
+    {
+        // аудит 3.6: процесс убили посреди замены — exe уже в .old, нового ещё нет; запуск доделывает установку
+        var stage = Path.Combine(_app, ".update", "eViSTool-1.2.0");
+        Directory.CreateDirectory(stage);
+        File.WriteAllText(Path.Combine(stage, AppUpdater.MainExe), "new main");
+        File.WriteAllText(Path.Combine(stage, "README.md"), "new readme");
+        var main = Path.Combine(_app, AppUpdater.MainExe);
+        if (File.Exists(main)) File.Move(main, main + ".abcd1234.old");
+        File.WriteAllText(Path.Combine(_app, ".update-installing"), Path.Combine(".update", "eViSTool-1.2.0"));
+
+        Assert.True(AppUpdater.RecoverInterrupted(_app));
+        Assert.Equal("new main", File.ReadAllText(main));
+        Assert.Equal("new readme", File.ReadAllText(Path.Combine(_app, "README.md")));
+        Assert.False(File.Exists(Path.Combine(_app, ".update-installing")));
+        Assert.False(Directory.Exists(Path.Combine(_app, ".update")));
+        Assert.Equal("my settings", File.ReadAllText(Path.Combine(_app, "data", "settings.json")));
+        Assert.False(AppUpdater.RecoverInterrupted(_app)); // второй раз — нечего
+    }
+
+    [Fact]
+    public void RecoverInterrupted_IgnoresAPathOutsideTheStaging()
+    {
+        var elsewhere = Path.Combine(_root, "elsewhere");
+        Directory.CreateDirectory(elsewhere);
+        File.WriteAllText(Path.Combine(elsewhere, "evil.dll"), "x");
+        File.WriteAllText(Path.Combine(_app, ".update-installing"), elsewhere);
+
+        Assert.False(AppUpdater.RecoverInterrupted(_app));
+        Assert.False(File.Exists(Path.Combine(_app, "evil.dll")));
+        Assert.False(File.Exists(Path.Combine(_app, ".update-installing")));
+    }
+
     /// <summary>Архив и его подпись («.sig»); signature: null — подписи нет (404).</summary>
     private sealed class FakeHandler(byte[] body, Func<string?>? signature = null) : HttpMessageHandler
     {

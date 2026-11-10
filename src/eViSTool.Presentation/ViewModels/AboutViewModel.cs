@@ -145,7 +145,7 @@ public sealed partial class AboutViewModel : ObservableObject
             var zip = await _updater.DownloadAsync(release, AppPaths.Downloads, progress);
             UpdateStatus = Loc.T("about.updateInstalling");
             var appDir = AppContext.BaseDirectory;
-            await Task.Run(() => AppUpdater.Install(zip, appDir));
+            await Task.Run(() => AppUpdater.Install(zip, appDir, release.Version));
             try { File.Delete(zip); } catch (IOException) { }
 
             AvailableUpdate = null;

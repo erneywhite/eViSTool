@@ -38,6 +38,7 @@ public partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += (_, a) => CrashLog.Write(a.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, a) => { CrashLog.Write(a.Exception); a.SetObserved(); };
         Core.AppPaths.MigrateLegacy(); // до первого чтения настроек
+        Core.AppUpdate.AppUpdater.RecoverInterrupted(AppContext.BaseDirectory); // установку обновления оборвали — доделать
         Core.AppUpdate.AppUpdater.CleanupOld(AppContext.BaseDirectory); // хвосты прошлого обновления
         PreloadForRestart();
 

@@ -305,7 +305,11 @@ public sealed class AppUpdater
     /// в «*.old». Папку data не трогаем — её в архиве нет. Если что-то пошло не так — всё возвращается как было.
     /// Архив — zip (Windows) или tar.gz (Linux: права файлов, в том числе «исполняемый», берутся из архива).
     /// </summary>
-    public static void Install(string zipPath, string appDir)
+    /// <param name="expected">
+    /// Версия релиза: в архиве должен лежать «.version» с ней же. Подпись проверяет только байты архива, и старый
+    /// подписанный архив, приложенный к новому тегу, иначе встал бы — с её известными ошибками. null — не сверять (тесты).
+    /// </param>
+    public static void Install(string zipPath, string appDir, ModVersion? expected = null)
     {
         var staging = Path.Combine(appDir, ".update");
         if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
@@ -326,23 +330,24 @@ public sealed class AppUpdater
             if (!File.Exists(Path.Combine(root, MainExe)) && Directory.GetDirectories(root) is [var only] && Directory.GetFiles(root).Length == 0)
                 root = only;
             if (!File.Exists(Path.Combine(root, MainExe))) throw new InvalidOperationException(Loc.T("update.badArchive"));
+            if (expected is not null)
+            {
+                var marker = Path.Combine(root, VersionFile);
+                var inside = File.Exists(marker) ? ModVersion.ParseOrNull(File.ReadAllText(marker).Trim()) : null;
+                if (inside is null || !inside.Equals(expected))
+                    throw new InvalidOperationException(Loc.T("update.versionMismatch", expected, inside?.ToString() ?? "?"));
+            }
 
             var done = new List<(string Target, string? Old)>();
+            // отметка «идёт установка»: процесс убили посреди замены (выключили свет) — следующий запуск доставит
+            // оставшиеся файлы из .update (RecoverInterrupted). Архив к этому месту уже проверен целиком: подпись,
+            // версия, exe на месте, так что доделать надёжнее, чем откатывать (работающий exe не перезаписать)
+            var journal = Path.Combine(appDir, InstallJournal);
+            File.WriteAllText(journal, Path.GetRelativePath(appDir, root));
             try
             {
-                foreach (var file in Directory.GetFiles(root))
-                {
-                    var target = Path.Combine(appDir, Path.GetFileName(file));
-                    string? old = null;
-                    if (File.Exists(target))
-                    {
-                        // уникальное имя: прежний «.old» может быть ещё занят агентом, запущенным до прошлого обновления
-                        old = $"{target}.{Guid.NewGuid().ToString("N")[..8]}.old";
-                        File.Move(target, old);
-                    }
-                    done.Add((target, old));
-                    File.Move(file, target);
-                }
+                foreach (var file in Directory.GetFiles(root)) done.Add(MoveIn(file, appDir));
+                File.Delete(journal); // всё на месте
             }
             catch
             {
@@ -356,13 +361,68 @@ public sealed class AppUpdater
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
                 }
+                try { File.Delete(journal); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
                 throw;
             }
         }
         finally
         {
-            try { Directory.Delete(staging, recursive: true); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            // после обрыва (journal остался) папку не трогаем: из неё доделает RecoverInterrupted
+            if (!File.Exists(Path.Combine(appDir, InstallJournal)))
+            {
+                try { Directory.Delete(staging, recursive: true); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            }
+        }
+    }
+
+    /// <summary>Файл архива — на место прежнего; прежний (если был) — в «*.old» с уникальным именем.</summary>
+    private static (string Target, string? Old) MoveIn(string file, string appDir)
+    {
+        var target = Path.Combine(appDir, Path.GetFileName(file));
+        string? old = null;
+        if (File.Exists(target))
+        {
+            // уникальное имя: прежний «.old» может быть ещё занят агентом, запущенным до прошлого обновления
+            old = $"{target}.{Guid.NewGuid().ToString("N")[..8]}.old";
+            File.Move(target, old);
+        }
+        File.Move(file, target);
+        return (target, old);
+    }
+
+    /// <summary>Файл в архиве релиза с его версией (кладёт build/publish.ps1).</summary>
+    public const string VersionFile = ".version";
+
+    /// <summary>Отметка «идёт установка обновления»; внутри — путь распакованного архива относительно папки программы.</summary>
+    internal const string InstallJournal = ".update-installing";
+
+    /// <summary>
+    /// Установку обновления оборвали посреди замены файлов (процесс убит, выключили свет) — доставить оставшиеся файлы,
+    /// чтобы в папке не осталась смесь двух версий. Звать при запуске окна и агента до <see cref="CleanupOld"/>.
+    /// true — установку доделали.
+    /// </summary>
+    public static bool RecoverInterrupted(string appDir)
+    {
+        var journal = Path.Combine(appDir, InstallJournal);
+        if (!File.Exists(journal)) return false;
+        var staging = Path.Combine(appDir, ".update");
+        try
+        {
+            var root = Path.GetFullPath(Path.Combine(appDir, File.ReadAllText(journal).Trim()));
+            // путь из файла — только внутри .update: файл лежит в папке программы, но чужому пути верить незачем
+            var inside = root == Path.GetFullPath(staging)
+                         || root.StartsWith(Path.GetFullPath(staging) + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+            if (inside && Directory.Exists(root))
+                foreach (var file in Directory.GetFiles(root)) MoveIn(file, appDir);
+            File.Delete(journal);
+            if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
+            return inside;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return false; // занято — попробуем при следующем запуске, journal остаётся
         }
     }
 
