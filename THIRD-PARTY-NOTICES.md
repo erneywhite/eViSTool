@@ -57,7 +57,8 @@ with the copyright line given below.
 ## Fonts
 
 The window ships its own fonts, so it looks the same on Windows and Linux. All are licensed under the
-SIL Open Font License 1.1; the full license text is next to each font in `Assets/Fonts`.
+SIL Open Font License 1.1; the full license texts come with the program as `LICENSE-<font>-OFL.txt` (in the
+source code, next to each font in `src/eViSTool.Desktop/Assets/Fonts`).
 
 - **Noto Sans** — Copyright 2022 The Noto Project Authors, https://github.com/notofonts/latin-greek-cyrillic
 - **Cascadia Mono** — Copyright (c) 2019 - Present, Microsoft Corporation, with Reserved Font Name Cascadia Code,
@@ -129,7 +130,8 @@ SOFTWARE.
 World backups use SQLite through the following components:
 
 - **SQLite** (native library `e_sqlite3`, bundled into both executables) — public domain, https://sqlite.org/copyright.html
-- **SQLitePCLRaw** — © 2014-2024 SourceGear, LLC, Apache License 2.0, https://github.com/ericsink/SQLitePCL.raw
+- **SQLitePCLRaw** — © 2014-2024 SourceGear, LLC, Apache License 2.0 (full text in `LICENSE-Apache-2.0-SQLitePCLRaw.txt`
+  next to the program, `licenses/Apache-2.0.txt` in the source code), https://github.com/ericsink/SQLitePCL.raw
 
 ## Acknowledgements
 

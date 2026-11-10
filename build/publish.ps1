@@ -20,6 +20,24 @@ if (-not $Version) {
     $Version = ([xml](Get-Content (Join-Path $root 'Directory.Build.props'))).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
 }
 $name = "eViSTool-$Version"
+
+# документы и лицензии — в каждый архив рядом с программами: тексты OFL шрифтов, вшитых в окно, и Apache-2.0 для
+# SQLitePCLRaw. Архив плоский (обновление ставит только файлы верхнего уровня), поэтому имена — с приставкой LICENSE-
+function Copy-Docs([string]$to) {
+    foreach ($doc in 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'README.md', 'README.ru.md') {
+        Copy-Item (Join-Path $root $doc) $to # нет файла — ошибка: архив без лицензии выкладывать нельзя
+    }
+    foreach ($license in Get-ChildItem (Join-Path $root 'src/eViSTool.Desktop/Assets/Fonts') -Filter '*-OFL.txt') {
+        Copy-Item $license.FullName (Join-Path $to "LICENSE-$($license.Name)")
+    }
+    Copy-Item (Join-Path $root 'licenses/Apache-2.0.txt') (Join-Path $to 'LICENSE-Apache-2.0-SQLitePCLRaw.txt')
+}
+
+# в папке перед упаковкой должны быть сами программы: сборка, тихо не положившая exe, дала бы архив, который
+# обновление отвергнет (или хуже — поставит без агента)
+function Assert-Programs([string]$dir, [string[]]$names) {
+    foreach ($n in $names) { if (-not (Test-Path (Join-Path $dir $n))) { throw "Нет $n в $dir" } }
+}
 $dist = Join-Path $root 'dist'
 $out = Join-Path $dist $name
 $zip = Join-Path $dist "$name-win-x64.zip"
@@ -44,9 +62,8 @@ if ($LASTEXITCODE) { throw "publish eViSTool.Agent: $LASTEXITCODE" }
 # в релиз — только сами программы; папку data программа создаст рядом при первом запуске
 Get-ChildItem $out -File | Where-Object { $_.Name -notin 'eViSTool.exe', 'eViSTool.Agent.exe' } | Remove-Item -Force
 Get-ChildItem $out -Directory | Remove-Item -Recurse -Force
-foreach ($doc in 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'README.md', 'README.ru.md') {
-    if (Test-Path (Join-Path $root $doc)) { Copy-Item (Join-Path $root $doc) $out }
-}
+Assert-Programs $out 'eViSTool.exe', 'eViSTool.Agent.exe'
+Copy-Docs $out
 # версия внутри подписанного архива: обновление сверяет её с версией релиза — старый подписанный архив, приложенный
 # к новому тегу, не поставится (подпись сама по себе версию не знает)
 [IO.File]::WriteAllText((Join-Path $out '.version'), $Version)
@@ -84,9 +101,8 @@ if ($LASTEXITCODE) { throw "publish eViSTool.Desktop linux-x64: $LASTEXITCODE" }
 $linuxExe = 'eViSTool', 'eViSTool.Agent'
 Get-ChildItem $linuxOut -File | Where-Object { $_.Name -notin $linuxExe } | Remove-Item -Force
 Get-ChildItem $linuxOut -Directory | Remove-Item -Recurse -Force
-foreach ($doc in 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'README.md', 'README.ru.md') {
-    if (Test-Path (Join-Path $root $doc)) { Copy-Item (Join-Path $root $doc) $linuxOut }
-}
+Assert-Programs $linuxOut $linuxExe
+Copy-Docs $linuxOut
 [IO.File]::WriteAllText((Join-Path $linuxOut '.version'), $Version) # см. Windows выше
 
 # tar собираем сами (System.Formats.Tar из .NET, на котором работает pwsh), с правами Unix в каждой записи: программы —
@@ -152,6 +168,7 @@ if ($env:EVISTOOL_SIGNING_KEY) {
         $stream = [IO.File]::OpenRead($file)
         try { $signature = $key.SignData($stream, [Security.Cryptography.HashAlgorithmName]::SHA256) } finally { $stream.Dispose() }
         [IO.File]::WriteAllText("$file.sig", [Convert]::ToBase64String($signature))
+        if (-not (Test-Path "$file.sig") -or (Get-Item "$file.sig").Length -eq 0) { throw "Подпись не создалась: $file.sig" }
     }
     $key.Dispose()
     Write-Host 'Архивы подписаны.'
