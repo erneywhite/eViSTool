@@ -135,7 +135,7 @@ public static class ModInstaller
             throw new IOException(Loc.T("err.installTargetTaken", Path.GetFileName(plan.TargetPath)));
 
         // копируем во временный файл рядом, чтобы при ошибке не остаться без мода вовсе
-        var tmp = plan.TargetPath + ".evistool.tmp";
+        var tmp = plan.TargetPath + ModScanner.TmpSuffix;
         File.Copy(plan.SourcePath, tmp, overwrite: true);
         var kept = new List<(LocalMod Mod, string Stored)>();
         try

@@ -40,6 +40,35 @@ public static class ModScanner
 {
     private const string ModInfoFile = "modinfo.json";
 
+    /// <summary>Временный файл установки мода рядом с будущим (<see cref="ModInstaller.Apply"/>).</summary>
+    public const string TmpSuffix = ".evistool.tmp";
+
+    /// <summary>Временный файл установки старше этого — остаток оборванной установки, а не идущая сейчас.</summary>
+    public static readonly TimeSpan StaleTmpAge = TimeSpan.FromHours(1);
+
+    /// <summary>
+    /// Остаток оборванной установки (окно закрыли с «Да», процесс убили, выключили свет) — удалить: игра его не читает,
+    /// а на диске он лежал бы вечно, размером с мод. Возраст на Windows — по самой поздней из дат создания и изменения:
+    /// копия там ставит файлу дату изменения исходника, и идущая сейчас установка выглядела бы старой. На Linux копия
+    /// дату изменения обновляет по ходу записи, а дату создания .NET там знает не везде — хватает даты изменения.
+    /// Файл, который ещё пишут, Windows удалить не даст — тогда просто пропускаем.
+    /// </summary>
+    internal static bool DeleteIfStale(FileInfo info, DateTime nowUtc)
+    {
+        var touched = OperatingSystem.IsWindows() && info.CreationTimeUtc > info.LastWriteTimeUtc
+            ? info.CreationTimeUtc : info.LastWriteTimeUtc;
+        if (nowUtc - touched < StaleTmpAge) return false;
+        try
+        {
+            info.Delete();
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>Сканирует несколько папок; несуществующие пропускает.</summary>
     public static IReadOnlyList<LocalMod> Scan(IEnumerable<string> modsDirs) =>
         modsDirs.Where(System.IO.Directory.Exists)
@@ -59,6 +88,11 @@ public static class ModScanner
 
         foreach (var info in folder.EnumerateFiles())
         {
+            if (info.Name.EndsWith(TmpSuffix, StringComparison.OrdinalIgnoreCase))
+            {
+                DeleteIfStale(info, DateTime.UtcNow);
+                continue;
+            }
             var file = System.IO.Path.Combine(modsDir, info.Name);
             var stamp = new ModFileStamp(file, info.LastWriteTimeUtc, info.Length);
             var ext = info.Extension;

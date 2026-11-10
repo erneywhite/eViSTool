@@ -140,6 +140,29 @@ public sealed class ModManagementTests : IDisposable
         Assert.Equal(2, store.List("devmod").Count);
     }
 
+    // остаток оборванной установки (окно закрыли посреди копирования) сканирование удаляет; свежий — идущая сейчас
+    // установка во втором окне или агенте — остаётся. Ни тот, ни другой модом не считается
+    [Fact]
+    public void Scan_RemovesStaleInstallLeftovers_KeepsFreshOnes()
+    {
+        MakeZip(_mods, "alpha_1.0.0.zip", "alpha", "1.0.0");
+        var stale = Path.Combine(_mods, "beta_1.0.0.zip" + ModScanner.TmpSuffix);
+        var fresh = Path.Combine(_mods, "gamma_1.0.0.zip" + ModScanner.TmpSuffix);
+        File.WriteAllText(stale, "half");
+        File.WriteAllText(fresh, "half");
+        var old = DateTime.UtcNow - ModScanner.StaleTmpAge - TimeSpan.FromMinutes(5);
+        if (OperatingSystem.IsWindows()) File.SetCreationTimeUtc(stale, old);
+        File.SetLastWriteTimeUtc(stale, old);
+        // копия на Windows ставит дату изменения исходника: старая дата изменения при свежем создании — идущая копия
+        if (OperatingSystem.IsWindows()) File.SetLastWriteTimeUtc(fresh, old);
+
+        var mods = ModScanner.Scan(_mods);
+
+        Assert.Equal("alpha", Assert.Single(mods).Info!.ModId);
+        Assert.False(File.Exists(stale));
+        Assert.True(File.Exists(fresh));
+    }
+
     // modinfo.json мода-папки не прочитать (его держат открытым) — этот мод с ошибкой, остальные на месте
     [WindowsFact]
     public void Scan_UnreadableFolderMod_DoesNotBreakTheScan()
