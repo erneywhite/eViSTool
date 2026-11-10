@@ -48,17 +48,20 @@ internal sealed class RemoteEntry(AgentState state, AgentJournal journal)
         var host = state.Host;
         var opts = state.Options;
         var changedAt = File.Exists(_file) ? File.GetLastWriteTimeUtc(_file) : default;
-        if (changedAt == _stamp) return;
+        // файл не менялся — ничего не делать; но вход, который не поднялся (порт занят), раз в минуту пробуем снова
+        if (changedAt == _stamp && !(Error is not null && DateTime.Now >= _retryAt)) return;
         _stamp = changedAt;
 
         var wasPort = _app is not null ? _settings.Port : (int?)null;
         _settings = RemoteAccess.Load(opts.ProfileId, opts.AgentsDir);
         if (_app is not null)
         {
-            await _app.StopAsync();
+            // открытые долгие запросы (консоль ждёт до 30 с) не держат главный цикл: через пару секунд — обрываем
+            using (var stop = new CancellationTokenSource(TimeSpan.FromSeconds(2))) await _app.StopAsync(stop.Token);
             await _app.DisposeAsync();
             _app = null;
         }
+        var previousError = Error;
         Error = null;
         if (!_settings.Enabled || _settings.Port <= 0 || _settings.Key.Length < 32)
         {
@@ -82,25 +85,24 @@ internal sealed class RemoteEntry(AgentState state, AgentJournal journal)
             var web = rb.Build();
             web.Use(async (ctx, next) =>
             {
-                // неверный ключ несколько раз подряд — адрес ждёт минуту: подбирать ключ бессмысленно, но и шуметь незачем
+                // неверный ключ несколько раз подряд — адрес ждёт минуту: подбирать ключ бессмысленно, но и шуметь незачем.
+                // Верный ключ проходит и с заблокированного адреса: за одним NAT сидят и чужой с неверным ключом, и своё окно
                 var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "?";
-                lock (_failures)
-                {
-                    if (_failures.TryGetValue(ip, out var f) && f.BlockedUntil > DateTime.Now)
-                    {
-                        ctx.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-                        return;
-                    }
-                }
                 var got = ctx.Request.Headers.TryGetValue(AgentProtocol.KeyHeader, out var header) ? Encoding.UTF8.GetBytes(header.ToString()) : [];
                 if (!CryptographicOperations.FixedTimeEquals(got, remoteKey))
                 {
                     int count;
                     lock (_failures)
                     {
+                        if (_failures.TryGetValue(ip, out var blocked) && blocked.BlockedUntil > DateTime.Now)
+                        {
+                            ctx.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                            return;
+                        }
+                        ForgetOldFailures();
                         var f = _failures.GetValueOrDefault(ip);
                         count = f.Count + 1;
-                        _failures[ip] = count >= 5 ? (0, DateTime.Now.AddMinutes(1)) : (count, default);
+                        _failures[ip] = count >= 5 ? (0, DateTime.Now.AddMinutes(1)) : (count, DateTime.Now);
                     }
                     // в журнал — первая неудача с адреса и блокировка после пяти, а не каждая попытка
                     if (count == 1) journal.Write("authFailed", [], ctx, isRemote: true);
@@ -119,9 +121,26 @@ internal sealed class RemoteEntry(AgentState state, AgentJournal journal)
         catch (Exception ex) when (ex is IOException or InvalidOperationException or CryptographicException
                                        or System.Net.Sockets.SocketException)
         {
+            // в консоль — один раз на сбой, а не на каждую повторную попытку
+            if (previousError != ex.Message) host.Console.Add(ConsoleLineKind.System, Loc.T("remote.failed", _settings.Port, ex.Message));
             Error = ex.Message;
-            host.Console.Add(ConsoleLineKind.System, Loc.T("remote.failed", _settings.Port, ex.Message));
+            _retryAt = DateTime.Now.AddMinutes(1);
         }
+    }
+
+    /// <summary>Когда снова пробовать поднять вход, который не поднялся.</summary>
+    private DateTime _retryAt;
+
+    /// <summary>
+    /// Таблица неудач не растёт без конца (порт в интернете перебирают сканеры): старые записи — прочь. Вызывать под замком.
+    /// Во втором поле — до какого времени адрес заблокирован, у незаблокированного — когда была последняя неудача.
+    /// </summary>
+    private void ForgetOldFailures()
+    {
+        if (_failures.Count < 256) return;
+        var old = DateTime.Now.AddMinutes(-10);
+        foreach (var ip in _failures.Where(f => f.Value.BlockedUntil < old).Select(f => f.Key).ToList()) _failures.Remove(ip);
+        if (_failures.Count >= 4096) _failures.Clear(); // наводнение со свежих адресов — лучше начать заново, чем съесть память
     }
 
     /// <summary>При выходе агента: перестать слушать.</summary>

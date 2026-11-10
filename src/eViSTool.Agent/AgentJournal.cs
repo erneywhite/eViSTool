@@ -21,7 +21,10 @@ internal sealed class AgentJournal(AgentOptions opts)
     {
         var ip = ctx.Connection.RemoteIpAddress;
         if (ip is { IsIPv4MappedToIPv6: true }) ip = ip.MapToIPv4();
-        var who = Uri.UnescapeDataString(ctx.Request.Headers[ServerJournal.ClientHeader].ToString());
+        // имя компьютера присылает сам клиент — и тот, кто ключа не знает (запись «неверный ключ»): длину ограничиваем,
+        // управляющие символы убираем
+        var who = new string(Uri.UnescapeDataString(ctx.Request.Headers[ServerJournal.ClientHeader].ToString())
+            .Where(c => !char.IsControl(c)).Take(64).ToArray());
         try
         {
             if (DateTime.UtcNow - _prunedAt > TimeSpan.FromDays(1))

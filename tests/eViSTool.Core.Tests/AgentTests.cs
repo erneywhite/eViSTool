@@ -301,9 +301,11 @@ public sealed class AgentTests : IAsyncLifetime
         {
             for (var i = 0; i < 5; i++)
                 Assert.Equal(401, (await Assert.ThrowsAsync<AgentHttpException>(() => wrong.StatusAsync())).StatusCode);
-            // после пяти неверных попыток адрес ждёт — даже с верным ключом
+            // после пяти неверных попыток с адреса неверный ключ ждёт минуту…
+            Assert.Equal(429, (await Assert.ThrowsAsync<AgentHttpException>(() => wrong.StatusAsync())).StatusCode);
+            // …а верный проходит: за одним NAT бывают и чужой с неверным ключом, и своё окно
             using var right = AgentClient.ForRemote(code);
-            Assert.Equal(429, (await Assert.ThrowsAsync<AgentHttpException>(() => right.StatusAsync())).StatusCode);
+            Assert.Equal(ServerState.Running, (await right.StatusAsync()).State);
         }
         using (var local = new AgentClient(_client.Endpoint, remote.Key))
             await Assert.ThrowsAsync<AgentHttpException>(() => local.StatusAsync());
