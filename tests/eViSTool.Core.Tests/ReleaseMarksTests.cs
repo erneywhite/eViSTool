@@ -92,6 +92,18 @@ public sealed class ReleaseMarksTests : IDisposable
     }
 
     [Fact]
+    public void Update_LockedFile_DoesNotOverwriteOtherMarks()
+    {
+        if (!OperatingSystem.IsWindows()) return; // монопольное открытие держит файл только на Windows (аудит 6.12)
+        // аудит 4.4: файл не прочитался (занят) — раньше поверх ложилась одна отметка вместо всех
+        ReleaseMarks.Update(MarksFile, new ModInfo { ModId = "other", Version = "1.0.0" }, "other_1.0.1.zip", Rel("1.0.1"));
+        using (new FileStream(MarksFile, FileMode.Open, FileAccess.Read, FileShare.None))
+            ReleaseMarks.Update(MarksFile, Info("1.8.0"), "carryon_1.8.1.zip", Rel("1.8.1"));
+        var marks = ReleaseMarks.Load(MarksFile);
+        Assert.True(marks.ContainsKey("other"));
+    }
+
+    [Fact]
     public void Update_SameVersions_NoFileCreated_AndOldMarkCleared()
     {
         ReleaseMarks.Update(MarksFile, Info("1.8.0"), "carryon_1.8.0.zip", Rel("v1.8.0"));

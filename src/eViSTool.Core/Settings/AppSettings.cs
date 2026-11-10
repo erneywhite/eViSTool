@@ -132,11 +132,9 @@ public sealed class SettingsStore(string? path = null)
 
     public void Save(AppSettings settings)
     {
-        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
-        var tmp = Path + ".tmp";
         var text = JsonConvert.SerializeObject(settings, Formatting.Indented);
-        File.WriteAllText(tmp, text);
-        Platform.SafeFile.Replace(tmp, Path);
+        // своё временное имя у каждой записи: окно и агент не пишут в один «.tmp»
+        Platform.SafeFile.WriteAllText(Path, text);
         _known = text;
     }
 }

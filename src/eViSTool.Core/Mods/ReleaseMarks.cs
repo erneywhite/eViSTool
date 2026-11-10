@@ -81,7 +81,9 @@ public static class ReleaseMarks
         var mark = For(release, info, fileName);
         lock (Gate)
         {
-            var marks = Read(file);
+            var marks = Read(file, out var unreadable);
+            // файл есть, но не прочитался (занят, нет прав) — не писать поверх одну отметку вместо всех
+            if (unreadable) return;
             if (mark is null && !marks.ContainsKey(info.ModId)) return;
             if (mark is null) marks.Remove(info.ModId);
             else marks[info.ModId] = mark;
@@ -102,8 +104,12 @@ public static class ReleaseMarks
     /// </summary>
     private static string NameOf(string path) => path[(path.LastIndexOfAny(['/', '\\']) + 1)..];
 
-    private static Dictionary<string, ReleaseMark> Read(string file)
+    private static Dictionary<string, ReleaseMark> Read(string file) => Read(file, out _);
+
+    /// <param name="unreadable">Файл не прочитался из-за диска или прав (битый JSON — не в счёт: его не жалко).</param>
+    private static Dictionary<string, ReleaseMark> Read(string file, out bool unreadable)
     {
+        unreadable = false;
         try
         {
             if (File.Exists(file) && JsonConvert.DeserializeObject<Dictionary<string, ReleaseMark>>(File.ReadAllText(file)) is { } read)
@@ -118,6 +124,7 @@ public static class ReleaseMarks
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
+            unreadable = ex is not JsonException;
             // битый или недоступный файл — как пустой: проверка обновлений сравнит по modinfo, как раньше
         }
         return new Dictionary<string, ReleaseMark>(StringComparer.OrdinalIgnoreCase);
@@ -126,17 +133,13 @@ public static class ReleaseMarks
     /// <summary>Через временный файл со своим именем (окно и агент на одной машине не пишут в один временный файл).</summary>
     private static void Write(string file, Dictionary<string, ReleaseMark> marks)
     {
-        var tmp = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-            File.WriteAllText(tmp, JsonConvert.SerializeObject(marks, Formatting.Indented));
-            SafeFile.Replace(tmp, file);
+            SafeFile.WriteAllText(file, JsonConvert.SerializeObject(marks, Formatting.Indented));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // отметка — подсказка: мод уже поставлен, сбой записи не должен отменять установку
-            try { File.Delete(tmp); } catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException) { }
         }
     }
 }

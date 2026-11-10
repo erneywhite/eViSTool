@@ -85,8 +85,7 @@ public sealed class ModErrorIgnores
             if (File.Exists(path)) File.Delete(path);
             return;
         }
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, JsonConvert.SerializeObject(this, Formatting.Indented));
+        Platform.SafeFile.WriteAllText(path, JsonConvert.SerializeObject(this, Formatting.Indented));
     }
 
     /// <summary>Игнор профиля; файла нет или он испорчен — пустой.</summary>

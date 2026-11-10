@@ -92,8 +92,7 @@ public sealed record ModErrorReport
     public void Save(string profileId)
     {
         var path = FileFor(profileId);
-        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, JsonConvert.SerializeObject(this, Formatting.Indented));
+        Platform.SafeFile.WriteAllText(path, JsonConvert.SerializeObject(this, Formatting.Indented));
     }
 
     public static ModErrorReport? Load(string profileId)

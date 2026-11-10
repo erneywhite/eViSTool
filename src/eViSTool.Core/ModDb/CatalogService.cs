@@ -112,17 +112,16 @@ public sealed class CatalogService(ModDbClient db, string? cacheFile = null)
                 if (!force && stale is { Count: > 0 } && DateTime.UtcNow - File.GetLastWriteTimeUtc(path) < MaxAge) return stale;
             }
         }
-        catch (Exception ex) when (ex is IOException or JsonException) { }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { }
 
         try
         {
             var fresh = (await fetch().ConfigureAwait(false)).ToList();
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                File.WriteAllText(path, JsonConvert.SerializeObject(fresh));
+                Platform.SafeFile.WriteAllText(path, JsonConvert.SerializeObject(fresh));
             }
-            catch (IOException) { }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
             return fresh;
         }
         catch (Exception ex) when ((ex is HttpRequestException or TaskCanceledException) && stale is { Count: > 0 })
@@ -192,10 +191,9 @@ public sealed class CatalogService(ModDbClient db, string? cacheFile = null)
     {
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_cacheFile)!);
-            File.WriteAllText(_cacheFile, JsonConvert.SerializeObject(Items));
+            Platform.SafeFile.WriteAllText(_cacheFile, JsonConvert.SerializeObject(Items));
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // без кэша тоже работаем
         }
