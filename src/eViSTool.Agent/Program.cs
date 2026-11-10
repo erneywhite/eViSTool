@@ -114,6 +114,10 @@ host.StateChanged += stats.OnServerState;
 state.Players.Changed += playerEvents.OnPlayersChanged;
 host.StateChanged += modErrors.OnServerState;
 host.StateChanged += crash.OnServerState;
+// сервер не поднялся после перезапуска или сторожа — оповещением: сам по себе он так и останется выключенным
+host.StartFailed += reason => notify.Notify(eViSTool.Core.Notifications.NotifyEvent.StartFailed,
+    eViSTool.Core.Localization.Loc.T("notify.ev.startFailed"),
+    [AgentNotifications.Line("⚠", "notify.lbl.reason", reason)]);
 host.Console.LineAdded += commands.Collect;
 host.Console.LineAdded += schedule.WatchBackup;
 

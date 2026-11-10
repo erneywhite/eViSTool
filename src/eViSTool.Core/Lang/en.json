@@ -2310,6 +2310,8 @@
   "srv.killing": "⚠ The server does not respond — killing the process (unsaved progress since the last autosave may be lost)",
   "srv.notRunning": "The server is not running",
   "srv.restartCanceled": "▸ Automatic restart cancelled: the world is being restored from a backup.",
+  "srv.restartFailed": "⚠ The server stopped but did not start again: {0}",
+  "srv.restartStuck": "⚠ The server process did not exit even after a forced stop, so it cannot be started again. Check the processes on the server machine.",
   "srv.startFailed": "Could not start the server process",
   "srv.starting": "▶ Starting the server…",
   "srv.stateHandlerFailed": "Error while handling a server state change: {0}",

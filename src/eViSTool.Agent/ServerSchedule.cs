@@ -107,7 +107,7 @@ internal sealed class ServerSchedule
         {
             Host.Console.Add(ConsoleLineKind.Error, Loc.T("autoupd.error", ex.Message));
         }
-        await Host.StartAsync();
+        Host.StartAfterStop(); // мир занят — подождёт его, другая ошибка — в консоль и оповещением
     }
 
     /// <summary>

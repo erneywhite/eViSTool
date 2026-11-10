@@ -298,6 +298,68 @@ public sealed class ServerHostTests : IAsyncLifetime
         await host.StopAsync();
     }
 
+    // перезапуск (кнопка, расписание): пока сервер останавливался, мир заняли (копия) — запуск не теряется, а ждёт мир,
+    // как сторож; раньше ошибка улетала в никуда и сервер оставался выключенным
+    [Fact]
+    public async Task Restart_WhileTheWorldIsTakenDuringStop_WaitsAndStarts()
+    {
+        var host = Host(o => o with { RestartDelay = TimeSpan.FromMilliseconds(300) });
+        await host.StartAsync();
+        await Until(() => host.State == ServerState.Running);
+        var failed = new List<string>();
+        host.StartFailed += failed.Add;
+
+        // как только сервер остановился — мир занимает «копия» (один раз на каждую остановку)
+        WorldLock? copy = null;
+        var takeOnStop = true;
+        host.StateChanged += s =>
+        {
+            if (s != ServerState.Stopped || !takeOnStop) return;
+            takeOnStop = false;
+            copy = WorldLock.TryTake(_data, WorldLock.Copy);
+        };
+        await host.RestartAsync(); // не бросает
+        Assert.NotNull(copy);
+        Assert.Equal(ServerState.Stopped, host.State);
+        Assert.NotNull(host.RestartScheduledAt); // ждёт мир
+        Assert.Contains(host.Console.GetSince(0), l => l.Text.Contains(WorldLock.BusyMessage(_data)));
+
+        copy!.Dispose();
+        await Until(() => host.State == ServerState.Running);
+        Assert.Empty(failed);
+
+        // «Стоп» во время такого ожидания его отменяет
+        takeOnStop = true;
+        await host.RestartAsync();
+        Assert.NotNull(copy);
+        Assert.NotNull(host.RestartScheduledAt);
+        await host.StopAsync();
+        Assert.Null(host.RestartScheduledAt);
+        copy!.Dispose();
+        await Task.Delay(500); // пауза ожидания (300 мс) прошла бы — сервер не поднимается
+        Assert.Equal(ServerState.Stopped, host.State);
+    }
+
+    // перезапуск, после которого сервер не поднять (файл сервера пропал) — строка в консоли и событие для оповещения
+    [Fact]
+    public async Task Restart_ThatCannotStart_IsReported()
+    {
+        var game = Directory.CreateDirectory(Path.Combine(_data, "game")).FullName;
+        var exe = FakeServer.InstallAs(game);
+        var host = Host(o => o with { ExePath = exe });
+        await host.StartAsync();
+        await Until(() => host.State == ServerState.Running);
+        var failed = new List<string>();
+        host.StartFailed += failed.Add;
+
+        host.StateChanged += s => { if (s == ServerState.Stopped) Directory.Delete(game, recursive: true); };
+        await host.RestartAsync(); // не бросает
+
+        Assert.Equal(ServerState.Stopped, host.State);
+        Assert.Single(failed);
+        Assert.Contains(host.Console.GetSince(0), l => l.Kind == ConsoleLineKind.System && l.Text.Contains(failed[0]));
+    }
+
     [Fact]
     public async Task CancelledRestart_DoesNotStartTheServerAfterTheRestore()
     {

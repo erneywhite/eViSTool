@@ -336,7 +336,11 @@ public sealed class ServerHost : IAsyncDisposable
         Sys(Loc.T("srv.crashed", code));
         if (!_options.Watchdog) return;
         if (restart is { } wait) ScheduleRestart(wait);
-        else Sys(Loc.T("srv.watchdogGaveUp", _options.MaxRestartsPerHour));
+        else
+        {
+            Sys(Loc.T("srv.watchdogGaveUp", _options.MaxRestartsPerHour));
+            ReportStartFailed(Loc.T("srv.watchdogGaveUp", _options.MaxRestartsPerHour));
+        }
     }
 
     /// <summary>
@@ -399,8 +403,9 @@ public sealed class ServerHost : IAsyncDisposable
                 }
                 catch (Exception ex)
                 {
-                    // любая ошибка — в консоль: молча упавший сторож больше не поднял бы сервер
+                    // любая ошибка — в консоль и оповещением: молча упавший сторож больше не поднял бы сервер
                     Sys(Loc.T("srv.watchdogFailed", ex.Message));
+                    ReportStartFailed(ex.Message);
                 }
             }, TaskScheduler.Default);
         }
@@ -503,10 +508,67 @@ public sealed class ServerHost : IAsyncDisposable
         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { }
     }
 
+    /// <summary>
+    /// Перезапуск (по кнопке и по расписанию): остановить и поднять — <see cref="StartAfterStop"/>. Не бросает: его зовут
+    /// без ожидания, и ошибка запуска раньше терялась — сервер так и оставался выключенным.
+    /// </summary>
     public async Task RestartAsync(CancellationToken ct = default)
     {
         await StopAsync(ct).ConfigureAwait(false);
-        await StartAsync().ConfigureAwait(false);
+        StartAfterStop();
+    }
+
+    /// <summary>
+    /// Сервер не поднялся ни сам, ни сторожем (перезапуск, перезапуск с обновлением модов, ожидание сторожа): текст причины.
+    /// Агент шлёт по нему оповещение — иначе выключенный сервер заметили бы, только когда зайдут в игру.
+    /// </summary>
+    public event Action<string>? StartFailed;
+
+    /// <summary>
+    /// Запуск после штатной остановки — перезапуск здесь и в расписании агента. Процесс не вышел и после kill — запуск
+    /// невозможен, об этом строка. Мир занят (копия, восстановление, чужой сервер на тех же файлах) — ждём, как сторож
+    /// после падения: пробуем снова через паузу, пока мир не освободится или ожидание не отменят «Стопом». Другая
+    /// ошибка — в консоль и <see cref="StartFailed"/>. Ничего не бросает.
+    /// </summary>
+    public void StartAfterStop()
+    {
+        lock (_lock)
+        {
+            if (State != ServerState.Stopped)
+            {
+                Sys(Loc.T("srv.restartStuck"));
+                ReportStartFailed(Loc.T("srv.restartStuck"));
+                return;
+            }
+        }
+        try
+        {
+            Start(CancellationToken.None);
+        }
+        catch (WorldBusyException ex)
+        {
+            Sys(Loc.T("srv.watchdogWaiting", ex.Message));
+            CancellationToken wait;
+            lock (_lock)
+            {
+                CancelScheduledRestart();
+                _restartCts = new CancellationTokenSource();
+                wait = _restartCts.Token;
+            }
+            ScheduleRestart(wait, afterCrash: false);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or InvalidOperationException or IOException
+                                       or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            Sys(Loc.T("srv.restartFailed", ex.Message));
+            ReportStartFailed(ex.Message);
+        }
+    }
+
+    private void ReportStartFailed(string reason)
+    {
+        try { StartFailed?.Invoke(reason); }
+        catch (Exception ex) { Sys(Loc.T("srv.stateHandlerFailed", ex.Message)); }
     }
 
     private static async Task<bool> WaitAsync(Task task, TimeSpan timeout, CancellationToken ct)
