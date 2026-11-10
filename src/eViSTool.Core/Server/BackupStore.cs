@@ -284,20 +284,57 @@ public sealed partial class BackupStore(string dataDir, string? prefix = null, s
     /// её сервер пишет на своём языке («Резервное копирование завершено!»). null — не дождались.
     /// </summary>
     public async Task<BackupFile?> WaitForAsync(string? name, IReadOnlySet<string> before, TimeSpan timeout,
-        CancellationToken ct = default, TimeSpan? poll = null)
+        CancellationToken ct = default, TimeSpan? poll = null, TimeSpan? settle = null)
     {
+        // на Linux монопольное открытие ничего не гарантирует (блокировок как в Windows нет): там «дописан» — размер не
+        // менялся несколько секунд и база SQLite по заголовку целая
+        var quiet = settle ?? (OperatingSystem.IsWindows() ? TimeSpan.Zero : TimeSpan.FromSeconds(3));
         var until = DateTime.UtcNow + timeout;
         long lastSize = -1;
+        var sizeSince = DateTime.UtcNow;
         while (DateTime.UtcNow < until)
         {
             var file = name is not null ? Find(name) : List().FirstOrDefault(b => !before.Contains(b.Name));
-            // дописан — размер перестал меняться и файл никто не держит открытым
-            if (file is not null && file.Size == lastSize && file.Size > 0 && !IsOpenElsewhere(file.Path)) return file;
-            lastSize = file?.Size ?? -1;
+            var size = file?.Size ?? -1;
+            if (size != lastSize) sizeSince = DateTime.UtcNow;
+            else if (file is not null && size > 0 && DateTime.UtcNow - sizeSince >= quiet
+                     && !IsOpenElsewhere(file.Path) && SqliteLooksComplete(file.Path) != false) return file;
+            lastSize = size;
             await Task.Delay(poll ?? TimeSpan.FromMilliseconds(500), ct).ConfigureAwait(false);
         }
         return null;
     }
+
+    /// <summary>
+    /// Заголовок SQLite: размер файла совпадает с записанным в нём числом страниц. false — база явно недописана;
+    /// null — не SQLite или размер в заголовке недостоверен (старые версии SQLite его не ведут), решать по другим
+    /// признакам; true — по заголовку целая.
+    /// </summary>
+    internal static bool? SqliteLooksComplete(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var header = new byte[100];
+            if (stream.ReadAtLeast(header, header.Length, throwOnEndOfStream: false) < header.Length)
+                return stream.Length > 0 && IsSqliteMagic(header) ? false : null;
+            if (!IsSqliteMagic(header)) return null;
+            var pageSize = (header[16] << 8) | header[17];
+            long page = pageSize == 1 ? 65536 : pageSize;
+            var pages = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(28));
+            var changeCounter = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(24));
+            var validFor = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(92));
+            if (page < 512 || pages == 0 || validFor != changeCounter) return null;
+            return stream.Length >= page * pages;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsSqliteMagic(ReadOnlySpan<byte> header) =>
+        header.Length >= 16 && header[..16].SequenceEqual("SQLite format 3\0"u8);
 
     private static bool IsOpenElsewhere(string path)
     {

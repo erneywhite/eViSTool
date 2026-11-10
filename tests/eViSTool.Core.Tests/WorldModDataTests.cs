@@ -175,6 +175,29 @@ public sealed class BackupWatchTests : IDisposable
     }
 
     [Fact]
+    public void SqliteHeader_TellsAHalfWrittenCopy()
+    {
+        // аудит 3.9: на Linux монопольное открытие ничего не значит — недописанную базу видно по заголовку
+        Directory.CreateDirectory(_data);
+        var path = Path.Combine(_data, "half.vcdbs");
+        var header = new byte[100];
+        "SQLite format 3\0"u8.CopyTo(header);
+        header[16] = 0x10; // страница 4096
+        header[27] = 7; header[95] = 7; // счётчик изменений = «размер достоверен для»
+        header[31] = 3; // три страницы
+        File.WriteAllBytes(path, [.. header, .. new byte[4096 * 2 - 100]]);
+        Assert.False(BackupStore.SqliteLooksComplete(path));
+        File.WriteAllBytes(path, [.. header, .. new byte[4096 * 3 - 100]]);
+        Assert.True(BackupStore.SqliteLooksComplete(path));
+
+        header[95] = 6; // размер в заголовке недостоверен — решать по другим признакам
+        File.WriteAllBytes(path, [.. header, .. new byte[4096 - 100]]);
+        Assert.Null(BackupStore.SqliteLooksComplete(path));
+        File.WriteAllText(path, "not a database");
+        Assert.Null(BackupStore.SqliteLooksComplete(path));
+    }
+
+    [Fact]
     public async Task UnnamedCommand_TakesTheNewFile_AndGivesUpOnTimeout()
     {
         var store = new BackupStore(_data, "Survival");
