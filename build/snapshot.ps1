@@ -62,6 +62,8 @@ $fixture = Join-Path $root 'tests/snapshots/fixture'
 $apps = @(@{ Name = 'avalonia'; Project = 'src/eViSTool.Desktop'; Exe = $(if ($IsWindows) { 'eViSTool.exe' } else { 'eViSTool' }) })
 
 New-Item -ItemType Directory -Force $work, $Out | Out-Null
+# полный путь: окно запускается со своей рабочей папкой, и относительный «snapshots» оно положило бы к себе
+$Out = (Resolve-Path $Out).Path
 
 foreach ($app in $apps) {
     if ($AppDir) {
