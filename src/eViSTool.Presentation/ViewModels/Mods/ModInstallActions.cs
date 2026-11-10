@@ -21,7 +21,7 @@ internal sealed class ModInstallActions(ModsViewModel owner, ModInstallService i
         var list = files.ToList();
         if (list.FirstOrDefault(f => f.EndsWith(PackManifest.Extension, StringComparison.OrdinalIgnoreCase)) is { } pack)
         {
-            _ = packs.ImportFileAsync(pack);
+            Ui.Run(packs.ImportFileAsync(pack));
             return;
         }
         var zips = list.Where(f => f.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)).ToList();

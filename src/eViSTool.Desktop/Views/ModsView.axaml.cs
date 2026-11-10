@@ -237,7 +237,7 @@ public partial class ModsView : UserControl
             return;
         }
         var files = e.DataTransfer.TryGetFiles()?.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
-        if (files is { Count: > 0 }) _ = _vm?.AddFilesAsync(files);
+        if (files is { Count: > 0 } && _vm is { } vm) Presentation.Ui.Run(vm.AddFilesAsync(files));
     }
 
     // ---------- перетаскивание мода в группу ----------

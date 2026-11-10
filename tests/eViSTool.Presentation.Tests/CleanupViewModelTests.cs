@@ -120,6 +120,18 @@ public sealed class CleanupViewModelTests : IDisposable
     });
 
     [Fact]
+    public void UiRun_ShowsAndLogsAFailure_ButNotACancel() => Sta.Run(() =>
+    {
+        // аудит 5.5: задача, запущенная без ожидания, упала — человек видит ошибку, она в логе падений
+        Ui.Platform = _platform;
+        Ui.Run(Task.FromCanceled(new CancellationToken(canceled: true)));
+        Ui.Run(Task.FromException(new IOException("диск отвалился")));
+        SpinWait.SpinUntil(() => _platform.Warned.Count > 0, TimeSpan.FromSeconds(5));
+        Assert.Equal([Loc.T("ui.taskFailed", "диск отвалился")], _platform.Warned);
+        Assert.IsType<IOException>(Assert.Single(_platform.Crashes));
+    });
+
+    [Fact]
     public void Start_ScansAndChecksRunningEveryTwoSeconds_UntilStopped() => Sta.Run(() =>
     {
         Ui.Platform = _platform;
@@ -309,7 +321,12 @@ public sealed class CleanupViewModelTests : IDisposable
         public void OpenTrash() => throw new NotSupportedException();
         public bool IsMainWindowVisible => false;
         public void RestartAfterClose(string exe) => throw new NotSupportedException();
-        public string WriteCrashLog(Exception ex) => throw new NotSupportedException();
+        public List<Exception> Crashes { get; } = [];
+        public string WriteCrashLog(Exception ex)
+        {
+            Crashes.Add(ex);
+            return "";
+        }
     }
 
     private sealed class ManualTimer : IUiTimer

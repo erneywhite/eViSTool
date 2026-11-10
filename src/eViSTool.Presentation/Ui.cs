@@ -106,4 +106,21 @@ public static class Ui
     public static void OpenUrl(string url) => Platform.OpenUrl(url);
     public static void OpenFolder(string dir) => Platform.OpenFolder(dir);
     public static void ShowInFolder(string path) => Platform.ShowInFolder(path);
+
+    /// <summary>
+    /// Запустить задачу, не дожидаясь её (щелчок, перетаскивание, смена вкладки). Упала — ошибку видно сообщением и она
+    /// в логе падений: «_ = задача» молча теряла её до сборки мусора, и человек не понимал, почему ничего не произошло.
+    /// Отмену не показываем: её просили.
+    /// </summary>
+    public static void Run(Task task) =>
+        task.ContinueWith(t =>
+        {
+            var ex = t.Exception!.GetBaseException();
+            if (ex is OperationCanceledException) return;
+            Post(() =>
+            {
+                Platform.WriteCrashLog(ex);
+                Error(Core.Localization.Loc.T("ui.taskFailed", ex.Message));
+            });
+        }, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
 }
