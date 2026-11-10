@@ -177,4 +177,18 @@ public sealed class ModConfigsTests : IDisposable
         }
         Assert.Equal(3, _backups.Versions(f.RelativePath).Count);
     }
+
+    [Fact]
+    public void NewVersion_SortsFirst_EvenWhenClocksWentBack()
+    {
+        // аудит 4.2: осенью часы назад на час — прежняя версия «из будущего», новая всё равно встаёт первой
+        var dir = Directory.CreateDirectory(Path.Combine(_backups.Root, "a.json")).FullName;
+        var future = Path.Combine(dir, DateTime.Now.AddHours(1).ToString("yyyyMMdd-HHmmss-fff") + ".json");
+        File.WriteAllText(future, "before");
+        _backups.Keep("after"u8.ToArray(), "a.json");
+
+        var versions = _backups.Versions("a.json");
+        Assert.Equal(2, versions.Count);
+        Assert.Equal("after", File.ReadAllText(versions[0]));
+    }
 }

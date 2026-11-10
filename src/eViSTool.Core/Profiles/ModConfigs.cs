@@ -269,14 +269,23 @@ public sealed class ModConfigBackups(string root, int keep = 5)
     public void Keep(byte[] content, string relativePath) =>
         Store(relativePath, System.IO.Path.GetExtension(relativePath), target => File.WriteAllBytes(target, content));
 
+    private const string NameFormat = "yyyyMMdd-HHmmss-fff";
+
     private void Store(string relativePath, string extension, Action<string> write)
     {
         var dir = Directory.CreateDirectory(DirFor(relativePath)).FullName;
         // две записи в одну миллисекунду (на быстром диске так и бывает) не должны затирать друг друга:
         // имя занято — следующая миллисекунда, порядок версий по имени сохраняется
         var at = DateTime.Now;
+        // версии упорядочены по имени: осенью часы идут на час назад, и новая версия получила бы имя меньше прежней —
+        // «Отменить» вернул бы не ту, а чистка удалила бы свежую. Поэтому имя всегда после самого нового
+        if (Versions(relativePath).FirstOrDefault() is { } newest
+            && DateTime.TryParseExact(System.IO.Path.GetFileNameWithoutExtension(newest), NameFormat,
+                System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var last)
+            && last >= at)
+            at = last.AddMilliseconds(1);
         string target;
-        while (File.Exists(target = System.IO.Path.Combine(dir, at.ToString("yyyyMMdd-HHmmss-fff") + extension)))
+        while (File.Exists(target = System.IO.Path.Combine(dir, at.ToString(NameFormat, System.Globalization.CultureInfo.InvariantCulture) + extension)))
             at = at.AddMilliseconds(1);
         write(target);
         foreach (var old in Versions(relativePath).Skip(keep)) File.Delete(old);
