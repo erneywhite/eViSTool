@@ -9,5 +9,13 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- воспроизводимая сборка: точные версии всех пакетов, и прямых, и транзитивных, — в packages.lock.json рядом с
+         проектом. В CI (GitHub ставит CI=true) восстановление строгое: lock-файл не совпал с проектом — ошибка, а не тихое
+         обновление. build/publish.ps1 lock-файлы репозитория не трогает: publish неявно добавляет пакет обрезки (ILLink) той
+         версии, что у SDK, и lock-файл зависел бы от точной версии SDK -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(CI)' == 'true' and '$(ReleasePublish)' != 'true'">true</RestoreLockedMode>
+    <!-- publish (ReleasePublish=true из build/publish.ps1) ведёт свой lock-файл в obj, отдельный от того, что в репозитории -->
+    <NuGetLockFilePath Condition="'$(ReleasePublish)' == 'true'">$(MSBuildProjectDirectory)/obj/packages.publish.lock.json</NuGetLockFilePath>
   </PropertyGroup>
 </Project>

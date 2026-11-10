@@ -1,0 +1,15 @@
+# Окончания строк одинаковы у всех клонов, а не по настройке core.autocrlf у каждого: в репозитории — LF,
+# при выгрузке — как принято в системе. Тестовые данные (логи, конфиги) на Windows и Linux тогда одинаковы по смыслу.
+* text=auto
+
+# скрипты для Linux — всегда с LF, иначе sh споткнётся о CR
+*.sh text eol=lf
+
+# двоичное — не трогать
+*.png binary
+*.jpg binary
+*.ico binary
+*.ttf binary
+*.zip binary
+*.gz binary
+*.vcdbs binary
