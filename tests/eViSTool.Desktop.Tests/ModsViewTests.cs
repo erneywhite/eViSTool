@@ -756,7 +756,7 @@ public sealed class ModsViewTests : IDisposable
             await Run(300);
             _window.GetVisualDescendants().OfType<DataGridRowGroupHeader>().First(h => h.IsVisible).Classes.Add("dropTarget");
             await Run(100);
-            Avalonia.Headless.HeadlessWindowExtensions.CaptureRenderedFrame(_window)!.Save(shot);
+            Avalonia.Headless.HeadlessWindowExtensions.CaptureRenderedFrame(_window)!.Save(shot, PngBitmapEncoderOptions.Default);
             _window.GetVisualDescendants().OfType<DataGridRowGroupHeader>().First(h => h.IsVisible).Classes.Remove("dropTarget");
         }
 

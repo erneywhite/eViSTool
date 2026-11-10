@@ -142,8 +142,6 @@ public sealed partial class ModsViewModel : ObservableObject
     public string UnneededLabel => Loc.Plural("mods.cntUnneeded", UnneededCount);
     public string ShownText => Loc.T("mods.shown", View.Count, Rows.Count);
 
-    public IReadOnlyList<string> SortModes { get; } = [Loc.T("mods.sortImportant"), Loc.T("mods.sortName")];
-
     // ---------- сводка профиля: правая панель, пока мод не выбран ----------
 
     /// <summary>Когда обновления этого профиля сверяли с модбазой; null — после открытия профиля ещё не сверяли.</summary>
