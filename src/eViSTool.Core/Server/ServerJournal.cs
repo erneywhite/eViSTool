@@ -18,7 +18,7 @@ public sealed record JournalEntry(DateTime At, string Action, IReadOnlyList<stri
 /// попытки подключиться. Пишет только агент — по строке JSON на действие; читают агент (для удалённого окна) и окно на
 /// этой машине. Хранится <see cref="Keep"/>; чтение запросов (статус, консоль) не пишется — окно опрашивает их постоянно.
 /// </summary>
-public static class ServerJournal
+public static partial class ServerJournal
 {
     public static readonly TimeSpan Keep = TimeSpan.FromDays(30);
 
@@ -45,7 +45,9 @@ public static class ServerJournal
         lock (Gate)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-            File.AppendAllText(file, line);
+            // новый журнал — только владельцу (на Linux иначе читался бы всеми пользователями машины)
+            if (!File.Exists(file)) Platform.OwnerOnlyFile.WriteText(file, line);
+            else File.AppendAllText(file, line);
         }
     }
 
@@ -110,7 +112,7 @@ public static class ServerJournal
             ("POST", "/stop") => ("stop", []),
             ("POST", "/restart") => ("restart", []),
             ("POST", "/kill") => ("kill", []),
-            ("POST", "/command") => ("command", [Str("Text").Trim()]),
+            ("POST", "/command") => ("command", [MaskCommand(Str("Text").Trim())]),
             ("POST", "/backup") or ("POST", "/backups/copy") => ("backup", []),
             ("POST", "/backups/restore") => ("restore", [Str("Name")]),
             ("POST", "/backups/delete") => ("backupDelete", [Str("Name")]),
@@ -132,6 +134,16 @@ public static class ServerJournal
             _ => null,
         };
     }
+
+    /// <summary>
+    /// Команда для журнала без секрета: всё после слова-пароля скрыто («/serverconfig password …»). Журнал читают все, кто
+    /// подключён к агенту, и лежит он на диске — пароль сервера там не нужен.
+    /// </summary>
+    public static string MaskCommand(string command) => SecretInCommand().Replace(command, "$1$2•••");
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"\b(password|passwd|pass|pwd|pw|token|secret|apikey|key)\b(\s+)\S.*$",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex SecretInCommand();
 
     /// <summary>Нужно ли этому запросу тело для <see cref="Describe"/> (архив мода не читаем — он большой и не нужен).</summary>
     public static bool NeedsBody(string path) => path.TrimEnd('/').ToLowerInvariant() is

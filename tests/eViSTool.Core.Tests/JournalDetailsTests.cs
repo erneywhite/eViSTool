@@ -36,6 +36,29 @@ public sealed class JournalDetailsTests
         Assert.DoesNotContain("abc", shown);
     }
 
+    // имена секретов не только «Password» и «Token»: ключи доступа, приватные ключи, строки подключения
+    [Fact]
+    public void Json_OtherSecretNames_AreHiddenToo()
+    {
+        var before = """{ "AccessKey": "a1", "AuthKey": "b1", "PrivateKey": "c1", "Pwd": "d1", "ConnectionString": "e1", "Motd": "hi" }""";
+        var after = """{ "AccessKey": "a2", "AuthKey": "b2", "PrivateKey": "c2", "Pwd": "d2", "ConnectionString": "e2", "Motd": "hey" }""";
+
+        var shown = string.Join("\n", Show(JournalDetails.Json(before, after)));
+
+        foreach (var secret in new[] { "a2", "b2", "c2", "d2", "e2" }) Assert.DoesNotContain(secret, shown);
+        Assert.Contains("hey", shown); // обычные значения видны
+    }
+
+    // команда в журнале — без пароля: «/serverconfig password …» пишется со скрытым хвостом
+    [Fact]
+    public void Command_WithAPassword_IsMasked()
+    {
+        Assert.Equal("/serverconfig password •••", ServerJournal.MaskCommand("/serverconfig password hunter2"));
+        Assert.Equal("/time set day", ServerJournal.MaskCommand("/time set day"));
+        var act = ServerJournal.Describe("POST", "/command", """{ "Text": "/serverconfig password hunter2" }""", null);
+        Assert.DoesNotContain("hunter2", string.Join(" ", act!.Value.Args));
+    }
+
     [Fact]
     public void Json_NothingChanged_OrNotJson_IsEmpty()
     {

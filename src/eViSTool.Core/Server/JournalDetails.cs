@@ -121,6 +121,7 @@ public static partial class JournalDetails
     private static string Short(string value) =>
         value.Length <= MaxValue ? value : value[..(MaxValue - 1)].TrimEnd() + "…";
 
-    [GeneratedRegex(@"pass|token|secret|webhook|apikey|api_key|^key$|url$", RegexOptions.IgnoreCase)]
+    // «key$» — и AccessKey, AuthKey, PrivateKey; лишний раз скрытое значение не страшно, показанный секрет — да
+    [GeneratedRegex(@"pass|pwd|token|secret|webhook|api_?key|credential|connectionstring|key$|url$", RegexOptions.IgnoreCase)]
     private static partial Regex SecretName();
 }
