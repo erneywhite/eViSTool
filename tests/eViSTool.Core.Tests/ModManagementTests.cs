@@ -225,16 +225,18 @@ public sealed class ModManagementTests : IDisposable
     [Fact]
     public void Install_PutsTheOldVersionsBack_WhenSomethingFailsMidway()
     {
-        var p = Server("""{ "ModPaths": [] }""");
+        // вторая копия не уходит в хранилище — первая к этому моменту уже там. На Windows так бывает, когда игра держит
+        // файл; на Linux открытый файл переносу не мешает, и сбой делаем иначе: вторая копия — в папке модов только для
+        // чтения, её оттуда не унести (занятое место в хранилище больше не мешает: Keep берёт другое имя)
+        var extra = Directory.CreateDirectory(Path.Combine(_root, "extra")).FullName;
+        var p = Server(OperatingSystem.IsWindows() ? """{ "ModPaths": [] }""" : $$"""{ "ModPaths": ["{{extra}}"] }""");
         MakeZip(_mods, "alpha_1.0.0.zip", "alpha", "1.0.0");
-        MakeZip(_mods, "alpha_0.9.0.zip", "alpha", "0.9.0"); // две копии одного мода — обе будут убраны
-        var before = Directory.GetFiles(_mods).ToDictionary(f => Path.GetFileName(f), File.ReadAllBytes);
+        MakeZip(OperatingSystem.IsWindows() ? _mods : extra, "alpha_0.9.0.zip", "alpha", "0.9.0"); // две копии одного мода — обе будут убраны
+        var before = Directory.GetFiles(_mods).Concat(Directory.GetFiles(extra)).ToDictionary(f => f, File.ReadAllBytes);
         var incoming = MakeZip(Directory.CreateDirectory(Path.Combine(_root, "dl")).FullName, "alpha_1.1.0.zip", "alpha", "1.1.0");
         var plan = ModInstaller.Plan(incoming, p, ModUpdateService.ScanLocal(p));
         Assert.Equal(2, plan.Replaces.Count);
 
-        // вторая копия не уходит в хранилище — первая к этому моменту уже там. На Windows так бывает, когда игра держит
-        // файл; на Linux открытый файл переносу не мешает, и сбой делаем иначе: место в хранилище занято папкой
         var backups = new ModBackupStore(Path.Combine(_root, "backups"));
         if (OperatingSystem.IsWindows())
         {
@@ -243,12 +245,14 @@ public sealed class ModManagementTests : IDisposable
         }
         else
         {
-            Directory.CreateDirectory(Path.Combine(backups.DirFor("alpha"), plan.Replaces[1].FileName));
-            Assert.ThrowsAny<IOException>(() => ModInstaller.Apply(plan, backups));
+            Assert.StartsWith(extra, plan.Replaces[1].Path); // сбой — именно на второй копии
+            File.SetUnixFileMode(extra, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+            try { Assert.ThrowsAny<UnauthorizedAccessException>(() => ModInstaller.Apply(plan, backups)); }
+            finally { File.SetUnixFileMode(extra, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute); }
         }
 
-        Assert.Equal(before.Keys.Order(), Directory.GetFiles(_mods).Select(Path.GetFileName).Order());
-        foreach (var (name, bytes) in before) Assert.Equal(bytes, File.ReadAllBytes(Path.Combine(_mods, name!)));
+        Assert.Equal(before.Keys.Order(), Directory.GetFiles(_mods).Concat(Directory.GetFiles(extra)).Order());
+        foreach (var (path, bytes) in before) Assert.Equal(bytes, File.ReadAllBytes(path));
     }
 
     [Fact]

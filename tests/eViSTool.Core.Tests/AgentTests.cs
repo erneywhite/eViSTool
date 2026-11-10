@@ -99,8 +99,16 @@ public sealed class AgentTests : IAsyncLifetime
         using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{_client.Endpoint.Port}/") };
         http.DefaultRequestHeaders.Add(AgentProtocol.KeyHeader, AgentProtocol.GetOrCreateKey(_profile.Id, AgentsDir));
         var huge = new string('a', 9 * 1024 * 1024);
-        using var resp = await http.PostAsync("command", new StringContent($$"""{ "Text": "/announce {{huge}}" }"""));
-        Assert.Equal(System.Net.HttpStatusCode.RequestEntityTooLarge, resp.StatusCode);
+        try
+        {
+            using var resp = await http.PostAsync("command", new StringContent($$"""{ "Text": "/announce {{huge}}" }"""));
+            Assert.Equal(System.Net.HttpStatusCode.RequestEntityTooLarge, resp.StatusCode);
+        }
+        catch (HttpRequestException)
+        {
+            // на Linux сервер отвечает 413 и закрывает соединение, не дочитав тело: клиент, ещё отправляющий его, видит
+            // обрыв («Broken pipe»), а не ответ. Это тот же отказ — главное, что агент цел (ниже)
+        }
         Assert.Equal(ServerState.Stopped, (await _client.StatusAsync()).State); // агент жив и отвечает
     }
 
