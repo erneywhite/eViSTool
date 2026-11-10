@@ -8,13 +8,17 @@ public static class SafeFile
     /// каждой записи — два писателя не мешают друг другу), потом подмена. Оборвалась запись (кончилось место, выключили
     /// свет) — прежний файл цел, недописанный временный убирается.
     /// </summary>
-    public static void WriteAllText(string path, string text)
+    public static void WriteAllText(string path, string text) => WriteAllText(path, text, null);
+
+    /// <summary>То же, в заданной кодировке (null — UTF-8 без метки).</summary>
+    public static void WriteAllText(string path, string text, System.Text.Encoding? encoding)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var tmp = $"{path}.{Guid.NewGuid():N}.tmp";
         try
         {
-            File.WriteAllText(tmp, text);
+            if (encoding is null) File.WriteAllText(tmp, text);
+            else File.WriteAllText(tmp, text, encoding);
             Replace(tmp, path);
         }
         finally

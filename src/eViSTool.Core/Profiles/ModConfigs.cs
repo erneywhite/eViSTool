@@ -145,8 +145,45 @@ public static partial class ModConfigs
 
     private static string Normalize(string s) => new string(s.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
 
-    /// <summary>Текст файла как есть (кодировка определяется по BOM, по умолчанию UTF-8).</summary>
-    public static string Read(string path) => File.ReadAllText(path);
+    /// <summary>Текст файла как есть: кодировка — по метке (BOM), без метки — UTF-8, если файл им читается.</summary>
+    public static string Read(string path) => Decode(File.ReadAllBytes(path), out _);
+
+    /// <summary>
+    /// Байты → текст и кодировка, в которой потом сохранять. Без метки и не UTF-8 (файл правили редактором в местной
+    /// кодировке) — Latin-1: так каждый байт становится одним знаком, и при сохранении нетронутое возвращается теми
+    /// же байтами, а не превращается в «?» (раньше любой такой файл читался как UTF-8 и портился при сохранении).
+    /// </summary>
+    internal static string Decode(byte[] bytes, out Encoding encoding)
+    {
+        ReadOnlySpan<byte> span = bytes;
+        if (span.StartsWith(Encoding.UTF8.Preamble)) encoding = new UTF8Encoding(true);
+        else if (span.StartsWith(Encoding.Unicode.Preamble)) encoding = Encoding.Unicode;
+        else if (span.StartsWith(Encoding.BigEndianUnicode.Preamble)) encoding = Encoding.BigEndianUnicode;
+        else
+        {
+            var strict = new UTF8Encoding(false, throwOnInvalidBytes: true);
+            try
+            {
+                encoding = new UTF8Encoding(false);
+                return strict.GetString(bytes);
+            }
+            catch (DecoderFallbackException)
+            {
+                encoding = Encoding.Latin1;
+                return encoding.GetString(bytes);
+            }
+        }
+        return encoding.GetString(bytes, encoding.Preamble.Length, bytes.Length - encoding.Preamble.Length);
+    }
+
+    /// <summary>Кодировка для сохранения: прежняя, если новый текст в неё помещается без потерь, иначе UTF-8.</summary>
+    internal static Encoding EncodingFor(string path, string text)
+    {
+        if (!File.Exists(path)) return new UTF8Encoding(false);
+        Decode(File.ReadAllBytes(path), out var encoding);
+        return encoding.CodePage == Encoding.Latin1.CodePage && encoding.GetString(encoding.GetBytes(text)) != text
+            ? new UTF8Encoding(false) : encoding;
+    }
 
     /// <summary>
     /// Ошибка в JSON (строка и позиция) или null, если всё в порядке. Проверка снисходительная, как у игры:
@@ -221,12 +258,9 @@ public static partial class ModConfigs
     public static void Save(ModConfigFile file, string text, ModConfigBackups backups)
     {
         if (file.Kind == ModConfigKind.Json && JsonError(text) is { } error) throw new InvalidDataException(error);
-        var bom = File.Exists(file.Path) && HasBom(file.Path);
+        var encoding = EncodingFor(file.Path, text); // в исходной кодировке и с той же меткой
         if (File.Exists(file.Path)) backups.Keep(file.Path, file.RelativePath);
-        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(file.Path)!); // файла (и папки) ещё может не быть
-        var tmp = file.Path + ".evistool.tmp";
-        File.WriteAllText(tmp, text, new UTF8Encoding(bom));
-        Platform.SafeFile.Replace(tmp, file.Path);
+        Platform.SafeFile.WriteAllText(file.Path, text, encoding); // папку (её ещё может не быть) создаст сам
     }
 
     /// <summary>
@@ -240,12 +274,6 @@ public static partial class ModConfigs
         File.Delete(file.Path);
     }
 
-    private static bool HasBom(string path)
-    {
-        using var s = File.OpenRead(path);
-        Span<byte> b = stackalloc byte[3];
-        return s.Read(b) == 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF;
-    }
 }
 
 /// <summary>

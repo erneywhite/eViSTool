@@ -179,6 +179,24 @@ public sealed class ModConfigsTests : IDisposable
     }
 
     [Fact]
+    public void NotUtf8File_KeepsItsBytes_WhenSaved()
+    {
+        // аудит 4.8: файл в местной кодировке (здесь «ä» в Latin-1 — один байт 0xE4) не портится при сохранении
+        var path = Path.Combine(_cfg, "Footprints-Client.json");
+        File.WriteAllBytes(path, [.. "{ \"name\": \""u8, 0xE4, .. "\" }"u8]);
+        var f = ModConfigs.List(_data, Mods).Single();
+        var text = ModConfigs.Read(path);
+        Assert.Equal("{ \"name\": \"ä\" }", text);
+
+        ModConfigs.Save(f, text.Replace("}", ", \"v\": 2 }"), _backups);
+        Assert.Equal([.. "{ \"name\": \""u8, 0xE4, .. "\" , \"v\": 2 }"u8], File.ReadAllBytes(path));
+
+        // а текст, который в прежнюю кодировку не помещается, — уже в UTF-8, без потерь
+        ModConfigs.Save(f, "{ \"name\": \"ёж\" }", _backups);
+        Assert.Equal("{ \"name\": \"ёж\" }", File.ReadAllText(path));
+    }
+
+    [Fact]
     public void NewVersion_SortsFirst_EvenWhenClocksWentBack()
     {
         // аудит 4.2: осенью часы назад на час — прежняя версия «из будущего», новая всё равно встаёт первой
