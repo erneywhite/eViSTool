@@ -3,7 +3,7 @@
 param([string[]]$Only)
 $S = $PSScriptRoot
 $out = Join-Path $S 'out'
-$repo = 'C:\Users\erney\Documents\ClaudeCode\eViSTool'
+$repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 New-Item -ItemType Directory -Force $out | Out-Null
 $shots = [ordered]@{
     'mods'           = @('mods.card.primitivesurvival', 'Main', 14)

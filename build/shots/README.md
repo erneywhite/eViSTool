@@ -10,7 +10,7 @@
 2. `python -I -X utf8 build/shots/build.py` — копия модов, папка сервера, настройки окна, неделя статистики, журнал.
 3. Запустить агента с сервером (аргументы — как у окна, `AgentLauncher`): `app/eViSTool.Agent.exe --profile srv1 --exe
    <игра>/VintagestoryServer.exe --data build/shots/srvdata --agents-dir build/shots/app/data/agents --start --lang en`.
-4. Остановить агента и сервер (по PID), `setup2.py` и `fix3.py` (вкладки сервера, история модов, статистика с игроками),
+4. Остановить агента и сервер (по PID), `tabs.py` и `stats.py` (вкладки сервера, история модов, статистика с игроками),
    снова запустить агента.
 5. Код удалённого профиля: `dotnet run --project build/shots/codegen -- build/shots/app/data/agents`, вписать его в
    `RemoteCode` профиля «Home server» в `app/data/settings.json`.
