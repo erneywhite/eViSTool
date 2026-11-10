@@ -24,6 +24,10 @@
     # профиль стенда смотрит в C:\snap-game: заставки из assets/game/textures/gui/backgrounds — фон под боковой панелью
 
 .EXAMPLE
+    pwsh build/snapshot.ps1 -Screens mods -AppDir dist/eViSTool-1.0.12-linux-x64
+    # окно из собранного релиза, без сборки
+
+.EXAMPLE
     pwsh build/snapshot.ps1 -Screens mods -NoBackdrop
     # без фона из игры: под боковой панелью заглушка
 #>
@@ -40,7 +44,9 @@ param(
     # выключить «Фон из игры»: под боковой панелью заглушка («горизонтали»), даже если игра установлена
     [switch]$NoBackdrop,
     # не пересобирать: взять сборки из прошлого запуска (если они есть)
-    [switch]$NoBuild
+    [switch]$NoBuild,
+    # готовое окно (папка с eViSTool / eViSTool.exe) вместо сборки — так CI снимает окно из собранного архива релиза
+    [string]$AppDir
 )
 
 $ErrorActionPreference = 'Stop'
@@ -58,6 +64,11 @@ $apps = @(@{ Name = 'avalonia'; Project = 'src/eViSTool.Desktop'; Exe = $(if ($I
 New-Item -ItemType Directory -Force $work, $Out | Out-Null
 
 foreach ($app in $apps) {
+    if ($AppDir) {
+        $app.Dir = [IO.Path]::GetFullPath($AppDir)
+        if (-not (Test-Path (Join-Path $app.Dir $app.Exe))) { throw "Нет $($app.Exe) в $AppDir" }
+        continue
+    }
     $dir = Join-Path $work $app.Name
     if (-not $NoBuild -or -not (Test-Path (Join-Path $dir $app.Exe))) {
         Write-Host "Сборка $($app.Project)…"

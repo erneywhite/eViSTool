@@ -64,13 +64,15 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: eViSTool-win-x64
-          path: dist/*.zip*
+          path: dist/*-win-x64.zip*
           retention-days: 14
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: eViSTool-linux-x64
-          path: dist/*.tar.gz*
+          path: |
+            dist/*-linux-x64.tar.gz*
+            dist/*-linux-x64.zip*
           retention-days: 14
 
   # окно на WPF на Linux не собирается — ядро, агент, окно на Avalonia и их тесты
@@ -99,11 +101,67 @@ jobs:
       - name: Test the Avalonia window
         run: dotnet test tests/eViSTool.Desktop.Tests --no-build -c Debug --logger "console;verbosity=normal" --blame-hang-timeout 10m --blame-hang-dump-type none
 
+  # собранный архив для Linux — на Linux: агент обрезан полностью (TrimMode=full), окно частично (partial), и то, что
+  # обрезка выкинула лишнее, видно только при запуске. Тесты агента — на агенте из архива, окно — снимком экрана
+  linux-release:
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: eViSTool-linux-x64
+          path: artifact
+
+      - name: Unpack
+        shell: pwsh
+        run: |
+          $tgz = Get-ChildItem artifact -Filter '*-linux-x64.tar.gz' | Select-Object -First 1
+          if (-not $tgz) { throw 'Нет tar.gz для Linux среди артефактов' }
+          New-Item -ItemType Directory -Force release | Out-Null
+          tar -xzf $tgz.FullName -C release
+          if ($LASTEXITCODE) { throw "tar: $LASTEXITCODE" }
+          foreach ($exe in 'eViSTool', 'eViSTool.Agent') {
+              if (-not (Test-Path "release/$exe")) { throw "Нет $exe в архиве" }
+              if (-not ((Get-Item "release/$exe").UnixFileMode -band [IO.UnixFileMode]::UserExecute)) { throw "$exe без права на запуск" }
+          }
+
+      - name: Test the release agent
+        shell: pwsh
+        run: |
+          dotnet build tests/eViSTool.Core.Tests -c Debug
+          $env:EVISTOOL_TEST_AGENT = (Resolve-Path release/eViSTool.Agent).Path
+          dotnet test tests/eViSTool.Core.Tests --no-build -c Debug --filter "FullyQualifiedName~AgentTests|FullyQualifiedName~AgentCliTests|FullyQualifiedName~AgentSetupTests"
+          if ($LASTEXITCODE) { throw "тесты агента из архива: $LASTEXITCODE" }
+
+      - name: Snapshot the release window
+        shell: pwsh
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libice6 libsm6 libfontconfig1
+          xvfb-run -a pwsh build/snapshot.ps1 -Screens mods,server,settings -AppDir release -Out snapshots
+          if ($LASTEXITCODE) { throw "окно из архива не сняло себя: $LASTEXITCODE" }
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: linux-release-snapshots
+          path: snapshots
+          retention-days: 14
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build, linux]
+    needs: [build, linux, linux-release]
     runs-on: windows-latest
     timeout-minutes: 30
+    # окружение release: в настройках репозитория у него можно потребовать подтверждение перед выкладкой
+    environment: release
     # только этому заданию — право выложить релиз; ключ подписи — только ему
     permissions:
       contents: write
@@ -116,39 +174,68 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      # имя тега — через переменную окружения, а не подстановкой в текст скрипта: так оно не может стать кодом
       - name: Check the version
         id: version
         shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
-          $tag = '${{ github.ref_name }}'
+          $tag = $env:TAG
+          if ($tag -notmatch '^v[0-9A-Za-z.+-]+$') { throw "Странное имя тега: $tag" }
           $version = $tag.TrimStart('v')
+          # выпуск — только с коммита, который уже в main: тег на ветке в стороне релиз не собирает
+          git fetch --quiet origin main
+          git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+          if ($LASTEXITCODE) { throw "Коммит тега $tag не в main" }
           $declared = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
           if ($declared -ne $version) { throw "Тег $tag, а в Directory.Build.props версия $declared" }
           if (-not (Test-Path "docs/moddb/changelog-$version.txt")) { throw "Нет docs/moddb/changelog-$version.txt" }
           git fetch --force origin "refs/tags/${tag}:refs/tags/${tag}"
           $message = git tag -l --format='%(contents)' $tag
           "version=$version" >> $env:GITHUB_OUTPUT
-          "recommended=$([bool]($message -match 'recommended'))" >> $env:GITHUB_OUTPUT
+          # «recommended» — отдельным словом в конце сообщения тега, а не где угодно («not recommended» не в счёт)
+          $text = ($message -join ' ').Trim()
+          $recommended = $text -match '(^|\s)recommended$' -and $text -notmatch 'not recommended$'
+          "recommended=$recommended" >> $env:GITHUB_OUTPUT
 
       - name: Build and sign
         shell: pwsh
         env:
           EVISTOOL_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          VERSION: ${{ steps.version.outputs.version }}
+          RECOMMENDED: ${{ steps.version.outputs.recommended }}
         run: |
           if (-not $env:EVISTOOL_SIGNING_KEY) { throw 'Нет секрета UPDATE_SIGNING_KEY — неподписанный релиз никто не сможет поставить' }
-          ./build/publish.ps1 -Version ${{ steps.version.outputs.version }}
-          $notes = @{ Version = '${{ steps.version.outputs.version }}' }
-          if ('${{ steps.version.outputs.recommended }}' -eq 'True') { $notes.Recommended = $true }
+          ./build/publish.ps1 -Version $env:VERSION
+          $notes = @{ Version = $env:VERSION }
+          if ($env:RECOMMENDED -eq 'True') { $notes.Recommended = $true }
           ./build/release-notes.ps1 @notes
 
       - name: Publish the release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ github.ref_name }}
         run: |
-          $v = '${{ steps.version.outputs.version }}'
+          $v = $env:VERSION
           $files = Get-ChildItem dist -File | Where-Object { $_.Name -like "eViSTool-$v-*" } | ForEach-Object { $_.FullName }
-          if (($files | Where-Object { $_ -like '*.sig' }).Count -ne 3) { throw 'Подписей должно быть три: win zip, linux tar.gz, linux zip' }
+          $sigs = @($files | Where-Object { $_ -like '*.sig' })
+          if ($sigs.Count -ne 3) { throw 'Подписей должно быть три: win zip, linux tar.gz, linux zip' }
+          # каждую подпись — открытым ключом, зашитым в программу: подписали не тем ключом — выкладывать нельзя,
+          # такое обновление никто не поставит
+          $pub = [regex]::Match((Get-Content src/eViSTool.Core/AppUpdate/UpdateSignature.cs -Raw), 'ReleaseKey = "([^"]+)"').Groups[1].Value
+          if (-not $pub) { throw 'Не нашёл ReleaseKey в UpdateSignature.cs' }
+          $key = [Security.Cryptography.ECDsa]::Create()
+          $null = $key.ImportSubjectPublicKeyInfo([Convert]::FromBase64String($pub), [ref]0)
+          foreach ($sig in $sigs) {
+              $archive = $sig.Substring(0, $sig.Length - 4)
+              $ok = $key.VerifyData([IO.File]::ReadAllBytes($archive), [Convert]::FromBase64String((Get-Content $sig -Raw).Trim()),
+                  [Security.Cryptography.HashAlgorithmName]::SHA256)
+              if (-not $ok) { throw "Подпись не сходится с открытым ключом программы: $sig" }
+          }
+          Write-Host 'Подписи проверены открытым ключом программы.' 
           # бета (0.12.0-beta.1) — pre-release: на GitHub не станет «последней», окно предложит её только тем, кто сам на бете
           $pre = if ($v.Contains('-')) { @('--prerelease') } else { @() }
-          gh release create '${{ github.ref_name }}' --title "eViSTool $v" --notes-file "dist/notes-$v.md" --verify-tag @pre @files
+          gh release create $env:TAG --title "eViSTool $v" --notes-file "dist/notes-$v.md" --verify-tag @pre @files
