@@ -38,10 +38,10 @@ public sealed class GameLauncherTests : IDisposable
         Assert.Empty(GameLauncher.StartInfo(Client(null)).ArgumentList);
     }
 
-    [Fact]
+    [LinuxFact]
     public void Linux_PointsFontconfigToGameFonts_LikeRunSh()
     {
-        if (!OperatingSystem.IsLinux()) return; // fontconfig — только на Linux
+        // fontconfig — только на Linux
         Assert.False(GameLauncher.StartInfo(Client(null)).Environment.ContainsKey("FONTCONFIG_FILE")); // нет fonts.conf — не трогаем
 
         var fonts = Path.Combine(_game, "fonts.conf");
@@ -49,10 +49,10 @@ public sealed class GameLauncherTests : IDisposable
         Assert.Equal(fonts, GameLauncher.StartInfo(Client(null)).Environment["FONTCONFIG_FILE"]);
     }
 
-    [Fact]
+    [LinuxFact]
     public void Flatpak_RunsThroughFlatpak_AndOpensOwnDataDirToTheSandbox()
     {
-        if (!OperatingSystem.IsLinux()) return; // Flatpak — только на Linux
+        // Flatpak — только на Linux
         var game = Path.Combine(_root, "flatpak", "app", GameInstall.FlatpakAppId, "current", "active", "files", "extra", "vintagestory");
         Directory.CreateDirectory(game);
         File.WriteAllText(Path.Combine(game, GameLauncher.ClientExeName), "");

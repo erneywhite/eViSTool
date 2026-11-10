@@ -99,10 +99,9 @@ public sealed class AgentSetupChecksTests : IDisposable
     public void NoServerFromThisGame_NothingToWarnAbout() =>
         Assert.Empty(AgentSetup.OtherServers(Game("server"), Dir("data"), ownServerPid: null));
 
-    [Fact]
+    [UnixFact]
     public void Unix_OwnerAndName_OfAFolder()
     {
-        if (OperatingSystem.IsWindows()) return;
         var dir = Dir("mine");
         Assert.Equal(UnixAccount.CurrentUid, UnixAccount.OwnerOf(dir));
         Assert.Equal(Environment.UserName, UnixAccount.NameOf(UnixAccount.CurrentUid));
@@ -112,10 +111,9 @@ public sealed class AgentSetupChecksTests : IDisposable
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserExecute | UnixFileMode.GroupRead, UnixAccount.Stat(dir)!.Value.Mode);
     }
 
-    [Fact]
+    [UnixFact]
     public void Unix_AsRoot_DataOfAnotherUser_SaysWhomToRunAs()
     {
-        if (OperatingSystem.IsWindows()) return;
         var (data, app) = (Dir("data"), Dir("evistool"));
         if (!UnixAccount.IsRoot)
         {
@@ -133,10 +131,9 @@ public sealed class AgentSetupChecksTests : IDisposable
         Assert.Equal(UnixAccount.Describe(Nobody), AgentSetup.OwnerToRunAs(data, app));
     }
 
-    [Fact]
+    [UnixFact]
     public void Unix_DataWithFilesThisUserCannotChange_IsAWarning()
     {
-        if (OperatingSystem.IsWindows()) return;
         var data = Dir("data");
         File.WriteAllText(Path.Combine(data, "serverconfig.json"), "{}");
         Assert.Null(AgentSetup.CheckDataOwners(data)); // всё своё

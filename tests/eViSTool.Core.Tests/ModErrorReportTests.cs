@@ -115,12 +115,11 @@ public sealed class ModErrorReportTests : IDisposable
         Assert.Equal(0, report.Unattributed);
     }
 
-    [Fact]
+    [WindowsFact]
     public void Session_KeepsErrorsAcrossReads_EvenWhenAStackArrivesInTheNextChunk()
     {
         // наблюдение за запуском игры — только у окна (Windows). На Linux у файла нет времени создания (.NET отдаёт
         // время последнего изменения), и LogTail принял бы каждую дописку лога за новый файл
-        if (!OperatingSystem.IsWindows()) return;
         var logs = Directory.CreateDirectory(Path.Combine(_root, "Logs")).FullName;
         var client = Path.Combine(logs, "client-main.log");
         var session = new GameSession(_root, DateTime.UtcNow.AddMinutes(-1));

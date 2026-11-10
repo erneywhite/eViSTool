@@ -33,10 +33,10 @@ public sealed class SafeFileTests : IDisposable
         Assert.False(File.Exists(tmp));
     }
 
-    [Fact]
+    [WindowsFact]
     public void Replace_GivesUp_WhenTheFileStaysLocked()
     {
-        if (!OperatingSystem.IsWindows()) return; // на Linux открытый файл подмене не мешает
+        // на Linux открытый файл подмене не мешает
         var file = Path.Combine(_dir, "locked.json");
         File.WriteAllText(file, "old");
         var tmp = file + ".tmp";

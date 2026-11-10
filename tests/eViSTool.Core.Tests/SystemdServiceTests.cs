@@ -139,10 +139,9 @@ public sealed class SystemdServiceTests : IDisposable
         Assert.Null(UnixAccounts.PickServiceUser(null, null, null));
     }
 
-    [Fact]
+    [LinuxFact]
     public void ServiceUser_FromRealFolders_AndTheirPermissions()
     {
-        if (!OperatingSystem.IsLinux()) return;
         var me = Environment.UserName;
         var data = Directory.CreateDirectory(Path.Combine(_tmp, "data")).FullName;
         var app = Directory.CreateDirectory(Path.Combine(_tmp, "evistool")).FullName;
@@ -223,10 +222,9 @@ public sealed class SystemdServiceTests : IDisposable
         Assert.Contains("service uninstall", text);
     }
 
-    [Fact]
+    [WindowsFact]
     public async Task ServiceCommand_OnWindows_SaysItIsForLinux()
     {
-        if (!OperatingSystem.IsWindows()) return;
         foreach (var sub in new[] { "install", "uninstall", "status" })
         {
             var (code, text) = await Agent("service", sub, "--lang", "en");
@@ -235,10 +233,9 @@ public sealed class SystemdServiceTests : IDisposable
         }
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task ServiceCommand_OnLinux_StatusOfAMissingService_AndNoInstallWithoutRoot()
     {
-        if (!OperatingSystem.IsLinux()) return;
         var systemd = Directory.Exists("/run/systemd/system");
         var name = "evistool-test-" + Guid.NewGuid().ToString("N")[..8];
 

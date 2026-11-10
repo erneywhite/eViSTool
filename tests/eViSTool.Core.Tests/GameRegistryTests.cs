@@ -43,10 +43,10 @@ public sealed class GameRegistryTests
         Assert.Equal([@"S:\Games\Vintagestory"], GameInstall.GameDirsFromUninstallEntries(entries));
     }
 
-    [Fact]
+    [UnixFact]
     public void OnOtherSystems_TheRegistryIsNotRead()
     {
-        if (OperatingSystem.IsWindows()) return; // на Windows — настоящий реестр машины: проверяем только, что не падает
+        // на Windows — настоящий реестр машины: проверяем только, что не падает
         Assert.Empty(GameInstall.RegistryInstallDirs());
     }
 

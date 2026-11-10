@@ -24,10 +24,10 @@ public sealed class WorldDbTests : IDisposable
     }
 
     // копия оборвалась (здесь: исходник не прочитать) — нет ни копии, ни недописанного файла
-    [Fact]
+    [WindowsFact]
     public void Snapshot_ThatFails_LeavesNothingBehind()
     {
-        if (!OperatingSystem.IsWindows()) return; // монопольное открытие файла есть только на Windows (пропуск — аудит, п. 6.12)
+        // монопольное открытие файла есть только на Windows (пропуск — аудит, п. 6.12)
         var source = Path.Combine(_dir, "world.vcdbs");
         File.WriteAllBytes(source, new byte[1024]);
         var target = Path.Combine(_dir, "copy.vcdbs");

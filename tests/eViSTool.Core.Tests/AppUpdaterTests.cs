@@ -80,10 +80,10 @@ public sealed class AppUpdaterTests : IDisposable
         return path;
     }
 
-    [Fact]
+    [WindowsFact]
     public void Install_SwapsFiles_KeepsData_AndLeavesOldForCleanup()
     {
-        if (!OperatingSystem.IsWindows()) return; // zip с eViSTool.exe — архив для Windows; для Linux — tar.gz (ниже)
+        // zip с eViSTool.exe — архив для Windows; для Linux — tar.gz (ниже)
         AppUpdater.Install(Zip(new() { ["eViSTool.exe"] = "new app", ["eViSTool.Agent.exe"] = "new agent", ["README.md"] = "readme" }), _app);
 
         Assert.Equal("new app", File.ReadAllText(Path.Combine(_app, "eViSTool.exe")));
@@ -99,19 +99,19 @@ public sealed class AppUpdaterTests : IDisposable
         Assert.False(File.Exists(Path.Combine(_app, ".previous-version.json")));
     }
 
-    [Fact]
+    [WindowsFact]
     public void Install_AcceptsArchiveWithAFolderInside()
     {
-        if (!OperatingSystem.IsWindows()) return; // zip с eViSTool.exe — архив для Windows
+        // zip с eViSTool.exe — архив для Windows
         AppUpdater.Install(Zip(new() { ["eViSTool-0.2.0/eViSTool.exe"] = "new app" }), _app);
         Assert.Equal("new app", File.ReadAllText(Path.Combine(_app, "eViSTool.exe")));
         Assert.Equal("old agent", File.ReadAllText(Path.Combine(_app, "eViSTool.Agent.exe")));
     }
 
-    [Fact]
+    [WindowsFact]
     public void Install_RefusesForeignArchive_AndRollsBackOnFailure()
     {
-        if (!OperatingSystem.IsWindows()) return; // zip с eViSTool.exe — архив для Windows
+        // zip с eViSTool.exe — архив для Windows
         Assert.Throws<InvalidOperationException>(() => AppUpdater.Install(Zip(new() { ["other.exe"] = "x" }), _app));
         Assert.Equal("old app", File.ReadAllText(Path.Combine(_app, "eViSTool.exe")));
 

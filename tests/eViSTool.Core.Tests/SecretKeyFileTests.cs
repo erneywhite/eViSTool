@@ -41,10 +41,9 @@ public sealed class SecretKeyFileTests : IDisposable
         Assert.Equal("123456789:AAHdqTcv", new SecretKeyFile(file).Unprotect(stored, Purpose));
     }
 
-    [Fact]
+    [UnixFact]
     public void OpenedKey_IsClosedBackTo600()
     {
-        if (OperatingSystem.IsWindows()) return;
         var file = Path.Combine(_dir, SecretKeyFile.FileName);
         var stored = new SecretKeyFile(file).Protect("s", Purpose);
         File.SetUnixFileMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead);

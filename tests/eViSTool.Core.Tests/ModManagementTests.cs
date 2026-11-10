@@ -141,10 +141,10 @@ public sealed class ModManagementTests : IDisposable
     }
 
     // modinfo.json мода-папки не прочитать (его держат открытым) — этот мод с ошибкой, остальные на месте
-    [Fact]
+    [WindowsFact]
     public void Scan_UnreadableFolderMod_DoesNotBreakTheScan()
     {
-        if (!OperatingSystem.IsWindows()) return; // монопольное открытие файла есть только на Windows (пропуск — аудит, п. 6.12)
+        // монопольное открытие файла есть только на Windows (пропуск — аудит, п. 6.12)
         var p = Server("""{ "ModPaths": [] }""");
         MakeZip(_mods, "carryon_1.0.0.zip", "carryon", "1.0.0");
         var dir = Directory.CreateDirectory(Path.Combine(_mods, "devmod")).FullName;

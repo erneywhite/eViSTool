@@ -118,10 +118,10 @@ public sealed class PlayTimeTests : IDisposable
 
     // учёт есть, но сейчас не читается (его держит другой процесс) — не «пустой»: Load говорит null, и поверх не пишут.
     // Раньше такой учёт считался пустым, и следующее сохранение затирало всё накопленное время
-    [Fact]
+    [WindowsFact]
     public void LockedLedger_IsNotTreatedAsEmpty()
     {
-        if (!OperatingSystem.IsWindows()) return; // монопольное открытие файла есть только на Windows (пропуск — см. аудит, п. 6.12)
+        // монопольное открытие файла есть только на Windows (пропуск — см. аудит, п. 6.12)
         var ledger = new PlayLedger();
         ledger.Merge([new PlaySession(Utc("26.10.2026 22:40:11"), Utc("26.10.2026 23:40:11"), null)]);
         ledger.Save(_profileId);

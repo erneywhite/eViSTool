@@ -23,12 +23,11 @@ public sealed class GameSessionTests : IDisposable
 
     private void Append(string file, IEnumerable<string> lines) => File.AppendAllLines(Path.Combine(Logs, file), lines);
 
-    [Fact]
+    [WindowsFact]
     public void LogTail_ReadsOnlyNewWholeLines_AndStartsOverOnANewFile()
     {
         // LogTail — для окна на Windows: новый файл лога узнаётся по времени создания, а на Linux .NET отдаёт вместо него
         // время последнего изменения (агент на Linux ошибки модов берёт из вывода сервера, не из логов)
-        if (!OperatingSystem.IsWindows()) return;
         var path = Path.Combine(Logs, "x.log");
         File.WriteAllText(path, "old\n");
         var tail = new LogTail(path, fromStart: false);

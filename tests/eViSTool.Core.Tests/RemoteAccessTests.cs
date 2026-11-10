@@ -31,10 +31,10 @@ public sealed class RemoteAccessTests : IDisposable
 
     // на Windows ключ и сертификат на диске зашифрованы (DPAPI): копия папки данных их не раскроет. Файлы прошлой
     // версии (ключ открытым текстом, обычный PFX) читаются и переписываются зашифрованными — код подключения прежний
-    [Fact]
+    [WindowsFact]
     public void OnWindows_KeyAndCertificateAreNotStoredInTheClear_AndOldFilesAreMigrated()
     {
-        if (!OperatingSystem.IsWindows()) return; // на Linux — файл только владельцу, без шифрования (пропуск — аудит, п. 6.12)
+        // на Linux — файл только владельцу, без шифрования (пропуск — аудит, п. 6.12)
         var s = RemoteAccess.Enable("p", _dir);
         Assert.DoesNotContain(s.Key, File.ReadAllText(RemoteAccess.FileFor("p", _dir)));
         Assert.StartsWith("evis-pfx1:", File.ReadAllText(RemoteAccess.CertFile("p", _dir)));

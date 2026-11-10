@@ -91,10 +91,10 @@ public sealed class ReleaseMarksTests : IDisposable
         Assert.Empty(ReleaseMarks.Load(MarksFile));
     }
 
-    [Fact]
+    [WindowsFact]
     public void Update_LockedFile_DoesNotOverwriteOtherMarks()
     {
-        if (!OperatingSystem.IsWindows()) return; // монопольное открытие держит файл только на Windows (аудит 6.12)
+        // монопольное открытие держит файл только на Windows (аудит 6.12)
         // аудит 4.4: файл не прочитался (занят) — раньше поверх ложилась одна отметка вместо всех
         ReleaseMarks.Update(MarksFile, new ModInfo { ModId = "other", Version = "1.0.0" }, "other_1.0.1.zip", Rel("1.0.1"));
         using (new FileStream(MarksFile, FileMode.Open, FileAccess.Read, FileShare.None))
