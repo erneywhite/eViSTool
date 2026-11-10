@@ -72,7 +72,21 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
     public async Task ImportFileAsync(string path)
     {
         if (owner.Profile is not { } profile || owner.IsBusy || owner.ChangeTarget() is not { } target) return;
+        // занято до первого ожидания (как в AddFilesAsync): пока сканируется цель и открыто окно подтверждения, вторая
+        // установка (перетащенный архив, «Обновить всё») не должна начаться в тот же профиль
+        owner.IsBusy = true;
+        try
+        {
+            await ImportLockedAsync(path, profile, target);
+        }
+        finally
+        {
+            owner.IsBusy = false;
+        }
+    }
 
+    private async Task ImportLockedAsync(string path, Core.Profiles.ResolvedProfile profile, ModTarget target)
+    {
         PackFile pack;
         try
         {
@@ -102,7 +116,6 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
             if (packChoice.Plan is { } chosen) plan = chosen; // ответ про клиентские моды на сервере
             if (!await installer.ConfirmIfRunningAsync(target)) return;
 
-            owner.IsBusy = true;
             PackImportResult result;
             var copyProblems = new List<string>();
             // поставленные моды — копиями сюда: потом предложим «Установить также в» связанные профили
@@ -125,10 +138,19 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
                     return yes;
                 }
                 // не своя машина (агент, хостер) — моды по одному через цель; своя — прямо в папки профиля
-                result = await Task.Run(() => target.IsLocal
-                    ? importer.ApplyAsync(pack, plan, profile, mirror, applyConfig,
-                        ModBackupStore.ForProfile(profile.Profile), progress, confirmChanged: AskChanged)
-                    : importer.ApplyToTargetAsync(pack, plan, target, mirror, applyConfig, progress, confirmChanged: AskChanged));
+                try
+                {
+                    result = await Task.Run(() => target.IsLocal
+                        ? importer.ApplyAsync(pack, plan, profile, mirror, applyConfig,
+                            ModBackupStore.ForProfile(profile.Profile), progress, confirmChanged: AskChanged)
+                        : importer.ApplyToTargetAsync(pack, plan, target, mirror, applyConfig, progress, confirmChanged: AskChanged));
+                }
+                catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException
+                                               or HttpRequestException or TimeoutException or TaskCanceledException)
+                {
+                    // импорт оборвался посреди: часть модов уже стоит — отчёт всё равно нужен, таблица перечитается в нём
+                    result = new PackImportResult([], [Loc.T("pack.interrupted", ex.Message)]);
+                }
                 progress.Close(); // отчёты, ещё не дошедшие из очереди, не затрут итог
                 // поставленное на сервер у хостера — в оповещение «Обновлены моды» (уйдёт с итогом операции)
                 owner.HostedWatch?.ModsChanged(target, result.Done, []);
@@ -143,7 +165,7 @@ internal sealed class ModPackActions(ModsViewModel owner, ModInstallService inst
             }
             finally
             {
-                owner.IsBusy = false;
+                owner.IsBusy = false; // отчёт перечитывает таблицу — для этого вкладка должна быть свободна
                 try { if (Directory.Exists(keep)) Directory.Delete(keep, recursive: true); } catch (IOException) { }
             }
             await owner.ReportAsync(Loc.T("report.imported", pack.Manifest.Name), [.. result.Done, .. alsoDone],

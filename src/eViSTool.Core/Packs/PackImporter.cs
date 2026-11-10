@@ -296,7 +296,9 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
                     file = pack.HasFile(m) ? pack.ExtractMod(m, temp)
                         : await (Download ?? DownloadExactAsync)(m, ct).ConfigureAwait(false);
                 }
-                catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or TaskCanceledException && !ct.IsCancellationRequested)
+                // зависшая загрузка (ModDbClient бросает TimeoutException) — тоже строкой отчёта, а не обрывом всего импорта
+                catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or TaskCanceledException
+                                               or TimeoutException or UnauthorizedAccessException && !ct.IsCancellationRequested)
                 {
                     problems.Add($"{m.Name} {m.Version}: {ex.Message}");
                     continue;
@@ -344,8 +346,10 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
                         File.Copy(file, System.IO.Path.Combine(dir, System.IO.Path.GetFileName(file)), overwrite: true);
                     }
                 }
+                // агент удалённого сервера не ответил вовремя (TaskCanceledException, TimeoutException) — этот мод не встал,
+                // остальные идут дальше
                 catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException
-                                               or HttpRequestException)
+                                               or HttpRequestException or TimeoutException or TaskCanceledException && !ct.IsCancellationRequested)
                 {
                     problems.Add($"{info.Name}: {ex.Message}");
                 }

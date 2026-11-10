@@ -83,6 +83,29 @@ public sealed class PackTests : IDisposable
         Assert.Contains("hud_2.0.0.zip", Directory.GetFiles(dst.InstallDir!).Select(Path.GetFileName));
     }
 
+    // загрузка одного мода зависла (ModDbClient бросает TimeoutException) — строка в отчёте, остальные моды ставятся
+    [Fact]
+    public async Task StalledDownload_IsReported_OthersAreInstalled()
+    {
+        var src = Profile("src");
+        Mod(src, "alpha", "1.0.0");
+        Mod(src, "gamma", "3.0.0");
+        src = ProfileResolver.Resolve(src.Profile);
+        using var pack = PackFile.Open(BuildPack(src, bundle: false)); // alpha «на модбазе» — качается, gamma внутри
+
+        var dst = Profile("dst");
+        var plan = PackImporter.Plan(pack.Manifest, dst, ModUpdateService.ScanLocal(dst));
+        using var db = new ModDbClient();
+        var importer = new PackImporter(db, new ModUpdater(db, Path.Combine(_root, "dl")))
+        {
+            Download = (_, _) => throw new TimeoutException("загрузка зависла"),
+        };
+        var result = await importer.ApplyAsync(pack, plan, dst, mirror: false, applyConfig: false, new ModBackupStore(Path.Combine(_root, "backups")));
+
+        Assert.Contains(result.Problems, p => p.Contains("загрузка зависла"));
+        Assert.Equal(["gamma_3.0.0.zip"], Directory.GetFiles(dst.InstallDir!).Select(Path.GetFileName));
+    }
+
     // в клиентский профиль клиентские моды ставятся как всегда
     [Fact]
     public void ImportToClient_KeepsClientMods()
