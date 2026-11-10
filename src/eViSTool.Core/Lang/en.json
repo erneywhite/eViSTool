@@ -1,5 +1,6 @@
 {
   "backup.noSpaceCopy": "Not enough space on drive {0}: the world copy needs about {1} MB, {2} MB is free.",
+  "dl.tooBig": "The file is too big for a mod ({0} MB); the download was cancelled.",
   "icon.color.none": "No colour",
   "icon.color.moss": "moss",
   "icon.color.pine": "pine",

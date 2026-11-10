@@ -105,9 +105,11 @@ public sealed class ModDbClient : IDisposable
         }
     }
 
-    /// <summary>Скачивает файл (архив мода с CDN модбазы). Пишет во временный файл и переименовывает в конце.</summary>
     /// <summary>Сколько ждать следующего куска файла: дольше — скачивание считается зависшим.</summary>
     public TimeSpan StallTimeout { get; init; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>Больше этого мод не бывает (самые большие — сотни мегабайт); такой файл не качаем.</summary>
+    public const long MaxFileSize = 2L * 1024 * 1024 * 1024;
 
     /// <summary>
     /// Файлы модов модбаза отдаёт с https://*.vintagestory.at (сейчас moddbcdn). Адрес приходит из её ответа, но
@@ -118,12 +120,17 @@ public sealed class ModDbClient : IDisposable
         && (uri.Host.Equals("vintagestory.at", StringComparison.OrdinalIgnoreCase)
             || uri.Host.EndsWith(".vintagestory.at", StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>Скачивает файл (архив мода с CDN модбазы). Пишет во временный файл и переименовывает в конце.</summary>
     public async Task DownloadAsync(string url, string destPath, IProgress<double>? progress = null, CancellationToken ct = default)
     {
         if (!IsModDbFileUrl(url)) throw new InvalidDataException(Loc.T("dl.badUrl", url));
         using var resp = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        // по перенаправлению можно уйти куда угодно — проверяем и адрес, откуда файл пришёл на самом деле
+        if (resp.RequestMessage?.RequestUri is { } final && !IsModDbFileUrl(final.AbsoluteUri))
+            throw new InvalidDataException(Loc.T("dl.badUrl", final.AbsoluteUri));
         resp.EnsureSuccessStatusCode();
         var total = resp.Content.Headers.ContentLength;
+        if (total > MaxFileSize) throw new InvalidDataException(Loc.T("dl.tooBig", total.Value / (1024 * 1024)));
 
         Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
         var tmp = destPath + ".part";
@@ -143,6 +150,7 @@ public sealed class ModDbClient : IDisposable
                     if ((n = await src.ReadAsync(buffer, stall.Token).ConfigureAwait(false)) <= 0) break;
                     await dst.WriteAsync(buffer.AsMemory(0, n), ct).ConfigureAwait(false);
                     read += n;
+                    if (read > MaxFileSize) throw new InvalidDataException(Loc.T("dl.tooBig", read / (1024 * 1024)));
                     if (total > 0) progress?.Report((double)read / total.Value);
                 }
             }
