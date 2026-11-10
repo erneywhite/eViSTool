@@ -23,8 +23,14 @@ Most interesting are the parts that deal with the network and with files on disk
 
 - **Remote management** — the agent's remote listener: the TLS connection and certificate pinning, the key check
   and the lockout after wrong keys, the commands it accepts, uploaded mod archives.
-- **Connection codes** — how they are generated, stored (DPAPI) and shown.
-- **Self-update** — downloading releases and verifying their SHA-256 checksums.
+- **Secrets at rest** — connection codes, notification tokens and the agent's remote key and certificate. On Windows
+  they are encrypted with DPAPI for the current user. On Linux there is no DPAPI: secrets are encrypted with
+  AES-256-GCM using a per-user key file readable only by its owner (mode 600), and the agent's key and certificate
+  are owner-only files.
+- **Self-update** — downloading releases, the SHA-256 checksum, and the ECDSA P-256 signature of every update
+  archive. The signing key exists only in the release build on GitHub Actions; the public key is built into the
+  program, and an archive without a valid signature, or with a version that does not match the release, is not
+  installed.
 - **Mods, modpacks and backups** — installing archives and modpacks, restoring backups: anything that could write
   outside the folders it should, or delete something it should not.
 

@@ -2,10 +2,11 @@
 
 **English** · [Русский](linux.ru.md)
 
-There is no eViSTool window on Linux yet: only the agent, `eViSTool.Agent`, runs there. It looks after the Vintage Story
+This page is about a server machine. The Linux archive has two programs: the eViSTool window (`eViSTool`, for a machine
+with a desktop) and the agent (`eViSTool.Agent`). On a server only the agent is needed. It looks after the Vintage Story
 server: starts it, brings it back after a crash, makes backups and scheduled restarts, and sends notifications. You
-control it from the eViSTool window on Windows with a connection code, like any remote server (see
-[Remote management](../README.md#remote-management) in the README). On the machine itself the agent is installed as a systemd
+control it from the eViSTool window on another computer, Windows or Linux, with a connection code, like any remote
+server (see [Remote management](../README.md#remote-management) in the README). On the machine itself the agent is installed as a systemd
 service and starts with the machine.
 
 ## What you need
@@ -13,7 +14,7 @@ service and starts with the machine.
 - Ubuntu or Debian on x64 with systemd. Tested on Ubuntu Server 24.04.
 - Root access (`sudo`).
 - .NET 10 for the Vintage Story server itself. The agent doesn't need .NET: it ships with its own runtime.
-- eViSTool on Windows to control the server from.
+- The eViSTool window on another computer (Windows or Linux) to control the server from.
 
 ## The Vintage Story server
 
@@ -44,21 +45,22 @@ settings in the `data` folder next to it, just like on Windows.
 ### 1. Download and unpack
 
 The `eViSTool-<version>-linux-x64.tar.gz` archive is on the [ModDB page](https://mods.vintagestory.at/evistoollinux) and the
-[Releases](https://github.com/erneywhite/eViSTool/releases) page. Inside is a single executable, `eViSTool.Agent`,
-and the docs.
+[Releases](https://github.com/erneywhite/eViSTool/releases) page. Inside are two executables, the window `eViSTool`
+and the agent `eViSTool.Agent`, and the docs. Put the latest version from the Releases page into `VER`:
 
 ```sh
 cd /tmp
-wget https://github.com/erneywhite/eViSTool/releases/download/v0.10.0/eViSTool-0.10.0-linux-x64.tar.gz
+VER=1.0.12   # the latest version from the Releases page
+wget https://github.com/erneywhite/eViSTool/releases/download/v$VER/eViSTool-$VER-linux-x64.tar.gz
 sudo mkdir -p /home/vintagestory/evistool
-sudo tar -xzf eViSTool-0.10.0-linux-x64.tar.gz -C /home/vintagestory/evistool
+sudo tar -xzf eViSTool-$VER-linux-x64.tar.gz -C /home/vintagestory/evistool
 sudo chown -R vintagestory:vintagestory /home/vintagestory/evistool
 cd /home/vintagestory/evistool
 ```
 
 The same files come as `eViSTool-<version>-linux-x64.zip` too (the ModDB page has only that one). It unpacks with
 `unzip` (`sudo apt install unzip`), keeping the agent executable:
-`sudo unzip eViSTool-0.10.0-linux-x64.zip -d /home/vintagestory/evistool`, then the same `chown`.
+`sudo unzip eViSTool-$VER-linux-x64.zip -d /home/vintagestory/evistool`, then the same `chown`.
 
 Don't skip the `chown`. The agent runs as `vintagestory`, the owner of the server data, and writes its settings, keys
 and, when updating, new files into its folder.
@@ -89,14 +91,14 @@ sudo -u vintagestory ./eViSTool.Agent remote enable --host 203.0.113.5
 sudo -u vintagestory ./eViSTool.Agent remote code
 ```
 
-In `--host`, give the address your Windows computer will use to reach this machine: the local one on a home network
+In `--host`, give the address the computer with the eViSTool window will use to reach this machine: the local one on a home network
 (like `192.168.1.20`), the public IP or a domain from the internet. The address goes into the connection code; you can
 change it later with `remote host <address>`.
 
 `remote code` prints the connection code. It holds the address, port, key and the server certificate's fingerprint, so
 treat it like a password. If the code leaks, `remote new-key` changes the key and the old code stops working.
 
-In the eViSTool window on Windows: "Profiles" → "+ Server" → "Server on another computer?" → "Connect by code…",
+In the eViSTool window on the other computer: "Profiles" → "+ Server" → "Server on another computer?" → "Connect by code…",
 paste the code, click "Check connection" and create the profile.
 
 ### 5. The remote access port
@@ -203,8 +205,8 @@ sudo systemctl start evistool
 
 ## Updating eViSTool
 
-The easy way is from the eViSTool window on Windows: when your version is newer, the "Server" tab shows an "Update on
-the server" button. The agent downloads the same version from GitHub, checks its checksum, stops the server with a
+The easy way is from the eViSTool window: when its version is newer, the "Server" tab shows an "Update on
+the server" button. The agent downloads the same version from GitHub, checks its checksum and signature, stops the server with a
 world save, replaces its own files and exits, and systemd starts the new version. If the server was running, it starts
 again; if it was stopped, it stays stopped.
 
@@ -254,7 +256,7 @@ world stay where they are. If you opened the remote access port, close it: `sudo
   or `/stop` in its console.
 - If the name `evistool` is taken by someone else's service, pick another one with `--name`.
 
-If the Windows window can't connect, check `remote status` (is access on, which port), whether the port is open in
+If the eViSTool window can't connect, check `remote status` (is access on, which port), whether the port is open in
 the firewall and on the router, and whether the address in the code fits where you connect from: a local address only
 works inside the same network.
 

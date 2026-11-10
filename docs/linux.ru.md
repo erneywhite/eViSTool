@@ -2,9 +2,10 @@
 
 [English](linux.md) · **Русский**
 
-Окна eViSTool на Linux пока нет, там работает только агент `eViSTool.Agent`. Он держит сервер Vintage Story: запускает его,
-поднимает после падения, делает резервные копии и перезапуски по расписанию, рассылает оповещения. Управляешь им из окна
-eViSTool на Windows по коду подключения, как любым удалённым сервером (см. [«Удалённое управление»](../README.ru.md#удалённое-управление) в README). На самой
+Эта страница про машину с сервером. В архиве для Linux две программы: окно eViSTool (`eViSTool`, для машины с рабочим
+столом) и агент `eViSTool.Agent`. На сервере нужен только агент. Он держит сервер Vintage Story: запускает его, поднимает
+после падения, делает резервные копии и перезапуски по расписанию, рассылает оповещения. Управляешь им из окна eViSTool на
+другом компьютере, с Windows или Linux, по коду подключения, как любым удалённым сервером (см. [«Удалённое управление»](../README.ru.md#удалённое-управление) в README). На самой
 машине агент ставится службой systemd и поднимается вместе с ней.
 
 ## Что понадобится
@@ -12,7 +13,7 @@ eViSTool на Windows по коду подключения, как любым у
 - Ubuntu или Debian на x64 с systemd. Проверено на Ubuntu Server 24.04.
 - Права root (`sudo`).
 - .NET 10 для самого сервера Vintage Story. Агенту .NET не нужен: он собран вместе со своей средой.
-- eViSTool на Windows, из которого будешь управлять сервером.
+- Окно eViSTool на другом компьютере (Windows или Linux), из которого будешь управлять сервером.
 
 ## Сервер Vintage Story
 
@@ -42,20 +43,22 @@ sudo ./server.sh setup
 ### 1. Скачать и распаковать
 
 Архив `eViSTool-<версия>-linux-x64.tar.gz` лежит на [странице модбазы](https://mods.vintagestory.at/evistoollinux) и на странице
-[Releases](https://github.com/erneywhite/eViSTool/releases). Внутри один исполняемый файл `eViSTool.Agent` и документы.
+[Releases](https://github.com/erneywhite/eViSTool/releases). Внутри окно `eViSTool`, агент `eViSTool.Agent` и документы.
+В `VER` впиши последнюю версию со страницы Releases:
 
 ```sh
 cd /tmp
-wget https://github.com/erneywhite/eViSTool/releases/download/v0.10.0/eViSTool-0.10.0-linux-x64.tar.gz
+VER=1.0.12   # последняя версия со страницы Releases
+wget https://github.com/erneywhite/eViSTool/releases/download/v$VER/eViSTool-$VER-linux-x64.tar.gz
 sudo mkdir -p /home/vintagestory/evistool
-sudo tar -xzf eViSTool-0.10.0-linux-x64.tar.gz -C /home/vintagestory/evistool
+sudo tar -xzf eViSTool-$VER-linux-x64.tar.gz -C /home/vintagestory/evistool
 sudo chown -R vintagestory:vintagestory /home/vintagestory/evistool
 cd /home/vintagestory/evistool
 ```
 
 Те же файлы есть и в `eViSTool-<версия>-linux-x64.zip` (на ModDB лежит только он). Распаковывается он через `unzip`
 (`sudo apt install unzip`), агент остаётся исполняемым:
-`sudo unzip eViSTool-0.10.0-linux-x64.zip -d /home/vintagestory/evistool`, дальше тот же `chown`.
+`sudo unzip eViSTool-$VER-linux-x64.zip -d /home/vintagestory/evistool`, дальше тот же `chown`.
 
 `chown` обязателен. Агент работает от пользователя `vintagestory`, владельца данных сервера, и пишет в свою папку
 настройки, ключи и при обновлении новые файлы.
@@ -86,14 +89,14 @@ sudo -u vintagestory ./eViSTool.Agent remote enable --host 203.0.113.5
 sudo -u vintagestory ./eViSTool.Agent remote code
 ```
 
-В `--host` укажи адрес, по которому до этой машины достучится твой компьютер с Windows: в домашней сети локальный
+В `--host` укажи адрес, по которому до этой машины достучится компьютер с окном eViSTool: в домашней сети локальный
 (вроде `192.168.1.20`), из интернета внешний IP или домен. Адрес попадает в код подключения, поменять его можно позже
 командой `remote host <адрес>`.
 
 `remote code` печатает код подключения. В нём адрес, порт, ключ и отпечаток сертификата сервера, поэтому обращайся с ним
 как с паролем. Если код утёк, `remote new-key` сменит ключ, и старый код перестанет работать.
 
-В окне eViSTool на Windows: «Профили» → «+ Сервер» → «Сервер на другом компьютере?» → «Подключить по коду…», вставь
+В окне eViSTool на другом компьютере: «Профили» → «+ Сервер» → «Сервер на другом компьютере?» → «Подключить по коду…», вставь
 код, нажми «Проверить подключение» и создай профиль.
 
 ### 5. Порт удалённого доступа
@@ -197,8 +200,8 @@ sudo systemctl start evistool
 
 ## Обновление eViSTool
 
-Проще всего из окна eViSTool на Windows: когда у тебя версия новее, на вкладке «Сервер» появляется кнопка «Обновить на
-сервере». Агент скачивает архив той же версии с GitHub, сверяет контрольную сумму, останавливает сервер с сохранением мира,
+Проще всего из окна eViSTool: когда его версия новее, на вкладке «Сервер» появляется кнопка «Обновить на
+сервере». Агент скачивает архив той же версии с GitHub, сверяет контрольную сумму и подпись, останавливает сервер с сохранением мира,
 заменяет свои файлы и выходит, а systemd запускает новую версию. Если сервер работал, он запустится снова, если был
 остановлен, то останется остановленным.
 
@@ -247,7 +250,7 @@ sudo rm -rf /home/vintagestory/.local/share/eViSTool /home/vintagestory/.net/eVi
   консоли.
 - Если имя `evistool` занято чужой службой, возьми другое через `--name`.
 
-Окно на Windows не подключается — проверь `remote status` (включён ли доступ, какой порт), открыт ли порт в межсетевом
+Окно eViSTool не подключается — проверь `remote status` (включён ли доступ, какой порт), открыт ли порт в межсетевом
 экране и на роутере и подходит ли адрес из кода к тому, откуда подключаешься: локальный адрес работает только внутри
 той же сети.
 
