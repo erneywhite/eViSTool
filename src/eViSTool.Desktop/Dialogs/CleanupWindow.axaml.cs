@@ -24,7 +24,14 @@ public partial class CleanupWindow : DialogWindow
     protected override async void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
-        if (_model is { } model) await model.StartAsync();
+        if (_model is not { } model) return;
+        // async void: исключение отсюда уронило бы программу — показать его в окне и записать
+        try { await model.StartAsync(); }
+        catch (Exception ex)
+        {
+            Platform.CrashLog.Write(ex);
+            model.Status = ex.Message;
+        }
     }
 
     protected override void OnClosed(EventArgs e)

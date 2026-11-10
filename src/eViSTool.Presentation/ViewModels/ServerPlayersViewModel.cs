@@ -305,7 +305,11 @@ public sealed partial class ServerPlayersViewModel : ObservableObject
     /// </summary>
     private async Task ApplyAsync(Func<IEnumerable<string>>? commands, PlayerFileEdit? edit)
     {
+        // по одному: два быстрых щелчка (роль и белый список) иначе шли разом — ожидание ответа сервера (_awaitReply)
+        // путалось, а правки файлов остановленного сервера читали и писали одни и те же файлы одновременно
+        _pending++;
         IsBusy = true;
+        await _applyGate.WaitAsync();
         ErrorText = "";
         try
         {
@@ -340,8 +344,15 @@ public sealed partial class ServerPlayersViewModel : ObservableObject
             ErrorText = ex.Message;
             await LoadAsync();
         }
-        finally { IsBusy = false; }
+        finally
+        {
+            _applyGate.Release();
+            if (--_pending == 0) IsBusy = false;
+        }
     }
+
+    private readonly SemaphoreSlim _applyGate = new(1, 1);
+    private int _pending; // сколько изменений ждут или идут: «занято» снимается после последнего
 
     private async Task ReloadLaterAsync(int generation)
     {

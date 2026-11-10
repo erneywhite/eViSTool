@@ -215,8 +215,22 @@ public sealed partial class CleanupViewModel : ObservableObject
 
         IsBusy = true;
         Status = Loc.T("clean.removing");
-        var (freed, problems) = await Task.Run(() => DiskCleanup.Remove(chosen, _services.Trash));
-        IsBusy = false;
+        long freed;
+        IReadOnlyList<string> problems;
+        try
+        {
+            (freed, problems) = await Task.Run(() => DiskCleanup.Remove(chosen, _services.Trash));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            // корзина недоступна или диск отвалился: окно не должно остаться «занятым» с серой кнопкой
+            Status = Loc.T("clean.problems", ex.Message);
+            return;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
         HasRecycled |= freed > 0;
         await ScanAsync();
         Status = Loc.T("clean.done", WorldCopiesViewModel.SizeText(freed))
