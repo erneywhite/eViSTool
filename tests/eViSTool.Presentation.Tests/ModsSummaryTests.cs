@@ -286,6 +286,8 @@ public sealed class ModsSummaryTests : IDisposable
         var db = new FakeModDb();
         var mods = Main(db, ClientProfile("a")).Mods;
         Sta.WaitFor(() => mods.ModCount == 3);
+        mods.Selected = mods.Rows[0];
+        var selectedFile = mods.Selected.FilePath;
         var changes = new List<string?>();
         mods.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
         try
@@ -296,6 +298,9 @@ public sealed class ModsSummaryTests : IDisposable
             foreach (var name in new[] { nameof(ModsViewModel.SummaryTitle), nameof(ModsViewModel.SummaryEnabledText),
                          nameof(ModsViewModel.SummaryProblemsText), nameof(ModsViewModel.SummaryCheckedText) })
                 Assert.Contains(name, changes);
+            // подписи строк — на новом языке, а выбор остался (раньше смена языка сбрасывала его, как смена профиля)
+            Assert.All(mods.Rows, r => Assert.Contains(r.SideText, new[] { Loc.T("mods.sideColClient"), Loc.T("mods.sideColServer"), Loc.T("mods.sideColBoth") }));
+            Assert.Equal(selectedFile, mods.Selected?.FilePath);
         }
         finally
         {

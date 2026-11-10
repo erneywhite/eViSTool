@@ -217,6 +217,11 @@ public sealed partial class ModsViewModel : ObservableObject
             OnPropertyChanged(name);
         WorldJobText = _worldJob.Text;
         RefreshSaidJob();
+        // строки и карточка собирают подписи (статус, сторона, заметки) при создании — строим их заново из того, что уже
+        // знаем: без сети и без сброса проверки, выбора и ответов модбазы (раньше смена языка делала всё это, как смена профиля)
+        foreach (var row in Rows) _renew.Add(row.FilePath);
+        Rebuild();
+        RefreshCategoryLists();
     }
 
     /// <summary>Ширина карточки (тянется разделителем, запоминается). Нижняя граница — как минимум колонки в окне (280):

@@ -70,8 +70,8 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(DataLocationText));
         foreach (var p in Profiles) p.NotifyLanguageChanged();
         NotifyPlay();
-        Mods.OnProfileSwitched();
-        Mods.OnLanguageChanged();
+        Mods.OnLanguageChanged(); // не OnProfileSwitched: тот сбрасывал проверку, выбор и снова шёл в сеть
+        RefreshPlayTime(allProfiles: false); // «Время в игре» собирает подписи в коде
         Catalog.OnLanguageChanged();
         Server.OnLanguageChanged();
     }
