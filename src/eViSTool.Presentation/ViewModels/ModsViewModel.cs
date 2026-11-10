@@ -347,6 +347,12 @@ public sealed partial class ModsViewModel : ObservableObject
     {
         _disk.SetActive(active);
         _hosted.SetActive(active);
+        // профили могли удалить или переименовать на «Профилях», пока здесь был выбор нескольких модов
+        if (active)
+        {
+            OnPropertyChanged(nameof(CopyTargets));
+            OnPropertyChanged(nameof(HasCopyTargets));
+        }
         // «проверены сегодня, 23:40» после полуночи — уже «вчера»: пересчитать при заходе на вкладку и в полночь, пока она открыта
         if (active) OnPropertyChanged(nameof(SummaryCheckedText));
         if (active) ArmMidnight();

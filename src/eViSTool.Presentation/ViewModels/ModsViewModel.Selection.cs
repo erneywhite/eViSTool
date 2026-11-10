@@ -231,6 +231,7 @@ public sealed partial class ModsViewModel
         if (IsBusy || !IsLocalProfile) return;
         var rows = SelectedRows.Where(r => r.Local.Info is not null).ToList();
         if (rows.Count == 0) return;
+        if (!_main.Profiles.Contains(to)) return; // профиль удалили, а пункт меню ещё остался
         if (ModTarget.For(to.Model) is not { } target)
         {
             Error(ModTarget.UnreadableText(to.Model));
