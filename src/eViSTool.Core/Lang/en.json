@@ -3106,5 +3106,6 @@
   "ws.worldWidth.value.512000": "512k blocks",
   "ws.worldWidth.value.600000": "600k blocks",
   "ws.worldWidth.value.64": "64 blocks",
-  "ws.worldWidth.value.8192000": "8 mil blocks"
+  "ws.worldWidth.value.8192000": "8 mil blocks",
+  "zip.entryTooBig": "The file \"{0}\" in the archive is larger than {1} MB, not reading it."
 }

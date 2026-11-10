@@ -3106,5 +3106,6 @@
   "ws.worldWidth.value.512000": "512 тыс. блоков",
   "ws.worldWidth.value.600000": "600 тыс. блоков",
   "ws.worldWidth.value.64": "64 блока",
-  "ws.worldWidth.value.8192000": "8 млн блоков"
+  "ws.worldWidth.value.8192000": "8 млн блоков",
+  "zip.entryTooBig": "Файл «{0}» в архиве больше {1} МБ — не читаю."
 }

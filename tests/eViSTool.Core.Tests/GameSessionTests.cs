@@ -44,6 +44,21 @@ public sealed class GameSessionTests : IDisposable
     }
 
     [Fact]
+    public void LogTail_KeepsLettersCutInHalf_AndFlushesTheLastLine()
+    {
+        // аудит 4.7: кусок, оборванный посреди буквы UTF-8, не портит её; недописанная строка отдаётся при закрытии
+        var path = Path.Combine(Logs, "y.log");
+        var bytes = System.Text.Encoding.UTF8.GetBytes("привет\nмир");
+        File.WriteAllBytes(path, bytes[..3]); // «п» и половина «р»
+        var tail = new LogTail(path, fromStart: true);
+        Assert.Empty(tail.ReadNew());
+        using (var f = new FileStream(path, FileMode.Append)) f.Write(bytes, 3, bytes.Length - 3);
+        Assert.Equal(["привет"], tail.ReadNew());
+        Assert.Equal(["мир"], tail.Flush());
+        Assert.Empty(tail.ReadNew());
+    }
+
+    [Fact]
     public void WorldClosedByTheBuiltInServer_IsReportedWhileTheGameStillRuns()
     {
         var client = Sample("client-main-disconnected.log");

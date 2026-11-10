@@ -113,8 +113,8 @@ public sealed class ModFingerprints
                 if (!name.Contains("/lang/", StringComparison.OrdinalIgnoreCase) || !name.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) continue;
                 try
                 {
-                    using var reader = new StreamReader(read());
-                    if (JToken.Parse(reader.ReadToEnd()) is not JObject lang) continue;
+                    using var stream = read();
+                    if (JToken.Parse(Platform.BoundedRead.Text(stream, name: name)) is not JObject lang) continue;
                     foreach (var p in lang.Properties())
                         if (p.Value.Type == JTokenType.String) map.TryAdd(p.Value.ToString(), mod);
                 }

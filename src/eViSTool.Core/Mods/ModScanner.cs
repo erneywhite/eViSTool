@@ -96,8 +96,7 @@ public static class ModScanner
                     : Loc.T("scan.noModInfo"));
             }
 
-            using var reader = new StreamReader(entry.Open());
-            var json = reader.ReadToEnd();
+            var json = Platform.BoundedRead.Text(entry); // предел: архив-«бомба» не съест память
             return Read(zipPath, () => json);
         }
         catch (InvalidDataException)

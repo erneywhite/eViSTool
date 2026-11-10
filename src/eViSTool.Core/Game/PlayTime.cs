@@ -26,7 +26,7 @@ public static class PlaySessions
         var result = new List<PlaySession>();
         string? server = null;
         DateTime? start = null, last = null;
-        foreach (var e in GameLog.Parse(lines))
+        foreach (var e in GameLog.Enumerate(lines))
         {
             if (!DateTime.TryParse(e.Time, culture, DateTimeStyles.None, out var local)) continue;
             var at = ToUtc(local, last, zone);
@@ -59,7 +59,7 @@ public static class PlaySessions
         culture ??= CultureInfo.CurrentCulture;
         var result = new List<(DateTime, string)>();
         DateTime? last = null;
-        foreach (var e in GameLog.Parse(lines))
+        foreach (var e in GameLog.Enumerate(lines))
         {
             if (!e.Message.StartsWith("Savegame ", StringComparison.Ordinal) || !e.Message.EndsWith(" loaded", StringComparison.Ordinal)) continue;
             if (!DateTime.TryParse(e.Time, culture, DateTimeStyles.None, out var local)) continue;
@@ -185,14 +185,27 @@ public sealed class PlayLedger
         return changed;
     }
 
-    /// <summary>Лог целиком; игра в это время может его дописывать.</summary>
-    private static List<string> ReadShared(string path)
+    /// <summary>
+    /// Лог по строкам, не целиком в память; игра в это время может его дописывать. Строка длиннее предела обрезается:
+    /// время входа и выхода — в начале строки, а склеенный мусор без переводов строки не должен съесть память.
+    /// </summary>
+    private static IEnumerable<string> ReadShared(string path)
     {
+        const int MaxLine = 64 * 1024;
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         using var reader = new StreamReader(stream);
-        var lines = new List<string>();
-        while (reader.ReadLine() is { } line) lines.Add(line);
-        return lines;
+        var line = new System.Text.StringBuilder();
+        int c;
+        while ((c = reader.Read()) >= 0)
+        {
+            if (c == '\n')
+            {
+                yield return line.ToString().TrimEnd('\r');
+                line.Clear();
+            }
+            else if (line.Length < MaxLine) line.Append((char)c);
+        }
+        if (line.Length > 0) yield return line.ToString().TrimEnd('\r');
     }
 
     public static string FileFor(string profileId) => System.IO.Path.Combine(AppPaths.Root, "playtime", profileId + ".json");

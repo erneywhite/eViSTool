@@ -31,8 +31,7 @@ public sealed class PackFile : IDisposable
         {
             var entry = zip.GetEntry(PackManifest.FileName)
                         ?? throw new InvalidDataException(Loc.T("pack.notAPack", System.IO.Path.GetFileName(path)));
-            using var reader = new StreamReader(entry.Open());
-            var manifest = JsonConvert.DeserializeObject<PackManifest>(reader.ReadToEnd())
+            var manifest = JsonConvert.DeserializeObject<PackManifest>(Platform.BoundedRead.Text(entry))
                            ?? throw new InvalidDataException(Loc.T("pack.notAPack", System.IO.Path.GetFileName(path)));
             if (manifest.Format > 1) throw new InvalidDataException(Loc.T("pack.newerFormat"));
             return new PackFile(path, zip, manifest);
@@ -54,7 +53,7 @@ public sealed class PackFile : IDisposable
         Directory.CreateDirectory(tempDir);
         // имя из манифеста — только имя: «..\..\x» записал бы файл за пределы временной папки
         var dest = PathRules.FileIn(tempDir, mod.FileName) ?? throw new InvalidDataException(Loc.T("pack.badFileName", mod.FileName));
-        entry.ExtractToFile(dest, overwrite: true);
+        Platform.BoundedRead.ExtractToFile(entry, dest);
         return dest;
     }
 
@@ -244,13 +243,12 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
                         skipped.Add(Loc.T("pack.configNotText", rel));
                         continue;
                     }
-                    string text;
-                    using (var reader = new StreamReader(entry.Open())) text = await reader.ReadToEndAsync(c).ConfigureAwait(false);
                     try
                     {
+                        var text = Platform.BoundedRead.Text(entry);
                         await source.SaveAsync(new ModConfigSaveRequest(rel, text, null), c).ConfigureAwait(false);
                     }
-                    catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or IOException)
+                    catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or IOException or InvalidDataException)
                     {
                         skipped.Add($"{rel}: {ex.Message}");
                     }
@@ -444,7 +442,7 @@ public sealed class PackImporter(ModDbClient db, ModUpdater updater)
             var dest = System.IO.Path.GetFullPath(System.IO.Path.Combine(configDir, rel));
             if (!dest.StartsWith(root, PathRules.Comparison)) continue; // защита от ../ в чужом архиве
             Directory.CreateDirectory(System.IO.Path.GetDirectoryName(dest)!);
-            entry.ExtractToFile(dest, overwrite: true);
+            Platform.BoundedRead.ExtractToFile(entry, dest, 64L << 20); // настройки бывают и не текстом, но не гигабайтами
         }
     }
 }
