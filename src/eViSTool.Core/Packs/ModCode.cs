@@ -75,7 +75,7 @@ public static class ModCode
             long id = 0;
             for (var i = 0; i < (int)count; i++)
             {
-                id += (long)deltas[i];
+                id = checked(id + checked((long)deltas[i])); // подделанный код с огромной разностью — «испорчен», а не отрицательный номер
                 result.Add(new ModCodeEntry(id, checked((int)indexes[i])));
             }
             return new ModCodeSet(result, game);
