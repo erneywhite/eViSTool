@@ -40,7 +40,7 @@ internal sealed class AgentLoop(
                 commands.SaveIfChanged();
                 await schedule.BackupAsync();
 
-                var idle = host.State == ServerState.Stopped && host.RestartScheduledAt is null
+                var idle = host.State == ServerState.Stopped && host.RestartScheduledAt is null && !state.IsWorking
                            && DateTime.Now - state.LastActivity > state.Options.IdleExit;
                 if (idle) return;
             }

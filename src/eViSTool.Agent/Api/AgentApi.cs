@@ -108,6 +108,7 @@ internal sealed partial class AgentApi(
     private async Task<IResult> Run(Func<Task> action)
     {
         state.LastActivity = DateTime.Now;
+        using var work = state.Working(); // долгий запрос (копия мира, установка мода) — не простой
         try
         {
             await action();
@@ -123,6 +124,7 @@ internal sealed partial class AgentApi(
     private IResult Guard(Func<object> action)
     {
         state.LastActivity = DateTime.Now;
+        using var work = state.Working();
         try
         {
             return Json(action());

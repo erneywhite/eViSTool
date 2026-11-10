@@ -29,6 +29,7 @@ internal sealed class AgentSelfUpdate(AgentState state)
 
     private async Task RunAsync(ModVersion target)
     {
+        using var work = state.Working(); // скачивание при остановленном сервере — не простой
         var host = state.Host;
         var opts = state.Options;
         var appDir = AppContext.BaseDirectory;
@@ -94,15 +95,8 @@ internal sealed class AgentSelfUpdate(AgentState state)
             host.Console.Add(ConsoleLineKind.Error, Loc.T("selfupd.failed", ex.Message));
             if (wasRunning && host.State == ServerState.Stopped && !state.Shutdown.IsCancellationRequested)
             {
-                try
-                {
-                    host.Console.Add(ConsoleLineKind.System, Loc.T("selfupd.restartServer"));
-                    await host.StartAsync();
-                }
-                catch (Exception startEx)
-                {
-                    host.Console.Add(ConsoleLineKind.Error, startEx.Message);
-                }
+                host.Console.Add(ConsoleLineKind.System, Loc.T("selfupd.restartServer"));
+                host.StartAfterStop(); // мир занят — подождёт его, другая ошибка — в консоль и оповещением
             }
         }
     }

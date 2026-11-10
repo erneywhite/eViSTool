@@ -69,7 +69,9 @@ internal sealed class ServerSchedule
         {
             // не дошло объявление — перезапуску это не мешает
         }
-        _ = _state.Automation.RestartUpdateMods ? RestartWithModUpdatesAsync() : Host.RestartAsync();
+        var work = _state.Working(); // пока идёт перезапуск (и обновление модов) — агент не уходит по простою
+        _ = (_state.Automation.RestartUpdateMods ? RestartWithModUpdatesAsync() : Host.RestartAsync())
+            .ContinueWith(_ => work.Dispose(), TaskScheduler.Default);
     }
 
     // Перезапуск с обновлением модов: остановить → поставить вышедшие обновления (сервер не держит файлы) → запустить.

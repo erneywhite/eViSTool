@@ -59,6 +59,34 @@ internal sealed class AgentState
     /// <summary>Когда агент последний раз был нужен: по нему агент уходит после простоя.</summary>
     public DateTime LastActivity { get; set; } = DateTime.Now;
 
+    private int _work;
+
+    /// <summary>
+    /// Идёт долгая работа — перезапуск с обновлением модов, самообновление, запрос окна (копия или восстановление мира):
+    /// агент не уходит по простою. Иначе агент, запущенный окном, выходил посреди обновления модов (сервер в это время
+    /// остановлен, и это выглядело как простой), и сервер оставался выключенным.
+    /// </summary>
+    public bool IsWorking => Volatile.Read(ref _work) > 0;
+
+    /// <summary>Начать долгую работу (см. <see cref="IsWorking"/>); простой считается с её конца.</summary>
+    public IDisposable Working()
+    {
+        Interlocked.Increment(ref _work);
+        return new WorkDone(this);
+    }
+
+    private sealed class WorkDone(AgentState state) : IDisposable
+    {
+        private int _done;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _done, 1) == 1) return;
+            state.LastActivity = DateTime.Now;
+            Interlocked.Decrement(ref state._work);
+        }
+    }
+
     /// <summary>Просьба агенту выйти: /shutdown, сигнал на Linux, самообновление.</summary>
     public CancellationTokenSource Shutdown { get; } = new();
 
