@@ -121,7 +121,7 @@ public sealed class PlayTimeTests : IDisposable
     [Fact]
     public void LockedLedger_IsNotTreatedAsEmpty()
     {
-        Assert.SkipUnless(OperatingSystem.IsWindows(), "монопольное открытие файла есть только на Windows");
+        if (!OperatingSystem.IsWindows()) return; // монопольное открытие файла есть только на Windows (пропуск — см. аудит, п. 6.12)
         var ledger = new PlayLedger();
         ledger.Merge([new PlaySession(Utc("26.10.2026 22:40:11"), Utc("26.10.2026 23:40:11"), null)]);
         ledger.Save(_profileId);
