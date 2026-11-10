@@ -1,0 +1,75 @@
+eViSTool 1.1.0: a reliability and security update. Recommended for everyone.
+
+Server
+- A restart, by schedule or from the window, waits for the world if it is busy (a backup or a restore is running) instead of leaving the server off. If the server still does not start, you get a notification.
+- Scheduled restarts, backups and announcements no longer drift by an hour when the clocks change. A restart set for a time that does not exist that night (02:30 in spring) happens an hour later, with the usual warnings in chat.
+- The agent no longer exits for being idle while it is updating mods before a restart, downloading an update or making a backup.
+- A backup counts as made only when its file has appeared, and a backup cut off halfway (the disk filled up) no longer looks complete.
+
+Mods
+- Copy to profile no longer silently replaces a newer version of a mod with an older one.
+- Mods that are folders go to the version store and back even when it is on another drive.
+- If installing a mod was cut off (the window closed, the computer turned off), the half-written file left in the mods folder is removed.
+- Archives with an oversized modinfo.json or modpack manifest are refused instead of filling up memory.
+- Mod settings saved in a non-UTF-8 encoding keep their encoding and characters.
+- Disk cleanup no longer offers to delete the saved copies of mod settings.
+- Switching the language no longer resets My mods.
+
+Settings and play time
+- Settings written by a newer version are no longer reset when an older one opens them.
+- Deleting the active profile no longer leaves it half-visible in the window.
+- Play time is counted correctly across the night when the clocks go back, and is not lost if its file is busy at the moment.
+
+Remote access and updates
+- On Windows, the remote access key and the server certificate are stored encrypted.
+- A computer that enters the right key is no longer locked out because someone else on the same network kept trying wrong keys.
+- Remote access comes back by itself if its port was busy when the agent started.
+- The agent journal no longer stores passwords and keys from commands.
+- An update archive must carry the same version as the release, so an old signed archive cannot be passed off as a new one.
+- If an update was cut off halfway, eViSTool finishes it on the next start.
+
+Window
+- Closing eViSTool while mods are being installed or a world copy is in progress asks first.
+- The mod errors window opens once per profile and shows the latest report.
+- If something goes wrong in the background, you now see a message instead of nothing happening.
+
+Update from About.
+
+---
+
+eViSTool 1.1.0: надёжность и безопасность. Рекомендуется всем.
+
+Сервер
+- Перезапуск, по расписанию или из окна, ждёт мир, если тот занят (идёт резервная копия или восстановление), а не оставляет сервер выключенным. Если сервер всё равно не запустился, придёт оповещение.
+- Перезапуски, копии и объявления по расписанию больше не съезжают на час при переводе часов. Перезапуск на время, которого в эту ночь нет (02:30 весной), случится на час позже, с обычными предупреждениями в чат.
+- Агент больше не выключается «за простоем», пока обновляет моды перед перезапуском, скачивает обновление или делает копию.
+- Копия считается сделанной, только когда появился её файл, а оборванная на полпути (кончилось место на диске) больше не выглядит целой.
+
+Моды
+- «Скопировать в профиль» больше не заменяет молча более новую версию мода старой.
+- Моды-папки уходят в хранилище версий и возвращаются, даже если оно на другом диске.
+- Если установку мода оборвали (закрыли окно, выключили компьютер), недописанный файл в папке модов удаляется.
+- Архивы с огромным modinfo.json или описанием модпака отклоняются, а не забивают память.
+- Настройки модов в кодировке не UTF-8 сохраняются в ней же, буквы не портятся.
+- «Уборка диска» больше не предлагает удалить сохранённые копии настроек модов.
+- Смена языка больше не сбрасывает «Мои моды».
+
+Настройки и время в игре
+- Настройки, записанные более новой версией, больше не сбрасываются, когда их открывает старая.
+- Удалённый активный профиль больше не остаётся в окне наполовину.
+- Время в игре правильно считается в ночь перевода часов назад и не теряется, если его файл в этот момент занят.
+
+Удалённый доступ и обновления
+- На Windows ключ удалённого доступа и сертификат сервера хранятся зашифрованными.
+- Компьютер с верным ключом больше не блокируется из-за того, что кто-то в той же сети перебирал неверные.
+- Удалённый доступ поднимается сам, если при запуске агента его порт был занят.
+- Журнал агента больше не хранит пароли и ключи из команд.
+- Архив обновления должен быть той же версии, что и релиз: старый подписанный архив за новый не выдать.
+- Если обновление оборвалось на полпути, eViSTool доделает его при следующем запуске.
+
+Окно
+- Закрытие eViSTool во время установки модов или копии мира сначала спрашивает.
+- Окно «Ошибки модов» открывается одно на профиль и показывает свежий отчёт.
+- Если что-то сорвалось в фоне, теперь видно сообщение, а не тишина.
+
+Обнови из «О программе».
