@@ -39,6 +39,7 @@ internal sealed partial class AgentApi(
     /// </summary>
     public void Map(WebApplication web, bool isRemote)
     {
+        UseBodyLimits(web);
         UseJournal(web, isRemote);
         MapServer(web);
         MapJournal(web);
@@ -55,6 +56,31 @@ internal sealed partial class AgentApi(
 
         MapShutdown(web);
     }
+
+    /// <summary>Тело обычного запроса (JSON: команда, настройки, имя файла) — с запасом, но не гигабайт.</summary>
+    public const long JsonBodyLimit = 8L * 1024 * 1024;
+
+    /// <summary>Постройка WorldEdit бывает в десятки мегабайт.</summary>
+    public const long SchematicBodyLimit = 256L * 1024 * 1024;
+
+    /// <summary>Архив мода — до гигабайта (это же общий предел входа).</summary>
+    public const long ModBodyLimit = 1L << 30;
+
+    /// <summary>
+    /// Предел тела запроса по адресу. Раньше у всех был гигабайт, и JSON-запросы читались в память целиком (журнал — ещё
+    /// раз): гигабайт в «/command» съедал память машины, где рядом работает сервер игры.
+    /// </summary>
+    internal static long BodyLimitFor(PathString path) =>
+        path.StartsWithSegments("/mods/install") ? ModBodyLimit
+        : path.StartsWithSegments("/schematics/write") ? SchematicBodyLimit
+        : JsonBodyLimit;
+
+    private static void UseBodyLimits(WebApplication web) => web.Use((ctx, next) =>
+    {
+        if (ctx.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit)
+            limit.MaxRequestBodySize = BodyLimitFor(ctx.Request.Path);
+        return next(ctx);
+    });
 
     /// <summary>Статус агента и сервера — ответ на /status и на любое действие.</summary>
     public AgentStatus Status() => new()

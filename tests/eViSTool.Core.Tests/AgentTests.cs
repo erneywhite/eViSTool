@@ -91,6 +91,19 @@ public sealed class AgentTests : IAsyncLifetime
         }
     }
 
+    // обычный запрос (команда, JSON) больше своего предела агент не читает — раньше гигабайт в «/command» уходил в память
+    [Fact]
+    public async Task OversizedJsonRequest_IsRefused()
+    {
+        _client = await AgentLauncher.EnsureRunningAsync(_profile, startServer: false, AgentExe, AgentsDir);
+        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{_client.Endpoint.Port}/") };
+        http.DefaultRequestHeaders.Add(AgentProtocol.KeyHeader, AgentProtocol.GetOrCreateKey(_profile.Id, AgentsDir));
+        var huge = new string('a', 9 * 1024 * 1024);
+        using var resp = await http.PostAsync("command", new StringContent($$"""{ "Text": "/announce {{huge}}" }"""));
+        Assert.Equal(System.Net.HttpStatusCode.RequestEntityTooLarge, resp.StatusCode);
+        Assert.Equal(ServerState.Stopped, (await _client.StatusAsync()).State); // агент жив и отвечает
+    }
+
     [Fact]
     public async Task ServerStoppedFromTheWindow_IsNotACrash()
     {
