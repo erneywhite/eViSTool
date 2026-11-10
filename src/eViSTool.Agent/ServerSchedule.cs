@@ -51,10 +51,20 @@ internal sealed class ServerSchedule
     {
         var now = DateTime.Now;
         var name = _state.Backups().NameFor(now);
-        _pendingBackup = name;
+        _pendingBackup = name; // до команды: строка «взялся за копию» может прийти сразу
         _pendingSince = now;
-        _scheduler.MarkDone(now, _state.Players.Players.Count); // чтобы следующий тик расписания не запустил копию повторно
-        await Host.SendCommandAsync("/genbackup " + name);
+        try
+        {
+            await Host.SendCommandAsync("/genbackup " + name);
+        }
+        catch
+        {
+            _pendingBackup = null; // команда не ушла — копии не будет, ждать её нечего
+            throw;
+        }
+        // сделанной копия станет, когда появится файл (WatchBackup); пока — только «попросили», чтобы следующий тик
+        // расписания не попросил её снова
+        _scheduler.MarkRequested(now);
     }
 
     // Сам перезапуск по расписанию: последнее слово игрокам — и сервер уходит на перезапуск.

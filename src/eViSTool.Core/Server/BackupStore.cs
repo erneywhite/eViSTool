@@ -402,7 +402,14 @@ public sealed class BackupScheduler
     /// </summary>
     public bool NeedsCopy(ServerAutomation settings) => !settings.BackupOnlyWhenPlayed || _played || !_copiedHere;
 
-    /// <summary>Копия запущена.</summary>
+    /// <summary>
+    /// Копию попросили (команда ушла серверу): следующий тик расписания не просит её снова. Сделанной она считается только
+    /// по <see cref="MarkDone"/>, когда файл появился: раньше отметка ставилась сразу, и не сделанная копия («сервер не
+    /// запущен», файл так и не появился) всё равно числилась последней, а копия перед перезапуском пропускалась.
+    /// </summary>
+    public void MarkRequested(DateTime now) => _base = now;
+
+    /// <summary>Копия готова (файл появился).</summary>
     public void MarkDone(DateTime now, int playersOnline)
     {
         _copiedHere = true;

@@ -339,6 +339,22 @@ public sealed class BackupTests : IDisposable
         Assert.True(s.NeedsCopy(onlyPlayed)); // игрок остался на сервере — мир меняется дальше
     }
 
+    // копию только попросили — следующий тик её не повторяет, но сделанной она не числится: последняя копия прежняя,
+    // и копия перед перезапуском («только когда играли») не пропускается
+    [Fact]
+    public void Scheduler_RequestedCopy_IsNotCountedAsDone()
+    {
+        var onlyPlayed = new ServerAutomation { BackupEnabled = true, BackupIntervalHours = 1, BackupOnlyWhenPlayed = true };
+        var s = new BackupScheduler();
+        s.Seed(T0.AddDays(-1));
+        s.NotePlayers(1);
+        s.MarkRequested(T0.AddHours(2));
+
+        Assert.Equal(T0.AddDays(-1), s.LastBackupAt);
+        Assert.True(s.NeedsCopy(onlyPlayed));
+        Assert.Equal(T0.AddHours(3), s.NextAt(onlyPlayed, ServerState.Running, T0)); // не просим снова в следующий тик
+    }
+
     private static readonly ServerAutomation Hourly = new() { BackupEnabled = true, BackupIntervalHours = 1, BackupOnlyWhenPlayed = false };
 
     [Fact]
