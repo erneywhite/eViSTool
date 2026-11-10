@@ -109,6 +109,28 @@ public sealed class ProfilesSettingsViewTests : IDisposable
         return main;
     }
 
+    /// <summary>«Ошибки модов»: одно окно на профиль, и оно следует за свежим отчётом.</summary>
+    [AvaloniaFact]
+    public void ModErrors_OneWindowPerProfile_FollowsTheFreshReport()
+    {
+        // аудит 5.2: второй щелчок по «!» поднимает открытое окно, новый отчёт профиля сразу в нём
+        var main = Main();
+        var profile = main.ActiveProfile!.Model;
+        var first = new Core.Diagnostics.ModErrorReport { At = DateTime.Now, Total = 12 };
+        var windows = new AvaloniaAppWindows();
+        windows.ShowModErrors(main, profile, first);
+        windows.ShowModErrors(main, profile, first);
+        var window = Assert.Single(windows.OpenModErrors).Value;
+        Assert.Same(first, ((ModErrorsViewModel)window.DataContext!).Report);
+
+        var fresh = first with { Total = 30 };
+        main.ErrorReport = fresh;
+        Assert.Same(fresh, ((ModErrorsViewModel)window.DataContext!).Report);
+
+        window.Close();
+        Assert.Empty(windows.OpenModErrors);
+    }
+
     /// <summary>
     /// Карточка «Постройки» на «Профилях»: схема из папки WorldEdit профиля видна по имени без «.json». Других профилей
     /// нет — копировать некуда, кнопка неактивна; у профиля на этой машине есть «Открыть папку».
