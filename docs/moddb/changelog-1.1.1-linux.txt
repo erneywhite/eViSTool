@@ -1,0 +1,15 @@
+eViSTool 1.1.1 for Linux: play time fix. Recommended for everyone.
+
+Fixed
+- Time in game was many times larger than the real one on systems with a month-first date format (US English and others). The game writes dates in its logs as day.month.year whatever the system language, and eViSTool read them in the system format: November 8 turned into August 11, and dates after the 12th were skipped. Play time on such systems is now counted again from the game logs that are still on disk. Time from older logs the game has already deleted can't be recovered.
+
+Update from About.
+
+---
+
+eViSTool 1.1.1 для Linux: исправлено время в игре. Рекомендуется всем.
+
+Исправлено
+- Время в игре выходило во много раз больше настоящего на системах, где в дате сначала идёт месяц (американский английский и другие). Игра пишет дату в лог как «день.месяц.год» при любом языке системы, а eViSTool читал её по формату системы: 8 ноября превращалось в 11 августа, а даты после 12-го числа пропускались. На таких системах время в игре теперь пересчитывается заново из логов игры, которые ещё лежат на диске. Время из старых логов, которые игра уже удалила, не вернуть.
+
+Обнови из «О программе».
