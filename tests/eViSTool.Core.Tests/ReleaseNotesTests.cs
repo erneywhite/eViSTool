@@ -82,6 +82,20 @@ public sealed class ReleaseNotesTests
         Assert.Equal(["One."], Assert.Single(notes.Sections).Items);
     }
 
+    // 1.1.1: окно взяло ленту (API упёрся в лимит), а в её HTML комментария нет — обновление не выделилось.
+    // Видимая строка в конце текста (build/release-notes.ps1) в ленте выглядит так и после разбора снова пометка
+    [Fact]
+    public void RecommendedMark_SurvivesTheFeed()
+    {
+        const string feed = "<p><strong>eViSTool 1.1.1: fix.</strong></p>\n<ul>\n<li>One.</li>\n</ul>\n<hr>\n<p>Исправлено.</p>\n<ul>\n<li>Один.</li>\n</ul>\n"
+                            + "<p>Обнови из «О программе».</p>\n<p><sub>&lt;!-- evistool: recommended --&gt;</sub></p>";
+        var body = ReleaseNotes.FromHtml(feed);
+        Assert.True(ReleaseNotes.IsRecommended(body));
+        Assert.Equal(["One."], Assert.Single(ReleaseNotes.Parse(body, russian: false).Sections).Items);
+        Assert.Equal(["Один."], Assert.Single(ReleaseNotes.Parse(body, russian: true).Sections).Items);
+        Assert.False(ReleaseNotes.IsRecommended(ReleaseNotes.FromHtml("<p><strong>eViSTool 1.1.1: fix.</strong></p>")));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

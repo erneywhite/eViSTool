@@ -33,7 +33,13 @@ function Format-Part([string]$part, [bool]$english) {
 
 $moddb = 'On ModDB: [eViSTool — Windows](https://mods.vintagestory.at/evistoolwin) and [eViSTool — Linux](https://mods.vintagestory.at/evistoollinux).'
 $body = (Format-Part $parts[0] $true) + "`n`n$moddb`n`n---`n`n" + (Format-Part $parts[1] $false) + "`n"
-if ($Recommended) { $body = "<!-- evistool: recommended -->`n" + $body }
+if ($Recommended) {
+    # API отдаёт текст как есть — его пометка первой строкой. Лента releases.atom (окно берёт её, когда API упёрся
+    # в лимит) отдаёт HTML, и комментарий GitHub оттуда вырезает. Поэтому в конце ещё мелкая видимая строка с той же
+    # пометкой текстом: после разбора ленты (ReleaseNotes.FromHtml) она снова «<!-- evistool: recommended -->» —
+    # это понимают и уже выпущенные версии окна. Стоит после пунктов, поэтому окно её не показывает.
+    $body = "<!-- evistool: recommended -->`n" + $body + "`n<sub>&lt;!-- evistool: recommended --&gt;</sub>`n"
+}
 
 $dist = Join-Path $root 'dist'
 New-Item -ItemType Directory -Force $dist | Out-Null
