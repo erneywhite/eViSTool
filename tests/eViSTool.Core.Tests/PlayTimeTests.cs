@@ -37,7 +37,7 @@ public sealed class PlayTimeTests : IDisposable
     [Fact]
     public void Sessions_FromWorldEntryToLeaving_ByServer()
     {
-        var s = PlaySessions.FromLog(Log, Ru);
+        var s = PlaySessions.FromLog(Log);
         Assert.Equal(2, s.Count);
         Assert.Equal((Utc("26.10.2026 22:40:11"), Utc("26.10.2026 22:55:04"), "192.168.31.31"), (s[0].StartUtc, s[0].EndUtc, s[0].Server));
         Assert.Equal("192.168.31.31", s[1].Server); // стандартный порт — тот же сервер
@@ -53,7 +53,7 @@ public sealed class PlayTimeTests : IDisposable
             "27.10.2026 10:00:00 [Notification] Client logger started.",
             "27.10.2026 10:01:00 [Notification] Received level finalize",
             "27.10.2026 10:31:00 [Notification] Saving game",
-        ], Ru);
+        ]);
         var only = Assert.Single(s);
         Assert.Null(only.Server);
         Assert.Equal(TimeSpan.FromMinutes(30), only.Length);
@@ -76,9 +76,9 @@ public sealed class PlayTimeTests : IDisposable
             @"29.10.2026 16:37:57 [Notification] Savegame %appdata%\VintagestoryData\Saves\erneys hermit story.vcdbs loaded",
         ]);
         var ledger = new PlayLedger();
-        ledger.Scan(_root, Ru);
+        ledger.Scan(_root);
         Assert.Equal(PlaySessions.WorldPrefix + "erneys hermit story", Assert.Single(ledger.All).Server);
-        Assert.Equal("world", Assert.Single(PlaySessions.Worlds(["1.1.2026 10:00:00 [Notification] Savegame /home/u/.config/VintagestoryData/Saves/world.vcdbs loaded"], Ru)).Name);
+        Assert.Equal("world", Assert.Single(PlaySessions.Worlds(["1.1.2026 10:00:00 [Notification] Savegame /home/u/.config/VintagestoryData/Saves/world.vcdbs loaded"])).Name);
     }
 
     [Fact]
@@ -92,17 +92,17 @@ public sealed class PlayTimeTests : IDisposable
             "28.10.2026 20:11:00 [Notification] tick"]);
 
         var ledger = new PlayLedger();
-        Assert.True(ledger.Scan(_root, Ru));
+        Assert.True(ledger.Scan(_root));
         Assert.Equal(3, ledger.All.Count);
         Assert.Equal(TimeSpan.FromMinutes(14) + TimeSpan.FromSeconds(53) + TimeSpan.FromMinutes(21) + TimeSpan.FromMinutes(10), ledger.Total);
 
         // игра идёт дальше: та же сессия удлиняется, а не добавляется второй; архив второй раз не читается
         File.AppendAllLines(current, ["28.10.2026 20:41:00 [Notification] Destroying game session"]);
         File.Delete(Path.Combine(archived, "client-main.log"));
-        Assert.True(ledger.Scan(_root, Ru));
+        Assert.True(ledger.Scan(_root));
         Assert.Equal(3, ledger.All.Count);
         Assert.Equal(TimeSpan.FromMinutes(40), ledger.Last!.Length);
-        Assert.False(ledger.Scan(_root, Ru)); // ничего нового
+        Assert.False(ledger.Scan(_root)); // ничего нового
 
         var byServer = ledger.ByServer();
         Assert.Equal("192.168.31.31", Assert.Single(byServer).Server);
@@ -111,7 +111,7 @@ public sealed class PlayTimeTests : IDisposable
         ledger.Save(_profileId);
         var back = PlayLedger.Load(_profileId)!;
         Assert.Equal(ledger.Total, back.Total);
-        Assert.False(back.Scan(_root, Ru)); // прочитанный архив запомнен и после перезапуска
+        Assert.False(back.Scan(_root)); // прочитанный архив запомнен и после перезапуска
         Assert.Empty(PlayLedger.Load("нет-такого-профиля")!.All);
         Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(PlayLedger.FileFor(_profileId))!, Path.GetFileName(PlayLedger.FileFor(_profileId)) + ".*.tmp"));
     }
@@ -161,9 +161,75 @@ public sealed class PlayTimeTests : IDisposable
             "25.10.2026 03:40:00 [Notification] Received level finalize",
             "25.10.2026 03:55:00 [Notification] Saving",
             "25.10.2026 03:10:00 [Notification] Destroying game session, waiting up to 200ms for client threads to exit",
-        ], Ru, riga);
+        ], riga);
         Assert.Single(s);
         Assert.Equal(new DateTime(2026, 10, 25, 0, 40, 0, DateTimeKind.Utc), s[0].StartUtc);
         Assert.Equal(TimeSpan.FromMinutes(30), s[0].Length);
+    }
+
+    // ModDB, 2026-11-11: у американского игрока время в игре вышло в 100 раз больше. Игра пишет дату своим форматом
+    // «d.M.yyyy» при любом языке системы, а разбор по формату системы читал «8.11» как 11 августа, а «30.10» не читал
+    [Fact]
+    public void GameDates_ReadTheSameInAnySystemLanguage()
+    {
+        var was = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+        try
+        {
+            var s = PlaySessions.FromLog(
+            [
+                "8.11.2026 21:23:45 [Notification] Received level finalize",
+                "8.11.2026 22:23:45 [Notification] Destroying game session, waiting up to 200ms for client threads to exit",
+                "30.10.2026 10:00:00 [Notification] Received level finalize",
+                "30.10.2026 10:30:00 [Notification] Destroying game session, waiting up to 200ms for client threads to exit",
+            ]);
+            Assert.Equal(2, s.Count);
+            Assert.Equal(TimeSpan.FromHours(1), s[0].Length);
+            Assert.Equal(TimeSpan.FromMinutes(30), s[1].Length);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = was;
+        }
+        Assert.Equal(new DateTime(2026, 11, 8, 21, 23, 45), eViSTool.Core.Diagnostics.GameLog.ParseTime("8.11.2026 21:23:45"));
+        Assert.Equal(new DateTime(2026, 9, 30, 7, 5, 0), eViSTool.Core.Diagnostics.GameLog.ParseTime("30.9.2026 07:05:00"));    }
+
+    [Theory]
+    [InlineData("ru-RU", true)]
+    [InlineData("de-DE", true)]
+    [InlineData("en-US", false)]
+    [InlineData("en-GB", true)]
+    public void ReadsGameDates_OnlyWhereTheOldParsingWasRight(string culture, bool right) =>
+        Assert.Equal(right, PlayLedger.ReadsGameDates(CultureInfo.GetCultureInfo(culture)));
+
+    // учёт до 1.1.1 (поля DateFormat нет): у американского игрока он неверный — собирается заново, у русского остаётся
+    [Theory]
+    [InlineData("en-US", 0)]
+    [InlineData("ru-RU", 1)]
+    public void OldLedger_IsRebuilt_OnlyWhereItWasMisread(string culture, int kept)
+    {
+        var path = PlayLedger.FileFor(_profileId);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, """
+            { "Sessions": [ { "StartUtc": "2026-08-11T18:23:45Z", "EndUtc": "2026-10-10T07:00:00Z", "Server": null } ],
+              "ScannedArchives": [ "2026-10-26_22_39_20" ] }
+            """);
+        var was = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
+        try
+        {
+            var ledger = PlayLedger.Load(_profileId)!;
+            Assert.Equal(kept, ledger.All.Count);
+            ledger.Save(_profileId);
+            // сохранённый новой версией учёт уже верный — второй раз не сбрасывается
+            ledger.Merge([new PlaySession(Utc("8.11.2026 21:00:00"), Utc("8.11.2026 22:00:00"), null)]);
+            ledger.Save(_profileId);
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+            Assert.Equal(kept + 1, PlayLedger.Load(_profileId)!.All.Count);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = was;
+        }
     }
 }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace eViSTool.Core.Diagnostics;
@@ -12,13 +13,28 @@ public sealed record LogEntry(string Time, string Level, string Message, IReadOn
 }
 
 /// <summary>
-/// Разбор логов Vintage Story (client-main.log, server-main.log, client-crash.log). Дата — в формате системы игрока
-/// (у русской Windows «7.10.2026 00:18:55», у английской «10/7/2026 12:18:55 AM»), поэтому запись узнаём по уровню
+/// Разбор логов Vintage Story (client-main.log, server-main.log, client-crash.log). Запись узнаём по уровню
 /// в квадратных скобках после даты и времени. В консоли выделенного сервера (её читает агент) у уровня есть
 /// приставка — «[Server Error]», «[Server Notification]», — в его файлах логов её нет.
 /// </summary>
 public static partial class GameLog
 {
+    /// <summary>
+    /// Игра пишет время своим форматом «d.M.yyyy HH:mm:ss» (строка зашита в VintagestoryLib.dll) при любом языке системы:
+    /// «8.11.2026 21:23:45» — это 8 ноября и у американского игрока. Разбор по формату системы читал её как 11 августа,
+    /// а «30.10.2026» не читал вовсе, и время в игре выходило в сотни раз больше. Остальные форматы — на случай чужих
+    /// сборок сервера у хостеров.
+    /// </summary>
+    private static readonly string[] TimeFormats =
+    [
+        "d.M.yyyy H:mm:ss", "M/d/yyyy h:mm:ss tt", "d/M/yyyy H:mm:ss", "M/d/yyyy H:mm:ss",
+        "yyyy-MM-dd H:mm:ss", "yyyy/M/d H:mm:ss", "d-M-yyyy H:mm:ss",
+    ];
+
+    /// <summary>Время записи лога («8.11.2026 21:23:45») — по часам игры, без пояса; не разобрать — null.</summary>
+    public static DateTime? ParseTime(string text) =>
+        DateTime.TryParseExact(text.Trim(), TimeFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var time) ? time : null;
+
     [GeneratedRegex(@"^(?<time>\S+ \d{1,2}:\d{2}:\d{2}(?: [AP]M)?) \[(?:Server )?(?<level>[A-Za-z]+)\] (?<msg>.*)$")]
     private static partial Regex EntryLine();
 

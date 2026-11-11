@@ -18,17 +18,15 @@ public sealed record PlaySession(DateTime StartUtc, DateTime EndUtc, string? Ser
 /// </summary>
 public static class PlaySessions
 {
-    /// <param name="culture">Дата в логе — в формате системы игрока: читаем в том же (тесты задают свой).</param>
     /// <param name="zone">Пояс, в котором игра писала время (по умолчанию — этого компьютера; тесты задают свой).</param>
-    public static IReadOnlyList<PlaySession> FromLog(IEnumerable<string> lines, CultureInfo? culture = null, TimeZoneInfo? zone = null)
+    public static IReadOnlyList<PlaySession> FromLog(IEnumerable<string> lines, TimeZoneInfo? zone = null)
     {
-        culture ??= CultureInfo.CurrentCulture;
         var result = new List<PlaySession>();
         string? server = null;
         DateTime? start = null, last = null;
         foreach (var e in GameLog.Enumerate(lines))
         {
-            if (!DateTime.TryParse(e.Time, culture, DateTimeStyles.None, out var local)) continue;
+            if (GameLog.ParseTime(e.Time) is not { } local) continue;
             var at = ToUtc(local, last, zone);
             last = at;
             var msg = e.Message;
@@ -54,15 +52,14 @@ public static class PlaySessions
     /// <summary>
     /// Миры одиночной игры из server-main.log того же запуска: «Savegame …\Saves\имя.vcdbs loaded» — когда и какой.
     /// </summary>
-    public static IReadOnlyList<(DateTime Utc, string Name)> Worlds(IEnumerable<string> lines, CultureInfo? culture = null, TimeZoneInfo? zone = null)
+    public static IReadOnlyList<(DateTime Utc, string Name)> Worlds(IEnumerable<string> lines, TimeZoneInfo? zone = null)
     {
-        culture ??= CultureInfo.CurrentCulture;
         var result = new List<(DateTime, string)>();
         DateTime? last = null;
         foreach (var e in GameLog.Enumerate(lines))
         {
             if (!e.Message.StartsWith("Savegame ", StringComparison.Ordinal) || !e.Message.EndsWith(" loaded", StringComparison.Ordinal)) continue;
-            if (!DateTime.TryParse(e.Time, culture, DateTimeStyles.None, out var local)) continue;
+            if (GameLog.ParseTime(e.Time) is not { } local) continue;
             var utc = ToUtc(local, last, zone);
             last = utc;
             var path = e.Message["Savegame ".Length..^" loaded".Length];
@@ -129,6 +126,15 @@ public sealed class PlayLedger
     /// <summary>Папки архива логов, которые уже прочитаны (архив не меняется — второй раз не читаем).</summary>
     [JsonProperty] private HashSet<string> ScannedArchives { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Как читалось время логов: 0 — по формату системы (до 1.1.1; в старом файле поля нет), 1 — форматом игры
+    /// (<see cref="GameLog.ParseTime"/>). Учёт в памяти всегда уже верный (<see cref="Load"/> проверяет старый),
+    /// поэтому <see cref="Save"/> пишет 1.
+    /// </summary>
+    [JsonProperty] private int DateFormat { get; set; }
+
+    private const int CurrentDateFormat = 1;
+
     [JsonIgnore] public IReadOnlyList<PlaySession> All => Sessions;
 
     public TimeSpan Total => Sessions.Aggregate(TimeSpan.Zero, (sum, s) => sum + s.Length);
@@ -162,7 +168,7 @@ public sealed class PlayLedger
     }
 
     /// <summary>Прочитать логи папки данных: архив — только новые папки, текущий лог — всегда. true — что-то добавилось.</summary>
-    public bool Scan(string dataDir, CultureInfo? culture = null)
+    public bool Scan(string dataDir)
     {
         var changed = false;
         foreach (var (key, path) in PlaySessions.LogFiles(dataDir))
@@ -170,10 +176,10 @@ public sealed class PlayLedger
             if (key.Length > 0 && ScannedArchives.Contains(key)) continue;
             try
             {
-                var sessions = PlaySessions.FromLog(ReadShared(path), culture);
+                var sessions = PlaySessions.FromLog(ReadShared(path));
                 var server = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "server-main.log");
                 if (sessions.Any(s => s.Server is null) && File.Exists(server))
-                    sessions = PlaySessions.WithWorlds(sessions, PlaySessions.Worlds(ReadShared(server), culture));
+                    sessions = PlaySessions.WithWorlds(sessions, PlaySessions.Worlds(ReadShared(server)));
                 changed |= Merge(sessions);
                 if (key.Length > 0) changed |= ScannedArchives.Add(key);
             }
@@ -211,8 +217,11 @@ public sealed class PlayLedger
     public static string FileFor(string profileId) => System.IO.Path.Combine(AppPaths.Root, "playtime", profileId + ".json");
 
     /// <summary>Записать через временный файл (<see cref="Platform.SafeFile.WriteAllText"/>): оборвётся запись — прежний файл цел.</summary>
-    public void Save(string profileId) =>
+    public void Save(string profileId)
+    {
+        DateFormat = CurrentDateFormat;
         Platform.SafeFile.WriteAllText(FileFor(profileId), JsonConvert.SerializeObject(this, Formatting.Indented));
+    }
 
     /// <summary>
     /// Учёт профиля; файла нет — пустой. Файл испорчен — он откладывается рядом (.broken), а не затирается новым учётом:
@@ -226,8 +235,10 @@ public sealed class PlayLedger
         {
             if (!File.Exists(path)) return new PlayLedger();
             if (JsonConvert.DeserializeObject<PlayLedger>(File.ReadAllText(path)) is { Sessions: not null } ledger)
+
             {
                 ledger.ScannedArchives = new HashSet<string>(ledger.ScannedArchives ?? [], StringComparer.OrdinalIgnoreCase);
+                ledger.ForgetIfMisread(CultureInfo.CurrentCulture);
                 return ledger;
             }
             PutAside(path);
@@ -242,6 +253,27 @@ public sealed class PlayLedger
         }
         return new PlayLedger();
     }
+
+    /// <summary>
+    /// Учёт, собранный до 1.1.1, читал даты по формату системы. Где формат системы читает дату игры так же
+    /// (русский, немецкий…), учёт верный — оставляем. Где нет (американский: «8.11» — 11 августа), сессии в нём
+    /// неверные, и сами они не исправятся: забываем их и прочитанные архивы, и учёт собирается заново из логов,
+    /// которые ещё лежат у игры.
+    /// </summary>
+    internal bool ForgetIfMisread(CultureInfo culture)
+    {
+        if (DateFormat >= CurrentDateFormat) return false;
+        DateFormat = CurrentDateFormat;
+        if (ReadsGameDates(culture)) return false;
+        Sessions.Clear();
+        ScannedArchives.Clear();
+        return true;
+    }
+
+    /// <summary>Прежний разбор по формату системы давал те же даты, что и формат игры (день до и после 12-го).</summary>
+    internal static bool ReadsGameDates(CultureInfo culture) =>
+        new[] { "8.11.2026 21:23:45", "30.9.2026 07:05:00" }.All(text =>
+            DateTime.TryParse(text, culture, DateTimeStyles.None, out var old) && old == GameLog.ParseTime(text));
 
     private static void PutAside(string path)
     {

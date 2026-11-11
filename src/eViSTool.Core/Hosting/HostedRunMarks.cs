@@ -50,13 +50,6 @@ public sealed class HostedRunMarks(bool fromMiddle = false)
     /// <summary>Имя папки запуска в Logs/Archive: время его начала по часам сервера.</summary>
     public const string RunNameFormat = "yyyy-MM-dd_HH_mm_ss";
 
-    // дата — в формате системы сервера: у G-Portal (Linux) «17.10.2026 13:27:08», у английской Windows «10/17/2026 1:27:08 PM»
-    private static readonly string[] TimeFormats =
-    [
-        "d.M.yyyy H:mm:ss", "M/d/yyyy h:mm:ss tt", "d/M/yyyy H:mm:ss", "M/d/yyyy H:mm:ss", "yyyy-MM-dd H:mm:ss",
-        "yyyy/M/d H:mm:ss", "d-M-yyyy H:mm:ss",
-    ];
-
     public bool FromMiddle { get; } = fromMiddle;
 
     /// <summary>Время первой строки — начало запуска (время сервера); чтение с середины — null.</summary>
@@ -123,8 +116,7 @@ public sealed class HostedRunMarks(bool fromMiddle = false)
         : HostedServerState.Starting;
 
     /// <summary>Время из начала строки лога («17.10.2026 13:27:08») — время сервера без пояса; не разобрать — null.</summary>
-    public static DateTime? ParseTime(string text) =>
-        DateTime.TryParseExact(text.Trim(), TimeFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var time) ? time : null;
+    public static DateTime? ParseTime(string text) => GameLog.ParseTime(text);
 
     /// <summary>Начало запуска по имени его папки в архиве («2026-10-17_13_25_13»).</summary>
     public static bool TryParseRunName(string name, out DateTime started) =>
