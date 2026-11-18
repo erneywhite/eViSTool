@@ -64,6 +64,35 @@ public sealed class CrashAnalyzerTests : IDisposable
         Assert.Contains("CrashTestMod.Boom.Now", finding.Stack);
     }
 
+    // GitHub, issue 11: игра дописывает вылеты в конец client-crash.log, а виноватым выходил мод из самого старого
+    // (давно удалённый hudclock), и стек склеивался из всех вылетов. Разбирается только последний отчёт
+    [Fact]
+    public void GameCrash_OnlyTheLastReportInTheFile_IsAnalyzed()
+    {
+        const string old = """
+            Game Version: v1.22.7 (Stable)
+            1.11.2026 19:26:22: Critical error occurred in the following mod: hudclock@3.4.0
+            Loaded Mods: hudclock@3.4.0, game@1.22.7
+            System.MissingMethodException: Method not found: 'Vintagestory.API.Common.IAsset Vintagestory.API.Common.IAssetManager.Get(System.String)'.
+               at hudclock.src.TimeDialog.TimeDialog..ctor()
+               at Vintagestory.Client.NoObf.ClientEventAPI.TriggerIsPlayerReady()
+
+            """;
+        var finding = CrashAnalyzer.Analyze([], old + File.ReadAllText(Path.Combine(Data, "client-crash.log")), null, Mods())!;
+
+        Assert.Equal("crashtest", finding.Culprit!.ModId);
+        Assert.Contains("boom in a world callback", finding.Error);
+        Assert.Contains("CrashTestMod.Boom.Now", finding.Stack);
+        Assert.DoesNotContain(finding.Stack, f => f.StartsWith("hudclock", StringComparison.Ordinal));
+
+        // и наоборот: свежий вылет без названного мода не получает виновника из старого отчёта
+        var fresh = old + "Game Version: v1.22.7 (Stable)\n14.11.2026 05:10:22: Critical error occurred\nSystem.ArgumentException: gourmand: boom\n   at Gourmand.CategoryDict.FromBytes()\n";
+        var second = CrashAnalyzer.Analyze([], fresh, null, ModFingerprints.Build([]))!;
+        Assert.Null(second.Culprit);
+        Assert.Equal("System.ArgumentException: gourmand: boom", second.Error);
+        Assert.Equal(["Gourmand.CategoryDict.FromBytes"], second.Stack);
+    }
+
     [Fact]
     public void GameCrash_WithoutTheReportFile_IsReadFromTheFatalLogEntry()
     {

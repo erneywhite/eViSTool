@@ -713,9 +713,7 @@ public sealed class HostedLogs
         {
             return null;
         }
-        if (string.IsNullOrWhiteSpace(text)) return null;
-        var last = text.LastIndexOf("\nGame Version:", StringComparison.Ordinal);
-        return last < 0 ? text : text[(last + 1)..];
+        return string.IsNullOrWhiteSpace(text) ? null : CrashAnalyzer.LastReport(text);
     }
 
     private HostedCrash Crash(CrashFinding finding, DateTime at, string run, RemoteEntry? crash, string? report, bool current) =>

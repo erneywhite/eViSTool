@@ -108,10 +108,25 @@ public static partial class CrashAnalyzer
         return new CrashFinding(GameExitKind.WorldClosed, reason, last.Entry.Message, [.. last.Entry.StackFrames], culprit, count);
     }
 
+    private const string ReportStart = "Game Version:";
+
+    /// <summary>
+    /// Последний отчёт из файла вылетов. Игра и сервер дописывают каждый вылет в конец client-crash.log
+    /// (server-crash.log), и каждый отчёт начинается строкой «Game Version: …». Разбор всего файла брал первое
+    /// исключение и первого названного мода, то есть самый старый вылет: GitHub, issue 11 — виноватым месяцами
+    /// выходил давно удалённый hudclock, а стек склеивался из всех вылетов подряд.
+    /// </summary>
+    public static string LastReport(string text)
+    {
+        var at = text.LastIndexOf("\n" + ReportStart, StringComparison.Ordinal);
+        return at < 0 ? text : text[(at + 1)..];
+    }
+
     private static CrashFinding FromCrash(IReadOnlyList<LogEntry> client, string? crashReport, IReadOnlyList<LogEntry>? server, ModFingerprints mods)
     {
-        // текст отчёта: файл, а если его нет — запись [Fatal] в логе (там то же самое)
-        var text = crashReport ?? string.Join("\n", client.Where(e => e.Level == "Fatal").SelectMany(e => e.Details.Prepend(e.Message)));
+        // текст отчёта: последний вылет из файла, а если файла нет — запись [Fatal] в логе (там то же самое)
+        var text = crashReport is not null ? LastReport(crashReport)
+            : string.Join("\n", client.Where(e => e.Level == "Fatal").SelectMany(e => e.Details.Prepend(e.Message)));
         var lines = text.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
         var error = lines.FirstOrDefault(l => l.Length > 0 && !l.StartsWith(' ') && l.Contains("Exception", StringComparison.Ordinal)
                                               && !l.StartsWith("Loaded Mods", StringComparison.Ordinal));
