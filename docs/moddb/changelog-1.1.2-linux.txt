@@ -1,0 +1,15 @@
+eViSTool 1.1.2 for Linux: crash reports point to the right mod again.
+
+Fixed
+- After a game crash, eViSTool could blame a mod from an old crash, even one that was removed long ago. The game adds every crash to the end of client-crash.log, and eViSTool read the whole file: it took the mod and the error from the oldest crash and glued the stack traces of all crashes together. Now only the latest crash is analyzed. The same applies to crashes of a dedicated server run by the agent.
+
+Update from About.
+
+---
+
+eViSTool 1.1.2 для Linux: при вылете снова называется нужный мод.
+
+Исправлено
+- После вылета игры eViSTool мог винить мод из старого вылета, даже давно удалённый. Игра дописывает каждый вылет в конец client-crash.log, а eViSTool читал файл целиком: брал мод и ошибку из самого старого вылета и склеивал стеки всех вылетов подряд. Теперь разбирается только последний вылет. То же касается вылетов выделенного сервера под агентом.
+
+Обнови из «О программе».
